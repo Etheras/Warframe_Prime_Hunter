@@ -272,6 +272,23 @@
   /* ── drawer ───────────────────────────────────────────────── */
   const drawer = $("#drawer"), scrim = $("#scrim"), dbody = $("#drawerBody");
 
+  /* Should this relic be refined for THIS part?
+     Radiant shifts odds towards rare rewards at the expense of common ones, so
+     refining actively hurts a common part. Compare the two ends and say which. */
+  function refineAdvice(ch) {
+    if (!ch) return null;
+    const intact = ch.Intact, rad = ch.Radiant;
+    if (intact == null || rad == null || !intact) return null;
+    if (rad <= intact) {
+      return { cls: "intact", label: "Intact",
+               why: `Radiant would drop this from ${intact}% to ${rad}% — don't refine` };
+    }
+    const mult = rad / intact;
+    return { cls: "radiant",
+             label: mult >= 1.5 ? `Radiant ×${mult.toFixed(1)}` : "Radiant",
+             why: `Radiant raises this from ${intact}% to ${rad}%` };
+  }
+
   // "I 11% · E 13% · F 17% · R 20%", with the refined odds emphasised
   function chanceStr(ch) {
     if (!ch) return "";
@@ -368,8 +385,24 @@
 
     /* parts → relics */
     if (it.parts && it.parts.length) {
-      html += `<section class="d-sec"><h3>Parts &amp; the relics that drop them</h3>`;
+      html += `<section class="d-sec"><h3>Parts &amp; the relics that drop them</h3>
+        <p class="legend">The dot is <b>this part's</b> rarity inside that relic:
+          <i class="rar Common"></i>common
+          <i class="rar Uncommon"></i>uncommon
+          <i class="rar Rare"></i>rare.
+          Best odds first. <b>Intact</b> means don't refine — refining a common
+          reward makes it rarer.</p>`;
       it.parts.forEach((p) => {
+        // easiest first: the relic most likely to give this part unrefined
+        p = Object.assign({}, p, {
+          relics: p.relics.slice().sort((a, b) => {
+            const ai = (a.chances && a.chances.Intact) || 0;
+            const bi = (b.chances && b.chances.Intact) || 0;
+            const af = RELICS[a.relic] && !RELICS[a.relic].vaulted ? 1 : 0;
+            const bf = RELICS[b.relic] && !RELICS[b.relic].vaulted ? 1 : 0;
+            return bf - af || bi - ai;   // droppable first, then best intact odds
+          }),
+        });
         html += `<div class="part">
           <div class="part-head">
             <span class="part-name">${esc(p.name)}</span>
@@ -378,11 +411,14 @@
           </div>`;
         p.relics.forEach((r) => {
           const rec = RELICS[r.relic] || {};
-          const tier = r.relic.split(" ")[0];
           const openNow = rec && !rec.vaulted;
+          const rar = r.rarity || "";
+          const adv = refineAdvice(r.chances);
           html += `<div class="relic-row">
-            <span class="relic-name"><i class="tier ${esc(tier)}"></i>${esc(r.relic)}</span>
-            <span class="rarity ${esc(r.rarity || "")}">${esc(r.rarity || "?")}</span>
+            <span class="relic-name" title="${esc(rar || "unknown")} reward in this relic"><i
+              class="rar ${esc(rar)}"></i>${esc(r.relic)}</span>
+            <span class="rarity ${esc(rar)}">${esc(rar || "?")}</span>
+            ${adv ? `<span class="advice ${adv.cls}" title="${esc(adv.why)}">${esc(adv.label)}</span>` : ""}
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
             <span class="chances">${chanceStr(r.chances)}</span>
           </div>`;

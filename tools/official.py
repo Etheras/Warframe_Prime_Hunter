@@ -29,7 +29,6 @@ import re
 _ROW = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S | re.I)
 _CELL = re.compile(r"<(th|td)\b[^>]*>(.*?)</\1>", re.S | re.I)
 _TAGS = re.compile(r"<[^>]+>")
-_RATE = re.compile(r"^(Common|Uncommon|Rare|Legendary|Very Common|Extremely Rare)?\s*\(?([\d.]+)\s*%\)?$", re.I)
 _RELIC_HDR = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\s*\((\w+)\)$", re.I)
 _RELIC_ITEM = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\b", re.I)
 _NODE_HDR = re.compile(r"^(.+?)/(.+?)\s*\((.+?)\)$")
@@ -76,16 +75,43 @@ def _rows(section: str):
         yield any(c[0].lower() == "th" for c in cells), [t for t in texts if t]
 
 
+def rarity_from_intact(pct: float | None) -> str | None:
+    """
+    Work out a relic reward's slot rarity from its unrefined drop chance.
+
+    DE's own rarity words are relative to each table's spread rather than the
+    relic's structure, so they are not usable here: the 25.33% common slot is
+    written "Uncommon", and the rare slot is "Rare" at Intact but "Uncommon"
+    once Radiant lifts it to 10%. The chances themselves are unambiguous —
+    every standard relic is 3 x 25.33% common, 2 x 11% uncommon, 1 x 2% rare.
+    """
+    if pct is None:
+        return None
+    if pct >= 20:
+        return "Common"
+    if pct >= 6:
+        return "Uncommon"
+    return "Rare"
+
+
 def _split_rate(cell: str):
-    """'Uncommon (11.06%)' -> ('Uncommon', 11.06)"""
-    m = _RATE.match(cell.strip())
+    """
+    'Uncommon (11.06%)' -> ('Uncommon', 11.06)
+
+    Deliberately does not enumerate rarity words. DE uses more of them than is
+    documented anywhere - 'Ultra Rare (1.01%)' appears on Defense tables - and a
+    fixed alternation silently dropped the chance for every row it did not
+    recognise. Take the percentage wherever it appears and treat whatever
+    precedes it as the label.
+    """
+    m = re.search(r"([\d.]+)\s*%", cell or "")
     if not m:
         return None, None
-    rarity = (m.group(1) or "").strip().title() or None
+    rarity = (cell[:m.start()] or "").strip(" () ").strip() or None
     try:
-        return rarity, float(m.group(2))
+        return (rarity.title() if rarity else None), float(m.group(1))
     except ValueError:
-        return rarity, None
+        return (rarity.title() if rarity else None), None
 
 
 def _slice_sections(page: str) -> dict[str, str]:
@@ -142,6 +168,14 @@ def parse_droptables(page: str):
         if rarity:
             slot["rarity"] = rarity
         slot["chances"][state] = chance
+
+    # Replace DE's chance-relative rarity words with the slot rarity implied by
+    # the unrefined odds (see rarity_from_intact).
+    for rec in relic_contents.values():
+        for slot in rec["rewards"].values():
+            derived = rarity_from_intact((slot.get("chances") or {}).get("Intact"))
+            if derived:
+                slot["rarity"] = derived
 
     # ---- star chart missions -------------------------------------------
     node = rotation = None

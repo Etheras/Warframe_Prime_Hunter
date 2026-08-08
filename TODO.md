@@ -70,8 +70,6 @@ the build now succeeds there in 6 seconds. The 302 seen on
       the drop-table parser against the mirror, the new-Prime recovery path, the
       warm/cold fetch policy, the degraded-build matrix. Those checks are worth
       keeping as real tests rather than rewriting them each time.
-- [ ] `serve.cmd` hardcodes port 8777 and fails if it's taken. Pick the next free
-      port instead, or say so more clearly than the raw Python traceback.
 - [ ] `build_data.py` is ~800 lines and doing three jobs (fetch, join, emit).
       The parsers already live in `official.py`; the join could move out too.
 - [ ] The GitHub Actions `deploy` job only runs after a successful `build`, so a

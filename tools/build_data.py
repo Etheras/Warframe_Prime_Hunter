@@ -259,7 +259,7 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
             page = fetch(OFFICIAL_DROPTABLES, "official_droptables", offline).decode("utf-8", "replace")
             contents, sources = official.parse_droptables(page)
             if len(contents) >= 200 and len(sources) >= 10:
-                return contents, sources, "official"
+                return contents, normalise_sources(sources), "official"
             log(f"! official drop table parsed thin ({len(contents)} relics, "
                 f"{len(sources)} farmable) - falling back to the mirror")
         except Exception as exc:
@@ -435,6 +435,31 @@ def parse_prime_page(text: str) -> list[dict]:
 # 2. drop tables -> relic contents and relic sources
 # --------------------------------------------------------------------------
 
+def normalise_sources(sources: dict[str, list]) -> dict[str, list]:
+    """
+    Collapse duplicate rows and put the best drop first.
+
+    One node can list the same relic several times (bounty stages, repeated
+    rotation entries), and neither source path emits rows in a useful order.
+    Both paths run through here so the site never shows a 1.84% node above an
+    11.06% one, and so `sources[:40]` keeps the drops actually worth farming.
+    """
+    out: dict[str, list] = {}
+    for relic, rows in sources.items():
+        best: dict[tuple, dict] = {}
+        for row in rows:
+            k = (row.get("kind"), row.get("planet"), row.get("node"),
+                 row.get("mode"), row.get("rotation"))
+            cur = best.get(k)
+            if cur is None or (row.get("chance") or 0) > (cur.get("chance") or 0):
+                best[k] = row
+        out[relic] = sorted(
+            best.values(),
+            key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "", s.get("node") or ""),
+        )
+    return out
+
+
 def relic_key(item_name: str) -> str | None:
     """'Lith A12 Relic' -> 'Lith A12'. Returns None for non-relic rewards."""
     m = RELIC_RE.match(item_name.strip())
@@ -550,20 +575,7 @@ def collect_relic_sources(payloads: dict[str, object], verbose: bool) -> dict[st
                     "rarity": r.get("rarity"),
                 })
 
-    # One node can list the same relic several times (bounty stages, duplicate
-    # rotation entries). Keep the best chance per place+rotation.
-    for relic, rows in list(sources.items()):
-        best: dict[tuple, dict] = {}
-        for row in rows:
-            k = (row["kind"], row["planet"], row["node"], row["mode"], row["rotation"])
-            cur = best.get(k)
-            if cur is None or (row.get("chance") or 0) > (cur.get("chance") or 0):
-                best[k] = row
-        merged = sorted(
-            best.values(),
-            key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "", s.get("node") or ""),
-        )
-        sources[relic] = merged
+    sources = normalise_sources(sources)
 
     if verbose:
         log(f"relic sources: {len(sources)} relics have at least one farmable location")
@@ -590,6 +602,14 @@ def collect_relic_contents(relics_payload: dict) -> dict[str, dict]:
                 continue
             slot = rec["rewards"].setdefault(item, {"rarity": r.get("rarity"), "chances": {}})
             slot["chances"][state] = r.get("chance")
+
+    # same correction as the official path: the published rarity words are
+    # chance-relative and shift with refinement, so derive the slot rarity
+    for rec in out.values():
+        for slot in rec["rewards"].values():
+            derived = official.rarity_from_intact((slot.get("chances") or {}).get("Intact"))
+            if derived:
+                slot["rarity"] = derived
     return out
 
 

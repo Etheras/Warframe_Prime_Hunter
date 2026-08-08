@@ -319,10 +319,28 @@ button,input,select,textarea{font:inherit;color:inherit}
   padding:8px 12px;border-top:1px solid var(--line-soft);font-size:12.5px;
 }
 .relic-name{font-weight:600;min-width:76px}
-.tier{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
-.tier.Lith{background:#8d9db5}.tier.Meso{background:#d0a24c}
-.tier.Neo{background:#7fb5d8}.tier.Axi{background:#c96f6f}
-.tier.Requiem{background:#9d7bea}.tier.Omnia{background:#4fd1c5}
+/* Dot = the rarity of THIS part inside that relic, in the game's own
+   bronze / silver / gold language. The relic tier is already in its name. */
+.rar{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-right:7px;vertical-align:1px;border:1px solid rgba(0,0,0,.45);
+}
+.rar.Common{background:#b9763f}
+.rar.Uncommon{background:#c7ced9}
+.rar.Rare{background:#e3bb52}
+.rar:not(.Common):not(.Uncommon):not(.Rare){background:#39424f}
+
+.legend{
+  margin:-4px 0 12px;font-size:11.5px;line-height:1.65;color:var(--txt-faint);
+}
+.legend b{color:var(--txt-dim);font-weight:600}
+.legend .rar{margin:0 4px 0 7px}
+
+/* refine-or-not verdict */
+.advice{font-size:10.5px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:4px;border:1px solid;cursor:help}
+.advice.intact{color:var(--green);border-color:#2d5a41;background:#16281e}
+.advice.radiant{color:#d9a5f0;border-color:#5a3a68;background:#241a2b}
+
 .rarity{font-size:11px;padding:1px 6px;border-radius:4px;border:1px solid}
 .rarity.Common{color:#b98d63;border-color:#4a3826}
 .rarity.Uncommon{color:#c3cad6;border-color:#3d4655}
