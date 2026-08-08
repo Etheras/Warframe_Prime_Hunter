@@ -19,6 +19,8 @@
   const RELICS = DATA.relics || {};
   const KEY_COLLECTED = "vorframe.collected.v1";
   const KEY_FILTERS = "vorframe.filters.v1";
+  const KEY_PARTS = "vorframe.parts.v1";
+  const KEY_MATERIALS = "vorframe.materials.v1";
 
   /* ── collection state ─────────────────────────────────────── */
   let collected = new Set();
@@ -31,6 +33,61 @@
     try { localStorage.setItem(KEY_COLLECTED, JSON.stringify(Array.from(collected))); }
     catch (e) { /* private mode: keep working in memory */ }
   };
+
+  /* ── part ownership ───────────────────────────────────────────
+     { itemId: { partName: countOwned } }. Keys are the normalised
+     part names the pipeline emits, so they survive a source switch. */
+  let partsOwned = {};
+  try {
+    partsOwned = JSON.parse(localStorage.getItem(KEY_PARTS) || "{}") || {};
+  } catch (e) { partsOwned = {}; }
+
+  const savePartsOwned = () => {
+    try { localStorage.setItem(KEY_PARTS, JSON.stringify(partsOwned)); }
+    catch (e) { /* non-fatal */ }
+  };
+
+  const needOf = (p) => p.itemCount || 1;
+  const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
+
+  function setPart(id, name, n) {
+    const bag = partsOwned[id] || (partsOwned[id] = {});
+    if (n > 0) bag[name] = n; else delete bag[name];
+    if (!Object.keys(bag).length) delete partsOwned[id];
+    savePartsOwned();
+  }
+
+  const partsComplete = (it) =>
+    it.parts.length > 0 && it.parts.every((p) => haveOf(it.id, p.name) >= needOf(p));
+
+  const partsDone = (it) =>
+    it.parts.filter((p) => haveOf(it.id, p.name) >= needOf(p)).length;
+
+  /* An item that has parts is "collected" exactly when all of them are owned.
+     Items with no parts (cosmetics, Founder gear) stay manually ticked. */
+  function syncCollected(it) {
+    if (!it.parts.length) return;
+    if (partsComplete(it)) collected.add(it.id); else collected.delete(it.id);
+  }
+
+  function setAllParts(it, full) {
+    if (!it.parts.length) return;
+    it.parts.forEach((p) => setPart(it.id, p.name, full ? needOf(p) : 0));
+  }
+
+  // Anything ticked before part tracking existed meant "I have the whole thing",
+  // so seed its parts rather than appearing to lose the tick.
+  (function migrate() {
+    let touched = false;
+    ITEMS.forEach((it) => {
+      if (collected.has(it.id) && it.parts.length && !partsOwned[it.id]) {
+        partsOwned[it.id] = {};
+        it.parts.forEach((p) => (partsOwned[it.id][p.name] = needOf(p)));
+        touched = true;
+      }
+    });
+    if (touched) savePartsOwned();
+  })();
 
   /* ── availability bucket ──────────────────────────────────────
      Each item gets exactly one bucket so the sidebar toggles are
@@ -65,6 +122,7 @@
     sort: "cat",
     q: "",
     hideVaultedRelics: false,
+    squad: false,
   };
 
   try {
@@ -79,6 +137,7 @@
       if (saved.sort) state.sort = saved.sort;
       if (typeof saved.hideVaultedRelics === "boolean")
         state.hideVaultedRelics = saved.hideVaultedRelics;
+      if (typeof saved.squad === "boolean") state.squad = saved.squad;
     }
   } catch (e) { /* ignore malformed saved filters */ }
 
@@ -91,6 +150,7 @@
         cats: Array.from(state.cats),
         sort: state.sort,
         hideVaultedRelics: state.hideVaultedRelics,
+        squad: state.squad,
       }));
     } catch (e) { /* non-fatal */ }
   };
@@ -169,7 +229,9 @@
       <div class="card-art">${art}</div>
       <div class="card-body">
         <div class="card-name">${esc(it.name)}</div>
-        <div class="card-cat">${esc(it.type || it.category)}</div>
+        <div class="card-cat">${esc(it.type || it.category)}${
+          it.parts.length ? ` · <span class="card-prog${has ? " full" : ""}">${
+            partsDone(it)}/${it.parts.length}</span>` : ""}</div>
         <div class="card-badges">${badges}</div>
       </div>
     </article>`;
@@ -239,11 +301,24 @@
   /* ── farm spot aggregation ────────────────────────────────────
      The question this app exists to answer: which single mission
      gives me the most relics for this frame?                      */
+  /* Only relics that still hold something you're missing. Falls back to the
+     full set once the item is complete, so the view never goes blank. */
+  function relicsStillNeeded(it) {
+    const need = new Set();
+    (it.parts || []).forEach((p) => {
+      if (haveOf(it.id, p.name) >= needOf(p)) return;
+      p.relics.forEach((r) => need.add(r.relic));
+    });
+    return need.size ? need : new Set(it.relics || []);
+  }
+
   function bestSpots(it) {
-    const open = (it.relics || []).filter((r) => RELICS[r] && !RELICS[r].vaulted);
+    const needed = relicsStillNeeded(it);
+    const open = (it.relics || []).filter(
+      (r) => RELICS[r] && !RELICS[r].vaulted && needed.has(r));
     const map = new Map();
     open.forEach((rname) => {
-      (RELICS[rname].sources || []).forEach((s) => {
+      (RELICS[rname].sources || []).filter((s) => !isRailjack(s)).forEach((s) => {
         const key = `${s.planet} ${s.node} ${s.mode}`;
         let e = map.get(key);
         if (!e) {
@@ -279,19 +354,43 @@
   /* Should this relic be refined for THIS part?
      Radiant shifts odds towards rare rewards at the expense of common ones, so
      refining actively hurts a common part. Compare the two ends and say which. */
+  /* Four players cracking the same relic see four rewards and keep the best,
+     so a per-opening chance p becomes 1 - (1 - p)^4. */
+  const squadify = (pct) =>
+    state.squad && pct != null ? (1 - Math.pow(1 - pct / 100, 4)) * 100 : pct;
+
+  const fmtPct = (v) => (v == null ? "?" : (Math.round(v * 100) / 100) + "%");
+
   function refineAdvice(ch) {
     if (!ch) return null;
     const intact = ch.Intact, rad = ch.Radiant;
     if (intact == null || rad == null || !intact) return null;
+    const si = squadify(intact), sr = squadify(rad);
+    const suffix = state.squad ? " (4-squad odds)" : "";
     if (rad <= intact) {
       return { cls: "intact", label: "Intact",
-               why: `Radiant would drop this from ${intact}% to ${rad}% — don't refine` };
+               why: `Radiant would drop this from ${fmtPct(si)} to ${fmtPct(sr)} — don't refine${suffix}` };
     }
     const mult = rad / intact;
     return { cls: "radiant",
              label: mult >= 1.5 ? `Radiant ×${mult.toFixed(1)}` : "Radiant",
-             why: `Radiant raises this from ${intact}% to ${rad}%` };
+             why: `Radiant raises this from ${fmtPct(si)} to ${fmtPct(sr)}${suffix}` };
   }
+
+  /* Railjack/Proxima nodes are a different activity, so they are kept out of the
+     ranking — but never hidden, because five live relics have no other source
+     and they carry never-vaulted frames (Nyx, Valkyr). */
+  const RAILJACK_NODES = new Set([
+    "Bendar Cluster", "Iota Temple", "Korm's Belt", "Ogal Cluster", "Sover Strait",
+    "Arva Vector", "Brom Cluster", "Enkidu Ice Drifts", "Mammon's Prospect",
+    "Nu-Gua Mines", "Sovereign Grasp", "Fenton's Field", "Khufu Envoy",
+    "Obol Crossing", "Peregrine Axis", "Profit Margin", "Seven Sirens",
+    "Kasio's Rest", "Lupal Pass", "Mordo Cluster", "Nodo Gap", "Vand Cluster",
+    "Beacon Shield Ring", "Bifrost Echo", "Falling Glory", "Luckless Expanse",
+    "Orvin-Haarc", "Vesper Strait",
+  ]);
+  const isRailjack = (s) =>
+    RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
 
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
      really "stay for the 4th reward". Spelled out on hover because the letters
@@ -386,7 +485,9 @@
     /* best farm spots */
     const spots = bestSpots(it);
     if (spots.length) {
-      const openCount = (it.farmableRelics || []).length;
+      const stillNeeded = relicsStillNeeded(it);
+      const openCount = (it.farmableRelics || []).filter((r) => stillNeeded.has(r)).length
+                        || (it.farmableRelics || []).length;
       html += `<section class="d-sec">
         <h3>Best places to farm its relics</h3>
         <div class="spots">` +
@@ -437,12 +538,18 @@
           list = list.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
         }
 
-        html += `<div class="part">
+        const need = needOf(p), have = haveOf(it.id, p.name);
+        const full = have >= need;
+        html += `<div class="part${full ? " part-done" : ""}">
           <div class="part-head">
+            <button class="part-own${full ? " on" : ""}" data-part="${esc(p.name)}"
+                    title="Click to change how many you own${need > 1 ? ` (0–${need})` : ""}">
+              ${need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;")}
+            </button>
             <span class="part-name">${esc(p.name)}</span>
             <span class="part-count">${list.length}${
               list.length !== total ? ` of ${total}` : ""} relic${total === 1 ? "" : "s"}${
-              p.itemCount && p.itemCount > 1 ? " · need " + p.itemCount : ""}</span>
+              need > 1 ? " · need " + need : ""}</span>
           </div>`;
 
         if (!list.length) {
@@ -513,6 +620,22 @@
         drawer.scrollTop = keep;   // don't lose the reader's place
       });
     }
+
+    // click a part counter: 0 → 1 → … → need → 0
+    $$(".part-own", dbody).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = it.parts.find((x) => x.name === btn.dataset.part);
+        if (!p) return;
+        const need = needOf(p);
+        setPart(it.id, p.name, (haveOf(it.id, p.name) + 1) % (need + 1));
+        syncCollected(it);
+        saveCollected();
+        const keep = drawer.scrollTop;
+        render();          // card progress, counts, filters
+        openItem(it.id);   // re-rank the farm spots against what's left
+        drawer.scrollTop = keep;
+      });
+    });
   }
 
   function closeDrawer() {
@@ -523,18 +646,26 @@
 
   /* ── collection toggles ───────────────────────────────────── */
   function toggle(id) {
-    if (collected.has(id)) collected.delete(id); else collected.add(id);
-    saveCollected();
-    const card = grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
-    if (card) {
-      const has = collected.has(id);
-      card.classList.toggle("is-collected", has);
-      const t = card.querySelector(".card-tick");
-      if (t) t.setAttribute("aria-checked", String(has));
-    }
-    // a hidden-by-filter item must disappear immediately
     const it = ITEMS.find((x) => x.id === id);
-    if (it && !matches(it)) render(); else { updateProgress(); updateCounts(); refreshHeadings(); }
+    const want = !collected.has(id);
+    if (it && it.parts.length) {
+      // parts are the source of truth for anything that has them
+      setAllParts(it, want);
+      syncCollected(it);
+    } else if (want) {
+      collected.add(id);
+    } else {
+      collected.delete(id);
+    }
+    saveCollected();
+    // the card also carries a parts counter now, so redraw it wholesale
+    if (it && !matches(it)) {
+      render();   // filtered out — must disappear immediately
+    } else {
+      const card = grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+      if (card) card.outerHTML = cardHTML(it);
+      updateProgress(); updateCounts(); refreshHeadings();
+    }
   }
 
   function refreshHeadings() {
@@ -681,6 +812,80 @@
       $("#dlgMsg").textContent = "Could not read that: " + err.message;
     }
   });
+
+  /* ── materials: a plain have/need checklist, no maths attached ─── */
+  const DEFAULT_MATERIALS = [
+    { name: "Forma", have: 0, need: 0 },
+    { name: "Orokin Cell", have: 0, need: 0 },
+    { name: "Orokin Catalyst", have: 0, need: 0 },
+    { name: "Orokin Reactor", have: 0, need: 0 },
+  ];
+  let materials;
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEY_MATERIALS) || "null");
+    materials = Array.isArray(raw) ? raw : DEFAULT_MATERIALS.slice();
+  } catch (e) { materials = DEFAULT_MATERIALS.slice(); }
+
+  const saveMaterials = () => {
+    try { localStorage.setItem(KEY_MATERIALS, JSON.stringify(materials)); }
+    catch (e) { /* non-fatal */ }
+  };
+
+  function renderMaterials() {
+    $("#matList").innerHTML = materials.map((mat, i) => {
+      const short = (Number(mat.need) || 0) - (Number(mat.have) || 0);
+      return `<div class="mat-row${short > 0 ? " short" : ""}">
+        <input class="mat-name" data-i="${i}" value="${esc(mat.name)}" placeholder="material">
+        <input class="mat-num" data-i="${i}" data-f="have" type="number" min="0"
+               value="${Number(mat.have) || 0}" title="how many you have">
+        <span class="mat-sep">/</span>
+        <input class="mat-num" data-i="${i}" data-f="need" type="number" min="0"
+               value="${Number(mat.need) || 0}" title="how many you need">
+        <button class="mat-del" data-i="${i}" title="remove">✕</button>
+        <span class="mat-short">${short > 0 ? `short ${short}` : (mat.need ? "ok" : "")}</span>
+      </div>`;
+    }).join("");
+  }
+
+  $("#matList").addEventListener("input", (e) => {
+    const el = e.target, i = Number(el.dataset.i);
+    if (Number.isNaN(i) || !materials[i]) return;
+    if (el.classList.contains("mat-name")) materials[i].name = el.value;
+    else if (el.classList.contains("mat-num")) materials[i][el.dataset.f] = Math.max(0, Number(el.value) || 0);
+    saveMaterials();
+    const row = el.closest(".mat-row");
+    const short = (Number(materials[i].need) || 0) - (Number(materials[i].have) || 0);
+    row.classList.toggle("short", short > 0);
+    row.querySelector(".mat-short").textContent =
+      short > 0 ? `short ${short}` : (materials[i].need ? "ok" : "");
+  });
+
+  $("#matList").addEventListener("click", (e) => {
+    const del = e.target.closest(".mat-del");
+    if (!del) return;
+    materials.splice(Number(del.dataset.i), 1);
+    saveMaterials(); renderMaterials();
+  });
+
+  $("#addMat").addEventListener("click", () => {
+    materials.push({ name: "", have: 0, need: 0 });
+    saveMaterials(); renderMaterials();
+    const last = $$("#matList .mat-name").pop();
+    if (last) last.focus();
+  });
+
+  $("#f-squad").checked = state.squad;
+  $("#f-squad").addEventListener("change", (e) => {
+    state.squad = e.target.checked;
+    saveFilters();
+    const open = drawer.hidden ? null : $("#drawerBody h2");
+    if (open) {                       // refresh the odds on screen
+      const it = ITEMS.find((x) => x.name === open.textContent.trim());
+      if (it) { const keep = drawer.scrollTop; openItem(it.id); drawer.scrollTop = keep; }
+    }
+  });
+
+  renderMaterials();
 
   /* footer note */
   const m = DATA.meta || {};

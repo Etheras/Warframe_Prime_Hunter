@@ -18,12 +18,21 @@ working out **where to farm the relics** for anything you're still missing.
 | Show / hide **vaulted** Primes | Sidebar → *Availability → Vaulted (V)* |
 | Categories (Warframe, Primary, Secondary, Melee, …) | Sidebar → *Category* |
 | Mark what you've **already collected** | Tick on each card, or the button in the detail drawer |
+| Track **individual parts**, with quantities | Per-part counters in the drawer; `2/4` on the card |
 | Hide collected items | Sidebar → *Collection → Show collected* (untick to hide) |
 | **Prime Resurgence (R)** filter | Sidebar → *Availability → Prime Resurgence (R)* |
 | **Where to farm the relics** for a Prime | Click any card → *Best places to farm its relics* |
 
-Collection state is stored in the browser's `localStorage` and can be exported or
-re-imported from the **Backup** button.
+Collection state is stored in the browser's `localStorage` across three keys:
+`vorframe.collected.v1` (whole items), `vorframe.parts.v1` (per-part counts) and
+`vorframe.materials.v1` (the manual checklist). Only the first is covered by the
+**Backup** button so far.
+
+**Parts are the source of truth** for anything that has them: an item counts as
+collected exactly when every part is owned, and ticking the card sets or clears
+them all. Items with no parts — cosmetics, Founder gear — stay manually ticked.
+Progress saved before part tracking existed is migrated on load by treating a
+ticked item as "all parts owned", so nothing appears to vanish.
 
 ---
 
@@ -258,8 +267,18 @@ and confirming it comes back with all four parts and working farm locations.
 
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
-that item's relics drop there*. That's why Caliban Prime surfaces Terrorem (Deimos)
-first — one Survival run can yield 5 of his 7 live relics.
+that item's relics drop there*. It only counts relics holding a part you are still
+missing, so the advice moves as you tick things off: Caliban Prime opens on
+Terrorem (5 of 7 relics), but once his Blueprint and Chassis are ticked it re-ranks
+to Zabala (2 of 2).
+
+Railjack/Proxima nodes are excluded from that ranking — a different activity — but
+never hidden, because five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10)
+have no other source and carry never-vaulted frames like Nyx and Valkyr.
+
+**Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
+shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
+rewards and keep the best.
 
 ### Availability buckets
 

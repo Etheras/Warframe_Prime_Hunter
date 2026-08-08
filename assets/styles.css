@@ -315,11 +315,50 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* parts */
 .part{margin-bottom:12px;border:1px solid var(--line-soft);border-radius:9px;overflow:hidden}
+.part.part-done{border-color:#2c4a37}
 .part-head{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  display:flex;align-items:center;gap:10px;
   padding:9px 12px;background:var(--panel);
 }
-.part-name{font-size:13.5px;font-weight:600}
+.part-name{font-size:13.5px;font-weight:600;flex:1}
+.part.part-done .part-name{color:var(--txt-dim)}
+
+/* how many of this part you own */
+.part-own{
+  flex:0 0 auto;min-width:34px;height:22px;padding:0 6px;
+  border-radius:6px;border:1.5px solid #3a4456;background:#0d1118;
+  color:var(--txt-dim);cursor:pointer;font-size:11.5px;font-weight:700;
+  font-variant-numeric:tabular-nums;transition:.15s;
+}
+.part-own:hover{border-color:var(--gold);color:var(--txt)}
+.part-own.on{background:var(--green);border-color:var(--green);color:#0b1a11}
+
+/* card progress */
+.card-prog{color:var(--txt-dim);font-variant-numeric:tabular-nums}
+.card-prog.full{color:var(--green)}
+
+/* advanced panel */
+#advanced summary{
+  font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:var(--txt-faint);
+  font-weight:700;cursor:pointer;padding:2px 0;
+}
+#advanced summary:hover{color:var(--gold)}
+#advanced[open] summary{margin-bottom:8px}
+.mat-list{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.mat-row{display:flex;align-items:center;gap:4px;font-size:12px}
+.mat-row input{
+  background:#0d1118;border:1px solid var(--line);border-radius:5px;
+  padding:3px 6px;color:var(--txt);font-size:11.5px;min-width:0;
+}
+.mat-row .mat-name{flex:1}
+.mat-row .mat-num{width:42px;text-align:right;font-variant-numeric:tabular-nums}
+.mat-row .mat-sep{color:var(--txt-faint)}
+.mat-row .mat-del{
+  background:none;border:none;color:var(--txt-faint);cursor:pointer;padding:0 3px;font-size:12px;
+}
+.mat-row .mat-del:hover{color:var(--red)}
+.mat-short{flex:0 0 auto;font-size:10.5px;color:var(--txt-faint);min-width:46px;text-align:right}
+.mat-row.short .mat-short{color:var(--gold);font-weight:600}
 .part-count{font-size:11.5px;color:var(--txt-faint)}
 .relic-row{
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;

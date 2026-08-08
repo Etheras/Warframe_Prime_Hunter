@@ -297,6 +297,21 @@ def acquire_export(offline: bool):
     return official.collect_prime_items(exports), hashlib.sha256(blob).hexdigest()[:16]
 
 
+def normalise_part(name: str) -> str:
+    """
+    One canonical spelling for a part, whichever source described it.
+
+    The item API says "Chassis"; the drop table says "Chassis Blueprint". Saved
+    progress is keyed on these names, so if they can change between builds a
+    player's ticks silently disappear. The bare main "Blueprint" keeps its name -
+    only the redundant suffix goes.
+    """
+    n = re.sub(r"\s+", " ", (name or "")).strip()
+    if n != "Blueprint" and n.endswith(" Blueprint"):
+        n = n[: -len(" Blueprint")].strip()
+    return n or "Blueprint"
+
+
 def parts_from_droptables(item_name: str, relic_contents: dict) -> list[dict]:
     """
     Work out an item's parts straight from the drop table, for anything the
@@ -310,7 +325,7 @@ def parts_from_droptables(item_name: str, relic_contents: dict) -> list[dict]:
         for reward, slot in (rec.get("rewards") or {}).items():
             if not reward.startswith(prefix):
                 continue
-            part = reward[len(prefix):].strip() or "Blueprint"
+            part = normalise_part(reward[len(prefix):])
             entry = by_part.setdefault(part, {"name": part, "itemCount": None, "relics": []})
             entry["relics"].append({
                 "relic": relic,
@@ -832,7 +847,7 @@ def main() -> int:
                 r["farmable"] = r["relic"] in relic_sources
 
             parts.append({
-                "name": comp.get("name"),
+                "name": normalise_part(comp.get("name")),
                 "itemCount": comp.get("itemCount"),
                 "relics": part_relics,
             })

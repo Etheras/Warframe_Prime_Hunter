@@ -79,6 +79,27 @@
       </select>
     </section>
 
+    <section class="filter-block">
+      <details id="advanced">
+        <summary>Advanced options</summary>
+
+        <label class="check" id="squadRow">
+          <input type="checkbox" id="f-squad">
+          <span class="box"></span>
+          <span class="lbl" title="A full squad cracking the same relic at the same refinement sees four rewards and keeps the best, so the odds shown become 1 − (1 − p)⁴. Leave this off for solo runs.">4-squad, same relic</span>
+        </label>
+        <p class="hint">Changes the odds shown on each relic. Off = solo.</p>
+
+        <div class="filter-head" style="margin-top:16px">
+          <h2>Materials</h2>
+          <button class="mini" id="addMat">+ add</button>
+        </div>
+        <p class="hint">Just a checklist — nothing here feeds the farm advice.
+          Forma will, once the planner lands.</p>
+        <div id="matList" class="mat-list"></div>
+      </details>
+    </section>
+
     <p class="src-note" id="srcNote"></p>
   </aside>
 

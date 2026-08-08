@@ -28,9 +28,9 @@ the build now succeeds there in 6 seconds. The 302 seen on
       `worldState.php` returns 404 on both `content.` and `origin.warframe.com`,
       so the live rotation comes via the warframestat proxy. Find a first-party
       route, or accept and document it.
-- [ ] **Part names differ between the two paths.** The item-API path yields
-      `"Chassis"`, the drop-table fallback yields `"Chassis Blueprint"`. Cosmetic
-      only, but it makes a wiki-less build look inconsistent. Normalise one way.
+- [x] ~~Part names differ between the two paths~~ — fixed by `normalise_part()`:
+      the redundant trailing " Blueprint" is stripped so both sources agree, which
+      is what saved part progress is keyed on.
 - [ ] **Enemy levels for the node tie-break** come from DE's
       `ExportRegions_en.json` (269 nodes, `minEnemyLevel`/`maxEnemyLevel`). It
       covers only **55%** of the nodes that drop live relics — Railjack/Proxima
@@ -44,13 +44,11 @@ the build now succeeds there in 6 seconds. The 302 seen on
 
 ## Features
 
-- [ ] **Stage 1 — track individual parts**, not just whole items ("2 of 4"),
-      with quantities (49 parts need 2 copies). Feeds a need-filtered version of
-      `bestSpots`, so the farm advice reflects what you are actually missing.
-      Prerequisite: normalise part names (see Data accuracy).
-- [ ] **Stage 3 — materials panel**: manual rows of name / have / need for
-      non-relic resources (Orokin Cell, Forma, …). Deliberately *not* derived
-      from the API and not part of any calculation — a convenience checklist.
+- [x] ~~**Stage 1 — track individual parts**~~ — done. Per-part counters with
+      quantities, `2/4` on cards, auto-collect when complete, and `bestSpots`
+      filtered to what is still missing. Includes the 4-squad odds toggle.
+- [x] ~~**Stage 3 — materials panel**~~ — done. Manual name / have / need rows
+      under Advanced options, feeding no calculation.
 - [ ] **Stage 2 — the shopping-list planner**, on its own page (`plan.html`)
       rather than inside the collection view: pick what to farm, get a ranked
       node plan with a per-relic refinement decision. Scoring model prototyped

@@ -80,7 +80,18 @@ Want to see only what you can actually get today? Untick **Vaulted** and
 
 ### Marking what you own
 
-Click the small square in the top-right corner of any card. It turns green.
+Click the small square in the top-right corner of any card to mark the whole
+thing. It turns green.
+
+**Or tick off parts one at a time.** Open any Prime and each part has its own
+button on the left. Click it to say you've got that part; the card then shows
+your progress (`2/4`). A few parts need two copies — those cycle `0/2 → 1/2 →
+2/2` as you click. Tick the last one and the item marks itself collected.
+
+The useful bit: **the farm advice follows what you still need**. With nothing
+ticked, Caliban Prime points at Terrorem for 5 of his 7 relics. Tick off the
+Blueprint and Chassis and it re-ranks to Zabala, covering the 2 relics that
+actually hold the parts you're missing.
 
 The bar at the top right shows your overall progress, and each category heading
 shows its own count.
@@ -101,16 +112,30 @@ Click any card. A panel slides in from the right with:
    Prime's relics drop there. The number on the right is the important bit: "5 of 7
    relics" means one trip to that node can drop five of the seven relics you need.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
-   the odds at each refinement level (Intact → Radiant), and the top few places each
-   relic drops.
+   how rare it is inside each one (the bronze/silver/gold dot), whether to refine,
+   and the best places that relic drops. Hover a verdict or a rotation for detail.
 
 Vaulted Primes show their relics too, greyed out — useful when you're looking to
 trade for a specific one.
+
+### Advanced options
+
+At the bottom of the sidebar:
+
+- **4-squad, same relic** — a full squad cracking the same relic sees four
+  rewards and keeps the best, so the odds shown become much better. Leave it off
+  for solo runs. It only changes the numbers displayed, nothing else.
+- **Materials** — a plain checklist of what you have versus what you need
+  (Forma, Orokin Cell, and anything else you add). Purely for your own reference;
+  it doesn't feed the farm advice.
 
 ### Backing up your collection
 
 Your ticks are stored in your browser. Click **Backup** at the top right to copy
 them out as text, or paste a saved copy back in and press **Import**.
+
+*(Backup currently covers whole-item ticks. Part-level progress and materials
+live alongside it in the browser but aren't in the export yet.)*
 
 Worth doing before clearing your browser data.
 
