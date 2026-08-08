@@ -11,6 +11,9 @@ data/vorframe-data.json
 # single-file build output
 dist/
 
+# design drafts, not part of the shipped site
+drafts/
+
 # python
 __pycache__/
 *.pyc
