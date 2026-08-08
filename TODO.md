@@ -31,6 +31,11 @@ the build now succeeds there in 6 seconds. The 302 seen on
 - [ ] **Part names differ between the two paths.** The item-API path yields
       `"Chassis"`, the drop-table fallback yields `"Chassis Blueprint"`. Cosmetic
       only, but it makes a wiki-less build look inconsistent. Normalise one way.
+- [ ] **Enemy levels for the node tie-break** come from DE's
+      `ExportRegions_en.json` (269 nodes, `minEnemyLevel`/`maxEnemyLevel`). It
+      covers only **55%** of the nodes that drop live relics — Railjack/Proxima
+      nodes and `Event:` variants are absent from the export entirely. Nodes with
+      no known level will have to sort last rather than be guessed at.
 - [ ] Relic `sources` are capped at 40 per relic in the payload. Deduped and
       sorted by chance first so the useful ones survive, but the cap is arbitrary.
 - [ ] The wiki's `(R)` Resurgence markers are parsed and then ignored (they're
@@ -39,11 +44,33 @@ the build now succeeds there in 6 seconds. The 302 seen on
 
 ## Features
 
-- [ ] **Track individual parts**, not just whole items — "I have 3 of 4 Chassis".
-      Probably the single most useful addition.
-- [ ] **Global farm planner**: given everything still missing, rank nodes across
-      the whole collection rather than one item at a time. The per-item version
-      already exists in `bestSpots`; this generalises it.
+- [ ] **Stage 1 — track individual parts**, not just whole items ("2 of 4"),
+      with quantities (49 parts need 2 copies). Feeds a need-filtered version of
+      `bestSpots`, so the farm advice reflects what you are actually missing.
+      Prerequisite: normalise part names (see Data accuracy).
+- [ ] **Stage 3 — materials panel**: manual rows of name / have / need for
+      non-relic resources (Orokin Cell, Forma, …). Deliberately *not* derived
+      from the API and not part of any calculation — a convenience checklist.
+- [ ] **Stage 2 — the shopping-list planner**, on its own page (`plan.html`)
+      rather than inside the collection view: pick what to farm, get a ranked
+      node plan with a per-relic refinement decision. Scoring model prototyped
+      and validated; draft mockup in `drafts/`.
+
+### Planner design decisions (settled 2026-08-08)
+
+- **Forma is excluded from the ranking maths.** `Forma Blueprint` sits in a
+  Common slot (25.33% → 0.253 expected units) and `2X Forma Blueprint` in an
+  Uncommon one (11% → 0.220), so the two are near-identical and appear in 24 of
+  the 34 live relics. It is effectively a constant: it floods "usefulness"
+  without discriminating between relics. Tracked as a manual counter instead.
+- **Node tie-break**: show 2, hover for 20 (same pattern as relic sources).
+  Order by score, then enemy level (high weight), then rotation A ahead of B/C
+  (mid weight). Mission length is deliberately ignored as too ambiguous.
+- **Squad odds**: a checkbox, "4-squad run with the same relic and refinement".
+  Off means solo. With it on, a wanted reward at probability `w` becomes
+  `1 - (1 - w)^4`.
+
+
 - [ ] **Relic inventory** so the drawer can say "you already hold 2 of these".
 - [ ] Ducat value per part, for prime-junk triage.
 - [ ] Availability changelog: when a scheduled build changes what's farmable,
