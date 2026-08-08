@@ -296,26 +296,30 @@
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
      really "stay for the 4th reward". Spelled out on hover because the letters
      mean nothing on their own. */
-  const ROT_CYCLE = "Rewards cycle A → A → B → C, then repeat.";
-  const ROT_HELP = {
-    A: "Rotation A — the 1st and 2nd rewards. Survival 5 and 10 min · Defense waves 5 and 10 · "
-       + "Interception rounds 1 and 2 · Excavation 100 and 200 Cryotic. " + ROT_CYCLE,
-    B: "Rotation B — the 3rd reward. Survival 15 min · Defense wave 15 · "
-       + "Interception round 3 · Excavation 300 Cryotic. " + ROT_CYCLE,
-    C: "Rotation C — the 4th reward, the longest stay. Survival 20 min · Defense wave 20 · "
-       + "Interception round 4 · Excavation 400 Cryotic. " + ROT_CYCLE,
+  const ROT_CYCLE = "Rewards cycle: A → A → B → C → repeat.";
+  const ROT_WHEN = {
+    A: "Can drop as the 1st or 2nd reward.",
+    B: "Can drop as the 3rd reward.",
+    C: "Can drop as the 4th reward.",
   };
 
   function rotTag(rot, prefix) {
     if (!rot) return "";
-    const help = ROT_HELP[String(rot).toUpperCase()] || `Rotation ${rot}. ${ROT_CYCLE}`;
+    const key = String(rot).toUpperCase();
+    const help = (ROT_WHEN[key] ? ROT_WHEN[key] + "\n\n" : "") + ROT_CYCLE;
     return `<abbr class="rot" title="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
   }
 
   function rotListTag(rots) {
     if (!rots || !rots.length) return "";
-    const help = rots.map((r) => ROT_HELP[String(r).toUpperCase()] || `Rotation ${r}.`).join("\n\n");
-    return `<abbr class="rot" title="${esc(help)}">rotation ${esc(rots.join("/"))}</abbr>`;
+    // several rotations at once: name each so the letters stay distinguishable
+    const lines = rots
+      .map((r) => {
+        const k = String(r).toUpperCase();
+        return ROT_WHEN[k] ? `${k} — ${ROT_WHEN[k].replace("Can drop as the ", "")}` : k;
+      })
+      .join("\n");
+    return `<abbr class="rot" title="${esc(lines + "\n\n" + ROT_CYCLE)}">rotation ${esc(rots.join("/"))}</abbr>`;
   }
 
   function openItem(id) {
@@ -459,11 +463,27 @@
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
           </div>`;
           if (openNow) {
-            const top = (rec.sources || []).slice(0, 3).map((s) =>
+            const all = rec.sources || [];
+            const shownSrc = all.slice(0, 2);
+            const top = shownSrc.map((s) =>
               `<span>${esc(s.node)}${s.kind === "mission" ? " (" + esc(s.planet) + ")" : ""}${
                 s.rotation ? " · " + rotTag(s.rotation, "rot ") : ""} · ${s.chance}%</span>`).join("");
-            if (top) html += `<div class="relic-src">${top}${
-              rec.sourceCount > 3 ? `<span>+${rec.sourceCount - 3} more</span>` : ""}</div>`;
+
+            // everything else, condensed into the "+N more" tooltip
+            const restCount = (rec.sourceCount || all.length) - shownSrc.length;
+            let moreTag = "";
+            if (top && restCount > 0) {
+              const rest = all.slice(shownSrc.length);
+              const lines = rest.map((s) =>
+                `${s.node}${s.kind === "mission" ? ` (${s.planet})` : ""}${
+                  s.rotation ? ` rot ${s.rotation}` : ""}`);
+              // the payload keeps only the best 40 sources per relic
+              if (restCount > lines.length) {
+                lines.push(`…and ${restCount - lines.length} more not listed`);
+              }
+              moreTag = `<span class="more" title="${esc(lines.join("\n"))}">+${restCount} more</span>`;
+            }
+            if (top) html += `<div class="relic-src">${top}${moreTag}</div>`;
           }
         });
         html += `</div>`;
