@@ -287,6 +287,32 @@ instead of using `serve.cmd`. Restore from a **Backup** copy if you have one.
 
 ---
 
+## Licence and attribution
+
+VorFrame's own code — the build pipeline, the site, the docs — is **[MIT
+licensed](LICENSE)**. Do what you like with it.
+
+The game data is a different matter. WARFRAME, its item names, artwork and
+trademarks belong to **Digital Extremes Ltd.**, and are used here under their
+[Content Policy](https://www.warframe.com/en/contentpolicy) for non-commercial
+fan works. That policy sets three practical limits:
+
+- **Non-commercial only** — don't sell it, don't put ads on it
+- **No Warframe or Digital Extremes logos** without their written consent
+- Be clear it's **unofficial**
+
+VorFrame satisfies all three, and the site footer says so on every page.
+
+Data sources and their licences (catalogue from the WARFRAME Wiki under CC BY-SA,
+item and worldstate data from WFCD under MIT and Apache-2.0) are listed in
+[NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
+fresh on every build, so nothing is redistributed from here.
+
+> VorFrame is an unofficial fan project. It is not affiliated with, endorsed,
+> sponsored, or approved by Digital Extremes Ltd.
+
+---
+
 ## Want more detail?
 
 [PROJECT.md](PROJECT.md) covers how it's built — where each piece of data comes

@@ -139,6 +139,8 @@ VorFrame/
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
 ├── TODO.md                 ← known gaps and ideas, not yet done
+├── LICENSE                 ← MIT, scoped to our own code
+├── NOTICE.md               ← upstream sources and their terms
 ├── index.html              ← markup + filter controls
 ├── serve.cmd               ← double-click: serve the site and open a browser
 ├── refresh-data.cmd        ← double-click data refresh
@@ -149,11 +151,12 @@ VorFrame/
 │   ├── vorframe-data.js    ← GENERATED — window.VORFRAME_DATA = {...}
 │   └── vorframe-data.json  ← GENERATED — same payload as plain JSON
 ├── .github/workflows/
-│   └── refresh-data.yml    ← daily rebuild in CI, commits only on a real change
+│   └── publish.yml         ← daily rebuild in CI, publishes to Pages
 ├── tools/
 │   ├── build_data.py       ← pipeline: fetch, join, emit
 │   ├── official.py         ← parsers for DE's drop table + public export
 │   ├── bundle.py           ← inlines everything into dist/vorframe.html
+│   ├── serve.py            ← local server, picks a working port
 │   └── schedule.ps1        ← installs/removes the daily Scheduled Task
 ├── dist/                   ← GENERATED — single-file build, gitignored
 └── .cache/                 ← GENERATED — HTTP cache + state.json, safe to delete

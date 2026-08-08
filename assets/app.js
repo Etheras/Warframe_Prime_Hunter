@@ -64,6 +64,7 @@
     cats: new Set(CATEGORIES),
     sort: "cat",
     q: "",
+    hideVaultedRelics: false,
   };
 
   try {
@@ -76,6 +77,8 @@
         state.cats = new Set(saved.cats.filter((c) => CATEGORIES.includes(c)));
       }
       if (saved.sort) state.sort = saved.sort;
+      if (typeof saved.hideVaultedRelics === "boolean")
+        state.hideVaultedRelics = saved.hideVaultedRelics;
     }
   } catch (e) { /* ignore malformed saved filters */ }
 
@@ -87,6 +90,7 @@
         showMissing: state.showMissing,
         cats: Array.from(state.cats),
         sort: state.sort,
+        hideVaultedRelics: state.hideVaultedRelics,
       }));
     } catch (e) { /* non-fatal */ }
   };
@@ -289,17 +293,29 @@
              why: `Radiant raises this from ${intact}% to ${rad}%` };
   }
 
-  // "I 11% · E 13% · F 17% · R 20%", with the refined odds emphasised
-  function chanceStr(ch) {
-    if (!ch) return "";
-    const order = (DATA.meta && DATA.meta.refinements) ||
-      ["Intact", "Exceptional", "Flawless", "Radiant"];
-    const avail = order.filter((k) => ch[k] != null);
-    if (!avail.length) return "";
-    return avail.map((k, i) => {
-      const txt = `${k[0]}&nbsp;${ch[k]}%`;
-      return i === avail.length - 1 ? `<b>${txt}</b>` : txt;
-    }).join(" · ");
+  /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
+     really "stay for the 4th reward". Spelled out on hover because the letters
+     mean nothing on their own. */
+  const ROT_CYCLE = "Rewards cycle A → A → B → C, then repeat.";
+  const ROT_HELP = {
+    A: "Rotation A — the 1st and 2nd rewards. Survival 5 and 10 min · Defense waves 5 and 10 · "
+       + "Interception rounds 1 and 2 · Excavation 100 and 200 Cryotic. " + ROT_CYCLE,
+    B: "Rotation B — the 3rd reward. Survival 15 min · Defense wave 15 · "
+       + "Interception round 3 · Excavation 300 Cryotic. " + ROT_CYCLE,
+    C: "Rotation C — the 4th reward, the longest stay. Survival 20 min · Defense wave 20 · "
+       + "Interception round 4 · Excavation 400 Cryotic. " + ROT_CYCLE,
+  };
+
+  function rotTag(rot, prefix) {
+    if (!rot) return "";
+    const help = ROT_HELP[String(rot).toUpperCase()] || `Rotation ${rot}. ${ROT_CYCLE}`;
+    return `<abbr class="rot" title="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
+  }
+
+  function rotListTag(rots) {
+    if (!rots || !rots.length) return "";
+    const help = rots.map((r) => ROT_HELP[String(r).toUpperCase()] || `Rotation ${r}.`).join("\n\n");
+    return `<abbr class="rot" title="${esc(help)}">rotation ${esc(rots.join("/"))}</abbr>`;
   }
 
   function openItem(id) {
@@ -375,7 +391,7 @@
             <div class="spot-where">${esc(s.node)}${
               s.kind === "mission" ? ` <span style="color:var(--txt-faint);font-weight:400">— ${esc(s.planet)}</span>` : ""}</div>
             <div class="spot-meta">${esc(s.mode)}${
-              s.rotations.length ? " · rotation " + s.rotations.join("/") : ""}${
+              s.rotations.length ? " · " + rotListTag(s.rotations) : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.event ? " · event node" : ""} · best drop ${s.best}%</div>
             <div class="spot-score"><b>${s.count}</b>of ${openCount} relics</div>
@@ -385,31 +401,52 @@
 
     /* parts → relics */
     if (it.parts && it.parts.length) {
-      html += `<section class="d-sec"><h3>Parts &amp; the relics that drop them</h3>
+      const hidden = it.parts.reduce((n, p) =>
+        n + p.relics.filter((r) => RELICS[r.relic] && RELICS[r.relic].vaulted).length, 0);
+
+      html += `<section class="d-sec">
+        <div class="sec-head">
+          <h3>Parts &amp; the relics that drop them</h3>
+          <label class="mini-check" title="Vaulted relics can't be farmed — only traded for.">
+            <input type="checkbox" id="hideVaulted" ${state.hideVaultedRelics ? "checked" : ""}>
+            <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
+          </label>
+        </div>
         <p class="legend">The dot is <b>this part's</b> rarity inside that relic:
           <i class="rar Common"></i>common
           <i class="rar Uncommon"></i>uncommon
           <i class="rar Rare"></i>rare.
           Best odds first. <b>Intact</b> means don't refine — refining a common
-          reward makes it rarer.</p>`;
+          reward makes it rarer. Hover a verdict or a rotation for detail.</p>`;
+
       it.parts.forEach((p) => {
         // easiest first: the relic most likely to give this part unrefined
-        p = Object.assign({}, p, {
-          relics: p.relics.slice().sort((a, b) => {
-            const ai = (a.chances && a.chances.Intact) || 0;
-            const bi = (b.chances && b.chances.Intact) || 0;
-            const af = RELICS[a.relic] && !RELICS[a.relic].vaulted ? 1 : 0;
-            const bf = RELICS[b.relic] && !RELICS[b.relic].vaulted ? 1 : 0;
-            return bf - af || bi - ai;   // droppable first, then best intact odds
-          }),
+        let list = p.relics.slice().sort((a, b) => {
+          const ai = (a.chances && a.chances.Intact) || 0;
+          const bi = (b.chances && b.chances.Intact) || 0;
+          const af = RELICS[a.relic] && !RELICS[a.relic].vaulted ? 1 : 0;
+          const bf = RELICS[b.relic] && !RELICS[b.relic].vaulted ? 1 : 0;
+          return bf - af || bi - ai;   // droppable first, then best intact odds
         });
+        const total = list.length;
+        if (state.hideVaultedRelics) {
+          list = list.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
+        }
+
         html += `<div class="part">
           <div class="part-head">
             <span class="part-name">${esc(p.name)}</span>
-            <span class="part-count">${p.relics.length} relic${p.relics.length === 1 ? "" : "s"}${
+            <span class="part-count">${list.length}${
+              list.length !== total ? ` of ${total}` : ""} relic${total === 1 ? "" : "s"}${
               p.itemCount && p.itemCount > 1 ? " · need " + p.itemCount : ""}</span>
           </div>`;
-        p.relics.forEach((r) => {
+
+        if (!list.length) {
+          html += `<div class="relic-none">Every relic for this part is vaulted —
+            untick <b>Hide vaulted</b> to see which ones to trade for.</div>`;
+        }
+
+        list.forEach((r) => {
           const rec = RELICS[r.relic] || {};
           const openNow = rec && !rec.vaulted;
           const rar = r.rarity || "";
@@ -420,12 +457,11 @@
             <span class="rarity ${esc(rar)}">${esc(rar || "?")}</span>
             ${adv ? `<span class="advice ${adv.cls}" title="${esc(adv.why)}">${esc(adv.label)}</span>` : ""}
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
-            <span class="chances">${chanceStr(r.chances)}</span>
           </div>`;
           if (openNow) {
             const top = (rec.sources || []).slice(0, 3).map((s) =>
               `<span>${esc(s.node)}${s.kind === "mission" ? " (" + esc(s.planet) + ")" : ""}${
-                s.rotation ? " · rot " + esc(s.rotation) : ""} · ${s.chance}%</span>`).join("");
+                s.rotation ? " · " + rotTag(s.rotation, "rot ") : ""} · ${s.chance}%</span>`).join("");
             if (top) html += `<div class="relic-src">${top}${
               rec.sourceCount > 3 ? `<span>+${rec.sourceCount - 3} more</span>` : ""}</div>`;
           }
@@ -445,6 +481,17 @@
       toggle(it.id);
       openItem(it.id); // re-render with new state
     });
+
+    const hv = $("#hideVaulted");
+    if (hv) {
+      hv.addEventListener("change", (e) => {
+        state.hideVaultedRelics = e.target.checked;
+        saveFilters();
+        const keep = drawer.scrollTop;
+        openItem(it.id);
+        drawer.scrollTop = keep;   // don't lose the reader's place
+      });
+    }
   }
 
   function closeDrawer() {
@@ -625,6 +672,19 @@
     `catalogue: <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">wiki</a> ` +
     `+ DE public export · Resurgence: live worldstate.` +
     `<br>Refresh with <code>python tools/build_data.py</code>.` +
+    `<span class="attrib">
+       WARFRAME and all related data, names and artwork are the property of
+       <a href="https://www.warframe.com" target="_blank" rel="noopener">Digital Extremes Ltd.</a>
+       and are used here under their
+       <a href="https://www.warframe.com/en/contentpolicy" target="_blank" rel="noopener">Content Policy</a>
+       for non-commercial fan works. VorFrame is an unofficial fan project, not
+       affiliated with or endorsed by Digital Extremes.
+       <br>Catalogue data from the
+       <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">WARFRAME Wiki</a>
+       (CC BY-SA); item and worldstate data via
+       <a href="https://github.com/WFCD" target="_blank" rel="noopener">WFCD</a>
+       (MIT / Apache-2.0). VorFrame's own code is MIT licensed.
+     </span>` +
     ((m.stale && m.stale.length)
       ? `<br><span style="color:var(--txt-dim)">Reused cached data for
          ${esc(m.stale.join(", "))} — slightly behind.</span>` : "") +
