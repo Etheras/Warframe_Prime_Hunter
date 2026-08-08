@@ -61,7 +61,10 @@ jobs:
             "https://origin.warframe.com/PublicExport/index_en.txt.lzma" \
             "https://api.warframestat.us/pc/vaultTrader" \
             "https://drops.warframestat.us/data/relics.json" ; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' -m 30 \
+            # -L matters: warframe.com/droptables answers a datacenter IP with a
+            # 302. urllib follows redirects, so without -L this probe reports a
+            # "failure" the build never actually sees.
+            code=$(curl -sL -o /dev/null -w '%{http_code}' -m 30 \
                    -A 'VorFrame/1.0 (personal Prime collection tracker)' "$url" || echo "000")
             printf '  %-6s %s\n' "$code" "$url"
           done
@@ -108,8 +111,12 @@ jobs:
         with:
           path: _site
 
+  # GitHub Pages is unavailable for private repositories on the Free plan, so
+  # skip the deploy rather than failing the run. Make the repo public and this
+  # starts publishing on the next run with no edit needed here.
   deploy:
     needs: build
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -7,13 +7,20 @@ Newest observations go at the bottom of each section. Delete an item when it shi
 
 ## Open questions
 
-- [ ] **Which host blocks GitHub's runners?** CI run #1 died in 14s on an early
-      fetch. The `Probe the data sources` step now prints all five status codes —
-      read them on the next run and record the answer here. Prime suspect is
-      `wiki.warframe.com` (Cloudflare, already known to 403 non-browser clients).
-- [ ] Decide what CI should do if the wiki really is permanently blocked from
-      Azure: seed the cache once and rely on warm runs, pass `--allow-degraded`
-      deliberately, or drop the wiki from the CI build and accept losing cosmetics.
+- [ ] **Public or private repo?** The repo is currently private on the Free plan,
+      where GitHub Pages is unavailable ("Upgrade or make this repository public
+      to enable Pages"). The deploy job is now skipped automatically while
+      private, so runs stay green. Making it public starts publishing on the next
+      run with no edit needed. Trade-off: public = phone access; private = local
+      use only via `serve.cmd`.
+- [ ] Bump the workflow actions off Node 20 (`actions/checkout`,
+      `actions/setup-python`) — currently forced onto Node 24 with a deprecation
+      warning. Harmless today, will break eventually.
+
+**Resolved:** no host blocks GitHub's runners. All five sources answer from CI —
+the build now succeeds there in 6 seconds. The 302 seen on
+`www.warframe.com/droptables` was an artefact of the probe using `curl` without
+`-L`; `urllib` follows redirects, so the build never saw it. Probe now uses `-L`.
 
 ## Data accuracy
 
