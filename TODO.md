@@ -7,15 +7,15 @@ Newest observations go at the bottom of each section. Delete an item when it shi
 
 ## Open questions
 
-- [ ] **Public or private repo?** The repo is currently private on the Free plan,
-      where GitHub Pages is unavailable ("Upgrade or make this repository public
-      to enable Pages"). The deploy job is now skipped automatically while
-      private, so runs stay green. Making it public starts publishing on the next
-      run with no edit needed. Trade-off: public = phone access; private = local
-      use only via `serve.cmd`.
 - [ ] Bump the workflow actions off Node 20 (`actions/checkout`,
       `actions/setup-python`) — currently forced onto Node 24 with a deprecation
       warning. Harmless today, will break eventually.
+
+**Decided 2026-08-08:** repo stays **private** for now, while the tool gets used
+and verified. GitHub Pages is unavailable for private repos on the Free plan, so
+the deploy job skips itself and CI runs stay green as build validation. Nothing
+needs changing to switch later — making the repo public starts publishing on the
+next run.
 
 **Resolved:** no host blocks GitHub's runners. All five sources answer from CI —
 the build now succeeds there in 6 seconds. The 302 seen on
