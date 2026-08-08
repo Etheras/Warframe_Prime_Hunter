@@ -473,11 +473,12 @@
             const restCount = (rec.sourceCount || all.length) - shownSrc.length;
             let moreTag = "";
             if (top && restCount > 0) {
-              const rest = all.slice(shownSrc.length);
+              const TOOLTIP_MAX = 20;   // the label states the true total; the
+                                        // tooltip stays readable
+              const rest = all.slice(shownSrc.length, shownSrc.length + TOOLTIP_MAX);
               const lines = rest.map((s) =>
                 `${s.node}${s.kind === "mission" ? ` (${s.planet})` : ""}${
                   s.rotation ? ` rot ${s.rotation}` : ""}`);
-              // the payload keeps only the best 40 sources per relic
               if (restCount > lines.length) {
                 lines.push(`…and ${restCount - lines.length} more not listed`);
               }
