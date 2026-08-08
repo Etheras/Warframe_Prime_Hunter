@@ -58,14 +58,25 @@ the build now succeeds there in 6 seconds. The 302 seen on
 
 ### Planner design decisions (settled 2026-08-08)
 
-- **Forma is excluded from the ranking maths.** `Forma Blueprint` sits in a
-  Common slot (25.33% → 0.253 expected units) and `2X Forma Blueprint` in an
-  Uncommon one (11% → 0.220), so the two are near-identical and appear in 24 of
-  the 34 live relics. It is effectively a constant: it floods "usefulness"
-  without discriminating between relics. Tracked as a manual counter instead.
+- **Forma counts, but only up to what you still need.** It gets a have/need
+  field like any other material; if the field shows a shortfall it joins the
+  ranking, because unlike Orokin Cell it really does come from relics.
+  A drop is worth `min(quantity dropped, quantity still needed)`:
+  `Forma Blueprint` sits in a Common slot (25.33%) and `2X Forma Blueprint` in
+  an Uncommon one (11%), so needing **1** makes the 1× relic worth 0.253 against
+  the 2× relic's 0.110, while needing **2+** brings them close at 0.253 vs 0.220.
+  (An earlier note here said to drop Forma from the maths entirely — that was an
+  over-correction, since a near-uniform term barely reorders anything.)
 - **Node tie-break**: show 2, hover for 20 (same pattern as relic sources).
-  Order by score, then enemy level (high weight), then rotation A ahead of B/C
-  (mid weight). Mission length is deliberately ignored as too ambiguous.
+  Order by score, then **lower** enemy level (high weight), then rotation A ahead
+  of B/C (mid weight). `Event:` nodes get a boost, behind an advanced checkbox,
+  since the event is worth running alongside the relic farm. Mission length is
+  deliberately ignored as too ambiguous.
+- **Railjack/Proxima**: out of scope for now — but it cannot simply be deleted.
+  Five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10) have **no other
+  source**, and they carry Nyx, Valkyr, Cernos, Lex, Hikou and Scindo Prime
+  parts. Hiding Railjack outright would make permanently-unvaulted frames look
+  unfarmable. Keep the sources, just leave them out of the default ranking.
 - **Squad odds**: a checkbox, "4-squad run with the same relic and refinement".
   Off means solo. With it on, a wanted reward at probability `w` becomes
   `1 - (1 - w)^4`.
