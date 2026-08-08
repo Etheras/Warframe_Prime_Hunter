@@ -113,12 +113,32 @@ def cache_path(key: str) -> str:
     return os.path.join(CACHE_DIR, safe + ".gz")
 
 
-def fetch(url: str, key: str, offline: bool = False) -> bytes:
-    """GET with a small on-disk cache so reruns and --offline are cheap."""
+# A failed fetch means two very different things, and they are tracked apart:
+#
+#   STALE   - the refresh failed but a previous copy exists, so the build
+#             continues on slightly older data. An alert, not an error.
+#   MISSING - the refresh failed and there is nothing cached. Whatever that
+#             source contributes is simply absent, which is critical for a
+#             cold build (a CI runner always starts cold).
+#
+STALE: list[str] = []
+MISSING: list[str] = []
+
+
+def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
+    """
+    GET with a small on-disk cache so reruns and --offline are cheap.
+
+    On failure: reuse the cached copy if there is one (recorded as STALE),
+    otherwise record MISSING and either abort (critical) or return None.
+    """
     path = cache_path(key)
     if offline:
         if not os.path.exists(path):
-            raise SystemExit(f"--offline but nothing cached for {key}")
+            MISSING.append(key)
+            if critical:
+                raise SystemExit(f"--offline but nothing cached for {key}")
+            return None
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
@@ -142,15 +162,36 @@ def fetch(url: str, key: str, offline: bool = False) -> bytes:
             if attempt < 2:
                 time.sleep(1.5 * (attempt + 1))
 
+    # warm: a previous copy exists, so this is only an alert
     if os.path.exists(path):
-        log(f"! {key}: {last_err} - falling back to cached copy")
+        log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy")
+        STALE.append(key)
         with gzip.open(path, "rb") as fh:
             return fh.read()
-    raise SystemExit(f"failed to fetch {key}: {last_err}")
+
+    # cold: nothing to fall back on
+    MISSING.append(key)
+    if critical:
+        raise SystemExit(
+            f"failed to fetch {key} and nothing is cached: {last_err}\n"
+            f"  This is a cold build, so there is no earlier copy to fall back on."
+        )
+    log(f"! {key} unreachable and not cached ({last_err})")
+    return None
 
 
-def fetch_json(url: str, key: str, offline: bool = False):
-    return json.loads(fetch(url, key, offline).decode("utf-8"))
+def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True):
+    raw = fetch(url, key, offline, critical)
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        MISSING.append(key)
+        if critical:
+            raise SystemExit(f"{key} returned unparseable data: {exc}")
+        log(f"! {key} returned unparseable data ({exc})")
+        return None
 
 
 def head(url: str) -> dict:
@@ -608,6 +649,9 @@ def main() -> int:
                     help="exit without rebuilding when no upstream has moved")
     ap.add_argument("--check", action="store_true",
                     help="report whether upstream changed, then exit; writes nothing")
+    ap.add_argument("--allow-degraded", action="store_true",
+                    help="publish even if a source was unreachable with nothing cached "
+                         "(default: refuse, so a cold failure never silently thins the site)")
     args = ap.parse_args()
     off = args.offline
 
@@ -634,11 +678,14 @@ def main() -> int:
         log("upstream changed: " + (", ".join(sorted(moved)) or "first run"))
 
     # ---- fetch -----------------------------------------------------------
+    # Neither of these is fatal: the catalogue can be rebuilt from DE's export
+    # and parts can be reconstructed from the drop table.
     log("wiki: Prime page")
-    prime_wikitext = fetch(WIKI_RAW.format(title="Prime"), "wiki_prime", off).decode("utf-8", "replace")
+    wiki_blob = fetch(WIKI_RAW.format(title="Prime"), "wiki_prime", off, critical=False)
+    prime_wikitext = wiki_blob.decode("utf-8", "replace") if wiki_blob else None
 
     log("api: item database (name, image, vault state, components)")
-    items_raw = fetch_json(ITEMS_API, "api_items", off)
+    items_raw = fetch_json(ITEMS_API, "api_items", off, critical=False) or []
 
     log("api: Varzia / vault trader (live Prime Resurgence rotation)")
     try:
@@ -654,8 +701,31 @@ def main() -> int:
 
     # ---- transform -------------------------------------------------------
     print("-" * 60)
-    catalog = parse_prime_page(prime_wikitext)
-    log(f"catalogue: {len(catalog)} entries across {len(set(c['category'] for c in catalog))} sections")
+    if prime_wikitext:
+        catalog = parse_prime_page(prime_wikitext)
+        log(f"catalogue: {len(catalog)} entries across "
+            f"{len(set(c['category'] for c in catalog))} sections")
+    else:
+        catalog = []
+        log("! wiki unavailable - rebuilding the catalogue from DE's export alone")
+
+    if not catalog and not export_primes:
+        raise SystemExit(
+            "no catalogue available: both the wiki and DE's public export failed.\n"
+            "  Nothing can be built from the drop table alone - try again later."
+        )
+
+    # A source that failed with nothing cached leaves a real hole in the output.
+    # On a warm run the cache papers over it; on a cold run (every CI run) it
+    # does not, so refuse to publish a thinner site by accident.
+    if MISSING and not args.allow_degraded:
+        raise SystemExit(
+            "cold build: no data at all for " + ", ".join(sorted(set(MISSING))) + "\n"
+            "  Nothing was cached to fall back on, so the result would be missing\n"
+            "  items or artwork. The previous build (if any) has been left alone.\n"
+            "  Re-run when the source is reachable, or pass --allow-degraded to\n"
+            "  publish an explicitly incomplete build."
+        )
 
     # Primes DE already ships that the wiki page has not listed yet
     known = {norm(c["name"]) for c in catalog}
@@ -668,12 +738,15 @@ def main() -> int:
             "wikiImage": None,
             "wikiFlags": {"vaulted": False, "resurgenceWiki": False, "permanent": False,
                           "baro": False, "special": False, "founder": False},
-            "fromExport": True,
+            # only genuinely "new" if we had a wiki page to compare against
+            "fromExport": bool(prime_wikitext),
         })
-    if fresh:
+    if fresh and prime_wikitext:
         log(f"export: +{len(fresh)} Prime(s) not yet on the wiki page: "
             + ", ".join(p["name"] for p in fresh[:6])
             + (" …" if len(fresh) > 6 else ""))
+    elif fresh:
+        log(f"export: catalogue rebuilt from {len(fresh)} Primes in DE's item data")
 
     log(f"drops: using the {drop_source} source")
     log(f"relics: {len(relic_contents)} known, {len(relic_sources)} currently farmable")
@@ -838,7 +911,11 @@ def main() -> int:
             "resurgence": resurgence_window,
             "refinements": REFINEMENTS,
             "dropSource": drop_source,
-            "newCount": len(fresh),
+            "newCount": len(fresh) if prime_wikitext else 0,
+            # refresh failed but an older copy was reused — data is slightly behind
+            "stale": sorted(set(STALE)),
+            # refresh failed with nothing cached — this data is genuinely absent
+            "degraded": sorted(set(MISSING)),
             "sources": {
                 "catalogue": "https://wiki.warframe.com/w/Prime",
                 "newItems": "https://origin.warframe.com/PublicExport (Digital Extremes, official)",
@@ -885,6 +962,11 @@ def main() -> int:
     log(f"farmable items {with_farm}")
     log(f"resurgence     {sum(1 for i in out_items if i['flags']['resurgence'])}")
     log(f"wrote          data/vorframe-data.js  ({len(blob)/1024/1024:.2f} MB)")
+
+    if STALE:
+        log(f"~ ALERT    reused cached data for: {', '.join(sorted(set(STALE)))}")
+    if MISSING:
+        log(f"! DEGRADED built with no data at all for: {', '.join(sorted(set(MISSING)))}")
 
     if unmatched:
         log(f"note: {len(unmatched)} catalogue entries had no item-database match "

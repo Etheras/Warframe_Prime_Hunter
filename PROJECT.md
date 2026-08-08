@@ -138,6 +138,7 @@ feeds above at the same time or sooner, so nothing is lost by skipping them.
 VorFrame/
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
+├── TODO.md                 ← known gaps and ideas, not yet done
 ├── index.html              ← markup + filter controls
 ├── serve.cmd               ← double-click: serve the site and open a browser
 ├── refresh-data.cmd        ← double-click data refresh
@@ -185,6 +186,28 @@ build, and the sidebar footer shows it.
 `acquire_drops` refuses a parse that yields fewer than 200 relics or 10 farmable
 relics and drops to the mirror instead. A format change upstream degrades the app to
 slightly staler data rather than an empty page.
+
+### Warm vs cold: a failed fetch means two different things
+
+This distinction drives the whole error policy.
+
+| | Situation | Treated as | Result |
+|---|---|---|---|
+| **Warm** | Refresh failed, a cached copy exists | **Alert** | Build continues on the older copy; recorded in `meta.stale` |
+| **Cold** | Refresh failed, nothing cached | **Critical** | Build aborts; the previous `data/` is left untouched |
+
+A cold miss aborts because the output would be quietly *thinner* — fewer items, or
+no artwork — and publishing that over a good build is worse than not publishing.
+`--allow-degraded` overrides it deliberately, recording the gap in `meta.degraded`;
+the site footer then says what is missing.
+
+Every CI run starts cold, which is why the workflow persists `.cache/` with
+`actions/cache`. The first run must succeed on its own; after that, a blocked source
+downgrades from critical to a stale alert, exactly as it does locally.
+
+Verified across four states: warm-with-blocked-source (315 items + alert), cold
+(exits 1), cold with `--allow-degraded` (172 items + degraded flag), and healthy
+(315 items, clean).
 
 ---
 
@@ -306,12 +329,5 @@ Known limits:
 
 ## 9. Possible next steps
 
-Not built, in rough order of usefulness:
-
-- Track individual **parts** as owned, not just whole items ("I have 3 of 4 Chassis").
-- A **global farm planner**: given everything you're missing, rank nodes across the
-  whole collection rather than per item.
-- Ducat value per part, for prime-junk triage.
-- Relic **inventory** tracking, so the drawer can say "you already hold 2 of these".
-- Have the scheduled task write a short changelog when a rebuild changes availability,
-  so you can see "Frost Prime became farmable" without diffing the JSON.
+See **[TODO.md](TODO.md)** — open questions, known gaps, and ideas, kept as a
+running list rather than duplicated here.

@@ -39,20 +39,54 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Give CI the same warm/cold distinction the local build has: once a run
+      # has succeeded, a later run whose source is blocked reuses that copy and
+      # reports it as stale, instead of failing outright. The very first run is
+      # necessarily cold, so a failure there is a real error and should stop.
+      - name: Restore source cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: vorframe-sources-${{ github.run_id }}
+          restore-keys: |
+            vorframe-sources-
+
+      # Which sources answer a datacenter IP is not always the same as which
+      # answer a home connection, so record it before the build runs.
+      - name: Probe the data sources
+        run: |
+          for url in \
+            "https://wiki.warframe.com/index.php?title=Prime&action=raw" \
+            "https://www.warframe.com/droptables" \
+            "https://origin.warframe.com/PublicExport/index_en.txt.lzma" \
+            "https://api.warframestat.us/pc/vaultTrader" \
+            "https://drops.warframestat.us/data/relics.json" ; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 30 \
+                   -A 'VorFrame/1.0 (personal Prime collection tracker)' "$url" || echo "000")
+            printf '  %-6s %s\n' "$code" "$url"
+          done
+
       - name: Fetch data from Digital Extremes and build
         run: python tools/build_data.py
 
       - name: Sanity-check the result
         run: |
           python - <<'PY'
-          import json
+          import json, sys
           d = json.load(open("data/vorframe-data.json", encoding="utf-8"))
-          items, relics = d["items"], d["relics"]
+          items, relics, meta = d["items"], d["relics"], d["meta"]
           wf = [i for i in items if i["category"] == "Warframe"]
+          art = [i for i in items if i.get("image")]
           print(f"{len(items)} items, {len(wf)} Warframes, {len(relics)} relics, "
-                f"source={d['meta']['dropSource']}")
-          # refuse to publish an obviously broken build
-          assert len(items) >= 250, f"only {len(items)} items"
+                f"{len(art)} with artwork, source={meta['dropSource']}")
+          if meta.get("stale"):
+              print("::warning::refresh failed, reused cached data for: "
+                    + ", ".join(meta["stale"]))
+          if meta.get("degraded"):
+              print("::warning::no data at all for: " + ", ".join(meta["degraded"]))
+          # refuse to publish an obviously broken build. Thresholds allow for a
+          # wiki-less build (~172 items, cosmetics come only from the wiki).
+          assert len(items) >= 150, f"only {len(items)} items"
           assert len(wf) >= 40, f"only {len(wf)} Warframes"
           assert len(relics) >= 500, f"only {len(relics)} relics"
           assert any(i["flags"]["farmable"] for i in items), "nothing is farmable"

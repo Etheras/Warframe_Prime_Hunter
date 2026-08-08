@@ -588,7 +588,13 @@
     `${official ? "warframe.com (official)" : "community mirror"}</a> · ` +
     `catalogue: <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">wiki</a> ` +
     `+ DE public export · Resurgence: live worldstate.` +
-    `<br>Refresh with <code>python tools/build_data.py</code>.`;
+    `<br>Refresh with <code>python tools/build_data.py</code>.` +
+    ((m.stale && m.stale.length)
+      ? `<br><span style="color:var(--txt-dim)">Reused cached data for
+         ${esc(m.stale.join(", "))} — slightly behind.</span>` : "") +
+    ((m.degraded && m.degraded.length)
+      ? `<br><span style="color:var(--gold)">Built without ${esc(m.degraded.join(", "))}
+         — some items or artwork are missing.</span>` : "");
 
   render();
 })();
