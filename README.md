@@ -65,18 +65,19 @@ while you use the site — closing it shuts the site down.
 
 - **Search box** at the top — type a Prime, a part, or a relic name. Press `/` to jump to it.
 - **Category** in the sidebar — Warframe, Primary, Secondary, Melee, and so on.
-- **Availability** in the sidebar — five groups you can switch on and off:
+- **Availability** in the sidebar — six groups you can switch on and off:
 
 | | Meaning |
 |---|---|
 | **Farmable now** | Its relics are dropping in missions today |
 | **Prime Resurgence (R)** | Buyable from Varzia right now, with Aya |
+| **Baro Ki'Teer (B)** | Sold by the Void Trader when he visits |
+| **Other sources** | Not from relics at all — a quest, an event, a special vendor. Open one and it tells you exactly where |
 | **Vaulted (V)** | Not obtainable except by trading with other players |
-| **Baro Ki'Teer (B)** | Sold by the Void Trader |
-| **Founder / special** | Excalibur, Lato and Skana Prime, plus a few odd ones |
+| **Founder exclusive** | Excalibur, Lato and Skana Prime. Never coming back — kept at the bottom for that reason |
 
 Want to see only what you can actually get today? Untick **Vaulted** and
-**Founder / special**.
+**Founder exclusive**.
 
 ### Marking what you own
 
@@ -118,6 +119,14 @@ Click any card. A panel slides in from the right with:
 Vaulted Primes show their relics too, greyed out — useful when you're looking to
 trade for a specific one.
 
+### "Vaulting soon"
+
+Some farmable Primes carry an orange **VAULTING SOON** badge. Warframe vaults on a
+strict cadence: every Prime Access release vaults the Prime from *seven releases
+earlier*, on the same day — that has held for all 41 Warframes vaulted so far. The
+badge marks the two oldest still-farmable releases, weapons included, because they
+are next in line. If you want them, get them now.
+
 ### Advanced options
 
 At the bottom of the sidebar:
@@ -127,15 +136,18 @@ At the bottom of the sidebar:
   for solo runs. It only changes the numbers displayed, nothing else.
 - **Materials** — a plain checklist of what you have versus what you need
   (Forma, Orokin Cell, and anything else you add). Purely for your own reference;
-  it doesn't feed the farm advice.
+  it doesn't feed the farm advice. Normally you can only edit the *have* number,
+  since that's what changes as you play — press **edit** to rename rows, change
+  targets, or add and remove them.
 
 ### Backing up your collection
 
 Your ticks are stored in your browser. Click **Backup** at the top right to copy
 them out as text, or paste a saved copy back in and press **Import**.
 
-*(Backup currently covers whole-item ticks. Part-level progress and materials
-live alongside it in the browser but aren't in the export yet.)*
+The backup covers everything: whole-item ticks, per-part progress, and your
+materials list. Old backups from an earlier version still import — they're treated
+as "I own all of these" and expanded into parts.
 
 Worth doing before clearing your browser data.
 

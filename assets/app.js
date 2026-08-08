@@ -94,11 +94,11 @@
      unambiguous, but a card can still show several badges.        */
   function statusOf(it) {
     const f = it.flags;
-    if (f.founder) return "founder";
-    if (f.special) return "founder";       // grouped under "Founder / special"
+    if (f.founder) return "founder";        // never coming back
     if (f.resurgence) return "resurgence";  // time-limited: takes priority
     if (f.farmable) return "farmable";
-    if (f.baro) return "baro";
+    if (f.baro) return "baro";              // Gotva is (S) on the wiki but really Baro
+    if (f.special) return "special";        // quest / event / special vendor
     return "vaulted";
   }
 
@@ -115,7 +115,8 @@
 
   /* ── filter state ─────────────────────────────────────────── */
   const state = {
-    avail: { farmable: true, resurgence: true, vaulted: true, baro: true, founder: true },
+    avail: { farmable: true, resurgence: true, baro: true, special: true,
+             vaulted: true, founder: true },
     showCollected: true,
     showMissing: true,
     cats: new Set(CATEGORIES),
@@ -175,7 +176,7 @@
       CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) ||
       a.name.localeCompare(b.name),
     status: (a, b) => {
-      const order = ["farmable", "resurgence", "baro", "vaulted", "founder"];
+      const order = ["farmable", "resurgence", "baro", "special", "vaulted", "founder"];
       return order.indexOf(a._status) - order.indexOf(b._status) || a.name.localeCompare(b.name);
     },
     release: (a, b) => String(b.releaseDate || "").localeCompare(String(a.releaseDate || "")) ||
@@ -188,8 +189,9 @@
     resurgence: ["resurgence", "R · RESURGENCE"],
     vaulted: ["vaulted", "V · VAULTED"],
     baro: ["baro", "B · BARO"],
-    founder: ["founder", "FOUNDER"],
-    special: ["special", "S · SPECIAL"],
+    founder: ["founder", "FOUNDER EXCLUSIVE"],
+    special: ["special", "OTHER SOURCE"],
+    vaultsoon: ["vaultsoon", "VAULTING SOON"],
     perm: ["perm", "P · NEVER VAULTED"],
     fresh: ["fresh", "NEW"],
   };
@@ -199,13 +201,36 @@
     // shipped by DE but not on the wiki page yet
     if (it.isNew) out.push("fresh");
     if (f.founder) out.push("founder");
-    if (f.special && !f.founder) out.push("special");
+    // Gotva Prime carries (S) on the wiki but is really a Baro item, so the
+    // "other source" badge steps aside wherever Baro already explains it
+    if (f.special && !f.founder && !f.baro) out.push("special");
     if (f.resurgence) out.push("resurgence");
     if (f.farmable) out.push("farmable");
     else if (f.vaulted && !f.founder) out.push("vaulted");
+    if (it.vaultSoon) out.push("vaultsoon");
     if (f.permanent) out.push("perm");
     if (f.baro) out.push("baro");
     return out;
+  }
+
+  const VAULT_SOON_WHY =
+    "Vaulting runs on a fixed cadence: every Prime Access release vaults the " +
+    "Prime from seven releases earlier, on the same day. This is one of the two " +
+    "oldest still-farmable releases, so it is next in line. Grab it while you can.";
+
+  function badgeTitle(kind, it) {
+    if (kind === "special") return it.acquisition || "Comes from somewhere other than relics.";
+    if (kind === "vaultsoon") return VAULT_SOON_WHY;
+    if (kind === "founder") return "Only ever available to original Founders. This will never return.";
+    if (kind === "perm") return "Never vaulted — its relics keep dropping indefinitely.";
+    return "";
+  }
+
+  function badgeHTML(it) {
+    return badgesFor(it).map((b) => {
+      const t = badgeTitle(b, it);
+      return `<span class="badge ${BADGE[b][0]}"${t ? ` title="${esc(t)}"` : ""}>${BADGE[b][1]}</span>`;
+    }).join("");
   }
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
@@ -221,8 +246,7 @@
       ? `<img src="${esc(it.image)}" alt="" loading="lazy"
              onerror="this.parentNode.innerHTML='<span class=noimg>◈</span>'">`
       : '<span class="noimg">◈</span>';
-    const badges = badgesFor(it)
-      .map((b) => `<span class="badge ${BADGE[b][0]}">${BADGE[b][1]}</span>`).join("");
+    const badges = badgeHTML(it);
     return `<article class="card${has ? " is-collected" : ""}" data-id="${esc(it.id)}" tabindex="0">
       <div class="card-tick" data-tick="${esc(it.id)}" role="checkbox"
            aria-checked="${has}" title="Mark as collected">${TICK}</div>
@@ -281,7 +305,7 @@
 
   function updateCounts() {
     const availPool = ITEMS.filter((it) => matches(it, "avail"));
-    ["farmable", "resurgence", "vaulted", "baro", "founder"].forEach((k) => {
+    Object.keys(state.avail).forEach((k) => {
       const el = $(`[data-count="${k}"]`);
       if (el) el.textContent = availPool.filter((it) => it._status === k).length;
     });
@@ -430,8 +454,7 @@
     const art = it.image
       ? `<img src="${esc(it.image)}" alt="" onerror="this.style.display='none'">`
       : "◈";
-    const badges = badgesFor(it)
-      .map((b) => `<span class="badge ${BADGE[b][0]}">${BADGE[b][1]}</span>`).join("");
+    const badges = badgeHTML(it);
 
     let html = `
       <div class="d-head">
@@ -470,9 +493,16 @@
     } else if (f.farmable) {
       html += `<div class="d-callout good"><b>Farmable now.</b> Its relics drop in the
         missions listed below — no Aya needed.</div>`;
+    } else if (f.baro) {
+      html += `<div class="d-callout"><b>Baro Ki'Teer.</b> Sold by the Void Trader when he
+        visits, for Ducats and Credits. His stock changes every visit, so it's a matter of
+        catching the right one.${it.acquisition ? " " + esc(it.acquisition) : ""}</div>`;
     } else if (f.special) {
-      html += `<div class="d-callout vault"><b>Special acquisition.</b> This one comes from a
-        unique source rather than the relic system — see the wiki page for details.</div>`;
+      html += `<div class="d-callout vault"><b>Not from relics.</b> ${
+        it.acquisition
+          ? esc(it.acquisition)
+          : "This one comes from a unique source rather than the relic system — see the wiki page for details."
+      }</div>`;
     } else if (it.parts && it.parts.length) {
       html += `<div class="d-callout vault"><b>Vaulted.</b> None of its relics currently drop.
         Get it by trading relics or parts with other players, or wait for it to return in
@@ -480,6 +510,13 @@
     } else {
       html += `<div class="d-callout"><b>No relic data.</b> This is obtained outside the
         Void Relic system (Prime Access, accessories, or a special source).</div>`;
+    }
+
+    if (it.vaultSoon) {
+      html += `<div class="d-callout warn"><b>Likely vaulting soon.</b> Every Prime Access
+        release vaults the Prime from seven releases earlier, on the same day — that has held
+        for all 41 vaulted Warframes. This is one of the two oldest still-farmable releases,
+        so it's next in line.</div>`;
     }
 
     /* best farm spots */
@@ -699,7 +736,8 @@
   });
 
   const availIds = { "f-farmable": "farmable", "f-resurgence": "resurgence",
-    "f-vaulted": "vaulted", "f-baro": "baro", "f-founder": "founder" };
+    "f-baro": "baro", "f-special": "special", "f-vaulted": "vaulted",
+    "f-founder": "founder" };
   Object.keys(availIds).forEach((id) => {
     const el = $("#" + id);
     el.checked = state.avail[availIds[id]];
@@ -786,7 +824,14 @@
   /* backup dialog */
   const dlg = $("#dataDlg");
   $("#dataBtn").addEventListener("click", () => {
-    $("#dataArea").value = JSON.stringify(Array.from(collected));
+    $("#dataArea").value = JSON.stringify({
+      vorframe: 2,
+      exported: new Date().toISOString(),
+      collected: Array.from(collected),
+      parts: partsOwned,
+      materials: materials,
+    });
+    $("#dlgMsg").style.color = "";
     $("#dlgMsg").textContent = "";
     dlg.showModal();
   });
@@ -798,15 +843,76 @@
   });
   $("#importBtn").addEventListener("click", () => {
     try {
-      const arr = JSON.parse($("#dataArea").value);
-      if (!Array.isArray(arr)) throw new Error("expected a list of ids");
-      const known = new Set(ITEMS.map((i) => i.id));
-      const good = arr.filter((id) => known.has(id));
-      collected = new Set(good);
-      saveCollected(); render();
+      const raw = JSON.parse($("#dataArea").value);
+
+      // A bare array is a backup from before parts existed: it means
+      // "these items are complete", so expand it the way migrate() does.
+      const legacy = Array.isArray(raw);
+      const payload = legacy ? { collected: raw } : raw;
+      if (!payload || typeof payload !== "object" || !Array.isArray(payload.collected)) {
+        throw new Error("this doesn't look like a VorFrame backup");
+      }
+
+      const byId = new Map(ITEMS.map((i) => [i.id, i]));
+      let skipped = 0;
+
+      const ids = payload.collected.filter((id) => {
+        if (byId.has(id)) return true;
+        skipped++; return false;
+      });
+
+      // parts, validated against the current catalogue
+      const nextParts = {};
+      const srcParts = (!legacy && payload.parts && typeof payload.parts === "object")
+        ? payload.parts : {};
+      Object.keys(srcParts).forEach((id) => {
+        const it = byId.get(id);
+        if (!it) { skipped++; return; }
+        const bag = {};
+        Object.keys(srcParts[id] || {}).forEach((name) => {
+          const p = it.parts.find((x) => x.name === name);
+          if (!p) { skipped++; return; }
+          const n = Math.max(0, Math.min(needOf(p), Number(srcParts[id][name]) || 0));
+          if (n > 0) bag[name] = n;
+        });
+        if (Object.keys(bag).length) nextParts[id] = bag;
+      });
+      // legacy backups carry no parts, so derive them from the ticked items
+      if (legacy) {
+        ids.forEach((id) => {
+          const it = byId.get(id);
+          if (!it.parts.length) return;
+          nextParts[id] = {};
+          it.parts.forEach((p) => (nextParts[id][p.name] = needOf(p)));
+        });
+      }
+
+      const nextMaterials = Array.isArray(payload.materials)
+        ? payload.materials
+            .filter((m) => m && typeof m === "object")
+            .map((m) => ({
+              name: String(m.name == null ? "" : m.name).slice(0, 60),
+              have: Math.max(0, Number(m.have) || 0),
+              need: Math.max(0, Number(m.need) || 0),
+            }))
+        : null;
+
+      collected = new Set(ids);
+      partsOwned = nextParts;
+      // an item with parts is collected iff they're all owned — re-derive it
+      ITEMS.forEach((it) => syncCollected(it));
+      if (nextMaterials) { materials = nextMaterials; renderMaterials(); }
+
+      saveCollected(); savePartsOwned(); if (nextMaterials) saveMaterials();
+      render();
+
+      const partCount = Object.keys(partsOwned).length;
+      $("#dlgMsg").style.color = "";
       $("#dlgMsg").textContent =
-        `Imported ${good.length} item${good.length === 1 ? "" : "s"}` +
-        (arr.length - good.length ? ` (${arr.length - good.length} unrecognised, skipped).` : ".");
+        `Imported ${collected.size} collected, ${partCount} part-tracked` +
+        (nextMaterials ? `, ${nextMaterials.length} material rows` : "") +
+        (legacy ? " (old-format backup, parts filled in)" : "") +
+        (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped.` : ".");
     } catch (err) {
       $("#dlgMsg").style.color = "var(--red)";
       $("#dlgMsg").textContent = "Could not read that: " + err.message;
@@ -831,18 +937,33 @@
     catch (e) { /* non-fatal */ }
   };
 
+  /* Two modes: normally you only edit "have", because that's the number that
+     changes as you play. The name and the target sit behind the edit toggle so
+     they can't be knocked out of place by a stray click. */
+  let matEditing = false;
+
   function renderMaterials() {
+    $("#matEdit").textContent = matEditing ? "done" : "edit";
+    $("#matList").classList.toggle("editing", matEditing);
+    $("#addMat").hidden = !matEditing;
+
     $("#matList").innerHTML = materials.map((mat, i) => {
-      const short = (Number(mat.need) || 0) - (Number(mat.have) || 0);
+      const have = Number(mat.have) || 0, need = Number(mat.need) || 0;
+      const short = need - have;
+      const nameCell = matEditing
+        ? `<input class="mat-name" data-i="${i}" value="${esc(mat.name)}" placeholder="material">`
+        : `<span class="mat-name" title="${esc(mat.name)}">${esc(mat.name || "—")}</span>`;
+      const needCell = matEditing
+        ? `<input class="mat-num" data-i="${i}" data-f="need" type="number" min="0"
+                  value="${need}" title="how many you need">`
+        : `<span class="mat-need" title="how many you need">${need}</span>`;
       return `<div class="mat-row${short > 0 ? " short" : ""}">
-        <input class="mat-name" data-i="${i}" value="${esc(mat.name)}" placeholder="material">
-        <input class="mat-num" data-i="${i}" data-f="have" type="number" min="0"
-               value="${Number(mat.have) || 0}" title="how many you have">
+        ${nameCell}
+        <input class="mat-num mat-have" data-i="${i}" data-f="have" type="number" min="0"
+               value="${have}" title="how many you have">
         <span class="mat-sep">/</span>
-        <input class="mat-num" data-i="${i}" data-f="need" type="number" min="0"
-               value="${Number(mat.need) || 0}" title="how many you need">
-        <button class="mat-del" data-i="${i}" title="remove">✕</button>
-        <span class="mat-short">${short > 0 ? `short ${short}` : (mat.need ? "ok" : "")}</span>
+        ${needCell}
+        ${matEditing ? `<button class="mat-del" data-i="${i}" title="remove">✕</button>` : ""}
       </div>`;
     }).join("");
   }
@@ -855,9 +976,13 @@
     saveMaterials();
     const row = el.closest(".mat-row");
     const short = (Number(materials[i].need) || 0) - (Number(materials[i].have) || 0);
-    row.classList.toggle("short", short > 0);
-    row.querySelector(".mat-short").textContent =
-      short > 0 ? `short ${short}` : (materials[i].need ? "ok" : "");
+    if (row) row.classList.toggle("short", short > 0);
+  });
+
+  $("#matEdit").addEventListener("click", () => {
+    matEditing = !matEditing;
+    renderMaterials();
+    if (matEditing) { const f = $("#matList .mat-name"); if (f && f.focus) f.focus(); }
   });
 
   $("#matList").addEventListener("click", (e) => {

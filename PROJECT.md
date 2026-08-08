@@ -25,8 +25,10 @@ working out **where to farm the relics** for anything you're still missing.
 
 Collection state is stored in the browser's `localStorage` across three keys:
 `vorframe.collected.v1` (whole items), `vorframe.parts.v1` (per-part counts) and
-`vorframe.materials.v1` (the manual checklist). Only the first is covered by the
-**Backup** button so far.
+`vorframe.materials.v1` (the manual checklist). **Backup** exports all three as one
+document, and still accepts the old bare-array format by expanding each ticked item
+into fully-owned parts. Imports are validated against the current catalogue:
+unknown ids and part names are skipped and counts clamped to what the part needs.
 
 **Parts are the source of truth** for anything that has them: an item counts as
 collected exactly when every part is owned, and ticking the card sets or clears
@@ -285,9 +287,24 @@ rewards and keep the best.
 Each item lands in exactly one bucket so the sidebar toggles stay unambiguous;
 cards can still show several badges. Precedence:
 
-`founder → special → resurgence → farmable → baro → vaulted`
+`founder → resurgence → farmable → baro → special → vaulted`
 
-Resurgence outranks farmable because it's time-limited and worth surfacing.
+Resurgence outranks farmable because it's time-limited. **Baro outranks special**
+because Gotva Prime carries the wiki's bare `(S)` marker but is really a Void
+Trader item — the more specific answer wins. Founder is first in precedence but
+displayed *last* in the sidebar: it will never be available again, so it is the
+least actionable thing on the list.
+
+Items the wiki marks `(S)` get their real acquisition route read from their own
+wiki page (`acquisition_summary`), so "Other sources" can say *The Perita
+Rebellion, Rotation A* rather than shrugging. Only a handful of items, fetched
+non-critically.
+
+**`vaultSoon`** flags the two oldest still-farmable release batches. Vaulting runs
+on a strict cadence — every Prime Access release vaults the Prime from seven
+releases earlier, on the same day, which holds for all 41 vaulted Warframes in the
+current data. The flag is computed from the farmable non-permanent Warframes and
+then applied by release date, so the weapons that shipped alongside are caught too.
 
 ---
 

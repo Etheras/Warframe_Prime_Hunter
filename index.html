@@ -44,12 +44,14 @@
         <span class="box"></span><span class="lbl">Farmable now</span><span class="cnt" data-count="farmable"></span></label>
       <label class="check"><input type="checkbox" id="f-resurgence" checked>
         <span class="box"></span><span class="lbl">Prime Resurgence <em>(R)</em></span><span class="cnt" data-count="resurgence"></span></label>
-      <label class="check"><input type="checkbox" id="f-vaulted" checked>
-        <span class="box"></span><span class="lbl">Vaulted <em>(V)</em></span><span class="cnt" data-count="vaulted"></span></label>
       <label class="check"><input type="checkbox" id="f-baro" checked>
         <span class="box"></span><span class="lbl">Baro Ki'Teer <em>(B)</em></span><span class="cnt" data-count="baro"></span></label>
-      <label class="check"><input type="checkbox" id="f-founder" checked>
-        <span class="box"></span><span class="lbl">Founder / special</span><span class="cnt" data-count="founder"></span></label>
+      <label class="check" title="Primes that come from somewhere other than relics — a quest, an event, or a special vendor. Open one to see exactly where."><input type="checkbox" id="f-special" checked>
+        <span class="box"></span><span class="lbl">Other sources</span><span class="cnt" data-count="special"></span></label>
+      <label class="check"><input type="checkbox" id="f-vaulted" checked>
+        <span class="box"></span><span class="lbl">Vaulted <em>(V)</em></span><span class="cnt" data-count="vaulted"></span></label>
+      <label class="check" title="Only ever available to original Founders. These will never return."><input type="checkbox" id="f-founder" checked>
+        <span class="box"></span><span class="lbl">Founder exclusive</span><span class="cnt" data-count="founder"></span></label>
     </section>
 
     <section class="filter-block">
@@ -92,10 +94,13 @@
 
         <div class="filter-head" style="margin-top:16px">
           <h2>Materials</h2>
-          <button class="mini" id="addMat">+ add</button>
+          <span class="mat-actions">
+            <button class="mini" id="addMat" hidden>+ add</button>
+            <button class="mini" id="matEdit">edit</button>
+          </span>
         </div>
-        <p class="hint">Just a checklist — nothing here feeds the farm advice.
-          Forma will, once the planner lands.</p>
+        <p class="hint">Have / need. Just a checklist — nothing here feeds the farm
+          advice. Forma will, once the planner lands.</p>
         <div id="matList" class="mat-list"></div>
       </details>
     </section>

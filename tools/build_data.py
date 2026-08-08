@@ -297,6 +297,45 @@ def acquire_export(offline: bool):
     return official.collect_prime_items(exports), hashlib.sha256(blob).hexdigest()[:16]
 
 
+_WIKI_MARKUP = [
+    (re.compile(r"\{\{(?:Resource|Weapon|WF|Companion|Icon)\|([^|}]+)(?:\|[^}]*)?\}\}"), r"\1"),
+    (re.compile(r"\[\[[^\]|]+\|([^\]]+)\]\]"), r"\1"),
+    (re.compile(r"\[\[([^\]]+)\]\]"), r"\1"),
+    (re.compile(r"'''?"), ""),
+    (re.compile(r"<[^>]+>"), ""),
+    (re.compile(r"\{\{[^}]*\}\}"), ""),
+]
+
+
+def acquisition_summary(wikitext: str) -> str | None:
+    """
+    A one-line answer to "where does this actually come from?", for the handful
+    of Primes the wiki marks with a bare (S) and no explanation.
+
+    Reads either the {{Acquisition|...}} template or an ==Acquisition== section,
+    strips wiki markup and keeps the first sentence or two.
+    """
+    if not wikitext:
+        return None
+    m = re.search(r"\{\{Acquisition\|(.+?)\}\}\s*$", wikitext, re.S | re.M)
+    body = m.group(1) if m else None
+    if body is None:
+        m = re.search(r"^==\s*Acquisition\s*==\s*\n(.+?)(?=\n==[^=]|\Z)", wikitext, re.S | re.M)
+        body = m.group(1) if m else None
+    if not body:
+        return None
+
+    text = body.split("\n\n")[0]
+    for pat, rep in _WIKI_MARKUP:
+        text = pat.sub(rep, text)
+    text = re.sub(r"\s+", " ", text).strip(" *:\n")
+
+    # first two sentences is plenty for a tooltip
+    parts = re.split(r"(?<=\.)\s+", text)
+    out = " ".join(parts[:2]).strip()
+    return (out[:320].rstrip() + "…") if len(out) > 320 else (out or None)
+
+
 def normalise_part(name: str) -> str:
     """
     One canonical spelling for a part, whichever source described it.
@@ -906,6 +945,42 @@ def main() -> int:
             # present in DE's export but not yet on the wiki Prime page
             "isNew": bool(entry.get("fromExport")),
         })
+
+    # ---- explain the "special" Primes -----------------------------------
+    # The wiki marks these with a bare (S) and no reason, so fetch the reason.
+    for it in out_items:
+        if not it["flags"]["special"]:
+            continue
+        page = it["wikiUrl"].rsplit("/", 1)[-1]
+        blob = fetch(WIKI_RAW.format(title=page), f"wiki_{page}", off, critical=False)
+        if blob:
+            summary = acquisition_summary(blob.decode("utf-8", "replace").replace("\xa0", " "))
+            if summary:
+                it["acquisition"] = summary
+    named = sum(1 for i in out_items if i.get("acquisition"))
+    if named:
+        log(f"special: read the acquisition route for {named} item(s)")
+
+    # ---- which Primes are next in line for the vault --------------------
+    # Vaulting runs on a fixed cadence: every Prime Access release vaults the
+    # frame from seven releases earlier, on the same day. Verified against all
+    # 41 vaulted Warframes in the current data. So the oldest still-farmable
+    # frames are the ones about to go, along with the weapons released with them.
+    frames = sorted(
+        (i for i in out_items
+         if i["category"] == "Warframe" and i["flags"]["farmable"]
+         and not i["flags"]["permanent"] and i.get("releaseDate")),
+        key=lambda i: i["releaseDate"],
+    )
+    at_risk_dates = {i["releaseDate"][:10] for i in frames[:2]}
+    for it in out_items:
+        it["vaultSoon"] = bool(
+            it["flags"]["farmable"] and not it["flags"]["permanent"]
+            and (it.get("releaseDate") or "")[:10] in at_risk_dates)
+    if at_risk_dates:
+        log(f"vault watch: {sum(1 for i in out_items if i['vaultSoon'])} items in the "
+            f"{len(at_risk_dates)} oldest farmable release(s) — "
+            + ", ".join(i["name"] for i in frames[:2]))
 
     out_items.sort(key=lambda i: (
         CATEGORY_ORDER.index(i["category"]) if i["category"] in CATEGORY_ORDER else 99,

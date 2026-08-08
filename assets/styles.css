@@ -105,7 +105,9 @@ button,input,select,textarea{font:inherit;color:inherit}
   height:calc(100vh - 61px);overflow-y:auto;
   padding:18px 16px 40px;
   border-right:1px solid var(--line);
-  background:linear-gradient(180deg,var(--bg-2),transparent 340px);
+  /* Solid, not a gradient fading to transparent: the sidebar scrolls now, and a
+     gradient that ran out after 340px left the rest of the column unpainted. */
+  background:var(--bg-2);
 }
 .sidebar::-webkit-scrollbar,.drawer::-webkit-scrollbar{width:9px}
 .sidebar::-webkit-scrollbar-thumb,.drawer::-webkit-scrollbar-thumb{background:#232b38;border-radius:5px}
@@ -225,6 +227,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .badge.founder{color:var(--gold);border-color:var(--gold-dim);background:#241d0e}
 .badge.special{color:var(--teal);border-color:#2a5a55;background:#132522}
 .badge.perm{color:var(--teal);border-color:#2a5a55;background:#132522}
+.badge.vaultsoon{color:#f0a860;border-color:#6b4523;background:#2a1c10;cursor:help}
+.badge.special{cursor:help}
+.badge.founder{cursor:help}
 .badge.fresh{
   color:#0b1017;border-color:var(--gold);
   background:linear-gradient(90deg,var(--gold),#f0d089);
@@ -289,6 +294,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .d-callout.vault b{color:var(--gold)}
 .d-callout.good{border-color:#2d5a41;background:#15241c}
 .d-callout.good b{color:var(--green)}
+.d-callout.warn{border-color:#6b4523;background:#2a1c10}
+.d-callout.warn b{color:#f0a860}
 
 .d-sec{margin-top:26px}
 .d-sec > h3{
@@ -344,21 +351,40 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #advanced summary:hover{color:var(--gold)}
 #advanced[open] summary{margin-bottom:8px}
-.mat-list{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.mat-row{display:flex;align-items:center;gap:4px;font-size:12px}
+.mat-actions{display:flex;gap:8px;align-items:center}
+.mat-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+
+/* name takes whatever's left; the numbers get just enough for 2 digits */
+.mat-row{display:flex;align-items:center;gap:3px;font-size:12px;min-width:0}
 .mat-row input{
   background:#0d1118;border:1px solid var(--line);border-radius:5px;
-  padding:3px 6px;color:var(--txt);font-size:11.5px;min-width:0;
+  padding:3px 4px;color:var(--txt);font-size:11.5px;min-width:0;
 }
-.mat-row .mat-name{flex:1}
-.mat-row .mat-num{width:42px;text-align:right;font-variant-numeric:tabular-nums}
-.mat-row .mat-sep{color:var(--txt-faint)}
+.mat-row .mat-name{
+  flex:1 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+span.mat-name{color:var(--txt-dim);padding:3px 0}
+.mat-row.short span.mat-name{color:var(--txt)}
+.mat-row .mat-num{
+  flex:0 0 34px;width:34px;text-align:center;font-variant-numeric:tabular-nums;
+  -moz-appearance:textfield;
+}
+.mat-row .mat-num::-webkit-outer-spin-button,
+.mat-row .mat-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.mat-row .mat-have{border-color:#3a4456}
+.mat-row.short .mat-have{border-color:var(--gold-dim)}
+.mat-row .mat-need{
+  flex:0 0 34px;text-align:center;color:var(--txt-faint);
+  font-variant-numeric:tabular-nums;font-size:11.5px;
+}
+.mat-row.short .mat-need{color:var(--gold)}
+.mat-row .mat-sep{flex:0 0 auto;color:var(--txt-faint)}
 .mat-row .mat-del{
-  background:none;border:none;color:var(--txt-faint);cursor:pointer;padding:0 3px;font-size:12px;
+  flex:0 0 auto;background:none;border:none;color:var(--txt-faint);
+  cursor:pointer;padding:0 2px;font-size:12px;
 }
 .mat-row .mat-del:hover{color:var(--red)}
-.mat-short{flex:0 0 auto;font-size:10.5px;color:var(--txt-faint);min-width:46px;text-align:right}
-.mat-row.short .mat-short{color:var(--gold);font-weight:600}
 .part-count{font-size:11.5px;color:var(--txt-faint)}
 .relic-row{
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;

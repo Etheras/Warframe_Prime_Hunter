@@ -88,14 +88,17 @@ the build now succeeds there in 6 seconds. The 302 seen on
 
 ## UX
 
+- [x] ~~Backup only covered whole-item ticks~~ — it now carries parts and
+      materials too, and still imports old bare-array backups by expanding them.
 - [ ] **Collection doesn't sync between devices.** It lives in `localStorage`, so
       phone and desktop keep separate lists. Backup/Import covers it manually;
       a shareable URL or file export would be smoother.
 - [ ] Cosmetics and Emotes have no relic data, so they fall into the "vaulted"
       bucket by default. Technically true, but misleading — they deserve their own
       "not from relics" bucket.
-- [ ] `S · special` items are filtered together with Founder items. Fine for now
-      (there are few of each) but they aren't really the same thing.
+- [x] ~~`S · special` filtered together with Founder~~ — split. Founder is its own
+      bucket, pinned last (it will never return); "Other sources" now names the
+      actual route, read from each item's wiki page.
 - [ ] Artwork is hotlinked from `cdn.warframestat.us`. The standalone build is
       therefore not fully offline. An optional `--with-images` that inlines the
       art as data URIs would fix it, at a large size cost.
