@@ -1,0 +1,85 @@
+name: Build and publish site
+
+# Builds the dataset fresh from Digital Extremes' public sources and publishes
+# the result to GitHub Pages.
+#
+# The data is NEVER committed to this repository — it is downloaded at build
+# time and handed straight to Pages as an artifact. The repo stays source-only,
+# and the published site always reflects DE's current drop tables.
+#
+# No secrets, no API keys, no pip install: every source is public and the
+# pipeline is Python standard library only.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 18:40 UTC daily. Prime Resurgence rotations flip at 18:00 UTC, so this
+    # picks up a new rotation on the same day it starts.
+    - cron: "40 18 * * *"
+  workflow_dispatch:        # run it by hand from the Actions tab
+
+# Read-only against the repo. This workflow cannot modify your code.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch data from Digital Extremes and build
+        run: python tools/build_data.py
+
+      - name: Sanity-check the result
+        run: |
+          python - <<'PY'
+          import json
+          d = json.load(open("data/vorframe-data.json", encoding="utf-8"))
+          items, relics = d["items"], d["relics"]
+          wf = [i for i in items if i["category"] == "Warframe"]
+          print(f"{len(items)} items, {len(wf)} Warframes, {len(relics)} relics, "
+                f"source={d['meta']['dropSource']}")
+          # refuse to publish an obviously broken build
+          assert len(items) >= 250, f"only {len(items)} items"
+          assert len(wf) >= 40, f"only {len(wf)} Warframes"
+          assert len(relics) >= 500, f"only {len(relics)} relics"
+          assert any(i["flags"]["farmable"] for i in items), "nothing is farmable"
+          PY
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r assets _site/
+          mkdir -p _site/data
+          cp data/vorframe-data.js _site/data/
+          # also offer the single-file build as a download
+          python tools/bundle.py
+          cp dist/vorframe.html _site/vorframe-standalone.html
+          echo "Published $(date -u +%Y-%m-%dT%H:%MZ)" > _site/BUILD.txt
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

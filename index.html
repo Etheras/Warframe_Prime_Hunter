@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VorFrame — Prime collection tracker</title>
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💠</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <div>
+      <h1>VorFrame</h1>
+      <p class="brand-sub">Prime collection &amp; relic farming tracker</p>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <input id="search" type="search" placeholder="Search Primes, parts or relics…  (press /)" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div class="topbar-right">
+    <div class="progress-chip" id="progressChip" title="Items marked as collected">
+      <span class="progress-num" id="progressNum">0 / 0</span>
+      <span class="progress-bar"><i id="progressFill"></i></span>
+    </div>
+    <button class="btn ghost" id="dataBtn" title="Backup or restore your collection">Backup</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ────────────── filters ────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <section class="filter-block">
+      <div class="filter-head">
+        <h2>Availability</h2>
+        <button class="mini" data-preset="all">all</button>
+      </div>
+      <label class="check"><input type="checkbox" id="f-farmable" checked>
+        <span class="box"></span><span class="lbl">Farmable now</span><span class="cnt" data-count="farmable"></span></label>
+      <label class="check"><input type="checkbox" id="f-resurgence" checked>
+        <span class="box"></span><span class="lbl">Prime Resurgence <em>(R)</em></span><span class="cnt" data-count="resurgence"></span></label>
+      <label class="check"><input type="checkbox" id="f-vaulted" checked>
+        <span class="box"></span><span class="lbl">Vaulted <em>(V)</em></span><span class="cnt" data-count="vaulted"></span></label>
+      <label class="check"><input type="checkbox" id="f-baro" checked>
+        <span class="box"></span><span class="lbl">Baro Ki'Teer <em>(B)</em></span><span class="cnt" data-count="baro"></span></label>
+      <label class="check"><input type="checkbox" id="f-founder" checked>
+        <span class="box"></span><span class="lbl">Founder / special</span><span class="cnt" data-count="founder"></span></label>
+    </section>
+
+    <section class="filter-block">
+      <div class="filter-head"><h2>Collection</h2></div>
+      <label class="check"><input type="checkbox" id="f-collected" checked>
+        <span class="box"></span><span class="lbl">Show collected</span><span class="cnt" data-count="collected"></span></label>
+      <label class="check"><input type="checkbox" id="f-missing" checked>
+        <span class="box"></span><span class="lbl">Show not collected</span><span class="cnt" data-count="missing"></span></label>
+      <p class="hint">Untick <strong>Show collected</strong> to hide everything you already own.</p>
+    </section>
+
+    <section class="filter-block">
+      <div class="filter-head">
+        <h2>Category</h2>
+        <button class="mini" data-preset="cats">all</button>
+      </div>
+      <div id="catList" class="cat-list"></div>
+    </section>
+
+    <section class="filter-block">
+      <div class="filter-head"><h2>Sort</h2></div>
+      <select id="sort" class="select">
+        <option value="cat">Category, then name</option>
+        <option value="name">Name (A–Z)</option>
+        <option value="status">Availability</option>
+        <option value="release">Newest release</option>
+      </select>
+    </section>
+
+    <p class="src-note" id="srcNote"></p>
+  </aside>
+
+  <!-- ────────────── grid ────────────── -->
+  <main class="content">
+    <div class="content-head">
+      <div id="resultCount" class="result-count"></div>
+      <div class="bulk">
+        <button class="btn ghost sm" id="markAllBtn">Mark shown as collected</button>
+        <button class="btn ghost sm" id="clearAllBtn">Unmark shown</button>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" hidden>
+      <p>Nothing matches these filters.</p>
+      <button class="btn" data-preset="all">Reset filters</button>
+    </div>
+  </main>
+</div>
+
+<!-- ────────────── detail drawer ────────────── -->
+<div class="drawer-scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Item details">
+  <button class="drawer-close" id="drawerClose" aria-label="Close">✕</button>
+  <div id="drawerBody"></div>
+</aside>
+
+<!-- ────────────── backup dialog ────────────── -->
+<dialog id="dataDlg" class="dlg">
+  <h3>Backup / restore collection</h3>
+  <p class="dlg-note">Your collection lives in this browser's local storage. Copy the text below to back it up, or paste a backup in and press Import.</p>
+  <textarea id="dataArea" spellcheck="false" rows="8"></textarea>
+  <div class="dlg-actions">
+    <button class="btn" id="importBtn">Import</button>
+    <button class="btn ghost" id="copyBtn">Copy</button>
+    <button class="btn ghost" id="dlgCloseBtn">Close</button>
+  </div>
+  <p class="dlg-msg" id="dlgMsg"></p>
+</dialog>
+
+<script src="data/vorframe-data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

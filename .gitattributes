@@ -1,0 +1,9 @@
+# Normalise to LF inside the repo so diffs stay clean across machines.
+* text=auto eol=lf
+
+# ...except the Windows scripts, which must keep CRLF to run reliably.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Generated payload: big, machine-written, and not useful to read in a diff.
+data/vorframe-data.js linguist-generated=true -diff
