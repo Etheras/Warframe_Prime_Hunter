@@ -129,6 +129,10 @@
     return total;
   }
 
+  /* Optimises over everything wanted from this relic at once, which is why the
+     planner can return Exceptional or Flawless where the per-part view never
+     would: wanting a common and an uncommon from one relic makes the middle
+     steps genuinely best, since one curve rises as the other falls. */
   function bestRefinement(entries) {
     let best = REFINEMENTS[0], bestVal = -1;
     REFINEMENTS.forEach((f) => {

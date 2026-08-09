@@ -444,27 +444,31 @@
         common    25.33 → 23.33 → 20 → 16.67   (refining makes it worse)
         uncommon  11 → 13 → 17 → 20            (Radiant nearly doubles it)
         rare      2 → 4 → 6 → 10               (Radiant is 5x)                */
+  /* Refinement costs Void Traces: Exceptional 25, Flawless 50, Radiant 100. */
+  const TRACE_COST = { Intact: 0, Exceptional: 25, Flawless: 50, Radiant: 100 };
+
+  /* Which end to take this relic to, for THIS part. The odds move monotonically
+     with refinement, so the answer is always one of the two ends — the middle
+     steps are only ever a cheaper compromise, never better. */
   function refineAdvice(ch) {
     if (!ch) return null;
     const intact = ch.Intact, rad = ch.Radiant;
     if (intact == null || rad == null || !intact) return null;
-    const si = squadify(intact), sr = squadify(rad);
-    const suffix = state.squad ? ", as a 4-squad" : "";
-    if (rad <= intact) {
-      return {
-        cls: "intact", label: `Intact ${fmtPct(si)}`,
-        why: `Leave this one Intact${suffix}. Refining a common reward makes it rarer — ` +
-             `Radiant would take it from ${fmtPct(si)} down to ${fmtPct(sr)}. ` +
-             `Exceptional and Flawless sit in between, so they never beat Intact here.`,
-      };
-    }
-    return {
-      cls: "radiant", label: `Radiant ${fmtPct(sr)}`,
-      why: `Take this one to Radiant${suffix}: ${fmtPct(si)} → ${fmtPct(sr)}, ` +
-           `${(rad / intact).toFixed(1)}× more likely. The odds climb with every step ` +
-           `(Exceptional and Flawless land in between), so Radiant is the best this ` +
-           `relic can do for this part — it just costs 100 Void Traces.`,
-    };
+    return rad <= intact
+      ? { cls: "intact", label: "Intact" }
+      : { cls: "radiant", label: "Radiant" };
+  }
+
+  /* Every refinement for this reward, with what it costs to get there. */
+  function rarityTip(rar, ch) {
+    if (!ch) return rar || "";
+    const order = (DATA.meta && DATA.meta.refinements) ||
+      ["Intact", "Exceptional", "Flawless", "Radiant"];
+    const rows = order.filter((f) => ch[f] != null).map((f) =>
+      `${f.padEnd(12)} ${fmtPct(squadify(ch[f])).padStart(7)}   ${
+        TRACE_COST[f] ? TRACE_COST[f] + " traces" : "free"}`);
+    return (rar || "This") + " reward in this relic" + "\n" +
+      rows.join("\n") + (state.squad ? "\n\n4-squad odds" : "");
   }
 
   /* Railjack/Proxima nodes are a different activity, so they are kept out of the
@@ -604,7 +608,7 @@
               s.rotations.length ? " · " + rotListTag(s.rotations) : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
-              s.event ? " · event node" : ""} · ${s.count} of ${openCount} relics</div>
+              s.event ? " · event node" : ""} · <span class="relic-count" title="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
             <div class="spot-score" title="Chance that one reward drop here gives a part you still need, at the best refinement for it"><b>${
               (s.score * 100).toFixed(1)}%</b>per reward</div>
           </div>`).join("") +
@@ -624,12 +628,10 @@
             <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
           </label>
         </div>
-        <p class="legend">The dot is <b>this part's</b> rarity inside that relic:
-          <i class="rar Common"></i>common
-          <i class="rar Uncommon"></i>uncommon
-          <i class="rar Rare"></i>rare.
-          Best odds first. <b>Intact</b> means don't refine — refining a common
-          reward makes it rarer. Hover a verdict or a rotation for detail.</p>`;
+        <p class="legend">Each row is shaded by how rare <b>this part</b> is inside that
+          relic. Hover the rarity for the odds at every refinement and what they cost in
+          Void Traces; hover a rotation or a relic count for detail. Best odds first, and
+          <b>Intact</b> means don't refine — refining a common reward makes it rarer.</p>`;
 
       it.parts.forEach((p) => {
         // easiest first: the relic most likely to give this part unrefined
@@ -669,11 +671,11 @@
           const openNow = rec && !rec.vaulted;
           const rar = r.rarity || "";
           const adv = refineAdvice(r.chances);
-          html += `<div class="relic-row">
-            <span class="relic-name" title="${esc(rar || "unknown")} reward in this relic"><i
-              class="rar ${esc(rar)}"></i>${esc(r.relic)}</span>
-            <span class="rarity ${esc(rar)}">${esc(rar || "?")}</span>
-            ${adv ? `<span class="advice ${adv.cls}" title="${esc(adv.why)}">${esc(adv.label)}</span>` : ""}
+          html += `<div class="relic-row rar-row-${esc(rar)}">
+            <span class="relic-name">${esc(r.relic)}</span>
+            <span class="rarity ${esc(rar)}" title="${esc(rarityTip(rar, r.chances))}">${
+              esc(rar || "?")}</span>
+            ${adv ? `<span class="advice ${adv.cls}">${esc(adv.label)}</span>` : ""}
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
           </div>`;
           if (openNow) {

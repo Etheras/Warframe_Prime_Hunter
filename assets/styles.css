@@ -390,7 +390,16 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;
   padding:8px 12px;border-top:1px solid var(--line-soft);font-size:12.5px;
 }
+/* rarity reads off the row itself, so the chips can stay quiet */
+.relic-row.rar-row-Common{background:linear-gradient(90deg,rgba(185,118,63,.13),rgba(185,118,63,.02) 55%)}
+.relic-row.rar-row-Uncommon{background:linear-gradient(90deg,rgba(199,206,217,.10),rgba(199,206,217,.02) 55%)}
+.relic-row.rar-row-Rare{background:linear-gradient(90deg,rgba(227,187,82,.15),rgba(227,187,82,.02) 55%)}
 .relic-name{font-weight:600;min-width:76px}
+.rarity{cursor:help}
+.relic-count{
+  cursor:help;text-decoration:underline dotted var(--txt-faint);text-underline-offset:2px;
+}
+.relic-count:hover{color:var(--teal)}
 /* Dot = the rarity of THIS part inside that relic, in the game's own
    bronze / silver / gold language. The relic tier is already in its name. */
 .rar{

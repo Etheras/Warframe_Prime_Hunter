@@ -269,10 +269,24 @@ by `parts_from_droptables` — reward names are always `"<Item Name> <Part>"`, s
 prefix is unambiguous. Verified end to end by removing a frame from the wiki parse
 and confirming it comes back with all four parts and working farm locations.
 
-**Refinement is always one of the two ends.** The odds move monotonically —
-common 25.33 → 16.67 (worse), uncommon 11 → 20, rare 2 → 10 — so Exceptional and
-Flawless are never optimal for a single target, only cheaper in Void Traces. That
-is why the advice only ever reads Intact or Radiant.
+**Refinement, and when the middle steps matter.** The odds move monotonically —
+common 25.33 → 16.67 (worse), uncommon 11 → 20, rare 2 → 10 — so for a *single*
+target the answer is always one of the two ends, which is why the per-part advice
+in the collection view only ever reads Intact or Radiant.
+
+That stops being true the moment you want two rewards of different rarities from
+the same relic. Meso V15 holds Caliban's Blueprint (uncommon) and Chassis
+(common); wanting both makes **Flawless** the best choice, because the rising and
+falling curves cross in the middle:
+
+| | Intact | Exceptional | Flawless | Radiant |
+|---|---|---|---|---|
+| Blueprint (uncommon) | 11% | 13% | 17% | 20% |
+| Chassis (common) | 25.33% | 23.33% | 20% | 16.67% |
+| **both** | 36.33% | 36.33% | **37.00%** | 36.67% |
+
+The planner optimises over the whole wanted set per relic, so it finds these; the
+collection view answers the narrower per-part question and does not.
 
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
@@ -293,28 +307,64 @@ have no other source and carry never-vaulted frames like Nyx and Valkyr.
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
 
-### Where each flag comes from
+### The three sources, and what we change about them
 
-Worth being explicit, because only some of this is Digital Extremes' own data:
+Everything comes from one of three places, and they disagree in ways worth
+knowing. The policy: keep our data faithful to its source, and push corrections
+upstream rather than entrench them here. Every knowing disagreement is listed in
+TODO.md under *"Should be fixed on the wiki, not here"*.
 
-| Flag | Source | First party? |
+**1. Digital Extremes — first party.** The drop tables and the Public Export.
+This is the only source for what actually drops where, and it is authoritative.
+Two quirks we work around:
+
+- *Rarity words are chance-relative, not structural.* The 25.33% common slot is
+  written "Uncommon", and the rare slot reads "Rare" at Intact but "Uncommon"
+  once Radiant lifts it to 10%. **We derive rarity from the unrefined chance
+  instead** (≥20% common, ≥6% uncommon, below that rare), which reproduces the
+  exact 3/2/1 structure of every relic.
+- *Quantities are baked into the name.* `2X Forma Blueprint` is split into
+  `item: "Forma Blueprint", qty: 2`.
+- The export omits Railjack/Proxima and temporary `Event:` nodes entirely, so
+  enemy levels are known for about 69% of the nodes that drop live relics. An
+  unknown level sorts last rather than being guessed at.
+
+**2. The WARFRAME Wiki — editorial.** Supplies the catalogue's categories and the
+`(V)` `(P)` `(B)` `(S)` and Founder markers. **DE publishes none of those flags**,
+so they exist only because wiki editors maintain them — which means they can be
+stale or simply wrong, and two currently are (see TODO). Categories stay here
+deliberately: the wiki agrees with the item API on 250 of 277 items and every
+disagreement favours the wiki, which keeps Exalted, Extractor and Robotic Weapon
+apart where the API flattens them into "Misc" and "Primary".
+
+Wiki quirks handled in the parser: non-breaking spaces inside `{{WF}}` output,
+`== Prime Related==` carrying a leading space, and `====` sub-headers that must
+not be mistaken for categories.
+
+**3. WFCD (warframestat) — convenience layer.** Component names, artwork
+filenames, the `vaulted` field, and the live worldstate proxy. Its part naming
+disagrees with the drop table (`Chassis` vs `Chassis Blueprint`), so
+`normalise_part()` strips the redundant suffix — this matters because saved part
+progress is keyed on those names and would otherwise appear to vanish when a
+build falls back to the other source.
+
+### Which source decides what
+
+| Fact | Decided by | First party? |
 |---|---|---|
-| `farmable` | derived from DE's drop tables — does any relic for it drop right now | **yes** |
-| `resurgence` | live worldstate via the warframestat proxy | **yes** (proxied) |
-| `vaulted` | the item API's `vaulted` field, wiki `(V)` as fallback | no — WFCD |
-| `permanent` `(P)` | wiki marker | no — wiki editorial |
-| `baro` `(B)` | wiki marker | no — wiki editorial |
-| `special` `(S)` | wiki marker | no — wiki editorial |
-| `founder` | wiki marker | no — wiki editorial |
-| category | wiki page sections | no — wiki, but richer than the API |
+| `farmable` | DE drop tables — does a relic for it drop right now | **yes** |
+| relic contents, odds, drop locations | DE drop tables | **yes** |
+| enemy levels | DE Public Export | **yes** |
+| existence of a brand-new Prime | DE Public Export | **yes** |
+| `resurgence` | live worldstate, via the WFCD proxy | yes, proxied |
+| `vaulted` | WFCD's `vaulted`, wiki `(V)` as fallback | no |
+| category | wiki page sections | no |
+| `permanent` `baro` `special` `founder` | wiki markers only | **no — editorial** |
+| artwork | WFCD CDN (the images are DE's) | no |
 
-DE publishes no vault/Baro/special/Founder flags at all, so those five exist only
-because the wiki maintains them. `farmable` is the one availability fact that is
-fully derived from official data, which is why the UI leans on it.
-
-Categories stay on the wiki deliberately: it agrees with the item API on 250 of
-277 items, and every disagreement favours the wiki — the API flattens Exalted and
-Extractor into "Misc" and files Robotic Weapons under "Primary".
+`farmable` is the one availability fact derived entirely from official data,
+which is why the UI leans on it and why the vault/Baro/special/Founder markers
+are treated as annotation rather than truth.
 
 ### Availability buckets
 
