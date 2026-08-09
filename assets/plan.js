@@ -372,6 +372,10 @@
       const parts = p.entries
         .filter((e) => !e.bonus)
         .map((e) => ({ label: e.label, rar: rarityOf(e.chances) }));
+      // ringing the bottleneck only says something when there was a choice to
+      // make; on a single-part relic it made the same part look different in
+      // two rows for no reason
+      const showBlocker = parts.length > 1;
       return `<div class="relic-row ref-row-${esc(p.refinement)}">
         <span class="relic-name">${esc(rname)}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
@@ -389,10 +393,12 @@
           "Chance one opening gives something you want: " + pct(p.value))}"><b>${pct(p.value)}</b></span>
       </div>
       <div class="relic-parts">${
-        parts.map((x) => `<span class="part-chip ${esc(x.rar)}${
-          x.label === blocker ? " is-blocker" : ""}"${
-          x.label === blocker ? ` data-tip="${esc("The bottleneck: this is what the refinement above is chosen for.")}"` : ""
-        }>${esc(x.label)}</span>`).join("")
+        parts.map((x) => {
+          const isBlk = showBlocker && x.label === blocker;
+          return `<span class="part-chip ${esc(x.rar)}${isBlk ? " is-blocker" : ""}"${
+            isBlk ? ` data-tip="${esc("The bottleneck: this is what the refinement above is chosen for.")}"` : ""
+          }>${esc(x.label)}</span>`;
+        }).join("")
       }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 

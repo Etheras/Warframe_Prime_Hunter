@@ -86,6 +86,13 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 - **Weight is not a signal.** Do not bold one chip among several to mark it —
   differing weights in a row read as a rendering fault. Use a border or an inset
   ring instead.
+- **Only mark a choice that actually existed.** The bottleneck ring is drawn on a
+  relic with two or more wanted parts, never on one with a single part where the
+  answer was forced. Otherwise the same chip renders two different ways in two
+  rows and the difference means nothing — which is exactly how it was spotted.
+- **Pad a block on both sides.** A line with padding on the bottom and none on
+  the top reads as misaligned even when the spacing above comes from a
+  neighbour's margin.
 - Inline chips need horizontal room. In a column narrower than ~300px use **full
   width rows** instead; chips wrapped raggedly in the 290px planner sidebar and
   read as broken form controls.

@@ -670,7 +670,7 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;
   background:var(--panel);
 }
-.plan-main .relic-row{border-top:none;border-bottom:none;flex-wrap:nowrap;gap:9px}
+.plan-main .relic-row{border-top:none;border-bottom:none;flex-wrap:nowrap;gap:9px;padding:6px 12px 4px}
 .plan-main .relic-name{min-width:74px;flex:0 0 auto}
 .plan-main .chances{margin-left:auto;flex:0 0 auto;cursor:help}
 
@@ -710,7 +710,7 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
    chips carry their own colour. STYLE.md §1: one meaning per channel. */
 .relic-parts{
   display:flex;flex-wrap:wrap;gap:5px;
-  padding:0 12px 9px 12px;border-bottom:1px solid var(--line-soft);
+  padding:5px 12px 8px 12px;border-bottom:1px solid var(--line-soft);
   background:none;
 }
 .relic-parts:last-child{border-bottom:none}
