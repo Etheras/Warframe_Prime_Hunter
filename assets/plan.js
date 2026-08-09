@@ -90,22 +90,27 @@
       });
     });
 
-    // Forma: a real relic reward, so a shortfall belongs in the ranking.
-    // A 2x drop only counts double if you actually need two or more.
+    /* Forma never *adds* a relic to the plan.
+
+       Nobody runs a relic purely for Forma — you accumulate it from the rolls
+       that miss what you were actually after. So it only inflates the value of
+       relics already worth running for a Prime part, which also stops it
+       flooding the ranking (it sits in 24 of the 34 live relics).
+
+       A 2x drop still only counts double when two or more are wanted. */
     const formaShort = Math.max(0, (Number(opts.formaNeed) || 0) - (Number(opts.formaHave) || 0));
     if (formaShort > 0) {
-      Object.keys(RELICS).forEach((rname) => {
-        (RELICS[rname].rewards || []).forEach((rw) => {
+      want.forEach((entries, rname) => {
+        (RELICS[rname] ? RELICS[rname].rewards || [] : []).forEach((rw) => {
           if (!/^Forma/.test(rw.item)) return;
-          if (!want.has(rname)) want.set(rname, []);
-          want.get(rname).push({
+          entries.push({
             label: "Forma Blueprint", chances: rw.chances || {},
-            qty: rw.qty || 1, stillNeed: formaShort,
+            qty: rw.qty || 1, stillNeed: formaShort, bonus: true,
           });
         });
       });
       needs.push({ item: { name: "Forma", id: null }, part: "Blueprint",
-                   short: formaShort, need: Number(opts.formaNeed) || 0 });
+                   short: formaShort, need: Number(opts.formaNeed) || 0, bonus: true });
     }
     return { want, needs, formaShort };
   }
@@ -142,6 +147,8 @@
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
       if (!rec || rec.vaulted) return;
+      // a relic held only by the Forma bonus is not worth running on its own
+      if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value } = bestRefinement(entries);
       if (value <= 0) return;
       relicPlan.set(rname, {
@@ -237,6 +244,8 @@
       `The percentage is the chance that <b>one reward drop</b> at that node leads to ` +
       `something on your list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
       `Ties are broken by lower enemy level, then rotation A.` +
+      (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
+        "running, but never adds one." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
     // nodes: show the best few, with the rest behind a hover
@@ -284,8 +293,10 @@
       return `<div class="need-row${live ? "" : " need-dead"}">
         <span class="need-name">${esc(n.item.name)}</span>
         <span class="need-part">${esc(n.part)}${n.short > 1 ? ` ×${n.short}` : ""}</span>
-        <span class="need-src">${live ? `${live} relic${live === 1 ? "" : "s"} dropping`
-                                      : "vaulted — trade or wait for Resurgence"}</span>
+        <span class="need-src">${
+          n.bonus ? "picked up along the way — never farmed for on its own"
+                  : (live ? `${live} relic${live === 1 ? "" : "s"} dropping`
+                          : "vaulted — trade or wait for Resurgence")}</span>
       </div>`;
     }).join("");
   }

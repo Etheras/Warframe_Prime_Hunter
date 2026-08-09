@@ -346,39 +346,79 @@
     return need.size ? need : new Set(it.relics || []);
   }
 
+  /* What one opening of this relic is worth for the parts of `it` you still
+     need, at whichever refinement suits them best. Same model the planner uses,
+     so the two pages cannot disagree about what "best" means. */
+  function relicValueFor(it, rname) {
+    const slots = [];
+    (it.parts || []).forEach((p) => {
+      if (haveOf(it.id, p.name) >= needOf(p)) return;
+      const hit = p.relics.find((r) => r.relic === rname);
+      if (hit && hit.chances) slots.push(hit.chances);
+    });
+    if (!slots.length) return 0;
+    const order = (DATA.meta && DATA.meta.refinements) ||
+      ["Intact", "Exceptional", "Flawless", "Radiant"];
+    let best = 0;
+    order.forEach((f) => {
+      let v = 0;
+      slots.forEach((ch) => { if (ch[f] != null) v += squadify(ch[f]) / 100; });
+      if (v > best) best = v;
+    });
+    return best;
+  }
+
   function bestSpots(it) {
     const needed = relicsStillNeeded(it);
     const open = (it.relics || []).filter(
       (r) => RELICS[r] && !RELICS[r].vaulted && needed.has(r));
+
+    const value = new Map();
+    open.forEach((r) => value.set(r, relicValueFor(it, r)));
+
     const map = new Map();
     open.forEach((rname) => {
+      if (!value.get(rname)) return;
       (RELICS[rname].sources || []).filter((s) => !isRailjack(s)).forEach((s) => {
-        const key = `${s.planet} ${s.node} ${s.mode}`;
+        const key = `${s.planet} ${s.node} ${s.mode}`;
         let e = map.get(key);
         if (!e) {
           e = { planet: s.planet, node: s.node, mode: s.mode, kind: s.kind,
-                relics: new Map(), event: s.event };
+                relics: new Map(), event: s.event, score: 0, lvl: s.lvl || null };
           map.set(key, e);
         }
         const prev = e.relics.get(rname);
         if (!prev || (s.chance || 0) > (prev.chance || 0)) {
+          // one entry per relic per node, keeping its best drop rate
+          if (prev) e.score -= ((prev.chance || 0) / 100) * value.get(rname);
+          e.score += ((s.chance || 0) / 100) * value.get(rname);
           e.relics.set(rname, { chance: s.chance, rotation: s.rotation });
+          if (!e.lvl && s.lvl) e.lvl = s.lvl;
         }
       });
     });
+
+    const ROT = { A: 0, B: 1, C: 2 };
     return Array.from(map.values())
-      .map((e) => {
-        const chances = Array.from(e.relics.values()).map((v) => v.chance || 0);
-        return {
-          ...e,
-          count: e.relics.size,
-          best: Math.max.apply(null, chances.concat([0])),
-          rotations: Array.from(new Set(Array.from(e.relics.values())
-            .map((v) => v.rotation).filter(Boolean))).sort(),
-          relicList: Array.from(e.relics.keys()),
-        };
+      .map((e) => ({
+        ...e,
+        count: e.relics.size,
+        best: Math.max.apply(null,
+          Array.from(e.relics.values()).map((v) => v.chance || 0).concat([0])),
+        rotations: Array.from(new Set(Array.from(e.relics.values())
+          .map((v) => v.rotation).filter(Boolean))).sort(),
+        relicList: Array.from(e.relics.keys()),
+      }))
+      // Rank by the chance a reward drop here yields something still wanted -
+      // not by how many relics happen to overlap, which is what used to make
+      // this list disagree with the per-part relic odds below it.
+      .sort((a, b) => {
+        if (Math.abs(b.score - a.score) > 1e-9) return b.score - a.score;
+        const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
+        if (al !== bl) return al - bl;
+        const ar = ROT[a.rotations[0]] ?? 3, br = ROT[b.rotations[0]] ?? 3;
+        return ar - br || (a.node || "").localeCompare(b.node || "");
       })
-      .sort((a, b) => b.count - a.count || b.best - a.best)
       .slice(0, 8);
   }
 
@@ -395,20 +435,36 @@
 
   const fmtPct = (v) => (v == null ? "?" : (Math.round(v * 100) / 100) + "%");
 
+  /* Which refinement to take this relic to, for THIS part.
+
+     The odds move monotonically with refinement, so the answer is always one of
+     the two ends — Exceptional and Flawless are never the best choice for a
+     single target, only a cheaper compromise in Void Traces:
+
+        common    25.33 → 23.33 → 20 → 16.67   (refining makes it worse)
+        uncommon  11 → 13 → 17 → 20            (Radiant nearly doubles it)
+        rare      2 → 4 → 6 → 10               (Radiant is 5x)                */
   function refineAdvice(ch) {
     if (!ch) return null;
     const intact = ch.Intact, rad = ch.Radiant;
     if (intact == null || rad == null || !intact) return null;
     const si = squadify(intact), sr = squadify(rad);
-    const suffix = state.squad ? " (4-squad odds)" : "";
+    const suffix = state.squad ? ", as a 4-squad" : "";
     if (rad <= intact) {
-      return { cls: "intact", label: "Intact",
-               why: `Radiant would drop this from ${fmtPct(si)} to ${fmtPct(sr)} — don't refine${suffix}` };
+      return {
+        cls: "intact", label: `Intact ${fmtPct(si)}`,
+        why: `Leave this one Intact${suffix}. Refining a common reward makes it rarer — ` +
+             `Radiant would take it from ${fmtPct(si)} down to ${fmtPct(sr)}. ` +
+             `Exceptional and Flawless sit in between, so they never beat Intact here.`,
+      };
     }
-    const mult = rad / intact;
-    return { cls: "radiant",
-             label: mult >= 1.5 ? `Radiant ×${mult.toFixed(1)}` : "Radiant",
-             why: `Radiant raises this from ${fmtPct(si)} to ${fmtPct(sr)}${suffix}` };
+    return {
+      cls: "radiant", label: `Radiant ${fmtPct(sr)}`,
+      why: `Take this one to Radiant${suffix}: ${fmtPct(si)} → ${fmtPct(sr)}, ` +
+           `${(rad / intact).toFixed(1)}× more likely. The odds climb with every step ` +
+           `(Exceptional and Flawless land in between), so Radiant is the best this ` +
+           `relic can do for this part — it just costs 100 Void Traces.`,
+    };
   }
 
   /* Railjack/Proxima nodes are a different activity, so they are kept out of the
@@ -547,8 +603,10 @@
             <div class="spot-meta">${esc(s.mode)}${
               s.rotations.length ? " · " + rotListTag(s.rotations) : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
-              s.event ? " · event node" : ""} · best drop ${s.best}%</div>
-            <div class="spot-score"><b>${s.count}</b>of ${openCount} relics</div>
+              s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
+              s.event ? " · event node" : ""} · ${s.count} of ${openCount} relics</div>
+            <div class="spot-score" title="Chance that one reward drop here gives a part you still need, at the best refinement for it"><b>${
+              (s.score * 100).toFixed(1)}%</b>per reward</div>
           </div>`).join("") +
         `</div></section>`;
     }

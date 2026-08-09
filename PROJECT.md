@@ -269,10 +269,19 @@ by `parts_from_droptables` — reward names are always `"<Item Name> <Part>"`, s
 prefix is unambiguous. Verified end to end by removing a frame from the wiki parse
 and confirming it comes back with all four parts and working farm locations.
 
+**Refinement is always one of the two ends.** The odds move monotonically —
+common 25.33 → 16.67 (worse), uncommon 11 → 20, rare 2 → 10 — so Exceptional and
+Flawless are never optimal for a single target, only cheaper in Void Traces. That
+is why the advice only ever reads Intact or Radiant.
+
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
-that item's relics drop there*. It only counts relics holding a part you are still
-missing, so the advice moves as you tick things off: Caliban Prime opens on
+that item's relics drop there*. It scores each node by the chance a single reward drop there yields a part you
+still need — the same model `plan.js` uses, so the two pages cannot rank things
+differently. (It used to rank by how many relics happened to overlap, which made
+the order disagree with the per-part odds listed underneath.) It only counts
+relics holding a part you are still missing, so the advice moves as you tick
+things off: Caliban Prime opens on
 Terrorem (5 of 7 relics), but once his Blueprint and Chassis are ticked it re-ranks
 to Zabala (2 of 2).
 

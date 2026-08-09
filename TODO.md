@@ -22,6 +22,38 @@ the build now succeeds there in 6 seconds. The 302 seen on
 `www.warframe.com/droptables` was an artefact of the probe using `curl` without
 `-L`; `urllib` follows redirects, so the build never saw it. Probe now uses `-L`.
 
+## Should be fixed on the wiki, not here
+
+Everywhere the app knowingly disagrees with `wiki.warframe.com/w/Prime`. The
+policy is to keep our data faithful to the source and push corrections upstream,
+so each of these is a wiki edit waiting to happen rather than something to
+entrench in code. Listed newest first.
+
+- [ ] **Gotva Prime is marked `(S)` but is a Baro Ki'Teer item.** Its own wiki
+      page says so outright: *"potentially sold by Baro Ki'Teer in the Concourse
+      section of the Tenno Relay"*. It carries `(B)` as well, so the `(S)` is
+      simply redundant. **Local override:** `statusOf()` ranks Baro above
+      Special, which puts it in the right bucket. Remove that override once the
+      `(S)` is dropped from the Prime page.
+- [ ] **The `(R)` Prime Resurgence markers are years out of date.** The page
+      still lists the December 2021 debut rotation and carries `{{UpdateMe}}`.
+      **Local override:** the markers are parsed and then ignored entirely;
+      Resurgence comes from the live worldstate instead. Nothing to change here
+      even if the wiki is fixed — the worldstate is simply better — but the page
+      is misleading anyone reading it directly.
+- [ ] **`(V)` vaulted markers are trusted less than the item API.** Where the two
+      disagree the API's `vaulted` field wins. Worth spot-checking which is
+      actually right before deciding whether this is a wiki problem or ours.
+
+Not wiki issues, recorded here so they are not mistaken for one:
+
+- `normalise_part()` reconciles two APIs with each other (`Chassis` vs
+  `Chassis Blueprint`), not the wiki.
+- Reward rarity is derived from the unrefined drop chance because **DE's** own
+  rarity words are chance-relative and shift with refinement. That is a
+  Digital Extremes data quirk.
+- Categories stay on the wiki deliberately — see PROJECT.md §6.
+
 ## Data accuracy
 
 - [ ] **Prime Resurgence is the one non-first-party source.** DE's own
