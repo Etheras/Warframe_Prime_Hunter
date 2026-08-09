@@ -113,8 +113,9 @@ Click any card. A panel slides in from the right with:
    Prime's relics drop there. The number on the right is the important bit: "5 of 7
    relics" means one trip to that node can drop five of the seven relics you need.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
-   how rare it is inside each one (the bronze/silver/gold dot), whether to refine,
-   and the best places that relic drops. Hover a verdict or a rotation for detail.
+   and whether to refine. Each row is shaded by how rare that part is inside that
+   relic; hover the rarity for the odds at every refinement and what they cost in
+   Void Traces. **Hide collected** and **Hide vaulted** trim the list down.
 
 Vaulted Primes show their relics too, greyed out — useful when you're looking to
 trade for a specific one.

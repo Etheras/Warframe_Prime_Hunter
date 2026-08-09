@@ -133,6 +133,7 @@
     sort: "cat",
     q: "",
     hideVaultedRelics: false,
+    hideOwnedParts: false,
     squad: false,
   };
 
@@ -149,6 +150,8 @@
       if (typeof saved.hideVaultedRelics === "boolean")
         state.hideVaultedRelics = saved.hideVaultedRelics;
       if (typeof saved.squad === "boolean") state.squad = saved.squad;
+      if (typeof saved.hideOwnedParts === "boolean")
+        state.hideOwnedParts = saved.hideOwnedParts;
     }
   } catch (e) { /* ignore malformed saved filters */ }
 
@@ -161,6 +164,7 @@
         cats: Array.from(state.cats),
         sort: state.sort,
         hideVaultedRelics: state.hideVaultedRelics,
+        hideOwnedParts: state.hideOwnedParts,
         squad: state.squad,
       }));
     } catch (e) { /* non-fatal */ }
@@ -245,6 +249,32 @@
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  /* ── tooltip ──────────────────────────────────────────────────
+     Anything with data-tip gets a monospaced, whitespace-preserving popup.
+     Native title= is proportional, which turns aligned columns to mush. */
+  const tipEl = document.createElement("div");
+  tipEl.className = "tip";
+  tipEl.hidden = true;
+  document.body.appendChild(tipEl);
+
+  function showTip(el) {
+    tipEl.textContent = el.dataset.tip || "";
+    tipEl.hidden = false;
+    const r = el.getBoundingClientRect();
+    const t = tipEl.getBoundingClientRect();
+    let left = Math.min(r.left, window.innerWidth - t.width - 10);
+    let top = r.bottom + 7;
+    if (top + t.height > window.innerHeight - 8) top = r.top - t.height - 7;
+    tipEl.style.left = Math.max(8, left) + "px";
+    tipEl.style.top = Math.max(8, top) + "px";
+  }
+  document.addEventListener("mouseover", (e) => {
+    const el = e.target.closest("[data-tip]");
+    if (el) showTip(el); else if (!tipEl.hidden) tipEl.hidden = true;
+  });
+  document.addEventListener("mouseleave", () => { tipEl.hidden = true; }, true);
+  window.addEventListener("scroll", () => { tipEl.hidden = true; }, true);
 
   /* ── grid render ──────────────────────────────────────────── */
   const grid = $("#grid");
@@ -465,8 +495,8 @@
     const order = (DATA.meta && DATA.meta.refinements) ||
       ["Intact", "Exceptional", "Flawless", "Radiant"];
     const rows = order.filter((f) => ch[f] != null).map((f) =>
-      `${f.padEnd(12)} ${fmtPct(squadify(ch[f])).padStart(7)}   ${
-        TRACE_COST[f] ? TRACE_COST[f] + " traces" : "free"}`);
+      `${f.padEnd(12)}${fmtPct(squadify(ch[f])).padStart(8)}${
+        (TRACE_COST[f] ? TRACE_COST[f] + " traces" : "free").padStart(12)}`);
     return (rar || "This") + " reward in this relic" + "\n" +
       rows.join("\n") + (state.squad ? "\n\n4-squad odds" : "");
   }
@@ -608,7 +638,7 @@
               s.rotations.length ? " · " + rotListTag(s.rotations) : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
-              s.event ? " · event node" : ""} · <span class="relic-count" title="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
+              s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
             <div class="spot-score" title="Chance that one reward drop here gives a part you still need, at the best refinement for it"><b>${
               (s.score * 100).toFixed(1)}%</b>per reward</div>
           </div>`).join("") +
@@ -619,21 +649,31 @@
     if (it.parts && it.parts.length) {
       const hidden = it.parts.reduce((n, p) =>
         n + p.relics.filter((r) => RELICS[r.relic] && RELICS[r.relic].vaulted).length, 0);
+      const ownedCount = it.parts.filter((p) => haveOf(it.id, p.name) >= needOf(p)).length;
+      const shownParts = state.hideOwnedParts
+        ? it.parts.filter((p) => haveOf(it.id, p.name) < needOf(p))
+        : it.parts;
 
       html += `<section class="d-sec">
         <div class="sec-head">
           <h3>Parts &amp; the relics that drop them</h3>
-          <label class="mini-check" title="Vaulted relics can't be farmed — only traded for.">
-            <input type="checkbox" id="hideVaulted" ${state.hideVaultedRelics ? "checked" : ""}>
-            <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
-          </label>
+          <span class="sec-toggles">
+            <label class="mini-check" title="Parts you already own.">
+              <input type="checkbox" id="hideOwned" ${state.hideOwnedParts ? "checked" : ""}>
+              <span class="box"></span>Hide collected${ownedCount ? ` (${ownedCount})` : ""}
+            </label>
+            <label class="mini-check" title="Vaulted relics can't be farmed — only traded for.">
+              <input type="checkbox" id="hideVaulted" ${state.hideVaultedRelics ? "checked" : ""}>
+              <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
+            </label>
+          </span>
         </div>
         <p class="legend">Each row is shaded by how rare <b>this part</b> is inside that
           relic. Hover the rarity for the odds at every refinement and what they cost in
           Void Traces; hover a rotation or a relic count for detail. Best odds first, and
           <b>Intact</b> means don't refine — refining a common reward makes it rarer.</p>`;
 
-      it.parts.forEach((p) => {
+      shownParts.forEach((p) => {
         // easiest first: the relic most likely to give this part unrefined
         let list = p.relics.slice().sort((a, b) => {
           const ai = (a.chances && a.chances.Intact) || 0;
@@ -673,7 +713,7 @@
           const adv = refineAdvice(r.chances);
           html += `<div class="relic-row rar-row-${esc(rar)}">
             <span class="relic-name">${esc(r.relic)}</span>
-            <span class="rarity ${esc(rar)}" title="${esc(rarityTip(rar, r.chances))}">${
+            <span class="rarity ${esc(rar)}" data-tip="${esc(rarityTip(rar, r.chances))}">${
               esc(rar || "?")}</span>
             ${adv ? `<span class="advice ${adv.cls}">${esc(adv.label)}</span>` : ""}
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
@@ -698,13 +738,17 @@
               if (restCount > lines.length) {
                 lines.push(`…and ${restCount - lines.length} more not listed`);
               }
-              moreTag = `<span class="more" title="${esc(lines.join("\n"))}">+${restCount} more</span>`;
+              moreTag = `<span class="more" data-tip="${esc(lines.join("\n"))}">+${restCount} more</span>`;
             }
             if (top) html += `<div class="relic-src">${top}${moreTag}</div>`;
           }
         });
         html += `</div>`;
       });
+      if (!shownParts.length) {
+        html += `<p class="hint">Every part is collected. Untick <b>Hide collected</b>
+          to see their relics again.</p>`;
+      }
       html += `</section>`;
     }
 
@@ -727,16 +771,18 @@
       });
     }
 
-    const hv = $("#hideVaulted");
-    if (hv) {
-      hv.addEventListener("change", (e) => {
-        state.hideVaultedRelics = e.target.checked;
-        saveFilters();
-        const keep = drawer.scrollTop;
-        openItem(it.id);
-        drawer.scrollTop = keep;   // don't lose the reader's place
+    [["#hideVaulted", "hideVaultedRelics"], ["#hideOwned", "hideOwnedParts"]]
+      .forEach(([sel, key]) => {
+        const el = $(sel);
+        if (!el) return;
+        el.addEventListener("change", (e) => {
+          state[key] = e.target.checked;
+          saveFilters();
+          const keep = drawer.scrollTop;
+          openItem(it.id);
+          drawer.scrollTop = keep;   // don't lose the reader's place
+        });
       });
-    }
 
     // click a part counter: 0 → 1 → … → need → 0
     $$(".part-own", dbody).forEach((btn) => {
