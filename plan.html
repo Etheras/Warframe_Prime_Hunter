@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VorFrame — farm planner</title>
+<link rel="stylesheet" href="assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💠</text></svg>">
+</head>
+<body class="plan-page">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <div>
+      <h1>Farm planner</h1>
+      <p class="brand-sub">Where to go next, for everything on your list</p>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <input id="addSearch" type="search" placeholder="Add a Prime to your list…  (press /)" autocomplete="off" spellcheck="false">
+    <div id="addResults" class="add-results" hidden></div>
+  </div>
+
+  <div class="topbar-right">
+    <a class="btn ghost" href="index.html">← Collection</a>
+  </div>
+</header>
+
+<div class="plan-layout">
+
+  <!-- ─────────── the list ─────────── -->
+  <aside class="plan-list">
+    <div class="filter-head">
+      <h2>Your list</h2>
+      <button class="mini" id="clearList">clear</button>
+    </div>
+    <div id="wishlist"></div>
+
+    <div class="filter-head" style="margin-top:22px">
+      <h2>Forma</h2>
+    </div>
+    <div class="forma-row">
+      <label>have <input type="number" id="formaHave" min="0" value="0"></label>
+      <label>want <input type="number" id="formaNeed" min="0" value="0"></label>
+      <span id="formaShort" class="forma-short"></span>
+    </div>
+    <p class="hint" id="formaNote">Forma drops from relics, so a shortfall joins the plan.
+      A relic giving 2&times; only counts double if you need 2 or more.</p>
+
+    <div class="filter-head" style="margin-top:22px">
+      <h2>Assumptions</h2>
+    </div>
+    <label class="check">
+      <input type="checkbox" id="p-squad">
+      <span class="box"></span>
+      <span class="lbl" title="Four players cracking the same relic at the same refinement see four rewards and keep the best, so a chance p becomes 1 − (1 − p)⁴.">4-squad, same relic</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="p-event">
+      <span class="box"></span>
+      <span class="lbl" title="Event nodes are worth running anyway while the event is live, so this nudges them up the ranking.">Prefer event nodes</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="p-railjack">
+      <span class="box"></span>
+      <span class="lbl" title="Railjack is a different activity with its own setup, so it is left out of the ranking by default. Five live relics drop only there, though.">Include Railjack</span>
+    </label>
+  </aside>
+
+  <!-- ─────────── the plan ─────────── -->
+  <main class="plan-main">
+    <div id="planEmpty" class="empty">
+      <p>Nothing on your list yet.</p>
+      <p class="hint" style="max-width:420px;margin:0 auto">
+        Search above to add a Prime, or open the collection and use
+        <b>Add to farm list</b>. Parts you already own are excluded automatically.
+      </p>
+    </div>
+
+    <section id="planWrap" hidden>
+      <div class="content-head">
+        <div class="result-count" id="planSummary"></div>
+      </div>
+
+      <h3 class="plan-h">Where to go</h3>
+      <p class="legend" id="planScoreNote"></p>
+      <div id="planNodes" class="spots"></div>
+
+      <h3 class="plan-h">How to crack them</h3>
+      <p class="legend">One refinement per relic — you can't hold the same relic two ways.
+        Each is set to whatever maximises the total chance of the things you still want inside it.</p>
+      <div id="planRelics"></div>
+
+      <h3 class="plan-h">Still needed</h3>
+      <div id="planNeeds"></div>
+    </section>
+  </main>
+</div>
+
+<script src="data/vorframe-data.js"></script>
+<script src="assets/plan.js"></script>
+</body>
+</html>

@@ -66,7 +66,8 @@ OFFICIAL_DROPTABLES = "https://www.warframe.com/droptables"
 EXPORT_INDEX = "https://origin.warframe.com/PublicExport/index_en.txt.lzma"
 EXPORT_MANIFEST = "https://content.warframe.com/PublicExport/Manifest/{file}"
 # the export files worth reading: everything that can carry a Prime
-EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json", "ExportSentinels_en.json"]
+EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
+                 "ExportSentinels_en.json", "ExportRegions_en.json"]
 
 STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 
@@ -294,7 +295,9 @@ def acquire_export(offline: bool):
         except Exception as exc:
             log(f"! could not read {want} ({exc})")
 
-    return official.collect_prime_items(exports), hashlib.sha256(blob).hexdigest()[:16]
+    return (official.collect_prime_items(exports),
+            official.node_levels(exports),
+            hashlib.sha256(blob).hexdigest()[:16])
 
 
 _WIKI_MARKUP = [
@@ -769,7 +772,7 @@ def main() -> int:
         vault_trader = {}
 
     log("export: DE public item manifest")
-    export_primes, export_hash = acquire_export(off)
+    export_primes, node_levels, export_hash = acquire_export(off)
 
     relic_contents, relic_sources, drop_source = acquire_drops(off, args.source, args.verbose)
 
@@ -988,16 +991,33 @@ def main() -> int:
     ))
 
     # trim the relic table to relics actually referenced by a catalogue item
+    def with_levels(srcs):
+        """Tag star-chart sources with DE's enemy levels, where they exist."""
+        out = []
+        for s0 in srcs:
+            row = dict(s0)
+            if row.get("kind") == "mission":
+                planet = re.sub(r"^Event:\s*", "", row.get("planet") or "").strip()
+                lv = node_levels.get(f"{planet}/{row.get('node')}")
+                if lv:
+                    row["lvl"] = lv
+            out.append(row)
+        return out
+
     relics_out = {}
     for rname in sorted(used_relics, key=lambda x: (TIER_ORDER.get(x.split()[0], 9), x)):
         content = relic_contents.get(rname, {})
-        srcs = relic_sources.get(rname, [])
+        srcs = with_levels(relic_sources.get(rname, []))
         relics_out[rname] = {
             "tier": content.get("tier") or rname.split()[0],
             "code": content.get("code") or rname.split()[-1],
             "vaulted": not srcs,
             "rewards": [
-                {"item": k, "rarity": v.get("rarity"), "chances": v.get("chances")}
+                dict(
+                    item=re.sub(r"^\d+\s*X\s+", "", k),
+                    qty=int(re.match(r"^(\d+)\s*X\s+", k).group(1)) if re.match(r"^\d+\s*X\s+", k) else 1,
+                    rarity=v.get("rarity"), chances=v.get("chances"),
+                )
                 for k, v in sorted((content.get("rewards") or {}).items())
             ],
             "sources": srcs[:40],

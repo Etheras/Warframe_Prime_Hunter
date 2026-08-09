@@ -49,10 +49,11 @@ the build now succeeds there in 6 seconds. The 302 seen on
       filtered to what is still missing. Includes the 4-squad odds toggle.
 - [x] ~~**Stage 3 — materials panel**~~ — done. Manual name / have / need rows
       under Advanced options, feeding no calculation.
-- [ ] **Stage 2 — the shopping-list planner**, on its own page (`plan.html`)
-      rather than inside the collection view: pick what to farm, get a ranked
-      node plan with a per-relic refinement decision. Scoring model prototyped
-      and validated; draft mockup in `drafts/`.
+- [x] ~~**Stage 2 — the shopping-list planner**~~ — built as `plan.html`. Wishlist
+      shared with the collection page, need-aware scoring, per-relic refinement
+      decision, Forma shortfall folded in, squad/event/Railjack toggles.
+- [ ] Planner follow-ups: no "runs needed" estimate yet, and the node list shows
+      8 with the next 20 on hover rather than a full browsable table.
 
 ### Planner design decisions (settled 2026-08-08)
 

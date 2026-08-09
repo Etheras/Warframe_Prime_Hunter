@@ -54,7 +54,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand-sub{margin:1px 0 0;font-size:11.5px;color:var(--txt-dim);letter-spacing:.3px}
 
 .search-wrap{flex:1;display:flex;justify-content:center}
-#search{
+#search,#addSearch{
   width:100%;max-width:520px;
   padding:9px 14px;
   background:var(--panel);
@@ -63,8 +63,8 @@ button,input,select,textarea{font:inherit;color:inherit}
   outline:none;
   transition:border-color .15s, box-shadow .15s;
 }
-#search::placeholder{color:var(--txt-faint)}
-#search:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
+#search::placeholder,#addSearch::placeholder{color:var(--txt-faint)}
+#search:focus,#addSearch:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
 
 .topbar-right{display:flex;align-items:center;gap:12px}
 .progress-chip{
@@ -497,4 +497,86 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 @media (max-width:560px){
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
   .drawer{padding:18px 16px 50px}
+}
+
+/* ── farm planner (plan.html) ─────────────────────────────── */
+.plan-layout{display:grid;grid-template-columns:290px 1fr;align-items:start}
+.plan-list{
+  position:sticky;top:61px;height:calc(100vh - 61px);overflow-y:auto;
+  padding:18px 16px 40px;border-right:1px solid var(--line);background:var(--bg-2);
+}
+.plan-main{padding:18px 22px 60px;min-width:0}
+.plan-h{
+  font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--txt-faint);
+  font-weight:700;margin:26px 0 8px;
+}
+.plan-h:first-of-type{margin-top:6px}
+
+/* add-to-list search */
+.search-wrap{position:relative}
+.add-results{
+  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  width:100%;max-width:520px;z-index:60;
+  background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.add-hit{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;
+  padding:8px 12px;background:none;border:none;border-bottom:1px solid var(--line-soft);
+  cursor:pointer;text-align:left;font-size:13px;color:var(--txt);
+}
+.add-hit:hover{background:var(--panel-2)}
+.add-cat{font-size:11px;color:var(--txt-faint)}
+.add-none{padding:9px 12px;font-size:12px;color:var(--txt-faint)}
+
+/* the list itself */
+.wish{border:1px solid var(--line-soft);border-radius:8px;margin-bottom:7px;overflow:hidden}
+.wish-done{border-color:#2c4a37}
+.wish-head{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel)}
+.wish-name{flex:1;font-size:13px;font-weight:600}
+.wish-prog{font-size:11.5px;color:var(--txt-dim);font-variant-numeric:tabular-nums}
+.wish-del{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:12px;padding:0 2px}
+.wish-del:hover{color:var(--red)}
+.wish-parts{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 10px;font-size:11.5px;color:var(--txt-faint)}
+.wish-all{color:var(--green)}
+
+.forma-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--txt-dim)}
+.forma-row input{
+  width:52px;background:#0d1118;border:1px solid var(--line);border-radius:5px;
+  padding:3px 5px;color:var(--txt);font-size:11.5px;text-align:center;
+}
+.forma-short{font-size:11px;color:var(--txt-faint)}
+.forma-short.on{color:var(--gold);font-weight:600}
+
+/* ranked nodes */
+.plan-main .spot-meta{white-space:normal}
+.tag{
+  font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;padding:1px 5px;
+  border-radius:4px;border:1px solid var(--line);color:var(--txt-faint);margin-left:6px;
+}
+.more-nodes{
+  padding:8px 12px;font-size:12px;color:var(--txt-faint);cursor:help;
+  text-decoration:underline dotted var(--txt-faint);text-underline-offset:3px;
+}
+.more-nodes:hover{color:var(--teal)}
+
+.relic-wants{
+  flex:1 1 100%;font-size:11px;color:var(--txt-faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.plan-main .relic-row{border-top:none;border-bottom:1px solid var(--line-soft)}
+.plan-main .chances{margin-left:auto}
+
+.need-row{
+  display:flex;align-items:baseline;gap:10px;padding:6px 2px;
+  border-bottom:1px solid var(--line-soft);font-size:12.5px;
+}
+.need-name{font-weight:600;min-width:150px}
+.need-part{color:var(--txt-dim)}
+.need-src{margin-left:auto;font-size:11.5px;color:var(--txt-faint)}
+.need-dead .need-src{color:var(--gold)}
+
+@media (max-width:900px){
+  .plan-layout{grid-template-columns:1fr}
+  .plan-list{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
 }

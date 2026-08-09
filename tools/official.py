@@ -291,6 +291,29 @@ PRODUCT_CATEGORY = {
 _SKIP = re.compile(r"\b(Prime Access|Glyph|Sigil|Noggle|Scene|Emblem|Poster|Display)\b", re.I)
 
 
+def node_levels(exports: dict[str, dict]) -> dict[str, list]:
+    """
+    "Planet/Node" -> [minEnemyLevel, maxEnemyLevel] from DE's region export.
+
+    Covers the regular star chart only: Railjack/Proxima nodes and temporary
+    Event: variants are simply not in the export, so the planner has to treat
+    an unknown level as unknown rather than guessing.
+    """
+    out: dict[str, list] = {}
+    payload = exports.get("ExportRegions_en.json") or {}
+    for rows in payload.values():
+        if not isinstance(rows, list):
+            continue
+        for n in rows:
+            if not isinstance(n, dict):
+                continue
+            system, name = n.get("systemName"), n.get("name")
+            lo, hi = n.get("minEnemyLevel"), n.get("maxEnemyLevel")
+            if system and name and lo is not None:
+                out[f"{system}/{name}"] = [lo, hi]
+    return out
+
+
 def collect_prime_items(exports: dict[str, dict]) -> list[dict]:
     """
     Every Prime in DE's official item data, as

@@ -152,12 +152,14 @@ VorFrame/
 ├── TODO.md                 ← known gaps and ideas, not yet done
 ├── LICENSE                 ← MIT, scoped to our own code
 ├── NOTICE.md               ← upstream sources and their terms
-├── index.html              ← markup + filter controls
+├── index.html              ← the collection: filters, cards, detail drawer
+├── plan.html               ← the farm planner (Stage 2)
 ├── serve.cmd               ← double-click: serve the site and open a browser
 ├── refresh-data.cmd        ← double-click data refresh
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
-│   └── app.js              ← filtering, collection state, detail drawer
+│   ├── app.js              ← filtering, collection state, detail drawer
+│   └── plan.js             ← wishlist, scoring model, ranked node plan
 ├── data/
 │   ├── vorframe-data.js    ← GENERATED — window.VORFRAME_DATA = {...}
 │   └── vorframe-data.json  ← GENERATED — same payload as plain JSON
@@ -281,6 +283,29 @@ have no other source and carry never-vaulted frames like Nyx and Valkyr.
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
+
+### Where each flag comes from
+
+Worth being explicit, because only some of this is Digital Extremes' own data:
+
+| Flag | Source | First party? |
+|---|---|---|
+| `farmable` | derived from DE's drop tables — does any relic for it drop right now | **yes** |
+| `resurgence` | live worldstate via the warframestat proxy | **yes** (proxied) |
+| `vaulted` | the item API's `vaulted` field, wiki `(V)` as fallback | no — WFCD |
+| `permanent` `(P)` | wiki marker | no — wiki editorial |
+| `baro` `(B)` | wiki marker | no — wiki editorial |
+| `special` `(S)` | wiki marker | no — wiki editorial |
+| `founder` | wiki marker | no — wiki editorial |
+| category | wiki page sections | no — wiki, but richer than the API |
+
+DE publishes no vault/Baro/special/Founder flags at all, so those five exist only
+because the wiki maintains them. `farmable` is the one availability fact that is
+fully derived from official data, which is why the UI leans on it.
+
+Categories stay on the wiki deliberately: it agrees with the item API on 250 of
+277 items, and every disagreement favours the wiki — the API flattens Exalted and
+Extractor into "Misc" and files Robotic Weapons under "Primary".
 
 ### Availability buckets
 

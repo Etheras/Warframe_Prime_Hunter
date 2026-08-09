@@ -89,6 +89,16 @@
     if (touched) savePartsOwned();
   })();
 
+  /* ── farm list, shared with plan.html ─────────────────────── */
+  const KEY_WISH = "vorframe.wishlist.v1";
+  let wishlist = [];
+  try { wishlist = JSON.parse(localStorage.getItem(KEY_WISH) || "[]") || []; } catch (e) {}
+  const onWishlist = (id) => wishlist.includes(id);
+  function toggleWishlist(id) {
+    wishlist = onWishlist(id) ? wishlist.filter((x) => x !== id) : wishlist.concat([id]);
+    try { localStorage.setItem(KEY_WISH, JSON.stringify(wishlist)); } catch (e) {}
+  }
+
   /* ── availability bucket ──────────────────────────────────────
      Each item gets exactly one bucket so the sidebar toggles are
      unambiguous, but a card can still show several badges.        */
@@ -470,6 +480,8 @@
 
       <div class="d-actions">
         <button class="btn" id="dCollect">${has ? "✓ Collected" : "Mark as collected"}</button>
+        ${it.parts.length ? `<button class="btn ghost" id="dWish">${
+          onWishlist(it.id) ? "✓ On farm list" : "Add to farm list"}</button>` : ""}
         <a class="btn ghost" href="${esc(it.wikiUrl)}" target="_blank" rel="noopener">Wiki page ↗</a>
       </div>`;
 
@@ -646,6 +658,14 @@
       toggle(it.id);
       openItem(it.id); // re-render with new state
     });
+
+    const dw = $("#dWish");
+    if (dw) {
+      dw.addEventListener("click", () => {
+        toggleWishlist(it.id);
+        const keep = drawer.scrollTop; openItem(it.id); drawer.scrollTop = keep;
+      });
+    }
 
     const hv = $("#hideVaulted");
     if (hv) {
