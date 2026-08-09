@@ -141,6 +141,9 @@ Not wiki issues, recorded here so they are not mistaken for one:
 
 - [x] ~~Backup only covered whole-item ticks~~ — it now carries parts and
       materials too, and still imports old bare-array backups by expanding them.
+- [ ] **Backup skips the farm list and planner options** (`vorframe.wishlist.v1`,
+      `vorframe.plan.v1`). Restoring on a new machine brings back your collection
+      but leaves the planner empty.
 - [ ] **Collection doesn't sync between devices.** It lives in `localStorage`, so
       phone and desktop keep separate lists. Backup/Import covers it manually;
       a shareable URL or file export would be smoother.

@@ -26,13 +26,20 @@ working out **where to farm the relics** for anything you're still missing.
 | Queue something to farm | Crosshair on the card, or *Add to farm list* in the drawer |
 | Plan a farm across several Primes | `plan.html` — click a part in the list to bank it as it drops |
 
-Collection state is stored in the browser's `localStorage` across three keys:
-`vorframe.collected.v1` (whole items), `vorframe.parts.v1` (per-part counts) and
-`vorframe.materials.v1` (the manual checklist), plus `vorframe.wishlist.v1` (the
-farm list, shared with the planner) and `vorframe.plan.v1` (planner options). **Backup** exports all three as one
-document, and still accepts the old bare-array format by expanding each ticked item
-into fully-owned parts. Imports are validated against the current catalogue:
-unknown ids and part names are skipped and counts clamped to what the part needs.
+Everything you enter lives in the browser's `localStorage`, across five keys:
+
+| Key | Holds | In Backup? |
+|---|---|---|
+| `vorframe.collected.v1` | whole items ticked | yes |
+| `vorframe.parts.v1` | per-part counts | yes |
+| `vorframe.materials.v1` | the manual materials checklist | yes |
+| `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
+| `vorframe.plan.v1` | planner options (squad, event, Railjack, Forma) | no |
+
+**Backup** exports the first three as one document and still accepts the old
+bare-array format by expanding each ticked item into fully-owned parts. Imports
+are validated against the current catalogue: unknown ids and part names are
+skipped, and counts clamped to what the part needs.
 
 **Parts are the source of truth** for anything that has them: an item counts as
 collected exactly when every part is owned, and ticking the card sets or clears
