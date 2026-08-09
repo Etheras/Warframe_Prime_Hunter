@@ -5,7 +5,7 @@ Newest observations go at the bottom of each section. Tick an item when it ships
 with a one-line note on what was actually done.
 
 **Keep this file current** — along with `README.md` and `PROJECT.md`, in the same
-commit as the change. See [CLAUDE.md](CLAUDE.md).
+commit as the change. See **PROJECT.md §2** for that and the other ground rules.
 
 ---
 
@@ -56,7 +56,7 @@ Not wiki issues, recorded here so they are not mistaken for one:
 - Reward rarity is derived from the unrefined drop chance because **DE's** own
   rarity words are chance-relative and shift with refinement. That is a
   Digital Extremes data quirk.
-- Categories stay on the wiki deliberately — see PROJECT.md §6.
+- Categories stay on the wiki deliberately — see PROJECT.md §7.
 
 ## Data accuracy
 

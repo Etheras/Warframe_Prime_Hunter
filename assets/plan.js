@@ -219,8 +219,9 @@
         <div class="wish-parts">${
           done === total
             ? `<span class="wish-all">complete</span>`
-            : missing.map((p) => `<span>${esc(p.name)}${
-                needOf(p) > 1 ? ` ×${needOf(p) - haveOf(id, p.name)}` : ""}</span>`).join("")
+            : missing.map((p) => `<button class="wish-part" data-got="${esc(id)}"
+                data-part="${esc(p.name)}" title="Got one — mark it collected">${esc(p.name)}${
+                needOf(p) > 1 ? ` ×${needOf(p) - haveOf(id, p.name)}` : ""}</button>`).join("")
         }</div>
       </div>`;
     }).join("");
@@ -259,11 +260,12 @@
       const more = ranked.length > SHOW;
       return `<div class="spot">
         <div class="spot-where">${esc(n.node)}
+          <span class="spot-mode">(${esc(n.mode)})</span>
           <span style="color:var(--txt-faint);font-weight:400">— ${esc(n.planet)}</span>
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
-        <div class="spot-meta">${esc(n.mode)}${
-          n.rotation ? ` · rot ${esc(n.rotation)}` : ""}${
+        <div class="spot-meta">${
+          n.rotation ? `rot ${esc(n.rotation)}` : "no rotation"}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
           rl.length} relic${rl.length === 1 ? "" : "s"}: ${esc(rl.join(", "))}</div>
         <div class="spot-score"><b>${pct(n.score)}</b>per reward</div>
@@ -331,6 +333,27 @@
       render();
       return;
     }
+    const got = e.target.closest("[data-got]");
+    if (got) {
+      const id = got.dataset.got, name = got.dataset.part;
+      const it = BY_ID.get(id);
+      const p = it && it.parts.find((x) => x.name === name);
+      if (p) {
+        // bank one copy; parts needing two take two clicks
+        const next = Math.min(needOf(p), (partsOwned[id] || {})[name] + 1 || 1);
+        partsOwned[id] = Object.assign({}, partsOwned[id], { [name]: next });
+        save(KEY_PARTS, partsOwned);
+        // an item whose parts are all owned counts as collected, same as the
+        // collection page — keep the two in step
+        const done = it.parts.every((q) => (partsOwned[id] || {})[q.name] >= needOf(q));
+        const coll = new Set(load("vorframe.collected.v1", []));
+        if (done) coll.add(id); else coll.delete(id);
+        save("vorframe.collected.v1", Array.from(coll));
+        render();
+      }
+      return;
+    }
+
     const del = e.target.closest("[data-del]");
     if (del) {
       wishlist = wishlist.filter((id) => id !== del.dataset.del);

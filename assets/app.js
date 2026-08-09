@@ -279,6 +279,10 @@
   /* ── grid render ──────────────────────────────────────────── */
   const grid = $("#grid");
   const TICK = '<svg viewBox="0 0 24 24"><polyline points="4,12 10,18 20,6"/></svg>';
+  // crosshair: "this is what I'm hunting"
+  const CROSS = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/>' +
+    '<line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/>' +
+    '<line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>';
 
   function cardHTML(it) {
     const has = collected.has(it.id);
@@ -289,7 +293,11 @@
     const badges = badgeHTML(it);
     return `<article class="card${has ? " is-collected" : ""}" data-id="${esc(it.id)}" tabindex="0">
       <div class="card-tick" data-tick="${esc(it.id)}" role="checkbox"
-           aria-checked="${has}" title="Mark as collected">${TICK}</div>
+           aria-checked="${has}" title="Mark as collected">${TICK}</div>${
+      it.parts.length ? `
+      <div class="card-farm${onWishlist(it.id) ? " on" : ""}" data-farm="${esc(it.id)}"
+           role="checkbox" aria-checked="${onWishlist(it.id)}"
+           title="${onWishlist(it.id) ? "On your farm list — click to remove" : "Farming for this — add to the planner"}">${CROSS}</div>` : ""}
       <div class="card-art">${art}</div>
       <div class="card-body">
         <div class="card-name">${esc(it.name)}</div>
@@ -632,10 +640,11 @@
         <div class="spots">` +
         spots.map((s) => `
           <div class="spot">
-            <div class="spot-where">${esc(s.node)}${
+            <div class="spot-where">${esc(s.node)}
+              <span class="spot-mode">(${esc(s.mode)})</span>${
               s.kind === "mission" ? ` <span style="color:var(--txt-faint);font-weight:400">— ${esc(s.planet)}</span>` : ""}</div>
-            <div class="spot-meta">${esc(s.mode)}${
-              s.rotations.length ? " · " + rotListTag(s.rotations) : ""}${
+            <div class="spot-meta">${
+              s.rotations.length ? rotListTag(s.rotations) : "no rotation"}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
               s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
@@ -908,6 +917,17 @@
       return;
     }
 
+    const farm = e.target.closest("[data-farm]");
+    if (farm) {
+      e.stopPropagation();
+      const id = farm.dataset.farm;
+      toggleWishlist(id);
+      const card = grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
+      if (card) card.outerHTML = cardHTML(ITEMS.find((x) => x.id === id));
+      updateFarmCount();
+      return;
+    }
+
     const tick = e.target.closest("[data-tick]");
     if (tick) { e.stopPropagation(); toggle(tick.dataset.tick); return; }
 
@@ -1137,6 +1157,15 @@
   });
 
   renderMaterials();
+
+  function updateFarmCount() {
+    const link = $("#planLink");
+    if (link) {
+      link.textContent = wishlist.length ? `Planner (${wishlist.length}) →` : "Planner →";
+      link.classList.toggle("has-items", wishlist.length > 0);
+    }
+  }
+  updateFarmCount();
 
   /* footer note */
   const m = DATA.meta || {};

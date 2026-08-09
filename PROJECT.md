@@ -4,10 +4,8 @@ A local, offline-capable web app for tracking your WARFRAME **Prime** collection
 working out **where to farm the relics** for anything you're still missing.
 
 > **This file must be kept current.** It is the one document to read to understand
-> VorFrame, and it is only worth that if it matches the code. Update it in the same
-> commit as any change to architecture, data sources, models, or gotchas — the same
-> goes for `README.md` (user-facing behaviour) and `TODO.md` (gaps and decisions).
-> See [CLAUDE.md](CLAUDE.md) for the full working rules.
+> VorFrame, and it is only worth that if it matches the code. **Section 2 sets out
+> how to work on this project — read it before changing anything.**
 
 **Last updated:** 2026-08-09
 
@@ -25,10 +23,13 @@ working out **where to farm the relics** for anything you're still missing.
 | Hide collected items | Sidebar → *Collection → Show collected* (untick to hide) |
 | **Prime Resurgence (R)** filter | Sidebar → *Availability → Prime Resurgence (R)* |
 | **Where to farm the relics** for a Prime | Click any card → *Best places to farm its relics* |
+| Queue something to farm | Crosshair on the card, or *Add to farm list* in the drawer |
+| Plan a farm across several Primes | `plan.html` — click a part in the list to bank it as it drops |
 
 Collection state is stored in the browser's `localStorage` across three keys:
 `vorframe.collected.v1` (whole items), `vorframe.parts.v1` (per-part counts) and
-`vorframe.materials.v1` (the manual checklist). **Backup** exports all three as one
+`vorframe.materials.v1` (the manual checklist), plus `vorframe.wishlist.v1` (the
+farm list, shared with the planner) and `vorframe.plan.v1` (planner options). **Backup** exports all three as one
 document, and still accepts the old bare-array format by expanding each ticked item
 into fully-owned parts. Imports are validated against the current catalogue:
 unknown ids and part names are skipped and counts clamped to what the part needs.
@@ -41,7 +42,77 @@ ticked item as "all parts owned", so nothing appears to vanish.
 
 ---
 
-## 2. Running it
+## 2. How to work on this project
+
+If you are picking this up cold — human or AI assistant — these are the standing
+rules. They exist because the project owner asked for them explicitly and
+repeatedly, not because they are conventional. Follow them even when a quicker
+route is obvious.
+
+### Keep the documentation current, always
+
+The three markdown files are part of what this project delivers, not notes about
+it. **Update them in the same commit as the change they describe.** A doc that
+has drifted is worse than no doc, because it will be trusted.
+
+| File | Who reads it | Update it when |
+|---|---|---|
+| `README.md` | the owner, day to day | anything visible changes — a control, a label, a workflow |
+| `PROJECT.md` | whoever maintains this next | architecture, data sources, the scoring model, or a hard-won gotcha |
+| `TODO.md` | both | you spot something worth doing, finish something, or make a decision worth remembering |
+
+If you notice a stale line while doing something else, fix it then. Do not leave
+it for a tidy-up pass that will not happen.
+
+### Never put a language model in the data pipeline
+
+Every source is JSON or a machine-generated HTML table with a regular structure,
+parsed deterministically. That is what lets a scheduled task keep this site
+current for years with nobody watching. **Do not add a step that needs a model,
+an API key, or a person reading prose.** Prose sources — patch notes, news posts,
+dev streams — were evaluated and deliberately rejected; see §4.
+
+### Fix the wiki, not the app
+
+Where our data knowingly disagrees with `wiki.warframe.com`, that disagreement
+belongs in `TODO.md` under *"Should be fixed on the wiki, not here"*, written up
+with whatever local override currently compensates. **Do not quietly patch data
+to paper over an upstream error.** The wiki is a shared resource; correcting it
+helps everyone, while a hidden override here rots silently.
+
+Categories are the deliberate exception: they stay on the wiki because the wiki's
+are better than the API's (§7). Availability facts come from Digital Extremes.
+
+### Commit freely, ask before every push
+
+Commit as part of normal work, with a message that explains *why* rather than
+what — the diff already says what. **Always ask before `git push`, every single
+time.** This is not a permission granted once; a commit is local and reversible,
+a push is outward-facing and is the owner's call.
+
+### No Node, no build step
+
+This machine has Python 3.14, git and a browser. There is no npm, no bundler, no
+framework, and adding one is not on the table. The site is plain HTML, CSS and
+JavaScript with the data baked into a `.js` file so it opens straight from
+`file://`. Keep it that way.
+
+### Verifying a change
+
+There is no automated test suite yet — it is in `TODO.md`. So verify in a browser
+and **say plainly what you actually checked**, rather than asserting it works:
+
+```bash
+python tools/build_data.py --offline   # rebuild from the cache, a few seconds
+python tools/serve.py                  # then look at it
+```
+
+Reset state between checks with `localStorage.clear()`, and leave it clean when
+you finish — the owner's real collection lives in those keys.
+
+---
+
+## 3. Running it
 
 The site is plain HTML/CSS/JS with the data baked into a `.js` file, so it needs
 no server and no install. Double-click `serve.cmd`, or:
@@ -75,7 +146,7 @@ or double-click `refresh-data.cmd`.
 
 ---
 
-## 3. Keeping it current, without an LLM
+## 4. Keeping it current, without an LLM
 
 Every source is either JSON or a machine-generated HTML table with a completely
 regular row structure, so the whole refresh is deterministic parsing — there is no
@@ -146,11 +217,10 @@ feeds above at the same time or sooner, so nothing is lost by skipping them.
 
 ---
 
-## 4. Layout
+## 5. Layout
 
 ```
 VorFrame/
-├── CLAUDE.md               ← standing rules for whoever works on this next
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
 ├── TODO.md                 ← known gaps and ideas, not yet done
@@ -183,7 +253,7 @@ Files marked GENERATED are rebuilt by `build_data.py`; don't hand-edit them.
 
 ---
 
-## 5. Data sources
+## 6. Data sources
 
 Ordered by authority. Where two sources overlap, the more official one wins and the
 other becomes an automatic fallback.
@@ -231,7 +301,7 @@ Verified across four states: warm-with-blocked-source (315 items + alert), cold
 
 ---
 
-## 6. Data model
+## 7. Data model
 
 `window.VORFRAME_DATA` holds:
 
@@ -396,7 +466,7 @@ then applied by release date, so the weapons that shipped alongside are caught t
 
 ---
 
-## 7. Gotchas discovered while building
+## 8. Gotchas discovered while building
 
 These cost real debugging time — worth remembering.
 
@@ -427,7 +497,7 @@ These cost real debugging time — worth remembering.
 
 ---
 
-## 8. Current snapshot
+## 9. Current snapshot
 
 As of the last data build (official drop table, 2026-06-25 revision):
 
@@ -454,7 +524,7 @@ Known limits:
 
 ---
 
-## 9. Possible next steps
+## 10. Possible next steps
 
 See **[TODO.md](TODO.md)** — open questions, known gaps, and ideas, kept as a
 running list rather than duplicated here.

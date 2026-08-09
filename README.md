@@ -111,8 +111,9 @@ Click any card. A panel slides in from the right with:
 1. **How to get it right now** — farmable, at Varzia, vaulted, or Founder-only.
 2. **Best places to farm its relics** — mission nodes ranked by the chance that
    one reward drop there gives you a part you still need. That percentage on the
-   right is the number to compare; hover "4 of 7 relics" to see which relics you'd
-   be after at that node. Ties break towards lower-level nodes, then rotation A.
+   right is the number to compare; the mission type is in brackets after the node
+   name, and hovering "4 of 7 relics" lists which relics you'd be after there.
+   Ties break towards lower-level nodes, then rotation A.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
    and whether to refine. Each row is shaded by how rare that part is inside that
    relic; hover the rarity for the odds at every refinement and what they cost in
@@ -131,8 +132,15 @@ are next in line. If you want them, get them now.
 
 ### Planning a whole farm
 
-The **Planner →** button (top right) opens a second page for when you're chasing
-several Primes at once. Add things to a list, and it ranks every node by the
+**Click the crosshair in a card's top-left corner** to say "I'm farming for this".
+The **Planner →** button counts what you've queued.
+
+The planner is a second page for when you're chasing several Primes at once. Your
+list sits top-left, showing only the parts still missing — **click a part name
+there the moment it drops** and it's banked, the list shrinks, and the plan
+re-ranks. Parts needing two copies take two clicks.
+
+It ranks every node by the
 chance a single reward drop gives you *anything* still on it, then tells you what
 refinement to take each relic to.
 
@@ -370,6 +378,6 @@ fresh on every build, so nothing is redistributed from here.
   knowing about.
 - **[TODO.md](TODO.md)** — known gaps, decisions already made, and the list of
   things that should be corrected on the wiki rather than patched here.
-- **[CLAUDE.md](CLAUDE.md)** — the standing rules for anyone (or any assistant)
-  picking this up: keep the docs current, no LLM in the data pipeline, ask before
-  pushing.
+Working on it yourself? **PROJECT.md §2** sets out the ground rules: keep the
+docs current, never put a language model in the data pipeline, fix the wiki
+rather than patching around it, and ask before pushing.
