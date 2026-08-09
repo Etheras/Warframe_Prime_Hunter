@@ -1169,11 +1169,10 @@
   renderMaterials();
 
   function updateFarmCount() {
-    const link = $("#planLink");
-    if (link) {
-      link.textContent = wishlist.length ? `Planner (${wishlist.length}) →` : "Planner →";
-      link.classList.toggle("has-items", wishlist.length > 0);
-    }
+    const n = $("#planCount");
+    if (!n) return;
+    n.textContent = wishlist.length;
+    n.hidden = wishlist.length === 0;
   }
   updateFarmCount();
 

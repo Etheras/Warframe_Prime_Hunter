@@ -14,9 +14,14 @@
     <span class="brand-mark">◈</span>
     <div>
       <h1>VorFrame</h1>
-      <p class="brand-sub">Prime collection &amp; relic farming tracker</p>
+      <p class="brand-sub">What you own, down to the part</p>
     </div>
   </div>
+
+  <nav class="viewtabs" aria-label="Views">
+    <a class="viewtab on" href="index.html" aria-current="page">Collection</a>
+    <a class="viewtab" id="planLink" href="plan.html">Planner<span class="viewtab-n" id="planCount" hidden></span></a>
+  </nav>
 
   <div class="search-wrap">
     <input id="search" type="search" placeholder="Search Primes, parts or relics…  (press /)" autocomplete="off" spellcheck="false">
@@ -27,7 +32,6 @@
       <span class="progress-num" id="progressNum">0 / 0</span>
       <span class="progress-bar"><i id="progressFill"></i></span>
     </div>
-    <a class="btn ghost" id="planLink" href="plan.html" title="Plan a farm across everything you're missing">Planner →</a>
     <button class="btn ghost" id="dataBtn" title="Backup or restore your collection">Backup</button>
   </div>
 </header>

@@ -1,7 +1,10 @@
 # VorFrame — project overview
 
-A local, offline-capable web app for tracking your WARFRAME **Prime** collection and
-working out **where to farm the relics** for anything you're still missing.
+A local, offline-capable web app presenting **two equal tools over one dataset**: a
+**collection tracker** (`index.html`) for what you own, and a **farm planner**
+(`plan.html`) for what to run next. Neither is subordinate — they share one build
+of the data and one set of saved progress, so a part ticked in either is ticked in
+both. Judge a change by whether it serves that shared dataset well.
 
 > **This file must be kept current.** It is the one document to read to understand
 > VorFrame, and it is only worth that if it matches the code. **Section 2 sets out
@@ -13,20 +16,34 @@ working out **where to farm the relics** for anything you're still missing.
 
 ## 1. What it does
 
+**Shared**
+
 | Requirement | Where it lives |
 |---|---|
 | Pull the Prime catalogue from the wiki | `tools/build_data.py` → parses `wiki.warframe.com/w/Prime` |
-| Show / hide **vaulted** Primes | Sidebar → *Availability → Vaulted (V)* |
-| Categories (Warframe, Primary, Secondary, Melee, …) | Sidebar → *Category* |
 | Mark what you've **already collected** | Tick on each card, or the button in the detail drawer |
 | Track **individual parts**, with quantities | Per-part counters in the drawer; `2/4` on the card |
+| Queue something to farm | Crosshair on the card, or *Add to farm list* in the drawer |
+
+**Collection** — `index.html`
+
+| Requirement | Where it lives |
+|---|---|
+| Show / hide **vaulted** Primes | Sidebar → *Availability → Vaulted (V)* |
+| Categories (Warframe, Primary, Secondary, Melee, …) | Sidebar → *Category* |
 | Hide collected items | Sidebar → *Collection → Show collected* (untick to hide) |
 | **Prime Resurgence (R)** filter | Sidebar → *Availability → Prime Resurgence (R)* |
 | **Where to farm the relics** for a Prime | Click any card → *Best places to farm its relics* |
-| Queue something to farm | Crosshair on the card, or *Add to farm list* in the drawer |
-| Plan a farm across several Primes | `plan.html` — click a part in the list to bank it as it drops |
-| Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
 | See what is about to be **vaulted** | `VAULTING SOON` badge on the two oldest farmable releases |
+
+**Planner** — `plan.html`
+
+| Requirement | Where it lives |
+|---|---|
+| Plan a farm across several Primes at once | Ranked node list, scored against everything queued |
+| Bank a part the moment it drops | Click it in the farm list; the plan re-ranks |
+| Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
+| Fold **Forma** into the ranking | Have/need field under Advanced options |
 
 Everything you enter lives in the browser's `localStorage`, across five keys:
 

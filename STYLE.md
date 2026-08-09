@@ -116,6 +116,16 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 
 ## 7. Layout
 
+- **Peer views get a segmented control, not a link.** `index.html` and `plan.html`
+  are two views of one dataset, so both carry the same `.viewtabs` pair with the
+  current one marked `.on` — gold text on `--panel-2` with an inset ring. A one-way
+  ghost button sat among the utility buttons and read as "somewhere else you can
+  go" rather than "the other half of this app". The brand block stays identical
+  across views; only the sub-line changes, because the tabs already say where you
+  are.
+- **Inactive nav text is `#9ca7b9`, not `--txt-dim`.** `--txt-dim` on `--panel`
+  measures 6.68:1 — under the 7:1 in §3. It passes elsewhere on lighter
+  backgrounds; on the top bar it does not, so nav sets its own value at 7.17:1.
 - Sidebars use a **solid** background, not a gradient. One that faded out after
   340px left the rest of a scrolling column unpainted.
 - Sections that sit on the page wash get **their own panel** (`--panel`, 1px

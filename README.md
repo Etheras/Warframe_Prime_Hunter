@@ -1,7 +1,11 @@
 # VorFrame
 
-A local website for tracking which WARFRAME **Primes** you own, and finding out
-**where to farm the relics** for the ones you don't.
+Two local tools over one dataset:
+
+- a **collection tracker** for the WARFRAME Primes you own, down to individual parts, and
+- a **farm planner** for deciding what to run next.
+
+They share your progress, so ticking off a part in one updates the other.
 
 Everything runs on your own machine. Nothing is uploaded, and there's no account.
 
@@ -60,6 +64,16 @@ while you use the site — closing it shuts the site down.
 ---
 
 ## Using it
+
+Two pages, linked from each other's top bar: the **collection** (`index.html`) and
+the **planner** (`plan.html`). Both read the same data and write the same saved
+progress — tick a part in one and it is ticked in the other. Which one you open
+first depends on the question you have: *what do I still need* or *what do I run
+next*.
+
+---
+
+## The collection
 
 ### Finding things
 
@@ -130,13 +144,16 @@ earlier*, on the same day — that has held for all 41 Warframes vaulted so far.
 badge marks the two oldest still-farmable releases, weapons included, because they
 are next in line. If you want them, get them now.
 
-### Planning a whole farm
+---
+
+## The planner
 
 **Click the crosshair in a card's top-left corner** to say "I'm farming for this".
-The **Planner →** button counts what you've queued.
+The **Planner →** button in the collection's top bar counts what you've queued.
 
-The planner is a second page for when you're chasing several Primes at once. Your
-list sits top-left, showing only the parts still missing — **click a part name
+The planner answers the other half of the question: given everything you're
+chasing, which mission is worth running right now. Your list sits top-left,
+showing only the parts still missing — **click a part name
 there the moment it drops** and it's banked, the list shrinks, and the plan
 re-ranks. Parts needing two copies take two clicks.
 
@@ -171,9 +188,11 @@ At the bottom of the sidebar:
   since that's what changes as you play — press **edit** to rename rows, change
   targets, or add and remove them.
 
-### Backing up your collection
+---
 
-Your ticks are stored in your browser. Click **Backup** at the top right to copy
+## Backing up your progress
+
+Your ticks are stored in your browser, and both pages read the same store. Click **Backup** at the top right to copy
 them out as text, or paste a saved copy back in and press **Import**.
 
 The backup covers everything: whole-item ticks, per-part progress, and your
