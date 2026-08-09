@@ -72,6 +72,10 @@ Not wiki issues, recorded here so they are not mistaken for one:
       after stripping the `Event:` prefix. The remaining 31% are Railjack/Proxima
       nodes, which DE's export omits entirely. Unknown levels sort last rather
       than being guessed at.
+- [ ] **Event nodes cannot be identified.** DE's drop table only says
+      `Event: <planet>/<node>`, never which event, and the live worldstate does
+      not link an event back to a drop-table node. If a mapping is ever found,
+      the planner could show "only during X" instead of hiding them.
 - [ ] Relic `sources` are capped at 40 per relic in the payload. Deduped and
       sorted by chance first so the useful ones survive, but the cap is arbitrary.
 
@@ -101,11 +105,15 @@ Not wiki issues, recorded here so they are not mistaken for one:
   the 2× relic's 0.110, while needing **2+** brings them close at 0.253 vs 0.220.
   (An earlier note here said to drop Forma from the maths entirely — that was an
   over-correction, since a near-uniform term barely reorders anything.)
-- **Node tie-break**: show 2, hover for 20 (same pattern as relic sources).
-  Order by score, then **lower** enemy level (high weight), then rotation A ahead
-  of B/C (mid weight). `Event:` nodes get a boost, behind an advanced checkbox,
-  since the event is worth running alongside the relic farm. Mission length is
-  deliberately ignored as too ambiguous.
+- **Node tie-break**: order by score, then **lower** enemy level (high weight),
+  then rotation A ahead of B/C (mid weight). Mission length is deliberately
+  ignored as too ambiguous.
+- **`Event:` nodes are excluded by default** (revised 2026-08-09 — they were
+  originally *promoted*). DE's drop table lists them permanently but never names
+  the event, and the node only exists on the star chart while that event runs, so
+  the planner was sending you after missions you could not find. Excluding them
+  drops 18% of live-relic source rows and orphans nothing. There is an *Include
+  event nodes* checkbox for when you know one is live.
 - **Railjack/Proxima**: out of scope for now — but it cannot simply be deleted.
   Five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10) have **no other
   source**, and they carry Nyx, Valkyr, Cernos, Lex, Hikou and Scindo Prime

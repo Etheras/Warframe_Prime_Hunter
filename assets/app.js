@@ -417,7 +417,8 @@
     const map = new Map();
     open.forEach((rname) => {
       if (!value.get(rname)) return;
-      (RELICS[rname].sources || []).filter((s) => !isRailjack(s)).forEach((s) => {
+      (RELICS[rname].sources || [])
+        .filter((s) => !isRailjack(s) && !isEventNode(s)).forEach((s) => {
         const key = `${s.planet} ${s.node} ${s.mode}`;
         let e = map.get(key);
         if (!e) {
@@ -523,6 +524,11 @@
   ]);
   const isRailjack = (s) =>
     RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
+
+  /* Event nodes only exist while their event is running, and DE's drop table
+     never says which event that is — so they are left out of the ranking here
+     rather than sending you looking for a node that isn't on your star chart. */
+  const isEventNode = (s) => /^Event:/i.test(s.planet || "");
 
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
      really "stay for the 4th reward". Spelled out on hover because the letters
@@ -728,7 +734,7 @@
             <span class="relic-state ${openNow ? "open" : "shut"}">${openNow ? "dropping" : "vaulted"}</span>
           </div>`;
           if (openNow) {
-            const all = rec.sources || [];
+            const all = (rec.sources || []).filter((x) => !isEventNode(x));
             const shownSrc = all.slice(0, 2);
             const top = shownSrc.map((s) =>
               `<span>${esc(s.node)}${s.kind === "mission" ? " (" + esc(s.planet) + ")" : ""}${

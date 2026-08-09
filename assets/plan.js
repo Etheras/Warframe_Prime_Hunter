@@ -66,6 +66,10 @@
     "Orvin-Haarc", "Vesper Strait",
   ]);
   const isRailjack = (s) => RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
+  /* DE's drop table lists event nodes permanently but never says which event
+     they belong to, and the node only exists in the game while that event is
+     running. Recommending one you cannot reach is worse than leaving it out, so
+     they are excluded by default and can be switched back on. */
   const isEvent = (s) => /^Event:/i.test(s.planet || "");
 
   /* ── what you still want ─────────────────────────────────────── */
@@ -165,6 +169,7 @@
     relicPlan.forEach((rp, rname) => {
       (RELICS[rname].sources || []).forEach((s) => {
         if (!opts.railjack && isRailjack(s)) return;
+        if (!opts.event && isEvent(s)) return;
         const key = `${s.planet}|${s.node}|${s.mode}|${s.rotation || "-"}`;
         let n = nodes.get(key);
         if (!n) {
@@ -185,7 +190,6 @@
     const ROT_RANK = { A: 0, B: 1, C: 2 };
     const ranked = Array.from(nodes.values()).sort((a, b) => {
       if (Math.abs(b.score - a.score) > 1e-9) return b.score - a.score;
-      if (opts.event && a.event !== b.event) return a.event ? -1 : 1;
       const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
       if (al !== bl) return al - bl;
       const ar = ROT_RANK[a.rotation] ?? 3, br = ROT_RANK[b.rotation] ?? 3;
@@ -256,6 +260,7 @@
       `Ties are broken by lower enemy level, then rotation A.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
+      (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
     // nodes: show the best few, with the rest behind a hover

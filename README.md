@@ -148,6 +148,11 @@ It also handles Forma: put in how many you have and how many you want, and a
 shortfall raises the value of relics you were already going to run. It will never
 add a relic just for Forma — you pick that up from the rolls that miss anyway.
 
+**Event nodes are left out by default.** They appear in Digital Extremes' drop
+table permanently, but the node only exists on your star chart while that event
+is actually running — and the table never says which event it is. There's an
+*Include event nodes* checkbox if you know one is live.
+
 ### Advanced options
 
 At the bottom of the sidebar:
