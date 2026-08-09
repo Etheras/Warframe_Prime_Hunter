@@ -472,6 +472,27 @@ build falls back to the other source.
 which is why the UI leans on it and why the vault/Baro/special/Founder markers
 are treated as annotation rather than truth.
 
+### Shared UI conventions
+
+Both pages use the same vocabulary, so a habit learned on one carries to the
+other. Anything added should follow it rather than invent a variant.
+
+- **Rarity is a row shade**, not a badge: bronze common, silver uncommon, gold
+  rare, using the game's own colour language. On the planner a relic row is
+  shaded by its *bottleneck* — the scarcest thing you want from it, which is what
+  decided its refinement.
+- **Vaulted fades to violet**, tying it to the Resurgence badge, since that is
+  how vaulted things come back.
+- **Tooltips are a custom monospaced element**, not native `title=`. Native
+  tooltips render proportionally, which ruins the aligned columns in the
+  refinement odds table. Anything column-shaped uses `data-tip`.
+- **`rot A/B/C` is always hoverable**, because the letters mean nothing alone.
+- **Long lists are condensed with the detail on hover** — relic lists, source
+  lists, wanted-part lists — rather than wrapping and pushing rows apart.
+- The page background is sized in **viewport percentages**. A fixed-pixel blob
+  landed differently on every screen and showed through panels with no
+  background of their own.
+
 ### Availability buckets
 
 Each item lands in exactly one bucket so the sidebar toggles stay unambiguous;

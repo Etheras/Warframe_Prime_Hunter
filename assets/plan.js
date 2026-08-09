@@ -149,9 +149,9 @@
      Forma never sets the bottleneck — you are not blocked on Forma — but it
      still counts towards the tie-break and the node score. */
   function bestRefinement(entries) {
-    let best = REFINEMENTS[0], bestCost = Infinity, bestTotal = -1;
+    let best = REFINEMENTS[0], bestCost = Infinity, bestTotal = -1, bestBlocker = null;
     REFINEMENTS.forEach((f) => {
-      let worst = 0, total = 0;
+      let worst = 0, total = 0, blocker = null;
       entries.forEach((e) => {
         const pct = e.chances[f];
         if (pct == null) return;
@@ -159,15 +159,17 @@
         total += p * Math.min(e.qty, e.stillNeed);
         if (e.bonus) return;                       // a by-product, never the blocker
         const openings = Math.ceil(e.stillNeed / (e.qty || 1));
-        worst = Math.max(worst, p > 0 ? openings / p : Infinity);
+        const cost = p > 0 ? openings / p : Infinity;
+        if (cost > worst) { worst = cost; blocker = e; }
       });
       const better = worst < bestCost - 1e-9 ||
         (Math.abs(worst - bestCost) < 1e-9 && total > bestTotal);
-      if (better) { best = f; bestCost = worst; bestTotal = total; }
+      if (better) { best = f; bestCost = worst; bestTotal = total; bestBlocker = blocker; }
     });
     // the node ranking still means "chance a reward drop yields something wanted",
     // measured at the refinement actually chosen above
-    return { refinement: best, value: relicValue(entries, best), openings: bestCost };
+    return { refinement: best, value: relicValue(entries, best), openings: bestCost,
+             blocker: bestBlocker };
   }
 
   /* ── the plan ────────────────────────────────────────────────── */
@@ -181,10 +183,10 @@
       if (!rec || rec.vaulted) return;
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
-      const { refinement, value, openings } = bestRefinement(entries);
+      const { refinement, value, openings, blocker } = bestRefinement(entries);
       if (value <= 0) return;
       relicPlan.set(rname, {
-        refinement, value, openings,
+        refinement, value, openings, blocker,
         wants: Array.from(new Set(entries.map((e) => e.label))).sort(),
       });
     });
@@ -222,6 +224,51 @@
     });
 
     return { relicPlan, ranked, needs, formaShort };
+  }
+
+  /* ── tooltip, same as the collection page ─────────────────────
+     Monospaced and whitespace-preserving, because native title= is
+     proportional and turns aligned columns to mush. */
+  const tipEl = document.createElement("div");
+  tipEl.className = "tip"; tipEl.hidden = true;
+  document.body.appendChild(tipEl);
+  function showTip(el) {
+    tipEl.textContent = el.dataset.tip || "";
+    tipEl.hidden = false;
+    const r = el.getBoundingClientRect(), t = tipEl.getBoundingClientRect();
+    let top = r.bottom + 7;
+    if (top + t.height > window.innerHeight - 8) top = r.top - t.height - 7;
+    tipEl.style.left = Math.max(8, Math.min(r.left, window.innerWidth - t.width - 10)) + "px";
+    tipEl.style.top = Math.max(8, top) + "px";
+  }
+  document.addEventListener("mouseover", (e) => {
+    const el = e.target.closest("[data-tip]");
+    if (el) showTip(el); else if (!tipEl.hidden) tipEl.hidden = true;
+  });
+  window.addEventListener("scroll", () => { tipEl.hidden = true; }, true);
+
+  /* Rotation rewards cycle A -> A -> B -> C and repeat, so "rotation C" really
+     means "stay for the 4th reward". Spelled out because the letters mean
+     nothing on their own. */
+  const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
+  const ROT_WHEN = {
+    A: "Can drop as the 1st or 2nd reward.",
+    B: "Can drop as the 3rd reward.",
+    C: "Can drop as the 4th reward.",
+  };
+  function rotTag(rot) {
+    if (!rot) return "no rotation";
+    const k = String(rot).toUpperCase();
+    const help = (ROT_WHEN[k] ? ROT_WHEN[k] + "\n\n" : "") + ROT_CYCLE;
+    return `<abbr class="rot" data-tip="${esc(help)}">rot ${esc(rot)}</abbr>`;
+  }
+
+  /* Rarity from the unrefined chance, the same rule the pipeline uses, so the
+     planner can colour-code rows exactly like the collection view. */
+  function rarityOf(chances) {
+    const i = chances && chances.Intact;
+    if (i == null) return "";
+    return i >= 20 ? "Common" : i >= 6 ? "Uncommon" : "Rare";
   }
 
   /* ── rendering ───────────────────────────────────────────────── */
@@ -304,10 +351,11 @@
           <span style="color:var(--txt-faint);font-weight:400">— ${esc(n.planet)}</span>
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
-        <div class="spot-meta">${
-          n.rotation ? `rot ${esc(n.rotation)}` : "no rotation"}${
+        <div class="spot-meta">${rotTag(n.rotation)}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
-          rl.length} relic${rl.length === 1 ? "" : "s"}: ${esc(rl.join(", "))}</div>
+          `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
+            rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
+            rl.length === 1 ? "" : "s"}</span>`}</div>
         <div class="spot-score"><b>${pct(n.score)}</b>per reward</div>
       </div>`;
     }).join("") + (ranked.length > SHOW
@@ -319,14 +367,23 @@
     // per-relic refinement decision
     const rp = Array.from(relicPlan.entries()).sort((a, b) => b[1].value - a[1].value);
     $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
-      const tier = rname.split(" ")[0];
-      return `<div class="relic-row">
+      const rar = p.blocker ? rarityOf(p.blocker.chances) : "";
+      const wants = p.wants.join(", ");
+      return `<div class="relic-row rar-row-${esc(rar)}">
         <span class="relic-name">${esc(rname)}</span>
+        <span class="rarity ${esc(rar)}" data-tip="${esc(
+          (rar ? rar + " is what you are blocked on here" : "") + "\n" +
+          (p.blocker ? "  " + p.blocker.label : ""))}">${esc(rar || "?")}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
-              title="Chance of getting something you want from one opening at this refinement">
-          ${esc(p.refinement)}</span>
-        <span class="chances" data-tip="${esc("Chance one opening gives something you want: " + pct(p.value) + (isFinite(p.openings) ? "\n" + "Expected openings to finish everything wanted here: " + p.openings.toFixed(1) : ""))}"><b>${pct(p.value)}</b></span>
-        <span class="relic-wants">${esc(p.wants.join(", "))}</span>
+              data-tip="${esc("Chosen to clear the scarcest reward fastest, not for the best overall hit rate.")}"
+          >${esc(p.refinement)}</span>
+        <span class="relic-wants" data-tip="${esc("From this relic you want:" + "\n" +
+          p.wants.map((w) => "  " + w).join("\n"))}">${esc(wants)}</span>
+        <span class="chances" data-tip="${esc(
+          "Chance one opening gives something you want: " + pct(p.value) +
+          (isFinite(p.openings) ? "\n" +
+            "Expected openings to finish everything wanted here: " + p.openings.toFixed(1) : "")
+          )}"><b>${pct(p.value)}</b></span>
       </div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 
@@ -336,7 +393,12 @@
         ? (BY_ID.get(n.item.id).parts.find((p) => p.name === n.part) || { relics: [] })
             .relics.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted).length
         : Array.from(relicPlan.keys()).length;
-      return `<div class="need-row${live ? "" : " need-dead"}">
+      const rar = n.item.id
+        ? (() => { const pp = BY_ID.get(n.item.id).parts.find((x) => x.name === n.part);
+                   const best = pp && pp.relics.find((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
+                   return best ? rarityOf(best.chances) : ""; })()
+        : "";
+      return `<div class="need-row${live ? "" : " need-dead"}${rar ? " rar-row-" + rar : ""}">
         <span class="need-name">${esc(n.item.name)}</span>
         <span class="need-part">${esc(n.part)}${n.short > 1 ? ` ×${n.short}` : ""}</span>
         <span class="need-src">${
