@@ -722,7 +722,6 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .part-chip.Common  {color:#d8965c;border-color:#5a3a20}
 .part-chip.Uncommon{color:#d3dae6;border-color:#454f60}
 .part-chip.Rare    {color:#ffce40;border-color:#6b5320}
-.part-chip.is-blocker{box-shadow:0 0 0 1px currentColor inset;cursor:help}
 
 /* Explanatory prose lives at the foot of the page, collapsed, so it never
    pushes the at-a-glance data down. STYLE.md §5. */

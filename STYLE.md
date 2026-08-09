@@ -86,10 +86,12 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 - **Weight is not a signal.** Do not bold one chip among several to mark it —
   differing weights in a row read as a rendering fault. Use a border or an inset
   ring instead.
-- **Only mark a choice that actually existed.** The bottleneck ring is drawn on a
-  relic with two or more wanted parts, never on one with a single part where the
-  answer was forced. Otherwise the same chip renders two different ways in two
-  rows and the difference means nothing — which is exactly how it was spotted.
+- **Order it rather than mark it.** If a set has a natural ranking, sort by it and
+  let position carry the meaning — do not highlight the top one. A highlight has
+  to pick a single winner even when two items are genuinely equal, and that pick
+  is arbitrary: two equally-scarce parts had one ringed purely because it came
+  first in the list. Sorting has no such failure mode, needs no legend, and
+  survives ties. Wanted parts sort rarest first, gold to bronze, left to right.
 - **Pad a block on both sides.** A line with padding on the bottom and none on
   the top reads as misaligned even when the spacing above comes from a
   neighbour's margin.

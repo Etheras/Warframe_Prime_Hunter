@@ -368,23 +368,23 @@
     const rp = Array.from(relicPlan.entries()).sort((a, b) => b[1].value - a[1].value);
     $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
       // background = the action (which refinement); chips = each part's rarity
-      const blocker = p.blocker ? p.blocker.label : null;
+      // Rarest first, so position carries "this is the hard one" — no marker
+      // needed. A highlight had to pick a winner even when two parts were
+      // equally scarce, and that choice was arbitrary.
+      const RAR_ORDER = { Rare: 0, Uncommon: 1, Common: 2 };
       const parts = p.entries
         .filter((e) => !e.bonus)
-        .map((e) => ({ label: e.label, rar: rarityOf(e.chances) }));
-      // ringing the bottleneck only says something when there was a choice to
-      // make; on a single-part relic it made the same part look different in
-      // two rows for no reason
-      const showBlocker = parts.length > 1;
+        .map((e) => ({ label: e.label, rar: rarityOf(e.chances) }))
+        .sort((a, b) => (RAR_ORDER[a.rar] ?? 9) - (RAR_ORDER[b.rar] ?? 9) ||
+                        a.label.localeCompare(b.label));
       return `<div class="relic-row ref-row-${esc(p.refinement)}">
         <span class="relic-name">${esc(rname)}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
               data-tip="${esc(
                 "Take this relic to " + p.refinement + "." + "\n\n" +
-                (blocker
-                  ? "It is chosen to clear " + blocker + " fastest — the scarcest thing you"
-                    + "\nwant here — rather than for the best overall hit rate."
-                  : "Chosen to clear the scarcest wanted reward fastest.") +
+                "Chosen to clear the scarcest thing you want here fastest," + "\n" +
+                "rather than for the best overall hit rate. The parts below are" + "\n" +
+                "listed rarest first." +
                 (isFinite(p.openings)
                   ? "\n\nExpected openings to finish everything wanted here: "
                     + p.openings.toFixed(1) : ""))}"
@@ -393,12 +393,7 @@
           "Chance one opening gives something you want: " + pct(p.value))}"><b>${pct(p.value)}</b></span>
       </div>
       <div class="relic-parts">${
-        parts.map((x) => {
-          const isBlk = showBlocker && x.label === blocker;
-          return `<span class="part-chip ${esc(x.rar)}${isBlk ? " is-blocker" : ""}"${
-            isBlk ? ` data-tip="${esc("The bottleneck: this is what the refinement above is chosen for.")}"` : ""
-          }>${esc(x.label)}</span>`;
-        }).join("")
+        parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}</span>`).join("")
       }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 
