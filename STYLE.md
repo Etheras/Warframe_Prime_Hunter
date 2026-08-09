@@ -76,6 +76,16 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   table impossible to scan.
 - Sources and parts belonging to a row go **on a line beneath it**, indented and
   dimmed — not inline, which turns every row into a different height.
+- **Explanation goes at the foot of the page, collapsed** — never between a
+  heading and its data. A paragraph explaining how a ranking works is read once
+  and then costs a screenful forever. Put it under a `How this works` summary at
+  the bottom and let the data start immediately.
+- **Chips carry their own colour, so what sits behind them does not.** The line
+  holding a set of chips is plain; tinting it as well is the one-meaning-per-
+  channel rule broken in a second place.
+- **Weight is not a signal.** Do not bold one chip among several to mark it —
+  differing weights in a row read as a rendering fault. Use a border or an inset
+  ring instead.
 - Inline chips need horizontal room. In a column narrower than ~300px use **full
   width rows** instead; chips wrapped raggedly in the 290px planner sidebar and
   read as broken form controls.

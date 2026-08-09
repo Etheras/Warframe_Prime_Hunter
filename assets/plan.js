@@ -388,7 +388,7 @@
         <span class="chances" data-tip="${esc(
           "Chance one opening gives something you want: " + pct(p.value))}"><b>${pct(p.value)}</b></span>
       </div>
-      <div class="relic-parts ref-row-${esc(p.refinement)}">${
+      <div class="relic-parts">${
         parts.map((x) => `<span class="part-chip ${esc(x.rar)}${
           x.label === blocker ? " is-blocker" : ""}"${
           x.label === blocker ? ` data-tip="${esc("The bottleneck: this is what the refinement above is chosen for.")}"` : ""
