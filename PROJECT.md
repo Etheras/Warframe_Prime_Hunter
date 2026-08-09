@@ -3,10 +3,13 @@
 A local, offline-capable web app for tracking your WARFRAME **Prime** collection and
 working out **where to farm the relics** for anything you're still missing.
 
-> This file is the living overview of the project. Keep it current when anything
-> below changes — it is meant to be the one document you read to understand VorFrame.
+> **This file must be kept current.** It is the one document to read to understand
+> VorFrame, and it is only worth that if it matches the code. Update it in the same
+> commit as any change to architecture, data sources, models, or gotchas — the same
+> goes for `README.md` (user-facing behaviour) and `TODO.md` (gaps and decisions).
+> See [CLAUDE.md](CLAUDE.md) for the full working rules.
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-09
 
 ---
 
@@ -111,7 +114,7 @@ something farmable — then publishes to GitHub Pages. This supersedes the Sched
 Task.
 
 **The dataset is never committed.** It is built in CI and handed to Pages as an
-artifact, so the repo stays source-only (14 files, ~120 KB) and DE's data is not
+artifact, so the repo stays source-only (21 files, ~231 KB) and DE's data is not
 redistributed — each build pulls it fresh. The workflow holds `contents: read`, so
 it cannot modify the repository at all.
 
@@ -147,6 +150,7 @@ feeds above at the same time or sooner, so nothing is lost by skipping them.
 
 ```
 VorFrame/
+├── CLAUDE.md               ← standing rules for whoever works on this next
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
 ├── TODO.md                 ← known gaps and ideas, not yet done

@@ -240,7 +240,7 @@ already includes the credential manager that handles the login.
 
 ### What actually gets uploaded
 
-Only **14 source files, about 120 KB**. Specifically:
+Only **21 source files, about 231 KB**. Specifically:
 
 - ✅ The code — `index.html`, `assets/`, `tools/`, the `.cmd` scripts, the two docs
 - ❌ **Not** Digital Extremes' game data (`data/vorframe-data.js` / `.json`)
@@ -365,5 +365,11 @@ fresh on every build, so nothing is redistributed from here.
 
 ## Want more detail?
 
-[PROJECT.md](PROJECT.md) covers how it's built — where each piece of data comes
-from, how the files fit together, and the quirks worth knowing about.
+- **[PROJECT.md](PROJECT.md)** — how it's built: where each piece of data comes
+  from, how the three sources disagree, the scoring model, and the quirks worth
+  knowing about.
+- **[TODO.md](TODO.md)** — known gaps, decisions already made, and the list of
+  things that should be corrected on the wiki rather than patched here.
+- **[CLAUDE.md](CLAUDE.md)** — the standing rules for anyone (or any assistant)
+  picking this up: keep the docs current, no LLM in the data pipeline, ask before
+  pushing.

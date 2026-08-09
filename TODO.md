@@ -1,7 +1,11 @@
 # TODO
 
 Things noticed while building VorFrame that are worth doing but haven't been done.
-Newest observations go at the bottom of each section. Delete an item when it ships.
+Newest observations go at the bottom of each section. Tick an item when it ships,
+with a one-line note on what was actually done.
+
+**Keep this file current** — along with `README.md` and `PROJECT.md`, in the same
+commit as the change. See [CLAUDE.md](CLAUDE.md).
 
 ---
 
@@ -63,16 +67,13 @@ Not wiki issues, recorded here so they are not mistaken for one:
 - [x] ~~Part names differ between the two paths~~ — fixed by `normalise_part()`:
       the redundant trailing " Blueprint" is stripped so both sources agree, which
       is what saved part progress is keyed on.
-- [ ] **Enemy levels for the node tie-break** come from DE's
-      `ExportRegions_en.json` (269 nodes, `minEnemyLevel`/`maxEnemyLevel`). It
-      covers only **55%** of the nodes that drop live relics — Railjack/Proxima
-      nodes and `Event:` variants are absent from the export entirely. Nodes with
-      no known level will have to sort last rather than be guessed at.
+- [ ] **Enemy levels cover 69% of live-relic nodes.** They come from DE's
+      `ExportRegions_en.json` (269 nodes, `minEnemyLevel`/`maxEnemyLevel`), joined
+      after stripping the `Event:` prefix. The remaining 31% are Railjack/Proxima
+      nodes, which DE's export omits entirely. Unknown levels sort last rather
+      than being guessed at.
 - [ ] Relic `sources` are capped at 40 per relic in the payload. Deduped and
       sorted by chance first so the useful ones survive, but the cap is arbitrary.
-- [ ] The wiki's `(R)` Resurgence markers are parsed and then ignored (they're
-      stale). Either drop the parse or use it as a cross-check that warns when the
-      wiki disagrees with the live worldstate.
 
 ## Features
 
@@ -86,6 +87,8 @@ Not wiki issues, recorded here so they are not mistaken for one:
       decision, Forma shortfall folded in, squad/event/Railjack toggles.
 - [ ] Planner follow-ups: no "runs needed" estimate yet, and the node list shows
       8 with the next 20 on hover rather than a full browsable table.
+- [ ] The planner's Forma field is separate from the collection page's materials
+      list, so the same number is entered twice. They should share one store.
 
 ### Planner design decisions (settled 2026-08-08)
 

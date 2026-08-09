@@ -711,7 +711,7 @@
           const openNow = rec && !rec.vaulted;
           const rar = r.rarity || "";
           const adv = refineAdvice(r.chances);
-          html += `<div class="relic-row rar-row-${esc(rar)}">
+          html += `<div class="relic-row rar-row-${esc(rar)}${openNow ? "" : " is-vaulted"}">
             <span class="relic-name">${esc(r.relic)}</span>
             <span class="rarity ${esc(rar)}" data-tip="${esc(rarityTip(rar, r.chances))}">${
               esc(rar || "?")}</span>
