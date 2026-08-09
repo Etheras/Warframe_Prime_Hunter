@@ -446,7 +446,11 @@
           Array.from(e.relics.values()).map((v) => v.chance || 0).concat([0])),
         rotations: Array.from(new Set(Array.from(e.relics.values())
           .map((v) => v.rotation).filter(Boolean))).sort(),
-        relicList: Array.from(e.relics.keys()),
+        // best-first, matching the planner: drop chance here x what it is worth
+        relicList: Array.from(e.relics.entries())
+          .map(([name, v]) => [name, ((v.chance || 0) / 100) * (value.get(name) || 0)])
+          .sort((a, b) => b[1] - a[1])
+          .map(([name]) => name),
       }))
       // Rank by the chance a reward drop here yields something still wanted -
       // not by how many relics happen to overlap, which is what used to make

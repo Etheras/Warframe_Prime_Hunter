@@ -257,6 +257,7 @@
     $("#planScoreNote").innerHTML =
       `The percentage is the chance that <b>one reward drop</b> at that node leads to ` +
       `something on your list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
+      `Relics are listed best-first within each node. ` +
       `Ties are broken by lower enemy level, then rotation A.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
@@ -266,7 +267,12 @@
     // nodes: show the best few, with the rest behind a hover
     const SHOW = 8;
     $("#planNodes").innerHTML = ranked.slice(0, SHOW).map((n) => {
-      const rl = Array.from(n.relics.keys()).sort();
+      // most useful relic first: how much of this node's score each one accounts
+      // for, i.e. the chance it drops here times what one opening is worth
+      const rl = Array.from(n.relics.entries())
+        .map(([name, chance]) => [name, (chance / 100) * (relicPlan.get(name) || {}).value || 0])
+        .sort((a, b) => b[1] - a[1])
+        .map(([name]) => name);
       const more = ranked.length > SHOW;
       return `<div class="spot">
         <div class="spot-where">${esc(n.node)}
