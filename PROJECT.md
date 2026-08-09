@@ -411,8 +411,8 @@ collection view answers the narrower per-part question and does not.
 
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
-that item's relics drop there*. It scores each node by the chance a single reward drop there yields a part you
-still need — the same model `plan.js` uses, so the two pages cannot rank things
+that item's relics drop there*. It scores each node by what one round there is worth towards a part you
+still need — the same model `plan.js` uses, rotation weighting included, so the two pages cannot rank things
 differently. (It used to rank by how many relics happened to overlap, which made
 the order disagree with the per-part odds listed underneath.) It only counts
 relics holding a part you are still missing, so the advice moves as you tick
@@ -430,6 +430,27 @@ node's own rotation rewards, which is the data we already use. A fissure run tha
 hands you a relic is therefore already priced in: the `P(relic drops here)` term
 *is* that event. (Railjack's Void Storms do get their own table and are parsed,
 but they drop at 2.5% and fall below the 40-source cap.)
+
+**Rotation is priced into the node score, not used as a tie-break.** DE's published
+drop chance is *conditional on that rotation coming up*, so it is not comparable
+across rotations as it stands: with the A&nbsp;→&nbsp;A&nbsp;→&nbsp;B&nbsp;→&nbsp;C
+cycle, a rot C relic at 23.34% arrives far more slowly than a rot A one at the same
+number. Each source is therefore weighted by **rounds played per wanted reward**,
+assuming you leave once the rotation you came for has paid:
+
+| Rotation | Rewards at | Rounds per shot at it | Weight |
+|---|---|---|---|
+| A | 1st and 2nd | 1 — two rounds yield *two* A rewards | 1 |
+| B | 3rd | 3 | 1/3 |
+| C | 4th | 4 | 1/4 |
+| none | every run | 1 | 1 |
+
+So rot A is **4× a rot C** listing at the same published chance, not 2× — the
+play-through reading (A fires twice per four rewards, so 2×) undercounts it,
+because you never have to play rounds 3 and 4 to collect an A reward. Both pages
+apply this, and the headline percentage is therefore **per round**, not per reward.
+Rotation was previously only a tie-break below enemy level, which let a rot C node
+outrank a rot A one outright whenever their raw scores matched.
 
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four

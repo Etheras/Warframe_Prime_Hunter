@@ -3,9 +3,12 @@
 
    The model, in one line:
 
-     score(node, rotation) = Σ over relics r dropped there:
+     score(node, rotation) = rotationWeight(rotation) × Σ over relics r dropped there:
                                P(r drops) × Σ over wanted things w in r:
                                               P(w | r, refinement) × min(qty, still needed)
+
+   The drop chance DE publishes is conditional on that rotation coming up, so
+   comparing rotations by it directly overrates the late ones — see ROT_ROUNDS.
 
    Both sums are plain additions rather than inclusion-exclusion, because a
    mission reward roll yields exactly one item (so the relics in a node's table
@@ -13,6 +16,17 @@
    wanted slots inside a relic are too).                                        */
 (function () {
   "use strict";
+
+  /* Rewards cycle A -> A -> B -> C. DE's published chance is conditional on
+     that rotation coming up, so it is not comparable across rotations as-is:
+     a rot C relic at 23% arrives far more slowly than a rot A one at 23%.
+
+     Weighting is by rounds played per wanted reward, assuming you leave once
+     the rotation you came for has paid. Two rounds yield *two* A rewards, so A
+     costs one round each; B needs three rounds and C four. A node with no
+     rotation pays out every run, so it also costs 1. */
+  const ROT_ROUNDS = { A: 1, B: 3, C: 4 };
+  const rotWeight = (rot) => 1 / (ROT_ROUNDS[String(rot || "").toUpperCase()] || 1);
 
   const DATA = window.VORFRAME_DATA;
   const $ = (s, r) => (r || document).querySelector(s);
@@ -204,22 +218,19 @@
                 railjack: isRailjack(s), score: 0, relics: new Map() };
           nodes.set(key, n);
         }
-        n.score += ((s.chance || 0) / 100) * rp.value;
+        n.score += ((s.chance || 0) / 100) * rp.value * rotWeight(s.rotation);
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev) n.relics.set(rname, s.chance || 0);
       });
     });
 
-    // Tie-break, in the order agreed: score first, then a lower enemy level
-    // (faster clears), then rotation A ahead of B/C (it comes round sooner).
-    // Mission length is deliberately ignored as too ambiguous to model.
-    const ROT_RANK = { A: 0, B: 1, C: 2 };
+    // Score first, then a lower enemy level (faster clears). Rotation used to
+    // be a tie-break here; it is priced into the score now, so tie-breaking on
+    // it as well would count it twice. Mission length stays unmodelled.
     const ranked = Array.from(nodes.values()).sort((a, b) => {
       if (Math.abs(b.score - a.score) > 1e-9) return b.score - a.score;
       const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
       if (al !== bl) return al - bl;
-      const ar = ROT_RANK[a.rotation] ?? 3, br = ROT_RANK[b.rotation] ?? 3;
-      if (ar !== br) return ar - br;
       return (a.node || "").localeCompare(b.node || "");
     });
 
@@ -252,9 +263,9 @@
      nothing on their own. */
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
-    A: "Can drop as the 1st or 2nd reward.",
-    B: "Can drop as the 3rd reward.",
-    C: "Can drop as the 4th reward.",
+    A: "Can drop as the 1st or 2nd reward.\n1 round per shot at it.",
+    B: "Can drop as the 3rd reward.\n3 rounds per shot at it.",
+    C: "Can drop as the 4th reward.\n4 rounds per shot at it.",
   };
   function rotTag(rot) {
     if (!rot) return "no rotation";
@@ -326,10 +337,13 @@
       `<b>${ranked.length}</b> place${ranked.length === 1 ? "" : "s"} to run`;
 
     $("#planScoreNote").innerHTML =
-      `The percentage is the chance that <b>one reward drop</b> at that node leads to ` +
-      `something on your list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
+      `The percentage is what <b>one round</b> at that node is worth towards your ` +
+      `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
+      `Rotation is priced in: the published chance assumes that rotation has come ` +
+      `up, and with the A&nbsp;&rarr;&nbsp;A&nbsp;&rarr;&nbsp;B&nbsp;&rarr;&nbsp;C cycle ` +
+      `an A reward costs one round, B three and C four. ` +
       `Relics are listed best-first within each node. ` +
-      `Ties are broken by lower enemy level, then rotation A.` +
+      `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
@@ -356,7 +370,7 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}</div>
-        <div class="spot-score"><b>${pct(n.score)}</b>per reward</div>
+        <div class="spot-score"><b>${pct(n.score)}</b>per round</div>
       </div>`;
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" title="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>

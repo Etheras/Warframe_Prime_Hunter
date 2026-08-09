@@ -414,6 +414,12 @@
     const value = new Map();
     open.forEach((r) => value.set(r, relicValueFor(it, r)));
 
+    // Same weighting as the planner: DE's chance is conditional on that
+    // rotation coming up, so it is not comparable across rotations. Rounds
+    // played per wanted reward, leaving once your rotation has paid.
+    const ROT_ROUNDS = { A: 1, B: 3, C: 4 };
+    const rotWeight = (rot) => 1 / (ROT_ROUNDS[String(rot || "").toUpperCase()] || 1);
+
     const map = new Map();
     open.forEach((rname) => {
       if (!value.get(rname)) return;
@@ -426,18 +432,20 @@
                 relics: new Map(), event: s.event, score: 0, lvl: s.lvl || null };
           map.set(key, e);
         }
+        // one entry per relic per node, keeping whichever rotation is worth
+        // most per round - not the biggest raw chance, which would prefer a
+        // rot C listing over a faster rot A one at the same number
+        const worth = ((s.chance || 0) / 100) * value.get(rname) * rotWeight(s.rotation);
         const prev = e.relics.get(rname);
-        if (!prev || (s.chance || 0) > (prev.chance || 0)) {
-          // one entry per relic per node, keeping its best drop rate
-          if (prev) e.score -= ((prev.chance || 0) / 100) * value.get(rname);
-          e.score += ((s.chance || 0) / 100) * value.get(rname);
-          e.relics.set(rname, { chance: s.chance, rotation: s.rotation });
+        if (!prev || worth > prev.worth) {
+          if (prev) e.score -= prev.worth;
+          e.score += worth;
+          e.relics.set(rname, { chance: s.chance, rotation: s.rotation, worth });
           if (!e.lvl && s.lvl) e.lvl = s.lvl;
         }
       });
     });
 
-    const ROT = { A: 0, B: 1, C: 2 };
     return Array.from(map.values())
       .map((e) => ({
         ...e,
@@ -446,21 +454,21 @@
           Array.from(e.relics.values()).map((v) => v.chance || 0).concat([0])),
         rotations: Array.from(new Set(Array.from(e.relics.values())
           .map((v) => v.rotation).filter(Boolean))).sort(),
-        // best-first, matching the planner: drop chance here x what it is worth
+        // best-first, matching the planner: worth per round, rotation included
         relicList: Array.from(e.relics.entries())
-          .map(([name, v]) => [name, ((v.chance || 0) / 100) * (value.get(name) || 0)])
+          .map(([name, v]) => [name, v.worth])
           .sort((a, b) => b[1] - a[1])
           .map(([name]) => name),
       }))
-      // Rank by the chance a reward drop here yields something still wanted -
-      // not by how many relics happen to overlap, which is what used to make
-      // this list disagree with the per-part relic odds below it.
+      // Rank by what a round here is worth towards what is still wanted - not
+      // by how many relics happen to overlap, which is what used to make this
+      // list disagree with the per-part relic odds below it. Rotation is in the
+      // score now, so it is not a tie-break as well.
       .sort((a, b) => {
         if (Math.abs(b.score - a.score) > 1e-9) return b.score - a.score;
         const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
         if (al !== bl) return al - bl;
-        const ar = ROT[a.rotations[0]] ?? 3, br = ROT[b.rotations[0]] ?? 3;
-        return ar - br || (a.node || "").localeCompare(b.node || "");
+        return (a.node || "").localeCompare(b.node || "");
       })
       .slice(0, 8);
   }
@@ -659,7 +667,7 @@
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
               s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
             <div class="spot-score" title="Chance that one reward drop here gives a part you still need, at the best refinement for it"><b>${
-              (s.score * 100).toFixed(1)}%</b>per reward</div>
+              (s.score * 100).toFixed(1)}%</b>per round</div>
           </div>`).join("") +
         `</div></section>`;
     }

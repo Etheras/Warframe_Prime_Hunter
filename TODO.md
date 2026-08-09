@@ -98,6 +98,15 @@ Not wiki issues, recorded here so they are not mistaken for one:
       there is still no estimate of **missions** to run (openings x how often the
       relic drops). The node list also shows 8 with the next 20 on hover rather
       than a full browsable table.
+- [ ] **Relic `sources` are ordered and capped by raw chance, not by the
+      rotation-weighted value the UI now ranks on.** `normalise_sources()` sorts
+      by chance and `build_data.py` keeps the top 40, so a fast rot A source
+      could in principle be cut in favour of a slower rot B/C one with a higher
+      published number. Not observed to bite yet — the cap only binds on relics
+      with many sources — but the two orderings should agree.
+- [ ] **`.more-nodes` uses a native `title=`**, which STYLE.md section 4 rules
+      out (native tooltips are proportional and mangle the aligned columns).
+      Should move to the `data-tip` engine like every other tooltip.
 - [ ] The planner's Forma field is separate from the collection page's materials
       list, so the same number is entered twice. They should share one store.
 
@@ -114,9 +123,19 @@ Dates are on the individual entries — several were revised after first use.
   the 2× relic's 0.110, while needing **2+** brings them close at 0.253 vs 0.220.
   (An earlier note here said to drop Forma from the maths entirely — that was an
   over-correction, since a near-uniform term barely reorders anything.)
-- **Node tie-break**: order by score, then **lower** enemy level (high weight),
-  then rotation A ahead of B/C (mid weight). Mission length is deliberately
-  ignored as too ambiguous.
+- **Node tie-break**: order by score, then **lower** enemy level. Mission length
+  is deliberately ignored as too ambiguous. Rotation *used* to be the third key
+  here; it moved into the score itself (below), so tie-breaking on it as well
+  would have counted it twice.
+- **Rotation is weighted into the score** (added 2026-08-09, prompted by a rot C
+  node outranking two rot A nodes at the same published chance). DE's chance is
+  conditional on that rotation coming up, so it is not comparable across
+  rotations. Weight is rounds played per wanted reward, assuming you leave once
+  your rotation has paid: **A = 1** (two rounds give two A rewards), **B = 3**,
+  **C = 4**, no rotation = 1. That makes rot A worth 4x a rot C listing at the
+  same number. The alternative reading — play straight through, so A is only 2x
+  because it fills two of every four reward slots — was considered and rejected
+  as not matching how the list is actually used.
 - **`Event:` nodes are excluded by default** (revised 2026-08-09 — they were
   originally *promoted*). DE's drop table lists them permanently but never names
   the event, and the node only exists on the star chart while that event runs, so

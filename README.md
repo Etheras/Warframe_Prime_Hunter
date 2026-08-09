@@ -123,11 +123,11 @@ so you can filter to a category first and tick it off in one go.
 Click any card. A panel slides in from the right with:
 
 1. **How to get it right now** — farmable, at Varzia, vaulted, or Founder-only.
-2. **Best places to farm its relics** — mission nodes ranked by the chance that
-   one reward drop there gives you a part you still need. That percentage on the
+2. **Best places to farm its relics** — mission nodes ranked by what one round
+   there is worth towards a part you still need. That percentage on the
    right is the number to compare; the mission type is in brackets after the node
    name, and hovering "4 of 7 relics" lists which relics you'd be after there.
-   Ties break towards lower-level nodes, then rotation A.
+   Ties break towards lower-level nodes.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
    and whether to refine. Each row is shaded by how rare that part is inside that
    relic; hover the rarity for the odds at every refinement and what they cost in
@@ -157,8 +157,15 @@ showing only the parts still missing — **click a part name
 there the moment it drops** and it's banked, the list shrinks, and the plan
 re-ranks. Parts needing two copies take two clicks.
 
-It ranks every node by the chance a single reward drop gives you *anything* still
-on it, then tells you what refinement to take each relic to.
+It ranks every node by what **one round** there is worth towards *anything* still
+on your list, then tells you what refinement to take each relic to.
+
+**Rotation counts, and it counts for a lot.** The percentage the game publishes
+assumes that rotation has already come up, so it flatters the late ones. Rewards
+cycle A → A → B → C, and you can leave as soon as you have what you came for: two
+rounds hand you *two* rotation A rewards, while a rotation C reward costs a full
+four. So an A listing is worth four times a C listing showing the same number, and
+the planner ranks it that way.
 
 That refinement advice follows **whatever you're most stuck on**, not whatever is
 most likely. If a relic holds a common part you need *and* a rare one, it says
