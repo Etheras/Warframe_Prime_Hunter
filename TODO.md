@@ -94,12 +94,16 @@ Not wiki issues, recorded here so they are not mistaken for one:
 - [x] ~~**Stage 2 — the shopping-list planner**~~ — built as `plan.html`. Wishlist
       shared with the collection page, need-aware scoring, per-relic refinement
       decision, Forma shortfall folded in, squad/event/Railjack toggles.
-- [ ] Planner follow-ups: no "runs needed" estimate yet, and the node list shows
-      8 with the next 20 on hover rather than a full browsable table.
+- [ ] Planner follow-ups: the per-relic view estimates *openings* to finish, but
+      there is still no estimate of **missions** to run (openings x how often the
+      relic drops). The node list also shows 8 with the next 20 on hover rather
+      than a full browsable table.
 - [ ] The planner's Forma field is separate from the collection page's materials
       list, so the same number is entered twice. They should share one store.
 
-### Planner design decisions (settled 2026-08-08)
+### Planner design decisions
+
+Dates are on the individual entries — several were revised after first use.
 
 - **Forma counts, but only up to what you still need.** It gets a have/need
   field like any other material; if the field shows a shortfall it joins the

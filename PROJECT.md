@@ -25,6 +25,8 @@ working out **where to farm the relics** for anything you're still missing.
 | **Where to farm the relics** for a Prime | Click any card → *Best places to farm its relics* |
 | Queue something to farm | Crosshair on the card, or *Add to farm list* in the drawer |
 | Plan a farm across several Primes | `plan.html` — click a part in the list to bank it as it drops |
+| Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
+| See what is about to be **vaulted** | `VAULTING SOON` badge on the two oldest farmable releases |
 
 Everything you enter lives in the browser's `localStorage`, across five keys:
 
@@ -35,6 +37,7 @@ Everything you enter lives in the browser's `localStorage`, across five keys:
 | `vorframe.materials.v1` | the manual materials checklist | yes |
 | `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
 | `vorframe.plan.v1` | planner options (squad, event, Railjack, Forma) | no |
+| `vorframe.filters.v1` | collection filters, sort and view toggles | no |
 
 **Backup** exports the first three as one document and still accepts the old
 bare-array format by expanding each ticked item into fully-owned parts. Imports
@@ -58,8 +61,8 @@ route is obvious.
 
 ### Keep the documentation current, always
 
-The three markdown files are part of what this project delivers, not notes about
-it. **Update them in the same commit as the change they describe.** A doc that
+The four markdown files below are part of what this project delivers, not notes
+about it. **Update them in the same commit as the change they describe.** A doc that
 has drifted is worse than no doc, because it will be trusted.
 
 | File | Who reads it | Update it when |
@@ -193,7 +196,7 @@ something farmable — then publishes to GitHub Pages. This supersedes the Sched
 Task.
 
 **The dataset is never committed.** It is built in CI and handed to Pages as an
-artifact, so the repo stays source-only (21 files, ~231 KB) and DE's data is not
+artifact, so the repo stays source-only (21 files, ~259 KB) and DE's data is not
 redistributed — each build pulls it fresh. The workflow holds `contents: read`, so
 it cannot modify the repository at all.
 
@@ -232,6 +235,7 @@ VorFrame/
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
 ├── TODO.md                 ← known gaps and ideas, not yet done
+├── STYLE.md                ← the visual rules a new page has to follow
 ├── LICENSE                 ← MIT, scoped to our own code
 ├── NOTICE.md               ← upstream sources and their terms
 ├── index.html              ← the collection: filters, cards, detail drawer

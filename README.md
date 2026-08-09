@@ -258,9 +258,9 @@ already includes the credential manager that handles the login.
 
 ### What actually gets uploaded
 
-Only **21 source files, about 231 KB**. Specifically:
+Only **21 source files, about 259 KB**. Specifically:
 
-- ✅ The code — `index.html`, `assets/`, `tools/`, the `.cmd` scripts, the two docs
+- ✅ The code — `index.html`, `plan.html`, `assets/`, `tools/`, the `.cmd` scripts and the docs
 - ❌ **Not** Digital Extremes' game data (`data/vorframe-data.js` / `.json`)
 - ❌ **Not** the download cache (`.cache/`) or the single-file build (`dist/`)
 - ❌ **Not** your editor or tool settings (`.claude/`, `.vscode/`)
