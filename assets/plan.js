@@ -186,7 +186,7 @@
       const { refinement, value, openings, blocker } = bestRefinement(entries);
       if (value <= 0) return;
       relicPlan.set(rname, {
-        refinement, value, openings, blocker,
+        refinement, value, openings, blocker, entries,
         wants: Array.from(new Set(entries.map((e) => e.label))).sort(),
       });
     });
@@ -367,32 +367,42 @@
     // per-relic refinement decision
     const rp = Array.from(relicPlan.entries()).sort((a, b) => b[1].value - a[1].value);
     $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
-      const rar = p.blocker ? rarityOf(p.blocker.chances) : "";
-      const wants = p.wants.join(", ");
-      return `<div class="relic-row rar-row-${esc(rar)}">
+      // background = the action (which refinement); chips = each part's rarity
+      const blocker = p.blocker ? p.blocker.label : null;
+      const parts = p.entries
+        .filter((e) => !e.bonus)
+        .map((e) => ({ label: e.label, rar: rarityOf(e.chances) }));
+      return `<div class="relic-row ref-row-${esc(p.refinement)}">
         <span class="relic-name">${esc(rname)}</span>
-        <span class="rarity ${esc(rar)}" data-tip="${esc(
-          (rar ? rar + " is what you are blocked on here" : "") + "\n" +
-          (p.blocker ? "  " + p.blocker.label : ""))}">${esc(rar || "?")}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
-              data-tip="${esc("Chosen to clear the scarcest reward fastest, not for the best overall hit rate.")}"
+              data-tip="${esc(
+                "Take this relic to " + p.refinement + "." + "\n\n" +
+                (blocker
+                  ? "It is chosen to clear " + blocker + " fastest — the scarcest thing you"
+                    + "\nwant here — rather than for the best overall hit rate."
+                  : "Chosen to clear the scarcest wanted reward fastest.") +
+                (isFinite(p.openings)
+                  ? "\n\nExpected openings to finish everything wanted here: "
+                    + p.openings.toFixed(1) : ""))}"
           >${esc(p.refinement)}</span>
-        <span class="relic-wants" data-tip="${esc("From this relic you want:" + "\n" +
-          p.wants.map((w) => "  " + w).join("\n"))}">${esc(wants)}</span>
         <span class="chances" data-tip="${esc(
-          "Chance one opening gives something you want: " + pct(p.value) +
-          (isFinite(p.openings) ? "\n" +
-            "Expected openings to finish everything wanted here: " + p.openings.toFixed(1) : "")
-          )}"><b>${pct(p.value)}</b></span>
-      </div>`;
+          "Chance one opening gives something you want: " + pct(p.value))}"><b>${pct(p.value)}</b></span>
+      </div>
+      <div class="relic-parts ref-row-${esc(p.refinement)}">${
+        parts.map((x) => `<span class="part-chip ${esc(x.rar)}${
+          x.label === blocker ? " is-blocker" : ""}"${
+          x.label === blocker ? ` data-tip="${esc("The bottleneck: this is what the refinement above is chosen for.")}"` : ""
+        }>${esc(x.label)}</span>`).join("")
+      }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 
     // what's left
     $("#planNeeds").innerHTML = needs.map((n) => {
-      const live = n.item.id
+      const liveRelics = n.item.id
         ? (BY_ID.get(n.item.id).parts.find((p) => p.name === n.part) || { relics: [] })
-            .relics.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted).length
-        : Array.from(relicPlan.keys()).length;
+            .relics.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted).map((r) => r.relic)
+        : Array.from(relicPlan.keys());
+      const live = liveRelics.length;
       const rar = n.item.id
         ? (() => { const pp = BY_ID.get(n.item.id).parts.find((x) => x.name === n.part);
                    const best = pp && pp.relics.find((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
@@ -403,8 +413,11 @@
         <span class="need-part">${esc(n.part)}${n.short > 1 ? ` ×${n.short}` : ""}</span>
         <span class="need-src">${
           n.bonus ? "picked up along the way — never farmed for on its own"
-                  : (live ? `${live} relic${live === 1 ? "" : "s"} dropping`
-                          : "vaulted — trade or wait for Resurgence")}</span>
+                  : (live
+                      ? `<span class="relic-count" data-tip="${esc("Dropping from:" + "\n" +
+                          liveRelics.map((r) => "  " + r).join("\n"))}">${live} relic${
+                          live === 1 ? "" : "s"} dropping</span>`
+                      : "vaulted — trade or wait for Resurgence")}</span>
       </div>`;
     }).join("");
   }

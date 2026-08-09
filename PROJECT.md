@@ -67,6 +67,7 @@ has drifted is worse than no doc, because it will be trusted.
 | `README.md` | the owner, day to day | anything visible changes — a control, a label, a workflow |
 | `PROJECT.md` | whoever maintains this next | architecture, data sources, the scoring model, or a hard-won gotcha |
 | `TODO.md` | both | you spot something worth doing, finish something, or make a decision worth remembering |
+| `STYLE.md` | whoever adds UI | a new visual pattern is introduced, or an existing one turns out to be wrong |
 
 If you notice a stale line while doing something else, fix it then. Do not leave
 it for a tidy-up pass that will not happen.
@@ -474,24 +475,13 @@ are treated as annotation rather than truth.
 
 ### Shared UI conventions
 
-Both pages use the same vocabulary, so a habit learned on one carries to the
-other. Anything added should follow it rather than invent a variant.
+Both pages share one visual vocabulary so a habit learned on either carries over:
+row background encodes the **action** (which refinement), chips encode **rarity**,
+vaulted fades to violet, long lists condense with the detail on hover, and
+tooltips explain rather than repeat.
 
-- **Rarity is a row shade**, not a badge: bronze common, silver uncommon, gold
-  rare, using the game's own colour language. On the planner a relic row is
-  shaded by its *bottleneck* — the scarcest thing you want from it, which is what
-  decided its refinement.
-- **Vaulted fades to violet**, tying it to the Resurgence badge, since that is
-  how vaulted things come back.
-- **Tooltips are a custom monospaced element**, not native `title=`. Native
-  tooltips render proportionally, which ruins the aligned columns in the
-  refinement odds table. Anything column-shaped uses `data-tip`.
-- **`rot A/B/C` is always hoverable**, because the letters mean nothing alone.
-- **Long lists are condensed with the detail on hover** — relic lists, source
-  lists, wanted-part lists — rather than wrapping and pushing rows apart.
-- The page background is sized in **viewport percentages**. A fixed-pixel blob
-  landed differently on every screen and showed through panels with no
-  background of their own.
+**The rules live in [STYLE.md](STYLE.md)** — read it before adding UI. Each rule
+records why it exists, so it is clear when one does not apply.
 
 ### Availability buckets
 

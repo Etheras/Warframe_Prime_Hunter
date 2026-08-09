@@ -4,8 +4,8 @@ Things noticed while building VorFrame that are worth doing but haven't been don
 Newest observations go at the bottom of each section. Tick an item when it ships,
 with a one-line note on what was actually done.
 
-**Keep this file current** — along with `README.md` and `PROJECT.md`, in the same
-commit as the change. See **PROJECT.md §2** for that and the other ground rules.
+**Keep this file current** — along with `README.md`, `PROJECT.md` and `STYLE.md`,
+in the same commit as the change. See **PROJECT.md §2** for that and the other ground rules.
 
 ---
 

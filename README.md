@@ -388,6 +388,8 @@ fresh on every build, so nothing is redistributed from here.
   knowing about.
 - **[TODO.md](TODO.md)** — known gaps, decisions already made, and the list of
   things that should be corrected on the wiki rather than patched here.
+- **[STYLE.md](STYLE.md)** — the visual rules, so new pages look like the
+  existing ones without anyone having to compare them by eye.
 Working on it yourself? **PROJECT.md §2** sets out the ground rules: keep the
 docs current, never put a language model in the data pipeline, fix the wiki
 rather than patching around it, and ask before pushing.

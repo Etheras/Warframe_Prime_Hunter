@@ -670,11 +670,7 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;
   background:var(--panel);
 }
-.plan-main .relic-row{
-  border-top:none;border-bottom:1px solid var(--line-soft);
-  flex-wrap:nowrap;gap:9px;
-}
-.plan-main .relic-row:last-child{border-bottom:none}
+.plan-main .relic-row{border-top:none;border-bottom:none;flex-wrap:nowrap;gap:9px}
 .plan-main .relic-name{min-width:74px;flex:0 0 auto}
 .plan-main .chances{margin-left:auto;flex:0 0 auto;cursor:help}
 
@@ -698,3 +694,29 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .need-part{color:var(--txt-dim)}
 .need-src{margin-left:auto;font-size:11.5px;color:var(--txt-faint)}
 .need-dead .need-src{color:#cbbcf2}
+
+/* ── planner relic rows ─────────────────────────────────────────
+   STYLE.md §1: the background says what to DO with the relic (which
+   refinement); the chips beneath say how rare each wanted part is. The two
+   never share a channel, which is why the parts stayed legible this time. */
+.ref-row-Intact     {background:linear-gradient(90deg,rgba(95,206,143,.16) 0,rgba(95,206,143,.16) 38%,transparent 76%)}
+.ref-row-Exceptional{background:linear-gradient(90deg,rgba(79,209,197,.15) 0,rgba(79,209,197,.15) 38%,transparent 76%)}
+.ref-row-Flawless   {background:linear-gradient(90deg,rgba(90,169,230,.15) 0,rgba(90,169,230,.15) 38%,transparent 76%)}
+.ref-row-Radiant    {background:linear-gradient(90deg,rgba(157,123,234,.18) 0,rgba(157,123,234,.18) 38%,transparent 76%)}
+
+/* the wanted parts, on their own line beneath — same shape as the collection's
+   source line, so a habit learned there carries over */
+.relic-parts{
+  display:flex;flex-wrap:wrap;gap:5px;
+  padding:0 12px 9px 12px;border-bottom:1px solid var(--line-soft);
+}
+.relic-parts:last-child{border-bottom:none}
+.part-chip{
+  font-size:10.5px;padding:1px 7px;border-radius:4px;
+  border:1px solid;background:#0e131c;          /* opaque: STYLE.md §2 */
+  white-space:nowrap;
+}
+.part-chip.Common  {color:#d8965c;border-color:#5a3a20}
+.part-chip.Uncommon{color:#d3dae6;border-color:#454f60}
+.part-chip.Rare    {color:#ffce40;border-color:#6b5320}
+.part-chip.is-blocker{box-shadow:0 0 0 1px currentColor inset;font-weight:700;cursor:help}
