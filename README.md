@@ -109,9 +109,10 @@ so you can filter to a category first and tick it off in one go.
 Click any card. A panel slides in from the right with:
 
 1. **How to get it right now** — farmable, at Varzia, vaulted, or Founder-only.
-2. **Best places to farm its relics** — mission nodes ranked by *how many* of that
-   Prime's relics drop there. The number on the right is the important bit: "5 of 7
-   relics" means one trip to that node can drop five of the seven relics you need.
+2. **Best places to farm its relics** — mission nodes ranked by the chance that
+   one reward drop there gives you a part you still need. That percentage on the
+   right is the number to compare; hover "4 of 7 relics" to see which relics you'd
+   be after at that node. Ties break towards lower-level nodes, then rotation A.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
    and whether to refine. Each row is shaded by how rare that part is inside that
    relic; hover the rarity for the odds at every refinement and what they cost in
@@ -127,6 +128,17 @@ strict cadence: every Prime Access release vaults the Prime from *seven releases
 earlier*, on the same day — that has held for all 41 Warframes vaulted so far. The
 badge marks the two oldest still-farmable releases, weapons included, because they
 are next in line. If you want them, get them now.
+
+### Planning a whole farm
+
+The **Planner →** button (top right) opens a second page for when you're chasing
+several Primes at once. Add things to a list, and it ranks every node by the
+chance a single reward drop gives you *anything* still on it, then tells you what
+refinement to take each relic to.
+
+It also handles Forma: put in how many you have and how many you want, and a
+shortfall raises the value of relics you were already going to run. It will never
+add a relic just for Forma — you pick that up from the rolls that miss anyway.
 
 ### Advanced options
 
