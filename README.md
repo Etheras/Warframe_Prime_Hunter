@@ -7,7 +7,16 @@ Two local tools over one dataset:
 
 They share your progress, so ticking off a part in one updates the other.
 
-Everything runs on your own machine. Nothing is uploaded, and there's no account.
+Everything runs on your own machine. Your collection never leaves it, and there's
+no account.
+
+> **One exception, so you know about it:** the item artwork is loaded from
+> `cdn.warframestat.us` as you browse, rather than being stored locally. That CDN
+> therefore sees your IP address and which item images your browser asked for. No
+> collection data, ticks or farm list is ever sent anywhere. If your browser
+> reports *"Cookie has been rejected as third-party"* against files like
+> `LavosPrime.png`, that is this — and it is your browser refusing the CDN a
+> cookie, which is the outcome you want.
 
 ---
 

@@ -251,9 +251,16 @@ Dates are on the individual entries — several were revised after first use.
 - [x] ~~`S · special` filtered together with Founder~~ — split. Founder is its own
       bucket, pinned last (it will never return); "Other sources" now names the
       actual route, read from each item's wiki page.
-- [ ] Artwork is hotlinked from `cdn.warframestat.us`. The standalone build is
-      therefore not fully offline. An optional `--with-images` that inlines the
-      art as data URIs would fix it, at a large size cost.
+- [ ] **Artwork is hotlinked from `cdn.warframestat.us`**, so the standalone
+      build is not fully offline *and* the CDN sees your IP plus which item
+      images you rendered. No collection data leaks, but it is the only part of
+      the app that talks to anyone while you use it, and it is why Firefox logs
+      "Cookie has been rejected as third-party" against `*Prime.png`. Measured
+      2026-08-09: **278 items carry art, mean 63 KB, about 17 MB raw** — 22.8 MB
+      if base64-inlined, which is too much for the single-file bundle. Better
+      option is a `--with-images` that downloads into `assets/img/` and rewrites
+      the URLs, keeping the bundle free to stay hotlinked or drop art entirely.
+      README now states the exception rather than implying nothing leaves.
 
 ## Engineering
 
