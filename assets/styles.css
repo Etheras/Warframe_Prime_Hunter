@@ -481,9 +481,15 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .rarity.Common{color:#b98d63;border-color:#4a3826}
 .rarity.Uncommon{color:#c3cad6;border-color:#3d4655}
 .rarity.Rare{color:var(--gold);border-color:var(--gold-dim)}
-.relic-state{margin-left:auto;font-size:10.5px;padding:1px 6px;border-radius:4px;border:1px solid}
-.relic-state.open{color:var(--green);border-color:#2d5a41;background:#16281e}
-.relic-state.shut{color:var(--txt-faint);border-color:#333c4c}
+/* Both states carry an opaque background: these sit at the right-hand end of the
+   row, exactly where the rarity gradient (and the violet vault wash) is
+   strongest, and a translucent chip disappears into it. */
+.relic-state{
+  margin-left:auto;font-size:10.5px;font-weight:600;letter-spacing:.3px;
+  padding:1px 6px;border-radius:4px;border:1px solid;
+}
+.relic-state.open{color:var(--green);border-color:#2d5a41;background:#12241a}
+.relic-state.shut{color:#cbbcf2;border-color:#584379;background:#191330}
 /* one line: two best spots, then a "+N more" that carries the rest on hover */
 .relic-src{
   padding:2px 12px 9px 12px;font-size:11.5px;color:var(--txt-faint);
