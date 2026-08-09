@@ -129,9 +129,16 @@ Not wiki issues, recorded here so they are not mistaken for one:
   `1 - (1 - w)^4`.
 
 
-- [ ] **Relic inventory** so the drawer can say "you already hold 2 of these".
-      The biggest remaining inaccuracy in the planner: every score is *per reward
-      drop*, so it ignores the stack you could already be cracking.
+- [ ] **Relic inventory** — *deferred 2026-08-09, do not re-propose without a
+      better input method.* It remains the biggest inaccuracy in the planner
+      (every score is *per reward drop*, so it ignores the stack you could already
+      be cracking), but the blocker is data entry, not value: the game gives no
+      export, and typing in a relic collection by hand is unreasonable when a
+      long-standing account holds hundreds, most of them vaulted and irrelevant.
+      What would unblock it: only the **34 currently-live relics** can affect the
+      plan, so a future attempt should ask about those alone — a single screen of
+      counters, re-asked when the drop tables change — rather than the whole
+      inventory. Anything that needs the vaulted ones is the wrong design.
 - [ ] Ducat value per part, for prime-junk triage.
 - [ ] Availability changelog: when a scheduled build changes what's farmable,
       write a short summary so "Frost Prime became farmable" is visible without
