@@ -76,6 +76,11 @@ Not wiki issues, recorded here so they are not mistaken for one:
       `Event: <planet>/<node>`, never which event, and the live worldstate does
       not link an event back to a drop-table node. If a mapping is ever found,
       the planner could show "only during X" instead of hiding them.
+- [ ] **Void Storm sources are cut by the 40-source cap.** Railjack's equivalent
+      of a Void Fissure does get its own table (44 rows across 6 groups, all for
+      live relics) but drops at 2.5%, below the 9–15% of ordinary nodes, so it
+      falls off the end. Low value and Railjack-only, hence left alone — but
+      raising the cap would bring it back.
 - [ ] Relic `sources` are capped at 40 per relic in the payload. Deduped and
       sorted by chance first so the useful ones survive, but the cap is arbitrary.
 
@@ -125,6 +130,8 @@ Not wiki issues, recorded here so they are not mistaken for one:
 
 
 - [ ] **Relic inventory** so the drawer can say "you already hold 2 of these".
+      The biggest remaining inaccuracy in the planner: every score is *per reward
+      drop*, so it ignores the stack you could already be cracking.
 - [ ] Ducat value per part, for prime-junk triage.
 - [ ] Availability changelog: when a scheduled build changes what's farmable,
       write a short summary so "Frost Prime became farmable" is visible without

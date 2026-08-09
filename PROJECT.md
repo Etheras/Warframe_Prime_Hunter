@@ -377,6 +377,13 @@ Railjack/Proxima nodes are excluded from that ranking — a different activity �
 never hidden, because five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10)
 have no other source and carry never-vaulted frames like Nyx and Valkyr.
 
+**Void Fissures need no special handling.** DE publishes no fissure reward table —
+a fissure is an overlay on an ordinary node, so the mission still pays out that
+node's own rotation rewards, which is the data we already use. A fissure run that
+hands you a relic is therefore already priced in: the `P(relic drops here)` term
+*is* that event. (Railjack's Void Storms do get their own table and are parsed,
+but they drop at 2.5% and fall below the 40-source cap.)
+
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
