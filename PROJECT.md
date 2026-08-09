@@ -350,6 +350,24 @@ by `parts_from_droptables` — reward names are always `"<Item Name> <Part>"`, s
 prefix is unambiguous. Verified end to end by removing a frame from the wiki parse
 and confirming it comes back with all four parts and working farm locations.
 
+**The planner picks refinement by bottleneck, not by hit rate.** Maximising the
+chance of getting *anything* wanted is the wrong objective when relics are
+finite: a common's 25.33% drowns out a rare you are actually blocked on, and the
+advice comes back "Intact" while the rare sits at 2%. What matters is how long it
+takes to get *everything* you want out of that relic, which is set by its
+scarcest reward. So `bestRefinement` minimises the expected openings for the
+worst-off wanted reward — `ceil(stillNeeded / qtyPerDrop) / p` — and breaks ties
+on total hit rate.
+
+This is not a rare correction. **All 34 live relics hold both a common and a rare
+Prime part**, so any list wanting one of each hits it. Lith G14 carries Gyre's
+Neuroptics (rare) and Lavos's Chassis (common): the old model said Intact at
+27.33% total, leaving the rare at ~50 expected openings; it now says Radiant,
+cutting the rare to ~10 while the common only slips from 3.9 to 6.
+
+Forma never sets the bottleneck — you are not blocked on it — but still counts
+towards the tie-break and the node score.
+
 **Refinement, and when the middle steps matter.** The odds move monotonically —
 common 25.33 → 16.67 (worse), uncommon 11 → 20, rare 2 → 10 — so for a *single*
 target the answer is always one of the two ends, which is why the per-part advice

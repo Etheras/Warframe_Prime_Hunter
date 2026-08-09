@@ -140,9 +140,14 @@ list sits top-left, showing only the parts still missing — **click a part name
 there the moment it drops** and it's banked, the list shrinks, and the plan
 re-ranks. Parts needing two copies take two clicks.
 
-It ranks every node by the
-chance a single reward drop gives you *anything* still on it, then tells you what
-refinement to take each relic to.
+It ranks every node by the chance a single reward drop gives you *anything* still
+on it, then tells you what refinement to take each relic to.
+
+That refinement advice follows **whatever you're most stuck on**, not whatever is
+most likely. If a relic holds a common part you need *and* a rare one, it says
+Radiant — because the rare is what's actually holding you up, and pushing it from
+2% to 10% matters far more than the common slipping from 25% to 17%. Hover the
+percentage to see how many openings it expects.
 
 It also handles Forma: put in how many you have and how many you want, and a
 shortfall raises the value of relics you were already going to run. It will never

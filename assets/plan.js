@@ -133,17 +133,41 @@
     return total;
   }
 
-  /* Optimises over everything wanted from this relic at once, which is why the
-     planner can return Exceptional or Flawless where the per-part view never
-     would: wanting a common and an uncommon from one relic makes the middle
-     steps genuinely best, since one curve rises as the other falls. */
+  /* Which refinement to take this relic to.
+
+     Not "whichever gives the best chance of *something* wanted" — that lets a
+     common's 25.33% drown out a rare you are actually blocked on, and tells you
+     to run Intact while the rare stays at 2%. What matters when relics are
+     finite is how long it takes to get *everything* you want out of this relic,
+     and that is set by the scarcest reward. So: minimise the expected openings
+     for the worst-off wanted reward, and break ties on total hit rate.
+
+     Concretely, wanting a common and a rare from one relic flips Intact (best
+     total, 27.33%) to Radiant, which cuts the rare from 50 expected openings to
+     10 while the common merely slips from 3.9 to 6.
+
+     Forma never sets the bottleneck — you are not blocked on Forma — but it
+     still counts towards the tie-break and the node score. */
   function bestRefinement(entries) {
-    let best = REFINEMENTS[0], bestVal = -1;
+    let best = REFINEMENTS[0], bestCost = Infinity, bestTotal = -1;
     REFINEMENTS.forEach((f) => {
-      const v = relicValue(entries, f);
-      if (v > bestVal) { best = f; bestVal = v; }
+      let worst = 0, total = 0;
+      entries.forEach((e) => {
+        const pct = e.chances[f];
+        if (pct == null) return;
+        const p = squadify(pct / 100);
+        total += p * Math.min(e.qty, e.stillNeed);
+        if (e.bonus) return;                       // a by-product, never the blocker
+        const openings = Math.ceil(e.stillNeed / (e.qty || 1));
+        worst = Math.max(worst, p > 0 ? openings / p : Infinity);
+      });
+      const better = worst < bestCost - 1e-9 ||
+        (Math.abs(worst - bestCost) < 1e-9 && total > bestTotal);
+      if (better) { best = f; bestCost = worst; bestTotal = total; }
     });
-    return { refinement: best, value: bestVal };
+    // the node ranking still means "chance a reward drop yields something wanted",
+    // measured at the refinement actually chosen above
+    return { refinement: best, value: relicValue(entries, best), openings: bestCost };
   }
 
   /* ── the plan ────────────────────────────────────────────────── */
@@ -157,10 +181,10 @@
       if (!rec || rec.vaulted) return;
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
-      const { refinement, value } = bestRefinement(entries);
+      const { refinement, value, openings } = bestRefinement(entries);
       if (value <= 0) return;
       relicPlan.set(rname, {
-        refinement, value,
+        refinement, value, openings,
         wants: Array.from(new Set(entries.map((e) => e.label))).sort(),
       });
     });
@@ -301,7 +325,7 @@
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
               title="Chance of getting something you want from one opening at this refinement">
           ${esc(p.refinement)}</span>
-        <span class="chances"><b>${pct(p.value)}</b></span>
+        <span class="chances" data-tip="${esc("Chance one opening gives something you want: " + pct(p.value) + (isFinite(p.openings) ? "\n" + "Expected openings to finish everything wanted here: " + p.openings.toFixed(1) : ""))}"><b>${pct(p.value)}</b></span>
         <span class="relic-wants">${esc(p.wants.join(", "))}</span>
       </div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;

@@ -124,6 +124,11 @@ Not wiki issues, recorded here so they are not mistaken for one:
   source**, and they carry Nyx, Valkyr, Cernos, Lex, Hikou and Scindo Prime
   parts. Hiding Railjack outright would make permanently-unvaulted frames look
   unfarmable. Keep the sources, just leave them out of the default ranking.
+- **Refinement is chosen by bottleneck** (revised 2026-08-09). Was "maximise the
+  chance of anything wanted", which let a common outvote a rare you were blocked
+  on. Now minimises expected openings for the scarcest wanted reward. Affects
+  every list that wants a common and a rare from one relic — and all 34 live
+  relics contain both.
 - **Squad odds**: a checkbox, "4-squad run with the same relic and refinement".
   Off means solo. With it on, a wanted reward at probability `w` becomes
   `1 - (1 - w)^4`.
