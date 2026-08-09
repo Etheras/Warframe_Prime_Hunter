@@ -573,14 +573,37 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .wish-prog{font-size:11.5px;color:var(--txt-dim);font-variant-numeric:tabular-nums}
 .wish-del{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:12px;padding:0 2px}
 .wish-del:hover{color:var(--red)}
-.wish-parts{display:flex;flex-wrap:wrap;gap:4px 8px;padding:6px 10px;font-size:11.5px;color:var(--txt-faint)}
-.wish-all{color:var(--green)}
+/* One row per part. Inline chips looked like broken form controls in a 290px
+   column and wrapped raggedly; a list reads cleanly and gives a bigger target. */
+.wish-parts{display:flex;flex-direction:column}
+.wish-part{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:6px 10px;text-align:left;cursor:pointer;
+  background:none;border:none;border-top:1px solid var(--line-soft);
+  font-size:12px;color:var(--txt-dim);transition:background .12s,color .12s;
+}
+.wish-part:hover{background:rgba(95,206,143,.10);color:var(--green)}
+.wish-part:active{background:rgba(95,206,143,.18)}
+.wp-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wp-left{
+  flex:0 0 auto;font-size:10.5px;color:var(--gold);
+  background:#241d0e;border:1px solid var(--gold-dim);border-radius:4px;padding:0 5px;
+}
+.wp-tick{flex:0 0 auto;font-weight:700;color:var(--green);opacity:0;transition:opacity .12s}
+.wish-part:hover .wp-tick{opacity:1}
+.wish-all{
+  padding:6px 10px;border-top:1px solid var(--line-soft);
+  font-size:11.5px;color:var(--green);
+}
 
 .forma-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--txt-dim)}
 .forma-row input{
-  width:52px;background:#0d1118;border:1px solid var(--line);border-radius:5px;
+  width:46px;background:#0d1118;border:1px solid var(--line);border-radius:5px;
   padding:3px 5px;color:var(--txt);font-size:11.5px;text-align:center;
+  -moz-appearance:textfield;
 }
+.forma-row input::-webkit-outer-spin-button,
+.forma-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .forma-short{font-size:11px;color:var(--txt-faint)}
 .forma-short.on{color:var(--gold);font-weight:600}
 
@@ -649,9 +672,3 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .card-farm.on svg{stroke:#062421;stroke-width:2.5}
 #planLink.has-items{color:var(--teal);border-color:#2a5a55}
 
-/* clickable parts in the planner's list */
-.wish-part{
-  background:none;border:1px solid var(--line);border-radius:5px;
-  padding:1px 6px;font-size:11.5px;color:var(--txt-faint);cursor:pointer;transition:.15s;
-}
-.wish-part:hover{border-color:var(--green);color:var(--green);background:#16281e}

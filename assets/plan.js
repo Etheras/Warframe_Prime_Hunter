@@ -218,10 +218,15 @@
         </div>
         <div class="wish-parts">${
           done === total
-            ? `<span class="wish-all">complete</span>`
-            : missing.map((p) => `<button class="wish-part" data-got="${esc(id)}"
-                data-part="${esc(p.name)}" title="Got one — mark it collected">${esc(p.name)}${
-                needOf(p) > 1 ? ` ×${needOf(p) - haveOf(id, p.name)}` : ""}</button>`).join("")
+            ? `<div class="wish-all">all parts collected</div>`
+            : missing.map((p) => {
+                const left = needOf(p) - haveOf(id, p.name);
+                return `<button class="wish-part" data-got="${esc(id)}"
+                  data-part="${esc(p.name)}" title="Got one — mark it collected">
+                  <span class="wp-name">${esc(p.name)}</span>${
+                  left > 1 ? `<span class="wp-left">${left} left</span>` : ""
+                  }<span class="wp-tick">✓</span></button>`;
+              }).join("")
         }</div>
       </div>`;
     }).join("");
