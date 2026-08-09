@@ -17,31 +17,51 @@
 (function () {
   "use strict";
 
-  /* Rewards cycle A -> A -> B -> C. DE's published chance is conditional on that
-     rotation coming up, so it is not comparable across rotations as it stands:
-     a rot C relic at 23% arrives far more slowly than a rot A one at 23%.
+  /* Rewards cycle A -> A -> B -> C, one per round: rounds 1-2 pay A, 3 pays B,
+     4 pays C, 5-6 pay A again. DE's published chance is conditional on that
+     rotation having come up, so it is not comparable across rotations as it
+     stands - a rot C relic at 23% arrives far more slowly than a rot A one.
 
-     Each rotation is weighted by wanted rewards per round played, which depends
-     on how far you take a run. Rounds 1-2 pay A, 3 pays B, 4 pays C, 5-6 pay A
-     again, and so on.
+     A run collects every rotation it passes through, not only the one you came
+     for: AABCAA hands you four A rewards *and* a B *and* a C. So a node is
+     valued whole - take the rewards the pattern actually yields, and divide by
+     the rounds it costs.
 
-       reset   leave the moment your rotation pays.  A 2/2, B 1/3, C 1/4
-       full    play on indefinitely, AABC repeating. A 2/4, B 1/4, C 1/4
-       aabcaa  six rounds, then restart.             A 4/6, B 1/6, C 1/6
+       reset   stop where it pays best: 2, 3 or 4 rounds, decided per node
+       full    keep going; the rate settles at one full AABC cycle
+       aabcaa  six rounds, then restart
 
-     A node with no rotation pays out once per run and scores 1 in every mode.
-     That equates one round to one whole mission, which overstates long missions
-     - deliberate, since mission length is not modelled anywhere. */
-  const ROT_WEIGHTS = {
-    reset:  { A: 2 / 2, B: 1 / 3, C: 1 / 4 },
-    full:   { A: 2 / 4, B: 1 / 4, C: 1 / 4 },
-    aabcaa: { A: 4 / 6, B: 1 / 6, C: 1 / 6 },
+     Stopping at 4 and running forever come to the same rate, so `reset` can
+     never score below `full` - it just also considers leaving earlier.
+
+     A node with no rotation pays once per run and is added flat. That equates a
+     round to a whole mission, which flatters long ones - deliberate, since
+     mission length is not modelled anywhere. */
+  const RUN_PATTERNS = {
+    reset:  [{ rounds: 2, counts: { A: 2 } },
+             { rounds: 3, counts: { A: 2, B: 1 } },
+             { rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
+    full:   [{ rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
+    aabcaa: [{ rounds: 6, counts: { A: 4, B: 1, C: 1 } }],
   };
-  const RUN_MODES = ["reset", "full", "aabcaa"];
-  function rotWeight(rot, mode) {
-    const k = String(rot || "").toUpperCase();
-    if (!k) return 1;                       // no rotation: one reward per run
-    return (ROT_WEIGHTS[mode] || ROT_WEIGHTS.reset)[k] ?? 1;
+  const RUN_MODES = Object.keys(RUN_PATTERNS);
+
+  /* rot holds value per reward drop of each rotation, plus `none` for sources
+     that carry no rotation at all. Returns the best pattern for this node. */
+  function runValue(rot, mode) {
+    const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
+    let perRound = 0, rounds = null, counts = null;
+    if (hasRot) {
+      (RUN_PATTERNS[mode] || RUN_PATTERNS.reset).forEach((p) => {
+        let v = 0;
+        Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
+        const per = v / p.rounds;
+        if (rounds === null || per > perRound + 1e-12) {
+          perRound = per; rounds = p.rounds; counts = p.counts;
+        }
+      });
+    }
+    return { perRound: perRound + (rot.none || 0), rounds, counts };
   }
 
   const DATA = window.VORFRAME_DATA;
@@ -227,18 +247,28 @@
       (RELICS[rname].sources || []).forEach((s) => {
         if (!opts.railjack && isRailjack(s)) return;
         if (!opts.event && isEvent(s)) return;
-        const key = `${s.planet}|${s.node}|${s.mode}|${s.rotation || "-"}`;
+        const key = `${s.planet}|${s.node}|${s.mode}`;
         let n = nodes.get(key);
         if (!n) {
-          n = { planet: s.planet, node: s.node, mode: s.mode, rotation: s.rotation,
+          n = { planet: s.planet, node: s.node, mode: s.mode,
                 kind: s.kind, lvl: s.lvl || null, event: isEvent(s),
-                railjack: isRailjack(s), score: 0, relics: new Map() };
+                railjack: isRailjack(s), score: 0,
+                rot: { A: 0, B: 0, C: 0, none: 0 }, relics: new Map() };
           nodes.set(key, n);
         }
-        n.score += ((s.chance || 0) / 100) * rp.value * rotWeight(s.rotation, opts.runMode);
+        const slot = { A: "A", B: "B", C: "C" }[String(s.rotation || "").toUpperCase()] || "none";
+        n.rot[slot] += ((s.chance || 0) / 100) * rp.value;
         const prev = n.relics.get(rname);
-        if (prev == null || (s.chance || 0) > prev) n.relics.set(rname, s.chance || 0);
+        if (prev == null || (s.chance || 0) > prev.chance) {
+          n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
+        }
       });
+    });
+
+    // value each node as a whole run, which is what you actually commit to
+    nodes.forEach((n) => {
+      const r = runValue(n.rot, opts.runMode);
+      n.score = r.perRound; n.rounds = r.rounds; n.counts = r.counts;
     });
 
     // Score first, then a lower enemy level (faster clears). Rotation used to
@@ -279,12 +309,12 @@
      means "stay for the 4th reward". Spelled out because the letters mean
      nothing on their own. */
   const RUN_BLURB = {
-    reset: "Leaving as soon as your rotation pays makes an A listing worth 3&times; a B " +
-           "and 4&times; a C at the same published number.",
-    full: "Playing straight through makes an A listing worth 2&times; a B or a C at the " +
-          "same published number.",
-    aabcaa: "Running AABCAA then restarting makes an A listing worth 4&times; a B or a C " +
-            "at the same published number.",
+    reset: "Each node is costed at whichever stopping point pays best — 2, 3 or 4 rounds " +
+           "— counting every rotation you pass on the way.",
+    full: "Each node is costed over a full A → A → B → C " +
+          "cycle, counting all four rewards.",
+    aabcaa: "Each node is costed over six rounds — four rotation A rewards plus a B and a C, " +
+            "all of which count.",
   };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
@@ -292,6 +322,35 @@
     B: "Can drop as the 3rd reward.\n3 rounds per shot at it.",
     C: "Can drop as the 4th reward.\n4 rounds per shot at it.",
   };
+  /* What this node pays over the run being costed, and what that run is. The
+     interesting part is invisible otherwise: on AABCAA you are also collecting
+     the B and C rewards, which is why they count towards the node at all. */
+  function runTag(n) {
+    const pays = n.counts
+      ? Object.keys(n.counts).filter((r) => (n.rot[r] || 0) > 0)
+      : [];
+    if (!pays.length && !n.rounds) return "no rotation";
+    const lines = [];
+    if (n.rounds) {
+      lines.push("Costed over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") +
+        (opts.runMode === "full" ? " (one full cycle; the rate is the same if you keep going)."
+                                 : ", then restart."));
+      lines.push("");
+      lines.push("You collect, and we count:");
+      Object.keys(n.counts).forEach((r) => {
+        const v = n.rot[r] || 0;
+        lines.push("  rot " + r + " x" + n.counts[r] +
+          (v > 0 ? "   worth " + pct(v) : "   nothing you want"));
+      });
+      if ((n.rot.none || 0) > 0) lines.push("  no rotation   worth " + pct(n.rot.none));
+      lines.push("");
+    }
+    lines.push(ROT_CYCLE);
+    const label = pays.length ? "rot " + pays.join("+") : "no rotation";
+    return `<abbr class="rot" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` +
+      (n.rounds ? ` · <span class="rounds">${n.rounds} rounds</span>` : "");
+  }
+
   function rotTag(rot) {
     if (!rot) return "no rotation";
     const k = String(rot).toUpperCase();
@@ -379,7 +438,7 @@
       // most useful relic first: how much of this node's score each one accounts
       // for, i.e. the chance it drops here times what one opening is worth
       const rl = Array.from(n.relics.entries())
-        .map(([name, chance]) => [name, (chance / 100) * (relicPlan.get(name) || {}).value || 0])
+        .map(([name, v]) => [name, (v.chance / 100) * (relicPlan.get(name) || {}).value || 0])
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name);
       const more = ranked.length > SHOW;
@@ -389,7 +448,7 @@
           <span style="color:var(--txt-faint);font-weight:400">— ${esc(n.planet)}</span>
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
-        <div class="spot-meta">${rotTag(n.rotation)}${
+        <div class="spot-meta">${runTag(n)}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
@@ -398,7 +457,7 @@
       </div>`;
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" title="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
-          `${n.node} (${n.planet}) ${n.mode}${n.rotation ? " rot " + n.rotation : ""} — ${pct(n.score)}`
+          `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${pct(n.score)}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
 

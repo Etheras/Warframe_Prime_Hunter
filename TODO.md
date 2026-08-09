@@ -132,6 +132,56 @@ Dates are on the individual entries — several were revised after first use.
   is deliberately ignored as too ambiguous. Rotation *used* to be the third key
   here; it moved into the score itself (below), so tie-breaking on it as well
   would have counted it twice.
+- **A node is valued as a whole run** (added 2026-08-09, in two steps). First
+  problem: rotation was only a tie-break, so a rot C node could outrank a rot A
+  one at the same published chance — DE's number is conditional on that rotation
+  coming up. Second problem, spotted straight after: weighting each rotation
+  separately still assumed you only collect the one you came for, when a run
+  that reaches rotation C has taken the A and B rewards too. Nodes are now keyed
+  by mission rather than `(mission, rotation)`, each rotation's value is banked
+  separately, and the score is `Σ count[r] × v[r] / rounds` for the pattern
+  being run.
+- **How far you run is a setting, not an assumption.** `reset` takes the best
+  stopping point per node (2, 3 or 4 rounds), `full` costs a whole AABC cycle,
+  `aabcaa` costs six rounds. `reset` is an optimisation rather than a fixed
+  weight, and can never score below `full`, since stopping at 4 and running
+  forever come to the same rate. Stored once in `vorframe.plan.v1` and read by
+  both pages, because they must not rank differently.
+
+- [ ] **Relic `sources` are ordered and capped by raw chance, not by the
+      rotation-weighted value the UI now ranks on.** `normalise_sources()` sorts
+      by chance and `build_data.py` keeps the top 40, so a fast rot A source
+      could in principle be cut in favour of a slower rot B/C one with a higher
+      published number. Not observed to bite yet — the cap only binds on relics
+      with many sources — but the two orderings should agree.
+- [ ] **`.more-nodes` and the option labels use native `title=`**, which
+      STYLE.md section 4 rules out (native tooltips are proportional and mangle
+      the aligned columns). The new *How far you run* label uses `data-tip`
+      correctly, so the sidebar now mixes both engines — they should all move.
+- [ ] **The squad toggle is stored twice** — `vorframe.filters.v1` on the
+      collection page and `vorframe.plan.v1` on the planner — so the two pages
+      can disagree about it. `runMode` was deliberately given a single home to
+      avoid exactly this; squad should follow.
+- [ ] The planner's Forma field is separate from the collection page's materials
+      list, so the same number is entered twice. They should share one store.
+
+### Planner design decisions
+
+Dates are on the individual entries — several were revised after first use.
+
+- **Forma counts, but only up to what you still need.** It gets a have/need
+  field like any other material; if the field shows a shortfall it joins the
+  ranking, because unlike Orokin Cell it really does come from relics.
+  A drop is worth `min(quantity dropped, quantity still needed)`:
+  `Forma Blueprint` sits in a Common slot (25.33%) and `2X Forma Blueprint` in
+  an Uncommon one (11%), so needing **1** makes the 1× relic worth 0.253 against
+  the 2× relic's 0.110, while needing **2+** brings them close at 0.253 vs 0.220.
+  (An earlier note here said to drop Forma from the maths entirely — that was an
+  over-correction, since a near-uniform term barely reorders anything.)
+- **Node tie-break**: order by score, then **lower** enemy level. Mission length
+  is deliberately ignored as too ambiguous. Rotation *used* to be the third key
+  here; it moved into the score itself (below), so tie-breaking on it as well
+  would have counted it twice.
 - **Rotation is weighted into the score** (added 2026-08-09, prompted by a rot C
   node outranking two rot A nodes at the same published chance). DE's chance is
   conditional on that rotation coming up, so it is not comparable across

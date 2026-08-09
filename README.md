@@ -164,21 +164,25 @@ on your list, then tells you what refinement to take each relic to.
 assumes that rotation has already come up, so it flatters the late ones. Rewards
 cycle A → A → B → C, one per round.
 
-How much that matters depends on how you actually play, so **How far you run** in
-the sidebar lets you say. Two rounds hand you *two* rotation A rewards; a rotation
-C reward costs a full four:
+How much that matters depends on how far you take a run, so **How far you run** in
+the sidebar lets you say. Crucially, a run collects *everything it passes through* —
+if you stay to round 4 you have taken the A rewards **and** the B **and** the C, so
+all of them count towards that node:
 
-| How far you run | What it assumes | An A listing is worth |
+| How far you run | What you collect | Rounds |
 |---|---|---|
-| **Reset as soon as it drops** | You leave the moment you have what you came for | 3× a B, 4× a C |
-| **Run straight through** | You keep going, taking rewards as they come | 2× a B or a C |
-| **AABCAA, then reset** | Six rounds, then restart for fresh A rewards | 4× a B or a C |
+| **Reset as soon as it drops** | whichever is best: A×2, or A×2+B, or A×2+B+C | 2, 3 or 4, picked per node |
+| **Run straight through** | A×2 + B + C | 4 |
+| **AABCAA, then reset** | A×4 + B + C | 6 |
 
-All three compare listings showing the *same* published number. The setting is
-shared with the collection page, so the two never disagree about where to go.
+So a node you'd skip on one setting can lead on another: if its rotation A is weak
+but its C is exactly what you need, staying to round 4 is worth it. Hover the
+rotations on any row to see what that run collects and what each part of it is
+worth — including rotations that pay you nothing.
 
-Missions with no rotation pay once per run and score the same either way — which
-means they climb the list on the two "keep playing" settings.
+Missions with no rotation pay once per run and score the same either way, which
+means they climb the list on the two "keep playing" settings. The setting is shared
+with the collection page, so the two never disagree about where to go.
 
 That refinement advice follows **whatever you're most stuck on**, not whatever is
 most likely. If a relic holds a common part you need *and* a rare one, it says

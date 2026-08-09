@@ -689,6 +689,7 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 [data-tip]{cursor:help}
 
 /* mission type, beside the node name */
+.rounds{color:var(--txt-dim)}
 .spot-mode{font-size:11.5px;font-weight:500;color:var(--teal);opacity:.85}
 
 /* "farming for" control on a card */

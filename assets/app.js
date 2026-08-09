@@ -124,18 +124,32 @@
   const CATEGORIES = DATA.categories.map((c) => c.name);
 
   /* ── filter state ─────────────────────────────────────────── */
-  /* Identical to plan.js. Wanted rewards per round played, which depends on how
-     far a run is taken: rounds 1-2 pay A, 3 pays B, 4 pays C, 5-6 pay A again.
-     A node with no rotation pays once per run and scores 1 in every mode. */
-  const ROT_WEIGHTS = {
-    reset:  { A: 2 / 2, B: 1 / 3, C: 1 / 4 },
-    full:   { A: 2 / 4, B: 1 / 4, C: 1 / 4 },
-    aabcaa: { A: 4 / 6, B: 1 / 6, C: 1 / 6 },
+  /* Identical to plan.js - see the long note there. A run collects every
+     rotation it passes through, so a node is valued whole: the rewards the
+     pattern yields, over the rounds it costs. */
+  const RUN_PATTERNS = {
+    reset:  [{ rounds: 2, counts: { A: 2 } },
+             { rounds: 3, counts: { A: 2, B: 1 } },
+             { rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
+    full:   [{ rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
+    aabcaa: [{ rounds: 6, counts: { A: 4, B: 1, C: 1 } }],
   };
-  function rotWeight(rot, mode) {
-    const k = String(rot || "").toUpperCase();
-    if (!k) return 1;
-    return (ROT_WEIGHTS[mode] || ROT_WEIGHTS.reset)[k] ?? 1;
+  const rotSlot = (r) =>
+    ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
+  function runValue(rot, mode) {
+    const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
+    let perRound = 0, rounds = null, counts = null;
+    if (hasRot) {
+      (RUN_PATTERNS[mode] || RUN_PATTERNS.reset).forEach((p) => {
+        let v = 0;
+        Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
+        const per = v / p.rounds;
+        if (rounds === null || per > perRound + 1e-12) {
+          perRound = per; rounds = p.rounds; counts = p.counts;
+        }
+      });
+    }
+    return { perRound: perRound + (rot.none || 0), rounds, counts };
   }
 
   const state = {
@@ -446,22 +460,33 @@
         let e = map.get(key);
         if (!e) {
           e = { planet: s.planet, node: s.node, mode: s.mode, kind: s.kind,
-                relics: new Map(), event: s.event, score: 0, lvl: s.lvl || null };
+                relics: new Map(), event: s.event, score: 0, lvl: s.lvl || null,
+                rot: { A: 0, B: 0, C: 0, none: 0 }, perRot: new Map() };
           map.set(key, e);
         }
-        // one entry per relic per node, keeping whichever rotation is worth
-        // most per round - not the biggest raw chance, which would prefer a
-        // rot C listing over a faster rot A one at the same number
-        const worth = ((s.chance || 0) / 100) * value.get(rname) *
-                      rotWeight(s.rotation, state.runMode);
-        const prev = e.relics.get(rname);
-        if (!prev || worth > prev.worth) {
-          if (prev) e.score -= prev.worth;
-          e.score += worth;
-          e.relics.set(rname, { chance: s.chance, rotation: s.rotation, worth });
-          if (!e.lvl && s.lvl) e.lvl = s.lvl;
+        // A relic can be listed on more than one rotation at the same node, and
+        // a run that reaches rotation C has collected the A and B rewards too -
+        // so every rotation gets its own bucket, best chance per relic in each.
+        const slot = rotSlot(s.rotation);
+        const worth = ((s.chance || 0) / 100) * value.get(rname);
+        const rk = rname + "|" + slot;
+        const prev = e.perRot.get(rk);
+        if (prev == null || worth > prev) {
+          e.rot[slot] += worth - (prev || 0);
+          e.perRot.set(rk, worth);
         }
+        const shown = e.relics.get(rname);
+        if (!shown || (s.chance || 0) > (shown.chance || 0)) {
+          e.relics.set(rname, { chance: s.chance, rotation: s.rotation });
+        }
+        if (!e.lvl && s.lvl) e.lvl = s.lvl;
       });
+    });
+
+    // value each node as a whole run, the same way the planner does
+    map.forEach((e) => {
+      const r = runValue(e.rot, state.runMode);
+      e.score = r.perRound; e.rounds = r.rounds; e.counts = r.counts;
     });
 
     return Array.from(map.values())
@@ -470,11 +495,14 @@
         count: e.relics.size,
         best: Math.max.apply(null,
           Array.from(e.relics.values()).map((v) => v.chance || 0).concat([0])),
-        rotations: Array.from(new Set(Array.from(e.relics.values())
-          .map((v) => v.rotation).filter(Boolean))).sort(),
-        // best-first, matching the planner: worth per round, rotation included
+        // the run is costed to a fixed depth, so only name the rotations it
+        // actually reaches - listing C when you stop after round 2 is a lie
+        rotations: e.counts
+          ? Object.keys(e.counts).filter((r) => (e.rot[r] || 0) > 0)
+          : [],
+        // best-first, matching the planner: chance here x what an opening is worth
         relicList: Array.from(e.relics.entries())
-          .map(([name, v]) => [name, v.worth])
+          .map(([name, v]) => [name, ((v.chance || 0) / 100) * (value.get(name) || 0)])
           .sort((a, b) => b[1] - a[1])
           .map(([name]) => name),
       }))
@@ -681,10 +709,11 @@
               s.kind === "mission" ? ` <span style="color:var(--txt-faint);font-weight:400">— ${esc(s.planet)}</span>` : ""}</div>
             <div class="spot-meta">${
               s.rotations.length ? rotListTag(s.rotations) : "no rotation"}${
+              s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
               s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
-            <div class="spot-score" title="Chance that one reward drop here gives a part you still need, at the best refinement for it"><b>${
+            <div class="spot-score" data-tip="What one round here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches."><b>${
               (s.score * 100).toFixed(1)}%</b>per round</div>
           </div>`).join("") +
         `</div></section>`;

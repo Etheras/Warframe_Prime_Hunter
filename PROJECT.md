@@ -431,35 +431,48 @@ hands you a relic is therefore already priced in: the `P(relic drops here)` term
 *is* that event. (Railjack's Void Storms do get their own table and are parsed,
 but they drop at 2.5% and fall below the 40-source cap.)
 
-**Rotation is priced into the node score, not used as a tie-break.** DE's published
+**A node is valued as a whole run, not one rotation at a time.** DE's published
 drop chance is *conditional on that rotation coming up*, so it is not comparable
-across rotations as it stands: with the A&nbsp;→&nbsp;A&nbsp;→&nbsp;B&nbsp;→&nbsp;C
-cycle, a rot C relic at 23.34% arrives far more slowly than a rot A one at the same
-number.
+across rotations as it stands. But weighting each rotation separately is not enough
+either: a run collects **every rotation it passes through**. Take AABCAA — you
+finish with four rotation A rewards *and* a B *and* a C, so all three count towards
+that node. Nodes are therefore keyed by mission, not by `(mission, rotation)`, and
+each rotation's value is banked in its own slot:
 
-Each source is therefore weighted by **wanted rewards per round played** — which
-depends on how far you take a run, so it is a setting rather than a constant.
-Rounds 1–2 pay A, round 3 pays B, round 4 pays C, rounds 5–6 pay A again:
+```
+v[r] = Σ over relics dropping at (node, rotation r): P(relic) × relicValue
+score = ( Σ over rotations r in the pattern: count[r] × v[r] ) / rounds
+```
 
-| `runMode` | Label in the UI | A | B | C | A vs B | A vs C |
-|---|---|---|---|---|---|---|
-| `reset` *(default)* | Reset as soon as it drops | 2/2 = 1.000 | 1/3 = 0.333 | 1/4 = 0.250 | 3× | 4× |
-| `full` | Run straight through | 2/4 = 0.500 | 1/4 = 0.250 | 1/4 = 0.250 | 2× | 2× |
-| `aabcaa` | AABCAA, then reset | 4/6 = 0.667 | 1/6 = 0.167 | 1/6 = 0.167 | 4× | 4× |
+Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 4 pays C,
+5–6 pay A again.
 
-`reset` is the only mode that ranks B above C, because it is the only one where you
-leave early enough for the difference to exist. `aabcaa` punishes B and C hardest:
-six rounds yield just one of each.
+| `runMode` | Label in the UI | Pattern | Rounds |
+|---|---|---|---|
+| `reset` *(default)* | Reset as soon as it drops | best of A×2 / A×2+B / A×2+B+C | 2, 3 or 4 — **chosen per node** |
+| `full` | Run straight through | A×2 + B + C | 4 |
+| `aabcaa` | AABCAA, then reset | A×4 + B + C | 6 |
 
-A node with **no rotation** pays once per run and scores 1 in every mode. That
-equates one round to one whole mission, which flatters long missions — deliberate,
-since mission length is not modelled anywhere (see §7 tie-breaks). It shows up as
-bounties and enemy drops climbing the list under `full` and `aabcaa`.
+`reset` is an optimisation, not a fixed weight: it takes whichever stopping point
+pays best *for that node*, so a node whose rotation C is the only thing you want is
+costed over 4 rounds, while one you only want rotation A from is costed over 2.
+Stopping at 4 and running forever give the same rate, so `reset` can never score
+below `full` — it just also considers leaving earlier.
+
+This is what makes the modes differ in kind rather than degree. Under `reset` a node
+is often worth *only* its rotation A; under `aabcaa` the same node picks up its B and
+C value too, which can reorder the list completely.
+
+A node with **no rotation** pays once per run and is added flat. That equates one
+round to one whole mission, which flatters long missions — deliberate, since mission
+length is not modelled anywhere (see the tie-break note above). It shows up as
+bounties and enemy drops climbing under `full` and `aabcaa`.
 
 The setting lives in `vorframe.plan.v1` and **both pages read that one copy**, since
 both rank nodes with it and this document guarantees they cannot disagree. The
-collection page writes back to the planner's store rather than keeping its own.
-The headline percentage is **per round**, not per reward.
+collection page writes back to the planner's store rather than keeping its own. The
+headline percentage is **per round**, not per reward; the row names only the
+rotations the costed run actually reaches.
 
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
