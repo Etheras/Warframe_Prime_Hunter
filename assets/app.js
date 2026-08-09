@@ -127,31 +127,40 @@
   /* Identical to plan.js - see the long note there. A run collects every
      rotation it passes through, so a node is valued whole: the rewards the
      pattern yields, over the rounds it costs. */
+  const RUN_MODES = ["reset", "full", "aabcaa"];
+  const RESET_STOPS = [
+    { rounds: 2, counts: { A: 2 } },              // nothing wanted past rotation A
+    { rounds: 3, counts: { A: 2, B: 1 } },        // ... past B
+    { rounds: 4, counts: { A: 2, B: 1, C: 1 } },  // ... past C
+  ];
   const RUN_PATTERNS = {
-    reset:  [{ rounds: 2, counts: { A: 2 } },
-             { rounds: 3, counts: { A: 2, B: 1 } },
-             { rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
-    full:   [{ rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
-    aabcaa: [{ rounds: 6, counts: { A: 4, B: 1, C: 1 } }],
+    full:   { rounds: 4, counts: { A: 2, B: 1, C: 1 } },
+    aabcaa: { rounds: 6, counts: { A: 4, B: 1, C: 1 } },
   };
-  const rotSlot = (r) =>
-    ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
+
+  /* rot holds value per reward drop of each rotation, plus `none` for sources
+     carrying no rotation at all.
+
+     For `reset` the stopping point is the LAST rotation holding something you
+     want - not whichever stop has the best rate. If you need a part from A and
+     another from C, leaving after round 2 never gets you the C part at all, so
+     a higher per-round rate there is measuring the wrong thing. Same reasoning
+     as refinement following the bottleneck instead of the likeliest reward. */
   function runValue(rot, mode) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let perRound = 0, rounds = null, counts = null;
     if (hasRot) {
-      (RUN_PATTERNS[mode] || RUN_PATTERNS.reset).forEach((p) => {
-        let v = 0;
-        Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
-        const per = v / p.rounds;
-        if (rounds === null || per > perRound + 1e-12) {
-          perRound = per; rounds = p.rounds; counts = p.counts;
-        }
-      });
+      const p = RUN_PATTERNS[mode] ||
+        RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
+      let v = 0;
+      Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
+      perRound = v / p.rounds; rounds = p.rounds; counts = p.counts;
     }
     return { perRound: perRound + (rot.none || 0), rounds, counts };
   }
 
+  const rotSlot = (r) =>
+    ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
   const state = {
     avail: { farmable: true, resurgence: true, baro: true, special: true,
              vaulted: true, founder: true },
@@ -171,7 +180,7 @@
      copy of it rather than one per page. */
   try {
     const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
-    if (plan && ROT_WEIGHTS[plan.runMode]) state.runMode = plan.runMode;
+    if (plan && RUN_MODES.includes(plan.runMode)) state.runMode = plan.runMode;
   } catch (e) { /* ignore malformed planner options */ }
 
   try {

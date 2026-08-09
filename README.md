@@ -171,12 +171,13 @@ all of them count towards that node:
 
 | How far you run | What you collect | Rounds |
 |---|---|---|
-| **Reset as soon as it drops** | whichever is best: A×2, or A×2+B, or A×2+B+C | 2, 3 or 4, picked per node |
+| **Reset as soon as it drops** | everything up to the last rotation you want something from | 2, 3 or 4, per node |
 | **Run straight through** | A×2 + B + C | 4 |
 | **AABCAA, then reset** | A×4 + B + C | 6 |
 
-So a node you'd skip on one setting can lead on another: if its rotation A is weak
-but its C is exactly what you need, staying to round 4 is worth it. Hover the
+On **Reset**, if you want a part from rotation A *and* one from rotation C, it costs
+the run at 4 rounds — because leaving after round 2 would never get you the C part,
+no matter how good the rate looked. Want nothing past A? It costs 2. Hover the
 rotations on any row to see what that run collects and what each part of it is
 worth — including rotations that pay you nothing.
 

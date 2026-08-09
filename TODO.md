@@ -141,12 +141,15 @@ Dates are on the individual entries — several were revised after first use.
   by mission rather than `(mission, rotation)`, each rotation's value is banked
   separately, and the score is `Σ count[r] × v[r] / rounds` for the pattern
   being run.
-- **How far you run is a setting, not an assumption.** `reset` takes the best
-  stopping point per node (2, 3 or 4 rounds), `full` costs a whole AABC cycle,
-  `aabcaa` costs six rounds. `reset` is an optimisation rather than a fixed
-  weight, and can never score below `full`, since stopping at 4 and running
-  forever come to the same rate. Stored once in `vorframe.plan.v1` and read by
-  both pages, because they must not rank differently.
+- **How far you run is a setting, not an assumption.** `reset` runs to the last
+  rotation holding something wanted (2, 3 or 4 rounds), `full` costs a whole
+  AABC cycle, `aabcaa` costs six rounds. Stored once in `vorframe.plan.v1` and
+  read by both pages, because they must not rank differently.
+- **`reset` stops at the deepest wanted rotation, not the best rate** (corrected
+  2026-08-09). It was first written as a rate optimiser, which dropped the case
+  it exists for: wanting a part from A and another from C, it stopped at 2
+  rounds and ignored C entirely. Per-round rate is the wrong objective when the
+  goal is to cover a set rather than maximise throughput of any one item.
 
 - [ ] **Relic `sources` are ordered and capped by raw chance, not by the
       rotation-weighted value the UI now ranks on.** `normalise_sources()` sorts

@@ -27,39 +27,44 @@
      valued whole - take the rewards the pattern actually yields, and divide by
      the rounds it costs.
 
-       reset   stop where it pays best: 2, 3 or 4 rounds, decided per node
+       reset   run to the last rotation you want something from, then restart
        full    keep going; the rate settles at one full AABC cycle
        aabcaa  six rounds, then restart
 
-     Stopping at 4 and running forever come to the same rate, so `reset` can
-     never score below `full` - it just also considers leaving earlier.
+     `reset` stops at the deepest wanted rotation rather than at the best rate:
+     leaving after A when you also need a C part never yields the C part.
 
      A node with no rotation pays once per run and is added flat. That equates a
      round to a whole mission, which flatters long ones - deliberate, since
      mission length is not modelled anywhere. */
+  const RESET_STOPS = [
+    { rounds: 2, counts: { A: 2 } },              // nothing wanted past rotation A
+    { rounds: 3, counts: { A: 2, B: 1 } },        // ... past B
+    { rounds: 4, counts: { A: 2, B: 1, C: 1 } },  // ... past C
+  ];
   const RUN_PATTERNS = {
-    reset:  [{ rounds: 2, counts: { A: 2 } },
-             { rounds: 3, counts: { A: 2, B: 1 } },
-             { rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
-    full:   [{ rounds: 4, counts: { A: 2, B: 1, C: 1 } }],
-    aabcaa: [{ rounds: 6, counts: { A: 4, B: 1, C: 1 } }],
+    full:   { rounds: 4, counts: { A: 2, B: 1, C: 1 } },
+    aabcaa: { rounds: 6, counts: { A: 4, B: 1, C: 1 } },
   };
-  const RUN_MODES = Object.keys(RUN_PATTERNS);
+  const RUN_MODES = ["reset", "full", "aabcaa"];
 
   /* rot holds value per reward drop of each rotation, plus `none` for sources
-     that carry no rotation at all. Returns the best pattern for this node. */
+     carrying no rotation at all.
+
+     For `reset` the stopping point is the LAST rotation holding something you
+     want - not whichever stop has the best rate. If you need a part from A and
+     another from C, leaving after round 2 never gets you the C part at all, so
+     a higher per-round rate there is measuring the wrong thing. Same reasoning
+     as refinement following the bottleneck instead of the likeliest reward. */
   function runValue(rot, mode) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let perRound = 0, rounds = null, counts = null;
     if (hasRot) {
-      (RUN_PATTERNS[mode] || RUN_PATTERNS.reset).forEach((p) => {
-        let v = 0;
-        Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
-        const per = v / p.rounds;
-        if (rounds === null || per > perRound + 1e-12) {
-          perRound = per; rounds = p.rounds; counts = p.counts;
-        }
-      });
+      const p = RUN_PATTERNS[mode] ||
+        RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
+      let v = 0;
+      Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
+      perRound = v / p.rounds; rounds = p.rounds; counts = p.counts;
     }
     return { perRound: perRound + (rot.none || 0), rounds, counts };
   }
@@ -309,8 +314,8 @@
      means "stay for the 4th reward". Spelled out because the letters mean
      nothing on their own. */
   const RUN_BLURB = {
-    reset: "Each node is costed at whichever stopping point pays best — 2, 3 or 4 rounds " +
-           "— counting every rotation you pass on the way.",
+    reset: "Each node is costed to the last rotation you want something from — 2, 3 or 4 " +
+           "rounds — counting every rotation you pass on the way.",
     full: "Each node is costed over a full A → A → B → C " +
           "cycle, counting all four rewards.",
     aabcaa: "Each node is costed over six rounds — four rotation A rewards plus a B and a C, " +
@@ -334,7 +339,8 @@
     if (n.rounds) {
       lines.push("Costed over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") +
         (opts.runMode === "full" ? " (one full cycle; the rate is the same if you keep going)."
-                                 : ", then restart."));
+         : opts.runMode === "reset" ? ", the last one you want anything from."
+         : ", then restart."));
       lines.push("");
       lines.push("You collect, and we count:");
       Object.keys(n.counts).forEach((r) => {

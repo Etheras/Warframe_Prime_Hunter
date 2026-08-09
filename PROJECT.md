@@ -449,19 +449,26 @@ Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 
 
 | `runMode` | Label in the UI | Pattern | Rounds |
 |---|---|---|---|
-| `reset` *(default)* | Reset as soon as it drops | best of A×2 / A×2+B / A×2+B+C | 2, 3 or 4 — **chosen per node** |
+| `reset` *(default)* | Reset as soon as it drops | everything up to the **last wanted rotation** | 2, 3 or 4 — **per node** |
 | `full` | Run straight through | A×2 + B + C | 4 |
 | `aabcaa` | AABCAA, then reset | A×4 + B + C | 6 |
 
-`reset` is an optimisation, not a fixed weight: it takes whichever stopping point
-pays best *for that node*, so a node whose rotation C is the only thing you want is
-costed over 4 rounds, while one you only want rotation A from is costed over 2.
-Stopping at 4 and running forever give the same rate, so `reset` can never score
-below `full` — it just also considers leaving earlier.
+`reset` stops at the **deepest rotation holding something you want**, not at the
+best-rate stopping point. Want a part from A and another from C? You run to C — 4
+rounds — because leaving after round 2 never yields the C part at all, however good
+the per-round rate looks. A node you only want rotation A from is costed over 2
+rounds, one whose B is the deepest over 3.
 
-This is what makes the modes differ in kind rather than degree. Under `reset` a node
-is often worth *only* its rotation A; under `aabcaa` the same node picks up its B and
-C value too, which can reorder the list completely.
+This was briefly implemented as a rate optimiser, which quietly dropped exactly the
+case it exists for: Io scored 78.01% over 2 rounds by ignoring its rotation C value
+outright. It is now 51.56% over 4, which is what running it actually costs. A
+per-round rate is the wrong objective when you need to *cover* a set rather than
+maximise throughput of any one item — the same reasoning as refinement following
+the bottleneck instead of the likeliest reward.
+
+This is what makes the modes differ in kind rather than degree. `reset` runs only as
+deep as it must and is scored over the fewest rounds; `aabcaa` always pays for six
+rounds but banks four rotation A rewards, so it favours nodes whose A is strong.
 
 A node with **no rotation** pays once per run and is added flat. That equates one
 round to one whole mission, which flatters long missions — deliberate, since mission
