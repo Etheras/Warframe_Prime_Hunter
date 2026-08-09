@@ -162,10 +162,23 @@ on your list, then tells you what refinement to take each relic to.
 
 **Rotation counts, and it counts for a lot.** The percentage the game publishes
 assumes that rotation has already come up, so it flatters the late ones. Rewards
-cycle A → A → B → C, and you can leave as soon as you have what you came for: two
-rounds hand you *two* rotation A rewards, while a rotation C reward costs a full
-four. So an A listing is worth four times a C listing showing the same number, and
-the planner ranks it that way.
+cycle A → A → B → C, one per round.
+
+How much that matters depends on how you actually play, so **How far you run** in
+the sidebar lets you say. Two rounds hand you *two* rotation A rewards; a rotation
+C reward costs a full four:
+
+| How far you run | What it assumes | An A listing is worth |
+|---|---|---|
+| **Reset as soon as it drops** | You leave the moment you have what you came for | 3× a B, 4× a C |
+| **Run straight through** | You keep going, taking rewards as they come | 2× a B or a C |
+| **AABCAA, then reset** | Six rounds, then restart for fresh A rewards | 4× a B or a C |
+
+All three compare listings showing the *same* published number. The setting is
+shared with the collection page, so the two never disagree about where to go.
+
+Missions with no rotation pay once per run and score the same either way — which
+means they climb the list on the two "keep playing" settings.
 
 That refinement advice follows **whatever you're most stuck on**, not whatever is
 most likely. If a relic holds a common part you need *and* a rare one, it says

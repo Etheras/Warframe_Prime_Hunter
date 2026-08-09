@@ -17,16 +17,32 @@
 (function () {
   "use strict";
 
-  /* Rewards cycle A -> A -> B -> C. DE's published chance is conditional on
-     that rotation coming up, so it is not comparable across rotations as-is:
+  /* Rewards cycle A -> A -> B -> C. DE's published chance is conditional on that
+     rotation coming up, so it is not comparable across rotations as it stands:
      a rot C relic at 23% arrives far more slowly than a rot A one at 23%.
 
-     Weighting is by rounds played per wanted reward, assuming you leave once
-     the rotation you came for has paid. Two rounds yield *two* A rewards, so A
-     costs one round each; B needs three rounds and C four. A node with no
-     rotation pays out every run, so it also costs 1. */
-  const ROT_ROUNDS = { A: 1, B: 3, C: 4 };
-  const rotWeight = (rot) => 1 / (ROT_ROUNDS[String(rot || "").toUpperCase()] || 1);
+     Each rotation is weighted by wanted rewards per round played, which depends
+     on how far you take a run. Rounds 1-2 pay A, 3 pays B, 4 pays C, 5-6 pay A
+     again, and so on.
+
+       reset   leave the moment your rotation pays.  A 2/2, B 1/3, C 1/4
+       full    play on indefinitely, AABC repeating. A 2/4, B 1/4, C 1/4
+       aabcaa  six rounds, then restart.             A 4/6, B 1/6, C 1/6
+
+     A node with no rotation pays out once per run and scores 1 in every mode.
+     That equates one round to one whole mission, which overstates long missions
+     - deliberate, since mission length is not modelled anywhere. */
+  const ROT_WEIGHTS = {
+    reset:  { A: 2 / 2, B: 1 / 3, C: 1 / 4 },
+    full:   { A: 2 / 4, B: 1 / 4, C: 1 / 4 },
+    aabcaa: { A: 4 / 6, B: 1 / 6, C: 1 / 6 },
+  };
+  const RUN_MODES = ["reset", "full", "aabcaa"];
+  function rotWeight(rot, mode) {
+    const k = String(rot || "").toUpperCase();
+    if (!k) return 1;                       // no rotation: one reward per run
+    return (ROT_WEIGHTS[mode] || ROT_WEIGHTS.reset)[k] ?? 1;
+  }
 
   const DATA = window.VORFRAME_DATA;
   const $ = (s, r) => (r || document).querySelector(s);
@@ -62,7 +78,8 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, formaHave: 0, formaNeed: 0 },
+    { squad: false, event: false, railjack: false, runMode: "reset",
+      formaHave: 0, formaNeed: 0 },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
@@ -218,7 +235,7 @@
                 railjack: isRailjack(s), score: 0, relics: new Map() };
           nodes.set(key, n);
         }
-        n.score += ((s.chance || 0) / 100) * rp.value * rotWeight(s.rotation);
+        n.score += ((s.chance || 0) / 100) * rp.value * rotWeight(s.rotation, opts.runMode);
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev) n.relics.set(rname, s.chance || 0);
       });
@@ -261,6 +278,14 @@
   /* Rotation rewards cycle A -> A -> B -> C and repeat, so "rotation C" really
      means "stay for the 4th reward". Spelled out because the letters mean
      nothing on their own. */
+  const RUN_BLURB = {
+    reset: "Leaving as soon as your rotation pays makes an A listing worth 3&times; a B " +
+           "and 4&times; a C at the same published number.",
+    full: "Playing straight through makes an A listing worth 2&times; a B or a C at the " +
+          "same published number.",
+    aabcaa: "Running AABCAA then restarting makes an A listing worth 4&times; a B or a C " +
+            "at the same published number.",
+  };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
     A: "Can drop as the 1st or 2nd reward.\n1 round per shot at it.",
@@ -340,8 +365,7 @@
       `The percentage is what <b>one round</b> at that node is worth towards your ` +
       `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
       `Rotation is priced in: the published chance assumes that rotation has come ` +
-      `up, and with the A&nbsp;&rarr;&nbsp;A&nbsp;&rarr;&nbsp;B&nbsp;&rarr;&nbsp;C cycle ` +
-      `an A reward costs one round, B three and C four. ` +
+      `up, so it is not comparable across rotations on its own. ${RUN_BLURB[opts.runMode] || RUN_BLURB.reset} ` +
       `Relics are listed best-first within each node. ` +
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
@@ -505,6 +529,13 @@
   });
 
   /* ── options ─────────────────────────────────────────────────── */
+  const runSel = $("#p-runmode");
+  if (runSel) {
+    runSel.value = RUN_MODES.includes(opts.runMode) ? opts.runMode : "reset";
+    runSel.addEventListener("change", () => {
+      opts.runMode = runSel.value; save(KEY_PLAN, opts); render();
+    });
+  }
   [["p-squad", "squad"], ["p-event", "event"], ["p-railjack", "railjack"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];

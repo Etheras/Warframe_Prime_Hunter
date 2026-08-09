@@ -124,6 +124,20 @@
   const CATEGORIES = DATA.categories.map((c) => c.name);
 
   /* ── filter state ─────────────────────────────────────────── */
+  /* Identical to plan.js. Wanted rewards per round played, which depends on how
+     far a run is taken: rounds 1-2 pay A, 3 pays B, 4 pays C, 5-6 pay A again.
+     A node with no rotation pays once per run and scores 1 in every mode. */
+  const ROT_WEIGHTS = {
+    reset:  { A: 2 / 2, B: 1 / 3, C: 1 / 4 },
+    full:   { A: 2 / 4, B: 1 / 4, C: 1 / 4 },
+    aabcaa: { A: 4 / 6, B: 1 / 6, C: 1 / 6 },
+  };
+  function rotWeight(rot, mode) {
+    const k = String(rot || "").toUpperCase();
+    if (!k) return 1;
+    return (ROT_WEIGHTS[mode] || ROT_WEIGHTS.reset)[k] ?? 1;
+  }
+
   const state = {
     avail: { farmable: true, resurgence: true, baro: true, special: true,
              vaulted: true, founder: true },
@@ -135,7 +149,16 @@
     hideVaultedRelics: false,
     hideOwnedParts: false,
     squad: false,
+    runMode: "reset",
   };
+
+  /* Lives in the planner's store on purpose. Both pages rank nodes with this,
+     and PROJECT.md guarantees they cannot disagree, so there is exactly one
+     copy of it rather than one per page. */
+  try {
+    const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
+    if (plan && ROT_WEIGHTS[plan.runMode]) state.runMode = plan.runMode;
+  } catch (e) { /* ignore malformed planner options */ }
 
   try {
     const saved = JSON.parse(localStorage.getItem(KEY_FILTERS) || "null");
@@ -414,12 +437,6 @@
     const value = new Map();
     open.forEach((r) => value.set(r, relicValueFor(it, r)));
 
-    // Same weighting as the planner: DE's chance is conditional on that
-    // rotation coming up, so it is not comparable across rotations. Rounds
-    // played per wanted reward, leaving once your rotation has paid.
-    const ROT_ROUNDS = { A: 1, B: 3, C: 4 };
-    const rotWeight = (rot) => 1 / (ROT_ROUNDS[String(rot || "").toUpperCase()] || 1);
-
     const map = new Map();
     open.forEach((rname) => {
       if (!value.get(rname)) return;
@@ -435,7 +452,8 @@
         // one entry per relic per node, keeping whichever rotation is worth
         // most per round - not the biggest raw chance, which would prefer a
         // rot C listing over a faster rot A one at the same number
-        const worth = ((s.chance || 0) / 100) * value.get(rname) * rotWeight(s.rotation);
+        const worth = ((s.chance || 0) / 100) * value.get(rname) *
+                      rotWeight(s.rotation, state.runMode);
         const prev = e.relics.get(rname);
         if (!prev || worth > prev.worth) {
           if (prev) e.score -= prev.worth;
@@ -1162,6 +1180,21 @@
     const last = $$("#matList .mat-name").pop();
     if (last) last.focus();
   });
+
+  const runSel = $("#f-runmode");
+  if (runSel) {
+    runSel.value = state.runMode;
+    runSel.addEventListener("change", () => {
+      state.runMode = runSel.value;
+      // written back to the planner's store, which owns this setting
+      try {
+        const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
+        plan.runMode = state.runMode;
+        localStorage.setItem("vorframe.plan.v1", JSON.stringify(plan));
+      } catch (e) { /* non-fatal */ }
+      render();
+    });
+  }
 
   $("#f-squad").checked = state.squad;
   $("#f-squad").addEventListener("change", (e) => {

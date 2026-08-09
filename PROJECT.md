@@ -435,22 +435,31 @@ but they drop at 2.5% and fall below the 40-source cap.)
 drop chance is *conditional on that rotation coming up*, so it is not comparable
 across rotations as it stands: with the A&nbsp;→&nbsp;A&nbsp;→&nbsp;B&nbsp;→&nbsp;C
 cycle, a rot C relic at 23.34% arrives far more slowly than a rot A one at the same
-number. Each source is therefore weighted by **rounds played per wanted reward**,
-assuming you leave once the rotation you came for has paid:
+number.
 
-| Rotation | Rewards at | Rounds per shot at it | Weight |
-|---|---|---|---|
-| A | 1st and 2nd | 1 — two rounds yield *two* A rewards | 1 |
-| B | 3rd | 3 | 1/3 |
-| C | 4th | 4 | 1/4 |
-| none | every run | 1 | 1 |
+Each source is therefore weighted by **wanted rewards per round played** — which
+depends on how far you take a run, so it is a setting rather than a constant.
+Rounds 1–2 pay A, round 3 pays B, round 4 pays C, rounds 5–6 pay A again:
 
-So rot A is **4× a rot C** listing at the same published chance, not 2× — the
-play-through reading (A fires twice per four rewards, so 2×) undercounts it,
-because you never have to play rounds 3 and 4 to collect an A reward. Both pages
-apply this, and the headline percentage is therefore **per round**, not per reward.
-Rotation was previously only a tie-break below enemy level, which let a rot C node
-outrank a rot A one outright whenever their raw scores matched.
+| `runMode` | Label in the UI | A | B | C | A vs B | A vs C |
+|---|---|---|---|---|---|---|
+| `reset` *(default)* | Reset as soon as it drops | 2/2 = 1.000 | 1/3 = 0.333 | 1/4 = 0.250 | 3× | 4× |
+| `full` | Run straight through | 2/4 = 0.500 | 1/4 = 0.250 | 1/4 = 0.250 | 2× | 2× |
+| `aabcaa` | AABCAA, then reset | 4/6 = 0.667 | 1/6 = 0.167 | 1/6 = 0.167 | 4× | 4× |
+
+`reset` is the only mode that ranks B above C, because it is the only one where you
+leave early enough for the difference to exist. `aabcaa` punishes B and C hardest:
+six rounds yield just one of each.
+
+A node with **no rotation** pays once per run and scores 1 in every mode. That
+equates one round to one whole mission, which flatters long missions — deliberate,
+since mission length is not modelled anywhere (see §7 tie-breaks). It shows up as
+bounties and enemy drops climbing the list under `full` and `aabcaa`.
+
+The setting lives in `vorframe.plan.v1` and **both pages read that one copy**, since
+both rank nodes with it and this document guarantees they cannot disagree. The
+collection page writes back to the planner's store rather than keeping its own.
+The headline percentage is **per round**, not per reward.
 
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four

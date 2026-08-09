@@ -104,9 +104,14 @@ Not wiki issues, recorded here so they are not mistaken for one:
       could in principle be cut in favour of a slower rot B/C one with a higher
       published number. Not observed to bite yet — the cap only binds on relics
       with many sources — but the two orderings should agree.
-- [ ] **`.more-nodes` uses a native `title=`**, which STYLE.md section 4 rules
-      out (native tooltips are proportional and mangle the aligned columns).
-      Should move to the `data-tip` engine like every other tooltip.
+- [ ] **`.more-nodes` and the option labels use native `title=`**, which
+      STYLE.md section 4 rules out (native tooltips are proportional and mangle
+      the aligned columns). The new *How far you run* label uses `data-tip`
+      correctly, so the sidebar now mixes both engines — they should all move.
+- [ ] **The squad toggle is stored twice** — `vorframe.filters.v1` on the
+      collection page and `vorframe.plan.v1` on the planner — so the two pages
+      can disagree about it. `runMode` was deliberately given a single home to
+      avoid exactly this; squad should follow.
 - [ ] The planner's Forma field is separate from the collection page's materials
       list, so the same number is entered twice. They should share one store.
 
@@ -133,9 +138,14 @@ Dates are on the individual entries — several were revised after first use.
   rotations. Weight is rounds played per wanted reward, assuming you leave once
   your rotation has paid: **A = 1** (two rounds give two A rewards), **B = 3**,
   **C = 4**, no rotation = 1. That makes rot A worth 4x a rot C listing at the
-  same number. The alternative reading — play straight through, so A is only 2x
-  because it fills two of every four reward slots — was considered and rejected
-  as not matching how the list is actually used.
+  same number.
+- **How far you run is a setting, not an assumption** (added 2026-08-09). The
+  weighting above only holds if you actually leave when your rotation pays, so
+  the three readings are offered as a dropdown rather than one being baked in:
+  `reset` (A 1, B 1/3, C 1/4), `full` (A 1/2, B 1/4, C 1/4) and `aabcaa`
+  (A 2/3, B 1/6, C 1/6). `reset` is the default and the only one that ranks B
+  above C. Stored once in `vorframe.plan.v1` and read by both pages, because
+  they must not rank differently.
 - **`Event:` nodes are excluded by default** (revised 2026-08-09 — they were
   originally *promoted*). DE's drop table lists them permanently but never names
   the event, and the node only exists on the star chart while that event runs, so

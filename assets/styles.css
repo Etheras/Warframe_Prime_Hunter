@@ -57,6 +57,26 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand h1{font-size:19px;letter-spacing:1.4px;text-transform:uppercase}
 .brand-sub{margin:1px 0 0;font-size:11.5px;color:var(--txt-dim);letter-spacing:.3px}
 
+/* a setting with more than two states: a select, not a row of checkboxes */
+.opt-select{display:block;margin:2px 0 10px}
+.opt-select .lbl{
+  display:block;margin-bottom:6px;
+  font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--txt-faint);
+  cursor:help;text-decoration:underline dotted var(--line);text-underline-offset:3px;
+}
+.opt-select select{
+  width:100%;
+  padding:7px 10px;
+  background:var(--panel-2);
+  color:var(--txt);
+  border:1px solid var(--line);
+  border-radius:7px;
+  font:inherit;font-size:12.5px;
+  outline:none;cursor:pointer;
+}
+.opt-select select:hover{border-color:var(--gold-dim)}
+.opt-select select:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
+
 /* the two views are peers, not a page and a link off it */
 .viewtabs{
   display:flex;gap:2px;padding:2px;flex:none;

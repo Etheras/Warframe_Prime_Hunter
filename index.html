@@ -90,6 +90,16 @@
       <details id="advanced">
         <summary>Advanced options</summary>
 
+        <label class="opt-select">
+          <span class="lbl" data-tip="Rewards cycle A → A → B → C, one per round.&#10;&#10;How far you take a run changes what each rotation is worth per round, because you can leave once you have what you came for:&#10;&#10;  Reset       A 1.00  B 0.33  C 0.25&#10;  Straight    A 0.50  B 0.25  C 0.25&#10;  AABCAA      A 0.67  B 0.17  C 0.17&#10;&#10;Nodes with no rotation pay once per run and score 1 either way.">How far you run</span>
+          <select id="f-runmode">
+            <option value="reset">Reset as soon as it drops</option>
+            <option value="full">Run straight through</option>
+            <option value="aabcaa">AABCAA, then reset</option>
+          </select>
+        </label>
+        <p class="hint">Ranks the farm spots. Shared with the planner.</p>
+
         <label class="check" id="squadRow">
           <input type="checkbox" id="f-squad">
           <span class="box"></span>
