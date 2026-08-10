@@ -22,53 +22,76 @@ no account.
 
 ## What you need
 
-- **Windows** (you're on Windows 11)
-- **Python 3.8 or newer** — already installed, version 3.14
-- A web browser
+- **Python 3.8 or newer** — the standard library only
+- **A web browser**
+- Windows, macOS or Linux
 
-That's it. There is nothing to download or install — no Node, no npm, no libraries.
+Nothing else. There are no dependencies to install: no Node, no npm, no `pip
+install`, no build step. The `.cmd` helper scripts are Windows convenience
+wrappers; on macOS and Linux you run the same Python commands directly, given
+alongside each step below.
 
-To double-check Python is available, open a terminal and run:
+Check Python is available:
 
 ```bash
 python --version
 ```
 
-If that prints a version number, you're ready.
+If that reports 3.8 or higher you are ready. Some systems name it `python3` — use
+whichever works, and substitute it throughout.
+
+---
+
+## Getting it
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Etheras/VorFrame.git
+```
+
+Then move into it:
+
+```bash
+cd VorFrame
+```
+
+No release download is published — the repository *is* the app.
 
 ---
 
 ## Setup
 
-Fetch the game data once, by double-clicking:
+Fetch the game data once. On Windows, double-click `refresh-data.cmd`, or from a
+terminal on any platform:
 
-```
-refresh-data.cmd
+```bash
+python tools/build_data.py
 ```
 
 It takes about a minute and downloads the current Prime and relic data straight
-from Digital Extremes. That's the whole setup — nothing gets installed.
+from Digital Extremes. That is the entire setup — nothing is installed.
 
-> The data isn't stored in this repository, so a fresh copy always needs this step
-> first. It also means you always start with today's data rather than whatever was
-> current when the code was last touched.
+> The dataset is deliberately **not** committed to the repository, so a fresh clone
+> always needs this step first. It also means you start with today's data rather
+> than whatever was current when the code was last touched.
 
 ---
 
 ## Opening the site
 
-Double-click:
+On Windows, double-click `serve.cmd`. On any platform, from a terminal:
 
+```bash
+python tools/serve.py
 ```
-serve.cmd
-```
 
-Your browser opens at `http://localhost:8777`. Leave that little black window open
-while you use the site — closing it shuts the site down.
+Your browser opens at `http://localhost:8777`. Leave the terminal window open while
+you use the site — closing it shuts the server down.
 
-> You *can* also just double-click `index.html`. It's quicker, but some browsers
-> refuse to save data for files opened that way, so your ticks might not survive a
-> restart. `serve.cmd` always saves properly.
+> You *can* open `index.html` directly instead. It is quicker, but some browsers
+> refuse to persist storage for pages opened over `file://`, so your ticks may not
+> survive a restart. Serving the folder always saves properly.
 
 ---
 
@@ -250,15 +273,16 @@ Resurgence rotation (those change every 28 days).
 
 ### By hand
 
-Double-click:
+On Windows, double-click `refresh-data.cmd`. On any platform:
 
+```bash
+python tools/build_data.py --if-changed
 ```
-refresh-data.cmd
-```
 
-Then reload the page in your browser.
+Then reload the page in your browser. `--if-changed` rewrites the data files only
+when something actually differs, so it is cheap to run often.
 
-### Automatically
+### Automatically — Windows
 
 Right-click `tools\schedule.ps1` → **Run with PowerShell**, or run this in a terminal:
 
@@ -269,6 +293,8 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 That sets up a Windows scheduled task that checks once a day at 18:30. On days when
 nothing has changed it finishes in about a second without touching anything.
 
+Only the scheduling is Windows-specific — the build itself runs anywhere.
+
 Useful variations:
 
 ```bash
@@ -277,6 +303,15 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:00
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
+```
+
+### Automatically — macOS and Linux
+
+There is no helper script; use `cron`. Run `crontab -e` and add a daily 18:30 check,
+substituting the full path to your copy:
+
+```bash
+30 18 * * * cd /path/to/VorFrame && python tools/build_data.py --if-changed
 ```
 
 No account, no API key, and no AI involved — it just reads the official data files
@@ -318,14 +353,14 @@ already includes the credential manager that handles the login.
 
 Only **21 source files, about 259 KB**. Specifically:
 
-- ✅ The code — `index.html`, `plan.html`, `assets/`, `tools/`, the `.cmd` scripts and the docs
+- ✅ The code — `index.html`, `plan.html`, `assets/`, `tools/`, the helper scripts and the docs
 - ❌ **Not** Digital Extremes' game data (`data/vorframe-data.js` / `.json`)
 - ❌ **Not** the download cache (`.cache/`) or the single-file build (`dist/`)
 - ❌ **Not** your editor or tool settings (`.claude/`, `.vscode/`)
 - ❌ **Not** your collection — that lives only in your browser
 
 DE's data is re-downloaded on demand instead of being redistributed. Anyone who
-clones the repo runs `refresh-data.cmd` and gets the current data straight from the
+clones the repo runs the refresh step and gets the current data straight from the
 source, which is fresher than anything that could have been committed.
 
 ### Steps
@@ -390,7 +425,7 @@ the Windows scheduled task any more.
 ## If something goes wrong
 
 **The page is blank or says data is missing**
-Run `refresh-data.cmd`.
+Run `refresh-data.cmd`, or `python tools/build_data.py`.
 
 **"python is not recognised"**
 Python isn't on your PATH. Reinstall it from [python.org](https://www.python.org/downloads/)
@@ -409,7 +444,7 @@ starting a second one.
 
 **My ticks disappeared**
 Most likely the browser cleared its storage, or you opened `index.html` directly
-instead of using `serve.cmd`. Restore from a **Backup** copy if you have one.
+instead of serving the folder. Restore from a **Backup** copy if you have one.
 
 ---
 
@@ -444,7 +479,7 @@ fresh on every build, so nothing is redistributed from here.
 - **[PROJECT.md](PROJECT.md)** — how it's built: where each piece of data comes
   from, how the three sources disagree, the scoring model, and the quirks worth
   knowing about.
-- **[TODO.md](TODO.md)** — known gaps, decisions already made, and the list of
+- **[TODO.md](TODO.md)** — everything still outstanding, and the list of
   things that should be corrected on the wiki rather than patched here.
 - **[STYLE.md](STYLE.md)** — the visual rules, so new pages look like the
   existing ones without anyone having to compare them by eye.

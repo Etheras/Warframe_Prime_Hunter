@@ -86,7 +86,7 @@ has drifted is worse than no doc, because it will be trusted.
 |---|---|---|
 | `README.md` | the owner, day to day | anything visible changes — a control, a label, a workflow |
 | `PROJECT.md` | whoever maintains this next | architecture, data sources, the scoring model, or a hard-won gotcha |
-| `TODO.md` | both | you spot something worth doing, finish something, or make a decision worth remembering |
+| `TODO.md` | both | you spot something worth doing, or finish something (delete the entry — it holds **only** outstanding work) |
 | `STYLE.md` | whoever adds UI | a new visual pattern is introduced, or an existing one turns out to be wrong |
 
 If you notice a stale line while doing something else, fix it then. Do not leave
@@ -251,7 +251,7 @@ feeds above at the same time or sooner, so nothing is lost by skipping them.
 VorFrame/
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
-├── TODO.md                 ← known gaps and ideas, not yet done
+├── TODO.md                 ← outstanding work only; decisions live here in §7
 ├── STYLE.md                ← the visual rules a new page has to follow
 ├── LICENSE                 ← MIT, scoped to our own code
 ├── NOTICE.md               ← upstream sources and their terms
@@ -654,5 +654,5 @@ Known limits:
 
 ## 10. Possible next steps
 
-See **[TODO.md](TODO.md)** — open questions, known gaps, and ideas, kept as a
+See **[TODO.md](TODO.md)** — everything still outstanding, kept as a
 running list rather than duplicated here.
