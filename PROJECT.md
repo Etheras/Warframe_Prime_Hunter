@@ -475,6 +475,44 @@ round to one whole mission, which flatters long missions — deliberate, since m
 length is not modelled anywhere (see the tie-break note above). It shows up as
 bounties and enemy drops climbing under `full` and `aabcaa`.
 
+**Disruption does not use the A → A → B → C cycle**, and is the only mission type
+that does not. It pays one reward per round, but the tier depends on the round *and*
+how many of the four conduits you successfully defended that round:
+
+| Round | 1 defended | 2 | 3 | 4 defended |
+|---|---|---|---|---|
+| 1 | A | A | A | **B** |
+| 2 | A | A | B | **B** |
+| 3 | A | B | B | **C** |
+| 4+ | B | B | C | **C** |
+
+**We assume all four are defended**, which is what anyone deliberately farming does.
+That pays `B B C C C C…`, so:
+
+- **Rotation C is unlocked, not periodic.** Past round three, *every* round is another
+  C. In an AABC mission C is one round in four, forever. This makes Disruption by far
+  the best rotation C farm in the game, and we ranked it as mediocre until 2026-08-10.
+- **Rotation A is unreachable.** Kappa's seven Meso relics are real, but a squad
+  clearing every conduit never sees them. They score zero there and the tooltip says
+  so explicitly rather than silently dropping them.
+
+Defending *fewer* conduits is a deliberate min-max, and the only route to rotation A:
+
+| Target | When it is reachable |
+|---|---|
+| A | rounds 1–3 only, defending 3 / 2 / 1 respectively |
+| B | every round — defend 4, then 3–4, then 2–3, then 1–2 |
+| C | round 3 onward, defending 3–4 |
+
+Losing all four in one round fails the mission, so one is the floor. This is not
+modelled — it needs a coordinated squad — but the tooltip documents it.
+
+Implementation: `tierAt(mission, round)` in both `plan.js` and `app.js` looks the
+mission type up in `ROT_PATTERN` and falls back to AABC. The run length still comes
+from `runMode`, so the two concerns stay separate: **mission type decides what a
+round pays, run mode decides how many rounds you stay.** Nodes on a non-standard
+rotation render their label in `--odd` amber with the full explanation on hover.
+
 **The score is a whole run, not a rate** (decided 2026-08-10). Dividing by rounds
 produced a dominance violation: Kappa and Ur were identical in rotations A and B,
 but Ur *also* dropped something wanted in rotation C, which forced it a round deeper

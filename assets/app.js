@@ -146,17 +146,56 @@
      another from C, leaving after round 2 never gets you the C part at all, so
      a higher per-round rate there is measuring the wrong thing. Same reasoning
      as refinement following the bottleneck instead of the likeliest reward. */
-  function runValue(rot, mode) {
+  /* Rotation pattern, by mission type.
+
+     Every endless mission advances A -> A -> B -> C and repeats, with one
+     exception. Disruption does not use that cycle at all: it pays one reward
+     per round, and the tier depends on the round number *and* how many of the
+     four conduits you successfully defended that round.
+
+         round   1 defended   2   3   4 defended
+           1         A        A   A       B
+           2         A        A   B       B
+           3         A        B   B       C
+           4+        B        B   C       C
+
+     We assume all four are defended, which is what anyone deliberately farming
+     does. That pays B, B, then C from round three onward for as long as you
+     stay -- so rotation C is *unlocked* rather than periodic, and rotation A is
+     unreachable. Defending fewer is a deliberate min-max: it is the only way to
+     reach rotation A, and it can hold you on B indefinitely. The rotation label
+     is coloured differently on these nodes and explains this on hover. */
+  const AABC = (r) => "AABC"[(r - 1) % 4];
+  const ROT_PATTERN = { Disruption: (r) => (r <= 2 ? "B" : "C") };
+  const tierAt = (mission, round) => (ROT_PATTERN[mission] || AABC)(round);
+  /* rounds after which the sequence only repeats its last tier */
+  const cycleLen = (mission) => (ROT_PATTERN[mission] ? 3 : 4);
+
+  function runValue(rot, runMode, mission) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let total = 0, rounds = null, counts = null;
+    let total = 0, rounds = null, counts = null, stranded = null;
     if (hasRot) {
-      const p = RUN_PATTERNS[mode] ||
-        RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
-      Object.keys(p.counts).forEach((r) => { total += p.counts[r] * (rot[r] || 0); });
-      rounds = p.rounds; counts = p.counts;
+      let n;
+      if (runMode === "full") n = 4;
+      else if (runMode === "aabcaa") n = 6;
+      else {
+        n = 0;                                  // reset: last round that pays
+        for (let r = 1; r <= cycleLen(mission); r++) {
+          if ((rot[tierAt(mission, r)] || 0) > 0) n = r;
+        }
+      }
+      counts = {};
+      for (let r = 1; r <= n; r++) {
+        const t = tierAt(mission, r);
+        counts[t] = (counts[t] || 0) + 1;
+      }
+      Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
+      rounds = n || null;
+      // rotations holding something wanted that this run can never reach
+      stranded = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !counts[t]);
     }
-    total += rot.none || 0;
-    return { total, perRound: total / (rounds || 1), rounds, counts };
+    return { total: total + (rot.none || 0), perRound: total / (rounds || 1),
+             rounds, counts, stranded, nonStandard: !!ROT_PATTERN[mission] };
   }
 
   const rotSlot = (r) =>
@@ -494,9 +533,10 @@
 
     // value each node as a whole run, the same way the planner does
     map.forEach((e) => {
-      const r = runValue(e.rot, state.runMode);
+      const r = runValue(e.rot, state.runMode, e.mode);
       e.score = r.total; e.perRound = r.perRound;
       e.rounds = r.rounds; e.counts = r.counts;
+      e.stranded = r.stranded; e.nonStandard = r.nonStandard;
     });
 
     return Array.from(map.values())
@@ -510,6 +550,7 @@
         rotations: e.counts
           ? Object.keys(e.counts).filter((r) => (e.rot[r] || 0) > 0)
           : [],
+        nonStandard: e.nonStandard,
         // best-first, matching the planner: chance here x what an opening is worth
         relicList: Array.from(e.relics.entries())
           .map(([name, v]) => [name, ((v.chance || 0) / 100) * (value.get(name) || 0)])
@@ -615,16 +656,31 @@
     return `<abbr class="rot" title="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
   }
 
-  function rotListTag(rots) {
+  function rotListTag(rots, nonStandard) {
     if (!rots || !rots.length) return "";
-    // several rotations at once: name each so the letters stay distinguishable
-    const lines = rots
-      .map((r) => {
+    const lines = [];
+    if (nonStandard) {
+      lines.push("DISRUPTION does not use the A -> A -> B -> C cycle.");
+      lines.push("One reward per round, and the tier depends on the round AND");
+      lines.push("how many of the four conduits you defended.");
+      lines.push("");
+      lines.push("Defending all four (what this assumes):");
+      lines.push("  round   1  2  3  4  5  6+");
+      lines.push("  tier    B  B  C  C  C  C");
+      lines.push("");
+      lines.push("Rotation C is unlocked, not periodic. Rotation A is out of");
+      lines.push("reach unless you deliberately defend fewer conduits.");
+    } else {
+      rots.forEach((r) => {
         const k = String(r).toUpperCase();
-        return ROT_WHEN[k] ? `${k} — ${ROT_WHEN[k].replace("Can drop as the ", "")}` : k;
-      })
-      .join("\n");
-    return `<abbr class="rot" title="${esc(lines + "\n\n" + ROT_CYCLE)}">rotation ${esc(rots.join("/"))}</abbr>`;
+        lines.push(ROT_WHEN[k] ? k + " — " + ROT_WHEN[k].replace("Can drop as the ", "") : k);
+      });
+      lines.push("");
+      lines.push(ROT_CYCLE);
+    }
+    const cls = "rot" + (nonStandard ? " rot-odd" : "");
+    return `<abbr class="${cls}" data-tip="${esc(lines.join("\n"))}">rotation ${
+      esc(rots.join("/"))}</abbr>`;
   }
 
   function openItem(id) {
@@ -718,7 +774,7 @@
               <span class="spot-mode">(${esc(s.mode)})</span>${
               s.kind === "mission" ? ` <span style="color:var(--txt-faint);font-weight:400">— ${esc(s.planet)}</span>` : ""}</div>
             <div class="spot-meta">${
-              s.rotations.length ? rotListTag(s.rotations) : "no rotation"}${
+              s.rotations.length ? rotListTag(s.rotations, s.nonStandard) : "no rotation"}${
               s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${

@@ -17,6 +17,7 @@
   --red:#e0637a;
   --green:#5fce8f;
   --blue:#5aa9e6;
+  --odd:#e8944a;      /* non-standard rule, read the tooltip */
   --radius:10px;
   --shadow:0 8px 28px rgba(0,0,0,.45);
 }
@@ -690,6 +691,14 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 
 /* mission type, beside the node name */
 .rounds{color:var(--txt-dim)}
+/* a rotation that does not follow A->A->B->C. Its own colour so it reads as
+   "this one works differently" rather than blending in with the rest. */
+abbr.rot-odd{
+  color:var(--odd);
+  text-decoration-color:var(--odd);
+  text-decoration-thickness:from-font;
+}
+abbr.rot-odd:hover{color:#f0a862;text-decoration-color:#f0a862}
 .spot-mode{font-size:11.5px;font-weight:500;color:var(--teal);opacity:.85}
 
 /* "farming for" control on a card */

@@ -11,35 +11,36 @@ understand, it needs rewriting.
 
 ---
 
-### Disruption does not use the AABC rotation, and we assume it does
+### Only Disruption has been checked for a non-standard rotation
 
-**Confirmed against the wiki 2026-08-10, after a player report the model could not
-explain.** Every other endless mission advances rotation on a fixed cadence, so the
-planner assumes rounds pay `A A B C` and repeat. Disruption does not. Its tier
-depends on **both round number and how many of the four conduits you defend**:
+Disruption turned out not to use the A→A→B→C cycle at all, and is now modelled
+properly (`PROJECT.md §7`). Nothing else has been checked. The data holds 31 mission
+types — Void Cascade, Void Flood, Void Armageddon, Alchemy, Ascension, Sanctuary
+Onslaught, Defection, The Circuit and others are all plausible candidates for their
+own rules, since several are newer than the cycle they are assumed to follow.
 
-| Round | 1 defended | 2 defended | 3 defended | 4 defended |
-|---|---|---|---|---|
-| 1 | A | A | A | **B** |
-| 2 | A | A | B | **B** |
-| 3 | A | B | B | **C** |
-| 4+ | B | B | C | **C** |
+`ROT_PATTERN` now makes adding one a two-line change, so this is a research task
+rather than an engineering one: work through the mission types that actually appear
+as relic sources and confirm each against the wiki.
 
-A squad clearing all four conduits therefore gets `B B C C C C…` and **never sees
-rotation A at all**. At Sedna/Kappa that is Neo, Neo, then Axi from round three on —
-while the planner claims Meso, Meso, Neo, Axi.
+### Disruption min-maxing is documented but not modelled
 
-The consequences are large and all in the same direction: for Disruption we badly
-overstate rotation A, understate B and C, and overstate how many rounds deep you
-must go. Disruption nodes are prominent in the rankings (Kappa, Ur, Olympus, Apollo,
-Armatus), so this is not a niche error.
+Defending fewer conduits deliberately changes which rotation you get, and it is the
+only way to reach rotation A at all. With a coordinated squad you can hold rotation B
+every single round, or take three rotation A rewards in the first three rounds. The
+tooltip explains all of this, but the planner always assumes four conduits defended
+and cannot plan around it. Would only make sense as an option gated behind the
+existing 4-squad checkbox, since it needs organised players.
 
-Fixing it needs a per-mission-type rotation model rather than one global pattern,
-plus an assumption about conduits defended — which is a playstyle input like *How
-far you run*, and probably belongs next to it. Worth checking whether any other
-mission type also deviates before building it.
+### The rotation label sits at 3.48:1 contrast
 
-### Mission length is not modelled at all, and the ranking now leans on it
+Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
+`--txt-faint`, which is below AA (4.5:1) and well below the 7:1 `STYLE.md §3`
+requires. It is deliberately dimmed as secondary information, so raising it changes
+the visual hierarchy on both pages — worth doing, but it is a design decision rather
+than a straight fix. The amber non-standard label was measured at 7.27:1 and passes.
+
+### Mission length is not modelled at all### Mission length is not modelled at all, and the ranking now leans on it
 
 A "round" is treated as one unit of effort regardless of mission. So four rounds of
 Disruption score four times a bounty that may well take just as long in real

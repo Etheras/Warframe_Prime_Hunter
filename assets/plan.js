@@ -56,17 +56,56 @@
      another from C, leaving after round 2 never gets you the C part at all, so
      a higher per-round rate there is measuring the wrong thing. Same reasoning
      as refinement following the bottleneck instead of the likeliest reward. */
-  function runValue(rot, mode) {
+  /* Rotation pattern, by mission type.
+
+     Every endless mission advances A -> A -> B -> C and repeats, with one
+     exception. Disruption does not use that cycle at all: it pays one reward
+     per round, and the tier depends on the round number *and* how many of the
+     four conduits you successfully defended that round.
+
+         round   1 defended   2   3   4 defended
+           1         A        A   A       B
+           2         A        A   B       B
+           3         A        B   B       C
+           4+        B        B   C       C
+
+     We assume all four are defended, which is what anyone deliberately farming
+     does. That pays B, B, then C from round three onward for as long as you
+     stay -- so rotation C is *unlocked* rather than periodic, and rotation A is
+     unreachable. Defending fewer is a deliberate min-max: it is the only way to
+     reach rotation A, and it can hold you on B indefinitely. The rotation label
+     is coloured differently on these nodes and explains this on hover. */
+  const AABC = (r) => "AABC"[(r - 1) % 4];
+  const ROT_PATTERN = { Disruption: (r) => (r <= 2 ? "B" : "C") };
+  const tierAt = (mission, round) => (ROT_PATTERN[mission] || AABC)(round);
+  /* rounds after which the sequence only repeats its last tier */
+  const cycleLen = (mission) => (ROT_PATTERN[mission] ? 3 : 4);
+
+  function runValue(rot, runMode, mission) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let total = 0, rounds = null, counts = null;
+    let total = 0, rounds = null, counts = null, stranded = null;
     if (hasRot) {
-      const p = RUN_PATTERNS[mode] ||
-        RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
-      Object.keys(p.counts).forEach((r) => { total += p.counts[r] * (rot[r] || 0); });
-      rounds = p.rounds; counts = p.counts;
+      let n;
+      if (runMode === "full") n = 4;
+      else if (runMode === "aabcaa") n = 6;
+      else {
+        n = 0;                                  // reset: last round that pays
+        for (let r = 1; r <= cycleLen(mission); r++) {
+          if ((rot[tierAt(mission, r)] || 0) > 0) n = r;
+        }
+      }
+      counts = {};
+      for (let r = 1; r <= n; r++) {
+        const t = tierAt(mission, r);
+        counts[t] = (counts[t] || 0) + 1;
+      }
+      Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
+      rounds = n || null;
+      // rotations holding something wanted that this run can never reach
+      stranded = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !counts[t]);
     }
-    total += rot.none || 0;
-    return { total, perRound: total / (rounds || 1), rounds, counts };
+    return { total: total + (rot.none || 0), perRound: total / (rounds || 1),
+             rounds, counts, stranded, nonStandard: !!ROT_PATTERN[mission] };
   }
 
   const DATA = window.VORFRAME_DATA;
@@ -272,9 +311,10 @@
 
     // value each node as a whole run, which is what you actually commit to
     nodes.forEach((n) => {
-      const r = runValue(n.rot, opts.runMode);
+      const r = runValue(n.rot, opts.runMode, n.mode);
       n.score = r.total; n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
+      n.stranded = r.stranded; n.nonStandard = r.nonStandard;
     });
 
     // Score first, then a lower enemy level (faster clears). Rotation used to
@@ -335,11 +375,30 @@
     const pays = n.counts
       ? Object.keys(n.counts).filter((r) => (n.rot[r] || 0) > 0)
       : [];
-    if (!pays.length && !n.rounds) return "no rotation";
+    if (!pays.length && !n.rounds && !(n.stranded || []).length) return "no rotation";
+
     const lines = [];
+    if (n.nonStandard) {
+      lines.push("DISRUPTION pays one reward per round, and the tier depends on");
+      lines.push("the round AND how many of the four conduits you defended.");
+      lines.push("");
+      lines.push("Defending all four (what this assumes):");
+      lines.push("  round   1  2  3  4  5  6+");
+      lines.push("  tier    B  B  C  C  C  C");
+      lines.push("");
+      lines.push("So rotation C is unlocked, not periodic - once you reach round");
+      lines.push("three every further round is another C.");
+      lines.push("");
+      lines.push("Defending fewer is a deliberate min-max:");
+      lines.push("  rotation A  only rounds 1-3, and only by defending 3/2/1");
+      lines.push("  rotation B  every round, defending 4 / 3-4 / 2-3 / 1-2");
+      lines.push("  rotation C  round 3 onward, defending 3-4");
+      lines.push("Losing all four in a round fails the mission.");
+      lines.push("");
+    }
     if (n.rounds) {
       lines.push("Costed over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") +
-        (opts.runMode === "full" ? " (one full cycle; the rate is the same if you keep going)."
+        (opts.runMode === "full" ? "."
          : opts.runMode === "reset" ? ", the last one you want anything from."
          : ", then restart."));
       lines.push("");
@@ -355,9 +414,17 @@
       lines.push("Per round  " + pct(n.perRound) + "   (" + n.rounds + " rounds)");
       lines.push("");
     }
-    lines.push(ROT_CYCLE);
-    const label = pays.length ? "rot " + pays.join("+") : "no rotation";
-    return `<abbr class="rot" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` +
+    (n.stranded || []).forEach((t) => {
+      lines.push("rot " + t + " holds something you want (" + pct(n.rot[t]) +
+        ") but this run never reaches it.");
+    });
+    if (!n.nonStandard) lines.push(ROT_CYCLE);
+
+    const label = pays.length ? "rot " + pays.join("+")
+      : (n.stranded || []).length ? "rot " + n.stranded.join("+") + " only"
+      : "no rotation";
+    const cls = "rot" + (n.nonStandard ? " rot-odd" : "");
+    return `<abbr class="${cls}" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` +
       (n.rounds ? ` · <span class="rounds">${n.rounds} rounds</span>` : "");
   }
 
