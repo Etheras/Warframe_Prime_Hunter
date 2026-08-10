@@ -441,7 +441,7 @@ each rotation's value is banked in its own slot:
 
 ```
 v[r] = Σ over relics dropping at (node, rotation r): P(relic) × relicValue
-score = ( Σ over rotations r in the pattern: count[r] × v[r] ) / rounds
+score = Σ over rotations r in the pattern: count[r] × v[r]      (a whole run)
 ```
 
 Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 4 pays C,
@@ -475,11 +475,25 @@ round to one whole mission, which flatters long missions — deliberate, since m
 length is not modelled anywhere (see the tie-break note above). It shows up as
 bounties and enemy drops climbing under `full` and `aabcaa`.
 
+**The score is a whole run, not a rate** (decided 2026-08-10). Dividing by rounds
+produced a dominance violation: Kappa and Ur were identical in rotations A and B,
+but Ur *also* dropped something wanted in rotation C, which forced it a round deeper
+and pushed its per-round rate below Kappa's — so the node offering strictly more
+ranked lower. Since you can always leave early, Ur can never actually be worse.
+
+Ranking on the run total fixes that, at a known cost: **a longer run can outrank a
+faster one on volume alone.** A 4-round endless node accumulates four rewards
+against a bounty's one, so single-reward missions sink regardless of speed — the
+Fortuna bounty went from 1st to below 28th on the same list. This was chosen with
+that trade understood. The per-round rate is still computed and shown in the
+rotation tooltip, so the pathology is visible rather than hidden; if a node with a
+much better rate is sitting below a longer one, the tooltip says so.
+
 The setting lives in `vorframe.plan.v1` and **both pages read that one copy**, since
 both rank nodes with it and this document guarantees they cannot disagree. The
 collection page writes back to the planner's store rather than keeping its own. The
-headline percentage is **per round**, not per reward; the row names only the
-rotations the costed run actually reaches.
+headline percentage is **per run**; the row names only the rotations the run
+actually reaches, and the round count is what it is divided by for the rate.
 
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four

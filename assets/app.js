@@ -148,15 +148,15 @@
      as refinement following the bottleneck instead of the likeliest reward. */
   function runValue(rot, mode) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let perRound = 0, rounds = null, counts = null;
+    let total = 0, rounds = null, counts = null;
     if (hasRot) {
       const p = RUN_PATTERNS[mode] ||
         RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
-      let v = 0;
-      Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
-      perRound = v / p.rounds; rounds = p.rounds; counts = p.counts;
+      Object.keys(p.counts).forEach((r) => { total += p.counts[r] * (rot[r] || 0); });
+      rounds = p.rounds; counts = p.counts;
     }
-    return { perRound: perRound + (rot.none || 0), rounds, counts };
+    total += rot.none || 0;
+    return { total, perRound: total / (rounds || 1), rounds, counts };
   }
 
   const rotSlot = (r) =>
@@ -495,7 +495,8 @@
     // value each node as a whole run, the same way the planner does
     map.forEach((e) => {
       const r = runValue(e.rot, state.runMode);
-      e.score = r.perRound; e.rounds = r.rounds; e.counts = r.counts;
+      e.score = r.total; e.perRound = r.perRound;
+      e.rounds = r.rounds; e.counts = r.counts;
     });
 
     return Array.from(map.values())
@@ -722,8 +723,8 @@
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
               s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
-            <div class="spot-score" data-tip="What one round here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches."><b>${
-              (s.score * 100).toFixed(1)}%</b>per round</div>
+            <div class="spot-score" data-tip="What one whole run here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches, so a longer run can outrank a faster one on volume alone."><b>${
+              (s.score * 100).toFixed(1)}%</b>per run</div>
           </div>`).join("") +
         `</div></section>`;
     }

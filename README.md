@@ -166,8 +166,13 @@ showing only the parts still missing — **click a part name
 there the moment it drops** and it's banked, the list shrinks, and the plan
 re-ranks. Parts needing two copies take two clicks.
 
-It ranks every node by what **one round** there is worth towards *anything* still
-on your list, then tells you what refinement to take each relic to.
+It ranks every node by what **one whole run** there is worth towards *anything*
+still on your list, then tells you what refinement to take each relic to.
+
+Because it scores the whole run, a longer run can beat a faster one on volume
+alone — four rounds of a Disruption collect four rewards against a bounty's one.
+Hover the rotations on any row for the per-round rate if you want to compare speed
+rather than total.
 
 **Rotation counts, and it counts for a lot.** The percentage the game publishes
 assumes that rotation has already come up, so it flatters the late ones. Rewards

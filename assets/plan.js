@@ -58,15 +58,15 @@
      as refinement following the bottleneck instead of the likeliest reward. */
   function runValue(rot, mode) {
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let perRound = 0, rounds = null, counts = null;
+    let total = 0, rounds = null, counts = null;
     if (hasRot) {
       const p = RUN_PATTERNS[mode] ||
         RESET_STOPS[(rot.C || 0) > 0 ? 2 : (rot.B || 0) > 0 ? 1 : 0];
-      let v = 0;
-      Object.keys(p.counts).forEach((r) => { v += p.counts[r] * (rot[r] || 0); });
-      perRound = v / p.rounds; rounds = p.rounds; counts = p.counts;
+      Object.keys(p.counts).forEach((r) => { total += p.counts[r] * (rot[r] || 0); });
+      rounds = p.rounds; counts = p.counts;
     }
-    return { perRound: perRound + (rot.none || 0), rounds, counts };
+    total += rot.none || 0;
+    return { total, perRound: total / (rounds || 1), rounds, counts };
   }
 
   const DATA = window.VORFRAME_DATA;
@@ -273,7 +273,8 @@
     // value each node as a whole run, which is what you actually commit to
     nodes.forEach((n) => {
       const r = runValue(n.rot, opts.runMode);
-      n.score = r.perRound; n.rounds = r.rounds; n.counts = r.counts;
+      n.score = r.total; n.perRound = r.perRound;
+      n.rounds = r.rounds; n.counts = r.counts;
     });
 
     // Score first, then a lower enemy level (faster clears). Rotation used to
@@ -314,11 +315,11 @@
      means "stay for the 4th reward". Spelled out because the letters mean
      nothing on their own. */
   const RUN_BLURB = {
-    reset: "Each node is costed to the last rotation you want something from — 2, 3 or 4 " +
-           "rounds — counting every rotation you pass on the way.",
-    full: "Each node is costed over a full A → A → B → C " +
-          "cycle, counting all four rewards.",
-    aabcaa: "Each node is costed over six rounds — four rotation A rewards plus a B and a C, " +
+    reset: "Each run goes to the last rotation you want something from — 2, 3 or 4 " +
+           "rounds — collecting every rotation on the way.",
+    full: "Each run is a full A → A → B → C " +
+          "cycle, all four rewards counted.",
+    aabcaa: "Each run is six rounds — four rotation A rewards plus a B and a C, " +
             "all of which count.",
   };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
@@ -349,6 +350,9 @@
           (v > 0 ? "   worth " + pct(v) : "   nothing you want"));
       });
       if ((n.rot.none || 0) > 0) lines.push("  no rotation   worth " + pct(n.rot.none));
+      lines.push("");
+      lines.push("Whole run  " + pct(n.score) + "   <- ranked on this");
+      lines.push("Per round  " + pct(n.perRound) + "   (" + n.rounds + " rounds)");
       lines.push("");
     }
     lines.push(ROT_CYCLE);
@@ -427,8 +431,10 @@
       `<b>${ranked.length}</b> place${ranked.length === 1 ? "" : "s"} to run`;
 
     $("#planScoreNote").innerHTML =
-      `The percentage is what <b>one round</b> at that node is worth towards your ` +
-      `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}. ` +
+      `The percentage is what <b>one whole run</b> at that node is worth towards your ` +
+      `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""} — so a ` +
+      `longer run can outrank a faster one on volume alone. Hover the rotations for the ` +
+      `per-round rate. ` +
       `Rotation is priced in: the published chance assumes that rotation has come ` +
       `up, so it is not comparable across rotations on its own. ${RUN_BLURB[opts.runMode] || RUN_BLURB.reset} ` +
       `Relics are listed best-first within each node. ` +
@@ -459,7 +465,7 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}</div>
-        <div class="spot-score"><b>${pct(n.score)}</b>per round</div>
+        <div class="spot-score"><b>${pct(n.score)}</b>per run</div>
       </div>`;
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" title="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>

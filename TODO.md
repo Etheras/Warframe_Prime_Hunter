@@ -145,6 +145,19 @@ Dates are on the individual entries — several were revised after first use.
   rotation holding something wanted (2, 3 or 4 rounds), `full` costs a whole
   AABC cycle, `aabcaa` costs six rounds. Stored once in `vorframe.plan.v1` and
   read by both pages, because they must not rank differently.
+- **Nodes are ranked on the whole run, not a per-round rate** (decided
+  2026-08-10). Dividing by rounds was a dominance violation: Ur matched Kappa in
+  rotations A and B and *also* had a wanted rotation C, which forced it deeper
+  and dropped its rate below Kappa's — the node offering more ranked lower, when
+  leaving early makes it strictly better. Known cost, accepted deliberately:
+  a longer run now outranks a faster one on volume alone, and single-reward
+  missions sink (the Fortuna bounty fell from 1st to below 28th). The per-round
+  rate is kept in the rotation tooltip so the trade stays visible.
+- [ ] **Mission length is still unmodelled, and per-run scoring leans on it
+      harder.** A round is treated as one unit of effort whatever the mission,
+      so 4 rounds of Disruption look like 4x a bounty that may take just as
+      long. Timing real missions is the only honest fix; until then the tooltip
+      rate is the workaround.
 - **`reset` stops at the deepest wanted rotation, not the best rate** (corrected
   2026-08-09). It was first written as a rate optimiser, which dropped the case
   it exists for: wanting a part from A and another from C, it stopped at 2
