@@ -257,6 +257,22 @@ table permanently, but the node only exists on your star chart while that event
 is actually running — and the table never says which event it is. There's an
 *Include event nodes* checkbox if you know one is live.
 
+### Aya
+
+Some missions drop **Aya**, and one Aya buys one relic *of your choosing* from Varzia
+— who stocks whatever Prime Resurgence is currently offering. That makes an Aya drop
+worth more than a random relic, because you choose which one you get.
+
+The planner counts it (**Count Aya drops**, on by default), valuing it at the best
+relic it could actually buy for your list. Nodes that drop it are marked **aya** —
+hover for the rate. Two things worth knowing:
+
+- It **only raises the value of a node you were already going to run.** It will never
+  put an Aya-only bounty ahead of somewhere carrying a part you need.
+- If your list wants nothing from the current Resurgence rotation, Aya is worth
+  nothing *to this plan* — even though banking it for a later rotation is still
+  sensible.
+
 ### Advanced options
 
 At the bottom of the sidebar:

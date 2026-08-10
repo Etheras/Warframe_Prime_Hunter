@@ -583,6 +583,26 @@ collection page writes back to the planner's store rather than keeping its own. 
 headline percentage is **per run**; the row names only the rotations the run
 actually reaches, and the round count is what it is divided by for the rate.
 
+**Aya is priced at what it buys, not guessed at.** Aya is a currency, not a
+reward, so it never reached the site before — DE lists it in the same drop rows as
+relics and the parser discarded it. It matters because Varzia sells relics for
+**1 Aya each** (`vaultTrader.inventory[].credits`), and Varzia stocks the current
+Prime Resurgence rotation. So one Aya is one relic *of your choosing* from that
+rotation — strictly better than a random relic off a drop table, because you pick
+it.
+
+Its value is therefore computed, not assumed: the best value any Resurgence relic
+would have for your list, at its best refinement. Relics carry a `resurgence` flag
+marking the ones an Aya can be spent on (88 of 763 at the time of writing). If your
+list wants nothing from the current rotation, Aya scores **zero** here, however
+useful it may be to bank for a later one.
+
+**It only ever inflates a node already worth running.** Same rule as Forma, and for
+the same reason: standing on its own it would send you to a bounty that drops Aya
+and nothing else, ahead of somewhere carrying a part you actually need. The code
+looks the node up and returns if it is not already in the plan, so Aya can raise a
+score but never create one. Default on, with a *Count Aya drops* checkbox.
+
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.

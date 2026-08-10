@@ -83,9 +83,9 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
         try:
             log("drops: warframe.com/droptables (official)")
             page = fetch(OFFICIAL_DROPTABLES, "official_droptables", offline).decode("utf-8", "replace")
-            contents, sources = official.parse_droptables(page)
+            contents, sources, aya = official.parse_droptables(page)
             if len(contents) >= 200 and len(sources) >= 10:
-                return contents, normalise_sources(sources), "official"
+                return contents, normalise_sources(sources), "official", aya
             log(f"! official drop table parsed thin ({len(contents)} relics, "
                 f"{len(sources)} farmable) - falling back to the mirror")
         except Exception as exc:
@@ -95,9 +95,11 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
     for fname in ["relics.json", *DROP_FILES.keys()]:
         log(f"drops: {fname} (mirror)")
         payloads[fname] = fetch_json(DROPS.format(name=fname), f"drops_{fname}", offline)
+    # the mirror splits its data differently and has no Aya table we can key on,
+    # so an Aya-less build is simply one without the bonus - never an error
     return (collect_relic_contents(payloads["relics.json"]),
             collect_relic_sources(payloads, verbose),
-            "mirror")
+            "mirror", [])
 
 
 def acquire_export(offline: bool):
@@ -230,7 +232,8 @@ def main() -> int:
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash = acquire_export(off)
 
-    relic_contents, relic_sources, drop_source = acquire_drops(off, args.source, args.verbose)
+    relic_contents, relic_sources, drop_source, aya_sources = acquire_drops(
+        off, args.source, args.verbose)
 
     # ---- transform -------------------------------------------------------
     print("-" * 60)
@@ -426,6 +429,9 @@ def main() -> int:
             summary = acquisition_summary(blob.decode("utf-8", "replace").replace("\xa0", " "))
             if summary:
                 it["acquisition"] = summary
+    if aya_sources:
+        log(f"aya            {len(aya_sources)} drop rows across "
+            f"{len({(a['planet'], a['node']) for a in aya_sources})} nodes")
     if skipped_non_relic:
         log(f"skipped        {skipped_non_relic} non-relic entries "
             f"({', '.join(sorted(NON_RELIC_CATEGORIES))})")
@@ -491,6 +497,13 @@ def main() -> int:
             ],
             "sources": srcs,
             "sourceCount": len(srcs),
+            # Varzia stocks the current Prime Resurgence rotation, and one Aya
+            # buys one relic there. So this marks the relics an Aya can actually
+            # be spent on - which is what makes an Aya drop worth anything.
+            "resurgence": any(
+                any(rw.startswith(n) for n in resurgence)
+                for rw in (content.get("rewards") or {})
+            ),
         }
 
     categories = []
@@ -533,6 +546,10 @@ def main() -> int:
         "categories": categories,
         "items": out_items,
         "relics": relics_out,
+        # Where Aya drops. One Aya buys one relic of your choosing at Varzia,
+        # so it is worth more than a random relic - but it is a currency, not a
+        # reward, hence a flat list rather than anything keyed by item.
+        "aya": normalise_sources({"Aya": aya_sources}).get("Aya", []),
     }
 
     os.makedirs(DATA_DIR, exist_ok=True)

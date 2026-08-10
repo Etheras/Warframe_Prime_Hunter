@@ -133,17 +133,30 @@ def parse_droptables(page: str):
     """
     Parse DE's drop table page.
 
-    Returns (relic_contents, relic_sources) in exactly the shape the mirror
-    path produces, so the rest of the build is source-agnostic:
+    Returns (relic_contents, relic_sources, aya_sources); the first two are in
+    exactly the shape the mirror path produces, so the rest of the build stays
+    source-agnostic:
 
         relic_contents["Axi A1"] = {tier, code, rewards: {item: {rarity, chances}}}
         relic_sources["Axi A1"]  = [{kind, planet, node, mode, rotation, chance, rarity}]
+        aya_sources              = [{kind, planet, node, mode, rotation, chance}]
+
+    Aya is not a relic, so it never reached the site before. It matters because
+    one Aya buys one relic *of your choosing* from Varzia, which is worth more
+    than a random relic off a drop table. Collected here because it appears in
+    the same rows, keyed nowhere - just a flat list of places it drops.
     """
     sections = _slice_sections(page)
     relic_contents: dict[str, dict] = {}
     relic_sources: dict[str, list] = {}
+    aya_sources: list[dict] = []
 
     def add_source(item_cell, entry):
+        # "Aya" exactly - not "Ayatan Amber Star" or the Ayatan sculptures,
+        # which are Maroo's treasures and have nothing to do with Prime Vault
+        if item_cell.strip().lower() == "aya":
+            aya_sources.append({k: v for k, v in entry.items() if k != "rarity"})
+            return
         m = _RELIC_ITEM.match(item_cell)
         if not m:
             return
@@ -240,7 +253,7 @@ def parse_droptables(page: str):
             "rotation": None, "chance": chance, "rarity": rarity,
         })
 
-    return relic_contents, relic_sources
+    return relic_contents, relic_sources, aya_sources
 
 
 # ── public export ─────────────────────────────────────────────────────────

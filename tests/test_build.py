@@ -230,6 +230,19 @@ def test_built_payload() -> None:
                and not (i.get("flags") or {}).get("special")]
     check("payload: partless items are all Founder/Baro/special", orphans, [])
 
+    # Aya is a currency, not a relic, and used to be discarded by the parser
+    aya = D.get("aya")
+    check_true("payload: Aya drop rows present", isinstance(aya, list) and len(aya) > 10,
+               "one Aya buys one relic at Varzia, so where it drops matters")
+    check("payload: no null Aya chances",
+          [a for a in (aya or []) if a.get("chance") is None], [])
+    check_true("payload: relics flag what Aya can buy",
+               any(r.get("resurgence") for r in D["relics"].values()),
+               "Aya is only worth something if we know which relics it buys")
+    # Ayatan sculptures and stars are Maroo's treasures, nothing to do with Aya
+    check("payload: Aya rows are Aya only",
+          [a for a in (aya or []) if "ayatan" in str(a.get("item", "")).lower()], [])
+
     # part names must be normalised, since saved progress is keyed on them
     raw = [p["name"] for i in D["items"] for p in (i.get("parts") or [])
            if p["name"] != "Blueprint" and p["name"].endswith(" Blueprint")]

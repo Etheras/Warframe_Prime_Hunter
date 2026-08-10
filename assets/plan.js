@@ -245,7 +245,7 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, runMode: "reset" },
+    { squad: false, event: false, railjack: false, runMode: "reset", aya: true },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
@@ -414,6 +414,45 @@
       });
     });
 
+    /* ── Aya ──────────────────────────────────────────────────────────
+       One Aya buys one relic *of your choosing* at Varzia, and Varzia stocks
+       the current Prime Resurgence rotation. So an Aya drop is worth the best
+       relic you could spend it on - strictly better than a random relic off a
+       drop table, because you pick it. If nothing in the rotation is on your
+       list it is worth nothing to this plan, however much it is worth later.
+
+       Crucially it only ever *inflates a node you were already going to run*.
+       Letting it stand on its own would send you to a bounty that drops Aya
+       and nothing else, ahead of a node carrying a part you actually need -
+       the same mistake Forma would make if it could add a relic. */
+    let ayaValue = 0, ayaRelic = null;
+    if (opts.aya) {
+      Object.keys(RELICS).forEach((rname) => {
+        const rec = RELICS[rname];
+        if (!rec || !rec.resurgence) return;
+        const entries = want.get(rname);
+        if (!entries || !entries.some((e) => !e.bonus)) return;
+        const { value } = bestRefinement(entries);
+        if (value > ayaValue) { ayaValue = value; ayaRelic = rname; }
+      });
+    }
+    if (ayaValue > 0) {
+      const byNode = new Map();
+      (DATA.aya || []).forEach((a) => {
+        if (!opts.railjack && isRailjack(a)) return;
+        if (!opts.event && isEvent(a)) return;
+        const key = `${a.planet}|${a.node}|${a.mode}`;
+        const n = nodes.get(key);
+        if (!n) return;                       // never adds a node, only inflates
+        const slot = { A: "A", B: "B", C: "C" }[String(a.rotation || "").toUpperCase()] || "none";
+        const prev = byNode.get(key + "|" + slot);
+        if (prev != null && prev >= (a.chance || 0)) return;
+        byNode.set(key + "|" + slot, a.chance || 0);
+        n.rot[slot] += ((a.chance || 0) / 100) * ayaValue;
+        n.aya = Math.max(n.aya || 0, a.chance || 0);
+      });
+    }
+
     // value each node as a whole run, which is what you actually commit to
     nodes.forEach((n) => {
       const r = runValue(n.rot, opts.runMode, n.mode, opts.squad);
@@ -433,7 +472,7 @@
       return (a.node || "").localeCompare(b.node || "");
     });
 
-    return { relicPlan, ranked, needs, formaShort };
+    return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -595,7 +634,7 @@
 
   function render() {
     renderWishlist();
-    const { relicPlan, ranked, needs, formaShort } = buildPlan();
+    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic } = buildPlan();
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
     $("#formaShort").classList.toggle("on", formaShort > 0);
@@ -622,6 +661,9 @@
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
+      (ayaValue > 0 ? " Aya counts too — one buys <b>" + esc(ayaRelic) + "</b> at " +
+        "Varzia, worth " + pct(ayaValue) + " to your list — but only at nodes " +
+        "already worth running." : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
@@ -642,6 +684,11 @@
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
         <div class="spot-meta">${runTag(n)}${
+          n.aya ? ` · <span class="aya" data-tip="${esc(
+            "Also drops Aya at " + pct(n.aya / 100) + " per reward." + "\n\n" +
+            "One Aya buys one relic of your choosing at Varzia. Counted at " +
+            pct(ayaValue) + " here, the value of the best relic it could buy you.")
+          }">aya</span>` : ""}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
@@ -788,7 +835,8 @@
       opts.runMode = runSel.value; save(KEY_PLAN, opts); render();
     });
   }
-  [["p-squad", "squad"], ["p-event", "event"], ["p-railjack", "railjack"]].forEach(([id, key]) => {
+  [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
+   ["p-railjack", "railjack"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
