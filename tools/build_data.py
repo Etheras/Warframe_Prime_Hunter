@@ -499,7 +499,16 @@ def normalise_sources(sources: dict[str, list]) -> dict[str, list]:
     One node can list the same relic several times (bounty stages, repeated
     rotation entries), and neither source path emits rows in a useful order.
     Both paths run through here so the site never shows a 1.84% node above an
-    11.06% one, and so `sources[:40]` keeps the drops actually worth farming.
+    11.06% one.
+
+    Every row is kept. There used to be a `sources[:40]` cap here, which threw
+    away 68% of all rows and made the planner blind to real farms: Sedna/Kappa
+    publishes 25 rows, we stored 14, and its whole rotation C -- seven Axi
+    relics at 10.20% plus the Gauss component blueprints -- vanished because
+    those relics are listed at 90-odd nodes and Kappa fell below the fortieth.
+    Caught by a player running the node and getting rewards the app said were
+    not there. The UI already shows the top few and hides the rest, so trimming
+    the data as well only removed information the ranking needed.
     """
     out: dict[str, list] = {}
     for relic, rows in sources.items():
@@ -1020,7 +1029,7 @@ def main() -> int:
                 )
                 for k, v in sorted((content.get("rewards") or {}).items())
             ],
-            "sources": srcs[:40],
+            "sources": srcs,
             "sourceCount": len(srcs),
         }
 

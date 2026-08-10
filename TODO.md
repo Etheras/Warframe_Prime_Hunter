@@ -11,6 +11,34 @@ understand, it needs rewriting.
 
 ---
 
+### Disruption does not use the AABC rotation, and we assume it does
+
+**Confirmed against the wiki 2026-08-10, after a player report the model could not
+explain.** Every other endless mission advances rotation on a fixed cadence, so the
+planner assumes rounds pay `A A B C` and repeat. Disruption does not. Its tier
+depends on **both round number and how many of the four conduits you defend**:
+
+| Round | 1 defended | 2 defended | 3 defended | 4 defended |
+|---|---|---|---|---|
+| 1 | A | A | A | **B** |
+| 2 | A | A | B | **B** |
+| 3 | A | B | B | **C** |
+| 4+ | B | B | C | **C** |
+
+A squad clearing all four conduits therefore gets `B B C C C C…` and **never sees
+rotation A at all**. At Sedna/Kappa that is Neo, Neo, then Axi from round three on —
+while the planner claims Meso, Meso, Neo, Axi.
+
+The consequences are large and all in the same direction: for Disruption we badly
+overstate rotation A, understate B and C, and overstate how many rounds deep you
+must go. Disruption nodes are prominent in the rankings (Kappa, Ur, Olympus, Apollo,
+Armatus), so this is not a niche error.
+
+Fixing it needs a per-mission-type rotation model rather than one global pattern,
+plus an assumption about conduits defended — which is a playstyle input like *How
+far you run*, and probably belongs next to it. Worth checking whether any other
+mission type also deviates before building it.
+
 ### Mission length is not modelled at all, and the ranking now leans on it
 
 A "round" is treated as one unit of effort regardless of mission. So four rounds of
@@ -46,15 +74,6 @@ should follow.
 `Backup` covers the collection and per-part progress but not `vorframe.wishlist.v1`
 or `vorframe.plan.v1`. Restoring on a new machine brings back what you own and
 leaves the planner empty.
-
-### Relic sources are ordered and capped by raw drop chance
-
-`normalise_sources()` sorts by published chance and `build_data.py` keeps the top 40
-per relic — but the UI ranks nodes on whole-run value, which weights rotations
-differently. A fast rotation A source could in principle be cut in favour of a
-slower rotation B/C one with a higher published number. The cap only binds on relics
-with many sources and this has not been observed to bite, but the two orderings
-should agree. The cap being 40 is itself arbitrary.
 
 ### Tooltips use two different engines
 
