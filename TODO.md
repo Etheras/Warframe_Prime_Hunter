@@ -144,11 +144,6 @@ For prime-junk triage: knowing what a spare part is worth to Baro.
 When a scheduled build changes what is farmable, write a short summary, so "Frost
 Prime became farmable" is visible without diffing 1.5 MB of JSON.
 
-### Workflow actions still run on Node 20
-
-`actions/checkout` and `actions/setup-python` are forced onto Node 24 with a
-deprecation warning. Harmless today, will break eventually.
-
 ---
 
 ## Should be fixed on the wiki, not here

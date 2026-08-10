@@ -33,18 +33,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # 3.14 matches what the project is developed against. The floor is 3.8
+      # (stdlib only, no walrus, no match, no 3.9+ stdlib) but there is no
+      # reason for CI to run anything but current.
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       # Give CI the same warm/cold distinction the local build has: once a run
       # has succeeded, a later run whose source is blocked reuses that copy and
       # reports it as stale, instead of failing outright. The very first run is
       # necessarily cold, so a failure there is a real error and should stop.
       - name: Restore source cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache
           key: vorframe-sources-${{ github.run_id }}
@@ -69,6 +72,11 @@ jobs:
             printf '  %-6s %s\n' "$code" "$url"
           done
 
+      # Parsers and join first: if these are broken there is no point spending
+      # a minute fetching from five upstreams to build a wrong dataset.
+      - name: Run the tests
+        run: python tests/test_build.py
+
       - name: Fetch data from Digital Extremes and build
         run: python tools/build_data.py
 
@@ -87,9 +95,10 @@ jobs:
                     + ", ".join(meta["stale"]))
           if meta.get("degraded"):
               print("::warning::no data at all for: " + ", ".join(meta["degraded"]))
-          # refuse to publish an obviously broken build. Thresholds allow for a
-          # wiki-less build (~172 items, cosmetics come only from the wiki).
-          assert len(items) >= 150, f"only {len(items)} items"
+          # Refuse to publish an obviously broken build. The catalogue is
+          # relic-only now (167 items, down from 315 when Cosmetics and the
+          # other non-relic categories were dropped), so the floor moved with it.
+          assert len(items) >= 120, f"only {len(items)} items"
           assert len(wf) >= 40, f"only {len(wf)} Warframes"
           assert len(relics) >= 500, f"only {len(relics)} relics"
           assert any(i["flags"]["farmable"] for i in items), "nothing is farmable"
@@ -107,7 +116,7 @@ jobs:
           cp dist/vorframe.html _site/vorframe-standalone.html
           echo "Published $(date -u +%Y-%m-%dT%H:%MZ)" > _site/BUILD.txt
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -123,4 +132,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

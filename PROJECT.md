@@ -278,7 +278,7 @@ VorFrame/
 │   ├── vorframe-data.js    ← GENERATED — window.VORFRAME_DATA = {...}
 │   └── vorframe-data.json  ← GENERATED — same payload as plain JSON
 ├── .github/workflows/
-│   └── publish.yml         ← daily rebuild in CI, publishes to Pages
+│   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
 ├── tests/
 │   └── test_build.py       ← the suite; --online adds clone-and-build
 ├── tools/
