@@ -601,7 +601,10 @@ useful it may be to bank for a later one.
 the same reason: standing on its own it would send you to a bounty that drops Aya
 and nothing else, ahead of somewhere carrying a part you actually need. The code
 looks the node up and returns if it is not already in the plan, so Aya can raise a
-score but never create one. Default on, with a *Count Aya drops* checkbox.
+score but never create one. Default on, with a *Count Aya drops* checkbox. Nodes that drop it get an `aya`
+marker at the end of the meta line, after the relic count — in the same colour as
+everything else on that line, since it is one more fact about the node rather than a
+state or a warning.
 
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four

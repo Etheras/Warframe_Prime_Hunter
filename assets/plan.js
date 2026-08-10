@@ -684,15 +684,15 @@
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
         <div class="spot-meta">${runTag(n)}${
+          n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
+          `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
+            rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
+            rl.length === 1 ? "" : "s"}</span>`}${
           n.aya ? ` · <span class="aya" data-tip="${esc(
             "Also drops Aya at " + pct(n.aya / 100) + " per reward." + "\n\n" +
             "One Aya buys one relic of your choosing at Varzia. Counted at " +
             pct(ayaValue) + " here, the value of the best relic it could buy you.")
-          }">aya</span>` : ""}${
-          n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
-          `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
-            rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
-            rl.length === 1 ? "" : "s"}</span>`}</div>
+          }">aya</span>` : ""}</div>
         <div class="spot-score"><b>${pct(n.score)}</b>per run</div>
       </div>`;
     }).join("") + (ranked.length > SHOW

@@ -264,8 +264,8 @@ Some missions drop **Aya**, and one Aya buys one relic *of your choosing* from V
 worth more than a random relic, because you choose which one you get.
 
 The planner counts it (**Count Aya drops**, on by default), valuing it at the best
-relic it could actually buy for your list. Nodes that drop it are marked **aya** —
-hover for the rate. Two things worth knowing:
+relic it could actually buy for your list. Nodes that drop it say `aya` at the end of their
+detail line — hover for the rate. Two things worth knowing:
 
 - It **only raises the value of a node you were already going to run.** It will never
   put an Aya-only bounty ahead of somewhere carrying a part you need.

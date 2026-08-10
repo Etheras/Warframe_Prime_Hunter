@@ -691,15 +691,13 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 
 /* mission type, beside the node name */
 .rounds{color:inherit}
-/* Aya marker on a node row. Teal is already "queued / intent to farm", and Aya
-   is the same idea in currency form - a node worth going to for what it buys
-   rather than what it drops. Dotted, because it explains itself on hover. */
+/* Aya marker on a node row. No colour of its own: it is one more fact about
+   the node, sitting with the level and the relic count, not a state or a
+   warning. Dotted only, so it still reads as hoverable (STYLE.md section 4). */
 .aya{
-  color:var(--teal);opacity:.75;
   text-decoration:underline dotted;text-underline-offset:3px;
   cursor:help;
 }
-.aya:hover{opacity:1}
 
 /* Data-freshness bar, shown under the top bar when a refresh failed or the
    build is old. Gold for "behind", red for "incomplete" - it reports a state of
