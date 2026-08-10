@@ -180,6 +180,34 @@
   const KEY_PARTS = "vorframe.parts.v1";
   const KEY_WISH = "vorframe.wishlist.v1";
   const KEY_PLAN = "vorframe.plan.v1";
+  const KEY_MATERIALS = "vorframe.materials.v1";
+
+  /* Forma has one home: the materials list on the collection page, where it is
+     row one. The planner used to keep its own copy in KEY_PLAN, so the same
+     number had to be typed twice and the two could disagree. These read and
+     write that shared row instead. */
+  const isForma = (m) => m && String(m.name || "").trim().toLowerCase() === "forma";
+  function readForma() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY_MATERIALS) || "null");
+      const row = Array.isArray(raw) ? raw.find(isForma) : null;
+      if (row) {
+        return { have: Math.max(0, Number(row.have) || 0),
+                 need: Math.max(0, Number(row.need) || 0) };
+      }
+    } catch (e) { /* fall through */ }
+    return null;
+  }
+  function writeForma(have, need) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY_MATERIALS) || "null");
+      const list = Array.isArray(raw) ? raw : [];
+      let row = list.find(isForma);
+      if (!row) { row = { name: "Forma", have: 0, need: 0 }; list.unshift(row); }
+      row.have = have; row.need = need;
+      localStorage.setItem(KEY_MATERIALS, JSON.stringify(list));
+    } catch (e) { /* non-fatal */ }
+  }
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -194,8 +222,7 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, runMode: "reset",
-      formaHave: 0, formaNeed: 0 },
+    { squad: false, event: false, railjack: false, runMode: "reset" },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
@@ -249,7 +276,8 @@
        flooding the ranking (it sits in 24 of the 34 live relics).
 
        A 2x drop still only counts double when two or more are wanted. */
-    const formaShort = Math.max(0, (Number(opts.formaNeed) || 0) - (Number(opts.formaHave) || 0));
+    const forma = readForma() || { have: 0, need: 0 };
+    const formaShort = Math.max(0, forma.need - forma.have);
     if (formaShort > 0) {
       want.forEach((entries, rname) => {
         (RELICS[rname] ? RELICS[rname].rewards || [] : []).forEach((rw) => {
@@ -261,7 +289,7 @@
         });
       });
       needs.push({ item: { name: "Forma", id: null }, part: "Blueprint",
-                   short: formaShort, need: Number(opts.formaNeed) || 0, bonus: true });
+                   short: formaShort, need: forma.need, bonus: true });
     }
     return { want, needs, formaShort };
   }
@@ -524,7 +552,7 @@
         <div class="wish-head">
           <span class="wish-name">${esc(it.name)}</span>
           <span class="wish-prog">${done}/${total}</span>
-          <button class="wish-del" data-del="${esc(id)}" title="remove from list">✕</button>
+          <button class="wish-del" data-del="${esc(id)}" data-tip="remove from list">✕</button>
         </div>
         <div class="wish-parts">${
           done === total
@@ -532,7 +560,7 @@
             : missing.map((p) => {
                 const left = needOf(p) - haveOf(id, p.name);
                 return `<button class="wish-part" data-got="${esc(id)}"
-                  data-part="${esc(p.name)}" title="Got one — mark it collected">
+                  data-part="${esc(p.name)}" data-tip="Got one — mark it collected">
                   <span class="wp-name">${esc(p.name)}</span>${
                   left > 1 ? `<span class="wp-left">${left} left</span>` : ""
                   }<span class="wp-tick">✓</span></button>`;
@@ -598,7 +626,7 @@
         <div class="spot-score"><b>${pct(n.score)}</b>per run</div>
       </div>`;
     }).join("") + (ranked.length > SHOW
-      ? `<div class="more-nodes" title="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
+      ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
           `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${pct(n.score)}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
@@ -742,13 +770,25 @@
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
   });
-  [["formaHave", "formaHave"], ["formaNeed", "formaNeed"]].forEach(([id, key]) => {
-    const el = $("#" + id);
-    el.value = Number(opts[key]) || 0;
-    el.addEventListener("input", () => {
-      opts[key] = Math.max(0, Number(el.value) || 0); save(KEY_PLAN, opts); render();
-    });
-  });
+  /* One-time migration from the planner's old private copy. */
+  if (!readForma() && ((opts.formaHave || 0) || (opts.formaNeed || 0))) {
+    writeForma(Math.max(0, Number(opts.formaHave) || 0),
+               Math.max(0, Number(opts.formaNeed) || 0));
+  }
+  delete opts.formaHave; delete opts.formaNeed; save(KEY_PLAN, opts);
+
+  {
+    const cur = readForma() || { have: 0, need: 0 };
+    const have = $("#formaHave"), need = $("#formaNeed");
+    have.value = cur.have; need.value = cur.need;
+    const push = () => {
+      writeForma(Math.max(0, Number(have.value) || 0),
+                 Math.max(0, Number(need.value) || 0));
+      render();
+    };
+    have.addEventListener("input", push);
+    need.addEventListener("input", push);
+  }
 
   // pick up part ticks made on the collection page in another tab
   window.addEventListener("storage", (e) => {
@@ -756,5 +796,37 @@
     if (e.key === KEY_WISH) { wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id)); render(); }
   });
 
+  /* A failed refresh used to be a line in the footer, which nobody scrolls to.
+     If the data is behind, say so above the fold and say what to do about it. */
+  function staleBanner() {
+    const m = DATA.meta || {};
+    const stale = (m.stale || []).length ? m.stale : null;
+    const degraded = (m.degraded || []).length ? m.degraded : null;
+    const built = m.generated ? new Date(m.generated) : null;
+    const days = built ? Math.floor((Date.now() - built.getTime()) / 86400000) : 0;
+    const old = !stale && !degraded && days >= 14;
+    if (!stale && !degraded && !old) return;
+
+    const el = document.createElement("div");
+    el.className = "databar " + (degraded ? "bad" : "warn");
+    const cmd = "python tools/build_data.py";
+    el.innerHTML = degraded
+      ? "<b>Some data is missing.</b> This build could not reach " +
+        esc(degraded.join(", ")) + " and had nothing cached to fall back on, so " +
+        "items or drop locations may be absent. Re-run <code>" + cmd + "</code>."
+      : stale
+        ? "<b>Showing older data.</b> The last refresh could not reach " +
+          esc(stale.join(", ")) + ", so a cached copy is being used" +
+          (days ? " (built " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
+          ". Vaulting and Resurgence may be out of date — use with care, and " +
+          "re-run <code>" + cmd + "</code>."
+        : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
+          "28 days and drop tables change with each update. Re-run <code>" + cmd +
+          "</code> to refresh.";
+    const header = document.querySelector("header.topbar");
+    if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
+  }
+
+  staleBanner();
   render();
 })();

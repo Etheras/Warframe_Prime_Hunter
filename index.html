@@ -28,11 +28,11 @@
   </div>
 
   <div class="topbar-right">
-    <div class="progress-chip" id="progressChip" title="Items marked as collected">
+    <div class="progress-chip" id="progressChip" data-tip="Items marked as collected">
       <span class="progress-num" id="progressNum">0 / 0</span>
       <span class="progress-bar"><i id="progressFill"></i></span>
     </div>
-    <button class="btn ghost" id="dataBtn" title="Backup or restore your collection">Backup</button>
+    <button class="btn ghost" id="dataBtn" data-tip="Backup or restore your collection">Backup</button>
   </div>
 </header>
 
@@ -51,11 +51,11 @@
         <span class="box"></span><span class="lbl">Prime Resurgence <em>(R)</em></span><span class="cnt" data-count="resurgence"></span></label>
       <label class="check"><input type="checkbox" id="f-baro" checked>
         <span class="box"></span><span class="lbl">Baro Ki'Teer <em>(B)</em></span><span class="cnt" data-count="baro"></span></label>
-      <label class="check" title="Primes that come from somewhere other than relics — a quest, an event, or a special vendor. Open one to see exactly where."><input type="checkbox" id="f-special" checked>
+      <label class="check" data-tip="Primes that come from somewhere other than relics — a quest, an event, or a special vendor. Open one to see exactly where."><input type="checkbox" id="f-special" checked>
         <span class="box"></span><span class="lbl">Other sources</span><span class="cnt" data-count="special"></span></label>
       <label class="check"><input type="checkbox" id="f-vaulted" checked>
         <span class="box"></span><span class="lbl">Vaulted <em>(V)</em></span><span class="cnt" data-count="vaulted"></span></label>
-      <label class="check" title="Only ever available to original Founders. These will never return."><input type="checkbox" id="f-founder" checked>
+      <label class="check" data-tip="Only ever available to original Founders. These will never return."><input type="checkbox" id="f-founder" checked>
         <span class="box"></span><span class="lbl">Founder exclusive</span><span class="cnt" data-count="founder"></span></label>
     </section>
 

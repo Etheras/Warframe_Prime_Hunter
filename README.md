@@ -499,6 +499,19 @@ fresh on every build, so nothing is redistributed from here.
 
 ---
 
+## Running the tests
+
+If you change anything under `tools/`:
+
+```bash
+python tests/test_build.py
+```
+
+No network needed, about a second. Add `--online` to also clone the repo into a
+temporary folder and build it from scratch — the path a new user takes.
+
+---
+
 ## Want more detail?
 
 - **[PROJECT.md](PROJECT.md)** — how it's built: where each piece of data comes

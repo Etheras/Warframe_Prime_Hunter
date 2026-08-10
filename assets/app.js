@@ -400,7 +400,7 @@
   function badgeHTML(it) {
     return badgesFor(it).map((b) => {
       const t = badgeTitle(b, it);
-      return `<span class="badge ${BADGE[b][0]}"${t ? ` title="${esc(t)}"` : ""}>${BADGE[b][1]}</span>`;
+      return `<span class="badge ${BADGE[b][0]}"${t ? ` data-tip="${esc(t)}"` : ""}>${BADGE[b][1]}</span>`;
     }).join("");
   }
 
@@ -450,11 +450,11 @@
     const badges = badgeHTML(it);
     return `<article class="card${has ? " is-collected" : ""}" data-id="${esc(it.id)}" tabindex="0">
       <div class="card-tick" data-tick="${esc(it.id)}" role="checkbox"
-           aria-checked="${has}" title="Mark as collected">${TICK}</div>${
+           aria-checked="${has}" data-tip="Mark as collected">${TICK}</div>${
       it.parts.length ? `
       <div class="card-farm${onWishlist(it.id) ? " on" : ""}" data-farm="${esc(it.id)}"
            role="checkbox" aria-checked="${onWishlist(it.id)}"
-           title="${onWishlist(it.id) ? "On your farm list — click to remove" : "Farming for this — add to the planner"}">${CROSS}</div>` : ""}
+           data-tip="${onWishlist(it.id) ? "On your farm list — click to remove" : "Farming for this — add to the planner"}">${CROSS}</div>` : ""}
       <div class="card-art">${art}</div>
       <div class="card-body">
         <div class="card-name">${esc(it.name)}</div>
@@ -726,7 +726,7 @@
     if (!rot) return "";
     const key = String(rot).toUpperCase();
     const help = (ROT_WHEN[key] ? ROT_WHEN[key] + "\n\n" : "") + ROT_CYCLE;
-    return `<abbr class="rot" title="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
+    return `<abbr class="rot" data-tip="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
   }
 
   function rotListTag(rots, nonStandard) {
@@ -875,11 +875,11 @@
         <div class="sec-head">
           <h3>Parts &amp; the relics that drop them</h3>
           <span class="sec-toggles">
-            <label class="mini-check" title="Parts you already own.">
+            <label class="mini-check" data-tip="Parts you already own.">
               <input type="checkbox" id="hideOwned" ${state.hideOwnedParts ? "checked" : ""}>
               <span class="box"></span>Hide collected${ownedCount ? ` (${ownedCount})` : ""}
             </label>
-            <label class="mini-check" title="Vaulted relics can't be farmed — only traded for.">
+            <label class="mini-check" data-tip="Vaulted relics can't be farmed — only traded for.">
               <input type="checkbox" id="hideVaulted" ${state.hideVaultedRelics ? "checked" : ""}>
               <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
             </label>
@@ -909,7 +909,7 @@
         html += `<div class="part${full ? " part-done" : ""}">
           <div class="part-head">
             <button class="part-own${full ? " on" : ""}" data-part="${esc(p.name)}"
-                    title="Click to change how many you own${need > 1 ? ` (0–${need})` : ""}">
+                    data-tip="Click to change how many you own${need > 1 ? ` (0–${need})` : ""}">
               ${need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;")}
             </button>
             <span class="part-name">${esc(p.name)}</span>
@@ -1178,12 +1178,22 @@
   /* backup dialog */
   const dlg = $("#dataDlg");
   $("#dataBtn").addEventListener("click", () => {
+    // Everything the user took the trouble to set. A backup that restores your
+    // collection but loses your farm list and options is not a backup.
+    let wishlist = [], planOpts = {};
+    try { wishlist = JSON.parse(localStorage.getItem(KEY_WISH) || "[]") || []; }
+    catch (e) { /* ignore */ }
+    try { planOpts = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {}; }
+    catch (e) { /* ignore */ }
     $("#dataArea").value = JSON.stringify({
-      vorframe: 2,
+      vorframe: 3,
       exported: new Date().toISOString(),
       collected: Array.from(collected),
       parts: partsOwned,
       materials: materials,
+      wishlist: wishlist,
+      filters: JSON.parse(localStorage.getItem(KEY_FILTERS) || "null"),
+      plan: planOpts,
     });
     $("#dlgMsg").style.color = "";
     $("#dlgMsg").textContent = "";
@@ -1241,6 +1251,14 @@
         });
       }
 
+      // farm list, validated against the catalogue like everything else
+      const nextWish = Array.isArray(payload.wishlist)
+        ? payload.wishlist.filter((id) => {
+            if (byId.has(id)) return true;
+            skipped++; return false;
+          })
+        : null;
+
       const nextMaterials = Array.isArray(payload.materials)
         ? payload.materials
             .filter((m) => m && typeof m === "object")
@@ -1253,6 +1271,31 @@
 
       collected = new Set(ids);
       partsOwned = nextParts;
+      if (nextWish) {
+        try { localStorage.setItem(KEY_WISH, JSON.stringify(nextWish)); }
+        catch (e) { /* non-fatal */ }
+      }
+      // options are plain settings; keep only keys we recognise
+      if (payload.plan && typeof payload.plan === "object") {
+        try {
+          const cur = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
+          ["squad", "event", "railjack", "runMode", "formaHave", "formaNeed"]
+            .forEach((k) => { if (payload.plan[k] !== undefined) cur[k] = payload.plan[k]; });
+          localStorage.setItem("vorframe.plan.v1", JSON.stringify(cur));
+          if (typeof cur.squad === "boolean") {
+            state.squad = cur.squad;
+            const cb = $("#f-squad"); if (cb) cb.checked = cur.squad;
+          }
+          if (RUN_MODES.includes(cur.runMode)) {
+            state.runMode = cur.runMode;
+            const sel = $("#f-runmode"); if (sel) sel.value = cur.runMode;
+          }
+        } catch (e) { /* non-fatal */ }
+      }
+      if (payload.filters && typeof payload.filters === "object") {
+        try { localStorage.setItem(KEY_FILTERS, JSON.stringify(payload.filters)); }
+        catch (e) { /* non-fatal */ }
+      }
       // an item with parts is collected iff they're all owned — re-derive it
       ITEMS.forEach((it) => syncCollected(it));
       if (nextMaterials) { materials = nextMaterials; renderMaterials(); }
@@ -1265,7 +1308,10 @@
       $("#dlgMsg").textContent =
         `Imported ${collected.size} collected, ${partCount} part-tracked` +
         (nextMaterials ? `, ${nextMaterials.length} material rows` : "") +
+        (nextWish ? `, ${nextWish.length} on the farm list` : "") +
+        (payload.plan ? ", planner options" : "") +
         (legacy ? " (old-format backup, parts filled in)" : "") +
+        (payload.filters ? " Filters restored — reload to see them." : "") +
         (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped.` : ".");
     } catch (err) {
       $("#dlgMsg").style.color = "var(--red)";
@@ -1306,18 +1352,18 @@
       const short = need - have;
       const nameCell = matEditing
         ? `<input class="mat-name" data-i="${i}" value="${esc(mat.name)}" placeholder="material">`
-        : `<span class="mat-name" title="${esc(mat.name)}">${esc(mat.name || "—")}</span>`;
+        : `<span class="mat-name" data-tip="${esc(mat.name)}">${esc(mat.name || "—")}</span>`;
       const needCell = matEditing
         ? `<input class="mat-num" data-i="${i}" data-f="need" type="number" min="0"
-                  value="${need}" title="how many you need">`
-        : `<span class="mat-need" title="how many you need">${need}</span>`;
+                  value="${need}" data-tip="how many you need">`
+        : `<span class="mat-need" data-tip="how many you need">${need}</span>`;
       return `<div class="mat-row${short > 0 ? " short" : ""}">
         ${nameCell}
         <input class="mat-num mat-have" data-i="${i}" data-f="have" type="number" min="0"
-               value="${have}" title="how many you have">
+               value="${have}" data-tip="how many you have">
         <span class="mat-sep">/</span>
         ${needCell}
-        ${matEditing ? `<button class="mat-del" data-i="${i}" title="remove">✕</button>` : ""}
+        ${matEditing ? `<button class="mat-del" data-i="${i}" data-tip="remove">✕</button>` : ""}
       </div>`;
     }).join("");
   }
@@ -1416,5 +1462,37 @@
       ? `<br><span style="color:var(--gold)">Built without ${esc(m.degraded.join(", "))}
          — some items or artwork are missing.</span>` : "");
 
+  /* A failed refresh used to be a line in the footer, which nobody scrolls to.
+     If the data is behind, say so above the fold and say what to do about it. */
+  function staleBanner() {
+    const m = DATA.meta || {};
+    const stale = (m.stale || []).length ? m.stale : null;
+    const degraded = (m.degraded || []).length ? m.degraded : null;
+    const built = m.generated ? new Date(m.generated) : null;
+    const days = built ? Math.floor((Date.now() - built.getTime()) / 86400000) : 0;
+    const old = !stale && !degraded && days >= 14;
+    if (!stale && !degraded && !old) return;
+
+    const el = document.createElement("div");
+    el.className = "databar " + (degraded ? "bad" : "warn");
+    const cmd = "python tools/build_data.py";
+    el.innerHTML = degraded
+      ? "<b>Some data is missing.</b> This build could not reach " +
+        esc(degraded.join(", ")) + " and had nothing cached to fall back on, so " +
+        "items or drop locations may be absent. Re-run <code>" + cmd + "</code>."
+      : stale
+        ? "<b>Showing older data.</b> The last refresh could not reach " +
+          esc(stale.join(", ")) + ", so a cached copy is being used" +
+          (days ? " (built " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
+          ". Vaulting and Resurgence may be out of date — use with care, and " +
+          "re-run <code>" + cmd + "</code>."
+        : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
+          "28 days and drop tables change with each update. Re-run <code>" + cmd +
+          "</code> to refresh.";
+    const header = document.querySelector("header.topbar");
+    if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
+  }
+
+  staleBanner();
   render();
 })();

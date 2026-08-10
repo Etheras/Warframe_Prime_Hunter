@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""
+Everything that talks to the network, plus the on-disk HTTP cache.
+
+Split out of build_data.py, which was doing fetch, join and emit in one file.
+This half owns the warm/cold policy that the rest of the build depends on:
+
+  STALE    a refresh failed but a cached copy existed, so the build continues
+           with slightly older data and says so in meta.stale
+  MISSING  a refresh failed with nothing cached, so the data is genuinely
+           absent - fatal unless --allow-degraded, and recorded in meta.degraded
+
+Both are module-level lists because every fetch in the build appends to them and
+the emitter reads them once at the end.
+"""
+
+from __future__ import annotations
+
+import re
+
+import gzip
+import hashlib
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import official  # noqa: E402  (local module, sits beside this file)
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT, "data")
+CACHE_DIR = os.path.join(ROOT, ".cache")
+
+UA = "VorFrame/1.0 (personal Prime collection tracker; contact: local user)"
+
+WIKI_RAW = "https://wiki.warframe.com/index.php?title={title}&action=raw"
+DROPS = "https://drops.warframestat.us/data/{name}"
+ITEMS_API = (
+    "https://api.warframestat.us/items/?language=en"
+    "&only=name,imageName,vaulted,category,type,components,uniqueName,masteryReq,"
+    "releaseDate,vaultDate,estimatedVaultDate,tradable,wikiaUrl"
+)
+VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
+IMG_CDN = "https://cdn.warframestat.us/img/"
+
+# Digital Extremes, first party
+OFFICIAL_DROPTABLES = "https://www.warframe.com/droptables"
+EXPORT_INDEX = "https://origin.warframe.com/PublicExport/index_en.txt.lzma"
+EXPORT_MANIFEST = "https://content.warframe.com/PublicExport/Manifest/{file}"
+# the export files worth reading: everything that can carry a Prime
+EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
+                 "ExportSentinels_en.json", "ExportRegions_en.json"]
+
+STATE_FILE = "state.json"  # inside .cache — drives --if-changed
+
+
+
+# --------------------------------------------------------------------------
+# fetching
+# --------------------------------------------------------------------------
+
+def log(msg: str) -> None:
+    print(f"  {msg}", flush=True)
+
+
+def cache_path(key: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", key)[:120]
+    return os.path.join(CACHE_DIR, safe + ".gz")
+
+
+# A failed fetch means two very different things, and they are tracked apart:
+#
+#   STALE   - the refresh failed but a previous copy exists, so the build
+#             continues on slightly older data. An alert, not an error.
+#   MISSING - the refresh failed and there is nothing cached. Whatever that
+#             source contributes is simply absent, which is critical for a
+#             cold build (a CI runner always starts cold).
+#
+STALE: list[str] = []
+MISSING: list[str] = []
+
+
+def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
+    """
+    GET with a small on-disk cache so reruns and --offline are cheap.
+
+    On failure: reuse the cached copy if there is one (recorded as STALE),
+    otherwise record MISSING and either abort (critical) or return None.
+    """
+    path = cache_path(key)
+    if offline:
+        if not os.path.exists(path):
+            MISSING.append(key)
+            if critical:
+                raise SystemExit(f"--offline but nothing cached for {key}")
+            return None
+        with gzip.open(path, "rb") as fh:
+            return fh.read()
+
+    last_err = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": UA,
+                "Accept-Encoding": "gzip",
+            })
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                raw = resp.read()
+                if resp.headers.get("Content-Encoding") == "gzip":
+                    raw = gzip.decompress(raw)
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with gzip.open(path, "wb") as fh:
+                fh.write(raw)
+            return raw
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
+            last_err = exc
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+
+    # warm: a previous copy exists, so this is only an alert
+    if os.path.exists(path):
+        log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy")
+        STALE.append(key)
+        with gzip.open(path, "rb") as fh:
+            return fh.read()
+
+    # cold: nothing to fall back on
+    MISSING.append(key)
+    if critical:
+        raise SystemExit(
+            f"failed to fetch {key} and nothing is cached: {last_err}\n"
+            f"  This is a cold build, so there is no earlier copy to fall back on."
+        )
+    log(f"! {key} unreachable and not cached ({last_err})")
+    return None
+
+
+def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True):
+    raw = fetch(url, key, offline, critical)
+    if raw is None:
+        return None
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        MISSING.append(key)
+        if critical:
+            raise SystemExit(f"{key} returned unparseable data: {exc}")
+        log(f"! {key} returned unparseable data ({exc})")
+        return None
+
+
+def head(url: str) -> dict:
+    """Cheap freshness probe — returns {} rather than raising."""
+    try:
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return {k.lower(): v for k, v in resp.headers.items()}
+    except Exception:
+        return {}
+
+
+def load_state() -> dict:
+    try:
+        with open(os.path.join(CACHE_DIR, STATE_FILE), encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def save_state(state: dict) -> None:
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(os.path.join(CACHE_DIR, STATE_FILE), "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=1)
+
+
+def upstream_signature(offline: bool = False) -> dict:
+    """
+    A small fingerprint of every upstream that matters, cheap enough to poll
+    on a schedule: the export index is ~500 bytes, the drop table is a HEAD,
+    and the trader window is a short JSON document.
+    """
+    sig: dict = {}
+    try:
+        sig["exportIndex"] = hashlib.sha256(
+            fetch(EXPORT_INDEX, "export_index", offline)).hexdigest()[:16]
+    except Exception:
+        pass
+
+    h = head(OFFICIAL_DROPTABLES)
+    sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
+
+    try:
+        vt = fetch_json(VAULT_TRADER, "api_vaulttrader", offline)
+        sig["resurgence"] = str(vt.get("expiry") or "?")
+    except Exception:
+        pass
+
+    return sig
+
+
+# ── drop data, official first ────────────────────────────────────────────
+
+
+# Drop-table files that can contain Void Relics, and how to read each one.
+DROP_FILES = {
+    "missionRewards.json": "missions",
+    "keyRewards.json": "keys",
+    "transientRewards.json": "transient",
+    "cetusBountyRewards.json": "bounty:Cetus (Plains of Eidolon)",
+    "solarisBountyRewards.json": "bounty:Fortuna (Orb Vallis)",
+    "deimosRewards.json": "bounty:Necralisk (Cambion Drift)",
+    "zarimanRewards.json": "bounty:Chrysalith (Zariman)",
+    "entratiLabRewards.json": "bounty:Entrati Labs (Deimos)",
+    "hexRewards.json": "bounty:Hex (Hollvania)",
+}

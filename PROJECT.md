@@ -127,7 +127,17 @@ JavaScript with the data baked into a `.js` file so it opens straight from
 
 ### Verifying a change
 
-There is no automated test suite yet — it is in `TODO.md`. So verify in a browser
+Run the tests before pushing anything that touches the pipeline:
+
+```bash
+python tests/test_build.py
+```
+
+They need no network and take about a second. `--online` adds a real clone-and-build
+into a temp directory, which is the only check covering the new-user path. Every test
+is there because of a bug that actually happened, and says which in its docstring.
+
+Also verify in a browser
 and **say plainly what you actually checked**, rather than asserting it works:
 
 ```bash
@@ -269,8 +279,14 @@ VorFrame/
 │   └── vorframe-data.json  ← GENERATED — same payload as plain JSON
 ├── .github/workflows/
 │   └── publish.yml         ← daily rebuild in CI, publishes to Pages
+├── tests/
+│   └── test_build.py       ← the suite; --online adds clone-and-build
 ├── tools/
-│   ├── build_data.py       ← pipeline: fetch, join, emit
+│   ├── build_data.py       ← orchestration, the item join, and emit
+│   ├── sources.py          ← network, HTTP cache, warm/cold STALE/MISSING policy
+│   ├── catalogue.py        ← the wiki Prime page, and the shared vocabulary
+│   ├── relics.py           ← drop tables -> relic contents and relic sources
+│   ├── artwork.py          ← optional local image copies (--with-images)
 │   ├── official.py         ← parsers for DE's drop table + public export
 │   ├── bundle.py           ← inlines everything into dist/vorframe.html
 │   ├── serve.py            ← local server, picks a working port

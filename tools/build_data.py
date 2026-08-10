@@ -27,225 +27,50 @@ install, and nothing here needs an LLM: every source is JSON or a regularly
 structured HTML table, so a scheduled task can keep the site current unattended.
 """
 
+
 from __future__ import annotations
 
 import argparse
-import gzip
 import hashlib
 import json
 import os
 import re
 import sys
-import time
-import urllib.error
-import urllib.request
-from collections import defaultdict
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import official  # noqa: E402  (local module, sits beside this file)
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(ROOT, "data")
-CACHE_DIR = os.path.join(ROOT, ".cache")
-
-UA = "VorFrame/1.0 (personal Prime collection tracker; contact: local user)"
-
-WIKI_RAW = "https://wiki.warframe.com/index.php?title={title}&action=raw"
-DROPS = "https://drops.warframestat.us/data/{name}"
-ITEMS_API = (
-    "https://api.warframestat.us/items/?language=en"
-    "&only=name,imageName,vaulted,category,type,components,uniqueName,masteryReq,"
-    "releaseDate,vaultDate,estimatedVaultDate,tradable,wikiaUrl"
-)
-VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
-IMG_CDN = "https://cdn.warframestat.us/img/"
-
-# Digital Extremes, first party
-OFFICIAL_DROPTABLES = "https://www.warframe.com/droptables"
-EXPORT_INDEX = "https://origin.warframe.com/PublicExport/index_en.txt.lzma"
-EXPORT_MANIFEST = "https://content.warframe.com/PublicExport/Manifest/{file}"
-# the export files worth reading: everything that can carry a Prime
-EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
-                 "ExportSentinels_en.json", "ExportRegions_en.json"]
-
-STATE_FILE = "state.json"  # inside .cache — drives --if-changed
-
-# Drop-table files that can contain Void Relics, and how to read each one.
-DROP_FILES = {
-    "missionRewards.json": "missions",
-    "keyRewards.json": "keys",
-    "transientRewards.json": "transient",
-    "cetusBountyRewards.json": "bounty:Cetus (Plains of Eidolon)",
-    "solarisBountyRewards.json": "bounty:Fortuna (Orb Vallis)",
-    "deimosRewards.json": "bounty:Necralisk (Cambion Drift)",
-    "zarimanRewards.json": "bounty:Chrysalith (Zariman)",
-    "entratiLabRewards.json": "bounty:Entrati Labs (Deimos)",
-    "hexRewards.json": "bounty:Hex (Hollvania)",
-}
-
-RELIC_RE = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+([A-Za-z0-9]+)\s+Relic\b", re.I)
-TIER_ORDER = {"Lith": 0, "Meso": 1, "Neo": 2, "Axi": 3, "Requiem": 4, "Omnia": 5}
-REFINEMENTS = ["Intact", "Exceptional", "Flawless", "Radiant"]
-
-# Sections of the wiki Prime page we turn into categories, in display order.
-CATEGORY_ORDER = [
-    "Warframe", "Primary", "Secondary", "Melee", "Archgun", "Companion",
-    "Robotic Weapon", "Archwing", "Exalted", "Extractor", "Cosmetic", "Emote",
-]
-
-# Wiki name -> WarframeStat name, where the two databases disagree.
-NAME_ALIASES = {
-    "Kavasa Prime Collar": "Kavasa Prime Kubrow Collar",
-    "Odonata Prime": "Odonata Prime",
-}
-
+# The build was one 1200-line file doing three jobs. It now orchestrates four
+# modules that each do one:
+#   sources    network, HTTP cache, freshness, the warm/cold STALE/MISSING policy
+#   catalogue  the wiki Prime page - the only editorial source
+#   relics     joining drop tables into relic contents and relic sources
+#   artwork    optional local copies of item images (--with-images)
+import artwork                                            # noqa: E402
+import catalogue                                          # noqa: E402
+import official                                           # noqa: E402
+import relics as relicmod                                 # noqa: E402
+import sources                                            # noqa: E402
+from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
+                     DROP_FILES, EXPORT_MANIFEST, EXPORT_WANTED, IMG_CDN, ITEMS_API,
+                     MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, VAULT_TRADER,
+                     WIKI_RAW, fetch, fetch_json, head, load_state, log,
+                     save_state, upstream_signature)
+from artwork import cache_images                          # noqa: E402
+from catalogue import (CATEGORY_ORDER, NAME_ALIASES,                # noqa: E402
+                       NON_RELIC_CATEGORIES, REFINEMENTS, TIER_ORDER,
+                       acquisition_summary, normalise_part, parse_prime_page,
+                       parts_from_droptables)
+from relics import (collect_relic_contents, collect_relic_sources,   # noqa: E402
+                    normalise_sources, relic_key)
 
 # --------------------------------------------------------------------------
-# fetching
+# 3. join everything into the site payload
 # --------------------------------------------------------------------------
 
-def log(msg: str) -> None:
-    print(f"  {msg}", flush=True)
-
-
-def cache_path(key: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", key)[:120]
-    return os.path.join(CACHE_DIR, safe + ".gz")
-
-
-# A failed fetch means two very different things, and they are tracked apart:
-#
-#   STALE   - the refresh failed but a previous copy exists, so the build
-#             continues on slightly older data. An alert, not an error.
-#   MISSING - the refresh failed and there is nothing cached. Whatever that
-#             source contributes is simply absent, which is critical for a
-#             cold build (a CI runner always starts cold).
-#
-STALE: list[str] = []
-MISSING: list[str] = []
-
-
-def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
-    """
-    GET with a small on-disk cache so reruns and --offline are cheap.
-
-    On failure: reuse the cached copy if there is one (recorded as STALE),
-    otherwise record MISSING and either abort (critical) or return None.
-    """
-    path = cache_path(key)
-    if offline:
-        if not os.path.exists(path):
-            MISSING.append(key)
-            if critical:
-                raise SystemExit(f"--offline but nothing cached for {key}")
-            return None
-        with gzip.open(path, "rb") as fh:
-            return fh.read()
-
-    last_err = None
-    for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": UA,
-                "Accept-Encoding": "gzip",
-            })
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                raw = resp.read()
-                if resp.headers.get("Content-Encoding") == "gzip":
-                    raw = gzip.decompress(raw)
-            os.makedirs(CACHE_DIR, exist_ok=True)
-            with gzip.open(path, "wb") as fh:
-                fh.write(raw)
-            return raw
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-            last_err = exc
-            if attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
-
-    # warm: a previous copy exists, so this is only an alert
-    if os.path.exists(path):
-        log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy")
-        STALE.append(key)
-        with gzip.open(path, "rb") as fh:
-            return fh.read()
-
-    # cold: nothing to fall back on
-    MISSING.append(key)
-    if critical:
-        raise SystemExit(
-            f"failed to fetch {key} and nothing is cached: {last_err}\n"
-            f"  This is a cold build, so there is no earlier copy to fall back on."
-        )
-    log(f"! {key} unreachable and not cached ({last_err})")
-    return None
-
-
-def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True):
-    raw = fetch(url, key, offline, critical)
-    if raw is None:
-        return None
-    try:
-        return json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
-        MISSING.append(key)
-        if critical:
-            raise SystemExit(f"{key} returned unparseable data: {exc}")
-        log(f"! {key} returned unparseable data ({exc})")
-        return None
-
-
-def head(url: str) -> dict:
-    """Cheap freshness probe — returns {} rather than raising."""
-    try:
-        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return {k.lower(): v for k, v in resp.headers.items()}
-    except Exception:
-        return {}
-
-
-def load_state() -> dict:
-    try:
-        with open(os.path.join(CACHE_DIR, STATE_FILE), encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
-        return {}
-
-
-def save_state(state: dict) -> None:
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(os.path.join(CACHE_DIR, STATE_FILE), "w", encoding="utf-8") as fh:
-        json.dump(state, fh, indent=1)
-
-
-def upstream_signature(offline: bool = False) -> dict:
-    """
-    A small fingerprint of every upstream that matters, cheap enough to poll
-    on a schedule: the export index is ~500 bytes, the drop table is a HEAD,
-    and the trader window is a short JSON document.
-    """
-    sig: dict = {}
-    try:
-        sig["exportIndex"] = hashlib.sha256(
-            fetch(EXPORT_INDEX, "export_index", offline)).hexdigest()[:16]
-    except Exception:
-        pass
-
-    h = head(OFFICIAL_DROPTABLES)
-    sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
-
-    try:
-        vt = fetch_json(VAULT_TRADER, "api_vaulttrader", offline)
-        sig["resurgence"] = str(vt.get("expiry") or "?")
-    except Exception:
-        pass
-
-    return sig
-
-
-# ── drop data, official first ────────────────────────────────────────────
-
+# These two pick official-vs-mirror and gate on sanity, and the drop path
+# needs relics.normalise_sources - orchestration, so they live here rather
+# than in sources.py, which would have made the two modules import each other.
 def acquire_drops(offline: bool, prefer: str, verbose: bool):
     """
     Returns (relic_contents, relic_sources, source_label).
@@ -300,462 +125,7 @@ def acquire_export(offline: bool):
             hashlib.sha256(blob).hexdigest()[:16])
 
 
-_WIKI_MARKUP = [
-    (re.compile(r"\{\{(?:Resource|Weapon|WF|Companion|Icon)\|([^|}]+)(?:\|[^}]*)?\}\}"), r"\1"),
-    (re.compile(r"\[\[[^\]|]+\|([^\]]+)\]\]"), r"\1"),
-    (re.compile(r"\[\[([^\]]+)\]\]"), r"\1"),
-    (re.compile(r"'''?"), ""),
-    (re.compile(r"<[^>]+>"), ""),
-    (re.compile(r"\{\{[^}]*\}\}"), ""),
-]
 
-
-def acquisition_summary(wikitext: str) -> str | None:
-    """
-    A one-line answer to "where does this actually come from?", for the handful
-    of Primes the wiki marks with a bare (S) and no explanation.
-
-    Reads either the {{Acquisition|...}} template or an ==Acquisition== section,
-    strips wiki markup and keeps the first sentence or two.
-    """
-    if not wikitext:
-        return None
-    m = re.search(r"\{\{Acquisition\|(.+?)\}\}\s*$", wikitext, re.S | re.M)
-    body = m.group(1) if m else None
-    if body is None:
-        m = re.search(r"^==\s*Acquisition\s*==\s*\n(.+?)(?=\n==[^=]|\Z)", wikitext, re.S | re.M)
-        body = m.group(1) if m else None
-    if not body:
-        return None
-
-    text = body.split("\n\n")[0]
-    for pat, rep in _WIKI_MARKUP:
-        text = pat.sub(rep, text)
-    text = re.sub(r"\s+", " ", text).strip(" *:\n")
-
-    # first two sentences is plenty for a tooltip
-    parts = re.split(r"(?<=\.)\s+", text)
-    out = " ".join(parts[:2]).strip()
-    return (out[:320].rstrip() + "…") if len(out) > 320 else (out or None)
-
-
-def normalise_part(name: str) -> str:
-    """
-    One canonical spelling for a part, whichever source described it.
-
-    The item API says "Chassis"; the drop table says "Chassis Blueprint". Saved
-    progress is keyed on these names, so if they can change between builds a
-    player's ticks silently disappear. The bare main "Blueprint" keeps its name -
-    only the redundant suffix goes.
-    """
-    n = re.sub(r"\s+", " ", (name or "")).strip()
-    if n != "Blueprint" and n.endswith(" Blueprint"):
-        n = n[: -len(" Blueprint")].strip()
-    return n or "Blueprint"
-
-
-def parts_from_droptables(item_name: str, relic_contents: dict) -> list[dict]:
-    """
-    Work out an item's parts straight from the drop table, for anything the
-    item API does not know about yet (a Prime that shipped hours ago).
-
-    Reward names are always "<Item Name> <Part>", so the prefix is unambiguous.
-    """
-    prefix = item_name + " "
-    by_part: dict[str, dict] = {}
-    for relic, rec in relic_contents.items():
-        for reward, slot in (rec.get("rewards") or {}).items():
-            if not reward.startswith(prefix):
-                continue
-            part = normalise_part(reward[len(prefix):])
-            entry = by_part.setdefault(part, {"name": part, "itemCount": None, "relics": []})
-            entry["relics"].append({
-                "relic": relic,
-                "rarity": slot.get("rarity"),
-                "chances": slot.get("chances") or {},
-            })
-    for entry in by_part.values():
-        entry["relics"].sort(key=lambda r: (TIER_ORDER.get(r["relic"].split()[0], 9), r["relic"]))
-    return [by_part[k] for k in sorted(by_part)]
-
-
-# --------------------------------------------------------------------------
-# 1. the wiki Prime page -> catalogue (categories + availability markers)
-# --------------------------------------------------------------------------
-
-def parse_prime_page(text: str) -> list[dict]:
-    """
-    Read the galleries under ==Primes==. Each line looks roughly like:
-
-        AshPrimeIcon.png|link=Ash_Prime|{{WF|Ash Prime|icon=0}} ([[Prime Vault|V]])|alt=Ash Prime (V)
-
-    Field order varies between sections, so every field is matched by name and
-    the availability markers are read from the wiki links rather than the alt
-    text (Gara's "([[Prime Vault|V, ]][[Prime Resurgence|R]])" breaks naive
-    paren parsing).
-    """
-    # The wiki uses non-breaking spaces inside {{WF}} output ("Ash\xa0Prime"),
-    # which silently breaks every downstream name comparison.
-    body = text.replace("\xa0", " ").replace("​", "")
-    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
-
-    m_start = re.search(r"^==\s*Primes\s*==\s*$", body, re.M)
-    if not m_start:
-        raise SystemExit("could not find the ==Primes== section on the wiki page")
-    m_end = re.search(r"^==\s*Prime Related\s*==\s*$", body[m_start.end():], re.M)
-    body = body[m_start.end():m_start.end() + (m_end.start() if m_end else len(body))]
-
-    items: list[dict] = []
-    seen: set[tuple[str, str]] = set()
-    category = None
-
-    for line in body.splitlines():
-        stripped = line.strip()
-
-        # exactly three '=' - the ==== sub-headers belong to other sections
-        if stripped.startswith("===") and stripped.endswith("===") and not stripped.startswith("===="):
-            category = stripped.strip("=").strip()
-            continue
-        if not category or "|" not in stripped:
-            continue
-        if stripped.startswith(("<gallery", "</gallery", "*", "!", "|-", "{|", "|}")):
-            continue
-        # gallery rows start with an image file name
-        if not re.match(r"^(File:)?[^|]+\.(png|jpg|jpeg|gif)\b", stripped, re.I):
-            continue
-
-        parts = stripped.split("|")
-        image_file = parts[0].strip()
-        if image_file.lower().startswith("file:"):
-            image_file = image_file[5:].strip()
-
-        link = None
-        alt = None
-        for field in parts[1:]:
-            f = field.strip()
-            if f.lower().startswith("link="):
-                link = f[5:].strip()
-            elif f.lower().startswith("alt="):
-                alt = f[4:].strip()
-
-        # availability markers, read from the wiki links in the raw row
-        flags = {
-            "vaulted": bool(re.search(r"\[\[Prime Vault\|V", stripped)),
-            "resurgenceWiki": bool(re.search(r"\[\[Prime Resurgence\|R\]\]", stripped)),
-            "permanent": bool(re.search(r"Never Vaulted\|P\]\]", stripped)),
-            "baro": bool(re.search(r"\[\[Baro Ki'?Teer\|B\]\]", stripped)),
-            "special": bool(re.search(r"\{\{Tooltip\|S\|", stripped)),
-            "founder": bool(re.search(r"\{\{Tooltip\|1\|Founder", stripped)),
-        }
-
-        # plain wikilink, used by the Cosmetic gallery: "[[Abbera Prime Syandana]]"
-        # or "[[Emotes|Interalpha Prime Narta]]"
-        wikilink = re.search(r"\[\[([^\]\[|]+?)(?:\|([^\]\[]+?))?\]\]", stripped)
-
-        name = None
-        if alt:
-            # "Ash Prime (V)" / "Gara Prime (V, R)" / "Excalibur Prime1"
-            name = re.sub(r"\s*\([^)]*\)\s*$", "", alt).strip()
-            name = re.sub(r"\d+$", "", name).strip()
-        if not name:
-            tmpl = re.search(r"\{\{(?:WF|Weapon|Companion|Archwing)\|([^|}]+)", stripped)
-            if tmpl:
-                name = tmpl.group(1).strip()
-        if not name and wikilink:
-            # prefer the visible label over the page title
-            name = (wikilink.group(2) or wikilink.group(1)).strip()
-        if not name and link:
-            name = link.replace("_", " ").strip()
-        if not name:
-            continue
-        if not link and wikilink:
-            link = wikilink.group(1).strip()
-        name = re.sub(r"\s+", " ", name).strip()
-
-        key = (category, name)
-        if key in seen:
-            continue
-        seen.add(key)
-
-        items.append({
-            "name": name,
-            "category": category,
-            "wikiPage": (link or name).split("#")[0].strip().replace(" ", "_"),
-            "wikiImage": image_file,
-            "wikiFlags": flags,
-        })
-
-    return items
-
-
-# --------------------------------------------------------------------------
-# 2. drop tables -> relic contents and relic sources
-# --------------------------------------------------------------------------
-
-IMG_DIR = os.path.join(ROOT, "assets", "img")
-
-
-def cache_images(items: list, offline: bool) -> int:
-    """
-    Download item artwork into assets/img/ and repoint every item at the local
-    copy.
-
-    Artwork is normally hotlinked from cdn.warframestat.us, which means the app
-    is not usable offline *and* the CDN sees your IP plus which items you looked
-    at. Neither is acceptable for a tool that otherwise keeps everything local,
-    but ~17 MB is too much to force on someone who does not care, so this is
-    opt-in behind --with-images.
-
-    Files already present are left alone, so re-running is cheap: only genuinely
-    new Primes are fetched. The directory is gitignored for the same reason the
-    dataset is - it is Digital Extremes' artwork, not ours to redistribute.
-    """
-    urls = {}
-    for it in items:
-        src = it.get("image") or ""
-        if src.startswith(IMG_CDN):
-            urls[src] = src[len(IMG_CDN):].split("?")[0]
-    if not urls:
-        return 0
-
-    os.makedirs(IMG_DIR, exist_ok=True)
-    have = miss = failed = 0
-    for url, fname in sorted(urls.items()):
-        dest = os.path.join(IMG_DIR, fname)
-        if os.path.exists(dest) and os.path.getsize(dest) > 0:
-            have += 1
-            continue
-        if offline:
-            miss += 1
-            continue
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=60) as r:
-                blob = r.read()
-            if not blob:
-                raise ValueError("empty response")
-            with open(dest, "wb") as fh:
-                fh.write(blob)
-            miss += 1
-        except Exception as e:                       # noqa: BLE001
-            failed += 1
-            log(f"  image failed: {fname} ({e})")
-
-    # repoint only what actually landed, so a partial run still produces a
-    # working site rather than a page of broken images
-    rewired = 0
-    for it in items:
-        src = it.get("image") or ""
-        if not src.startswith(IMG_CDN):
-            continue
-        fname = src[len(IMG_CDN):].split("?")[0]
-        if os.path.exists(os.path.join(IMG_DIR, fname)):
-            it["image"] = "assets/img/" + fname
-            rewired += 1
-
-    # items can share an image file, so these two counts differ legitimately
-    size = sum(os.path.getsize(os.path.join(IMG_DIR, f))
-               for f in os.listdir(IMG_DIR)
-               if os.path.isfile(os.path.join(IMG_DIR, f)))
-    log(f"images: {len(urls)} files ({size / 1024 / 1024:.1f} MB), "
-        f"{rewired} items now local"
-        + (f", {failed} failed" if failed else "")
-        + (", offline so nothing fetched" if offline and miss else ""))
-    return rewired
-
-
-# --------------------------------------------------------------------------
-
-def normalise_sources(sources: dict[str, list]) -> dict[str, list]:
-    """
-    Collapse duplicate rows and put the best drop first.
-
-    One node can list the same relic several times (bounty stages, repeated
-    rotation entries), and neither source path emits rows in a useful order.
-    Both paths run through here so the site never shows a 1.84% node above an
-    11.06% one.
-
-    Every row is kept. There used to be a `sources[:40]` cap here, which threw
-    away 68% of all rows and made the planner blind to real farms: Sedna/Kappa
-    publishes 25 rows, we stored 14, and its whole rotation C -- seven Axi
-    relics at 10.20% plus the Gauss component blueprints -- vanished because
-    those relics are listed at 90-odd nodes and Kappa fell below the fortieth.
-    Caught by a player running the node and getting rewards the app said were
-    not there. The UI already shows the top few and hides the rest, so trimming
-    the data as well only removed information the ranking needed.
-    """
-    out: dict[str, list] = {}
-    for relic, rows in sources.items():
-        best: dict[tuple, dict] = {}
-        for row in rows:
-            k = (row.get("kind"), row.get("planet"), row.get("node"),
-                 row.get("mode"), row.get("rotation"))
-            cur = best.get(k)
-            if cur is None or (row.get("chance") or 0) > (cur.get("chance") or 0):
-                best[k] = row
-        out[relic] = sorted(
-            best.values(),
-            key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "", s.get("node") or ""),
-        )
-    return out
-
-
-def relic_key(item_name: str) -> str | None:
-    """'Lith A12 Relic' -> 'Lith A12'. Returns None for non-relic rewards."""
-    m = RELIC_RE.match(item_name.strip())
-    if not m:
-        return None
-    return f"{m.group(1).title()} {m.group(2).upper()}"
-
-
-def collect_relic_sources(payloads: dict[str, object], verbose: bool) -> dict[str, list[dict]]:
-    """Walk every drop table and record where each relic can be farmed."""
-    sources: dict[str, list[dict]] = defaultdict(list)
-
-    def add(relic: str, entry: dict) -> None:
-        sources[relic].append(entry)
-
-    def rotations(rewards) -> list[tuple[str | None, list]]:
-        """rewards is either {rotation: [...]} or a bare list."""
-        if isinstance(rewards, dict):
-            return [(str(k), v) for k, v in rewards.items() if isinstance(v, list)]
-        if isinstance(rewards, list):
-            return [(None, rewards)]
-        return []
-
-    # star chart missions: planet -> node -> {gameMode, rewards}
-    mission_data = payloads.get("missionRewards.json") or {}
-    for planet, nodes in (mission_data.get("missionRewards") or {}).items():
-        if not isinstance(nodes, dict):
-            continue
-        for node, info in nodes.items():
-            if not isinstance(info, dict):
-                continue
-            mode = info.get("gameMode") or "Mission"
-            is_event = bool(info.get("isEvent"))
-            for rot, rewards in rotations(info.get("rewards")):
-                for r in rewards:
-                    relic = relic_key(r.get("itemName", ""))
-                    if not relic:
-                        continue
-                    add(relic, {
-                        "kind": "mission",
-                        "planet": planet,
-                        "node": node,
-                        "mode": mode,
-                        "rotation": rot,
-                        "chance": r.get("chance"),
-                        "rarity": r.get("rarity"),
-                        "event": is_event,
-                    })
-
-    # bounties: [{bountyLevel, rewards: {A/B/C: [...]}}]
-    for fname, kind in DROP_FILES.items():
-        if not kind.startswith("bounty:"):
-            continue
-        where = kind.split(":", 1)[1]
-        payload = payloads.get(fname) or {}
-        root_key = next(iter(payload), None)
-        for tier in (payload.get(root_key) or []):
-            if not isinstance(tier, dict):
-                continue
-            level = tier.get("bountyLevel") or ""
-            for rot, rewards in rotations(tier.get("rewards")):
-                for r in rewards:
-                    relic = relic_key(r.get("itemName", ""))
-                    if not relic:
-                        continue
-                    add(relic, {
-                        "kind": "bounty",
-                        "planet": where,
-                        "node": f"Bounty {level}".strip(),
-                        "mode": "Bounty",
-                        "rotation": rot,
-                        "chance": r.get("chance"),
-                        "rarity": r.get("rarity"),
-                    })
-
-    # keys / special missions: [{keyName, rewards}]
-    for entry in ((payloads.get("keyRewards.json") or {}).get("keyRewards") or []):
-        if not isinstance(entry, dict):
-            continue
-        name = entry.get("keyName") or "Key"
-        for rot, rewards in rotations(entry.get("rewards")):
-            for r in rewards:
-                relic = relic_key(r.get("itemName", ""))
-                if not relic:
-                    continue
-                add(relic, {
-                    "kind": "key",
-                    "planet": "Keys & Special",
-                    "node": name,
-                    "mode": "Key",
-                    "rotation": rot,
-                    "chance": r.get("chance"),
-                    "rarity": r.get("rarity"),
-                })
-
-    # transient / rotating objectives: [{objectiveName, rewards: [...]}]
-    for entry in ((payloads.get("transientRewards.json") or {}).get("transientRewards") or []):
-        if not isinstance(entry, dict):
-            continue
-        name = entry.get("objectiveName") or "Special"
-        for rot, rewards in rotations(entry.get("rewards")):
-            for r in rewards:
-                relic = relic_key(r.get("itemName", ""))
-                if not relic:
-                    continue
-                add(relic, {
-                    "kind": "transient",
-                    "planet": "Rotating / Event",
-                    "node": name,
-                    "mode": "Special",
-                    "rotation": rot,
-                    "chance": r.get("chance"),
-                    "rarity": r.get("rarity"),
-                })
-
-    sources = normalise_sources(sources)
-
-    if verbose:
-        log(f"relic sources: {len(sources)} relics have at least one farmable location")
-    return dict(sources)
-
-
-def collect_relic_contents(relics_payload: dict) -> dict[str, dict]:
-    """
-    relics.json lists one entry per relic per refinement state. Fold those into
-    one record per relic: the reward list plus the chance at each refinement.
-    """
-    out: dict[str, dict] = {}
-    for entry in (relics_payload.get("relics") or []):
-        tier = entry.get("tier")
-        code = entry.get("relicName")
-        state = entry.get("state") or "Intact"
-        if not tier or not code:
-            continue
-        name = f"{tier} {code}"
-        rec = out.setdefault(name, {"tier": tier, "code": code, "rewards": {}})
-        for r in entry.get("rewards") or []:
-            item = r.get("itemName")
-            if not item:
-                continue
-            slot = rec["rewards"].setdefault(item, {"rarity": r.get("rarity"), "chances": {}})
-            slot["chances"][state] = r.get("chance")
-
-    # same correction as the official path: the published rarity words are
-    # chance-relative and shift with refinement, so derive the slot rarity
-    for rec in out.values():
-        for slot in rec["rewards"].values():
-            derived = official.rarity_from_intact((slot.get("chances") or {}).get("Intact"))
-            if derived:
-                slot["rarity"] = derived
-    return out
-
-
-# --------------------------------------------------------------------------
-# 3. join everything into the site payload
-# --------------------------------------------------------------------------
 
 def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
@@ -927,6 +297,7 @@ def main() -> int:
 
     used_relics: set[str] = set()
     out_items: list[dict] = []
+    skipped_non_relic = 0
     unmatched: list[str] = []
     seen_ids: set[str] = set()
 
@@ -996,6 +367,15 @@ def main() -> int:
         )
         farmable_relics = [r for r in item_relics if r in relic_sources]
 
+        # nothing here can come from a relic - see NON_RELIC_CATEGORIES
+
+        if entry["category"] in NON_RELIC_CATEGORIES:
+
+            skipped_non_relic += 1
+
+            continue
+
+
         wf = entry["wikiFlags"]
         image = (api or {}).get("imageName")
         base_id = slugify(f"{entry['category']}-{name}")
@@ -1046,6 +426,9 @@ def main() -> int:
             summary = acquisition_summary(blob.decode("utf-8", "replace").replace("\xa0", " "))
             if summary:
                 it["acquisition"] = summary
+    if skipped_non_relic:
+        log(f"skipped        {skipped_non_relic} non-relic entries "
+            f"({', '.join(sorted(NON_RELIC_CATEGORIES))})")
     named = sum(1 for i in out_items if i.get("acquisition"))
     if named:
         log(f"special: read the acquisition route for {named} item(s)")

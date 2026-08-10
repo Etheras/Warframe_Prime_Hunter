@@ -75,63 +75,53 @@ pointing at a file that will not be there. Given the two pages are meant to be e
 switched with JS instead of a link — the dataset is already shared, so it is mostly
 a question of routing.
 
-### Backup skips the farm list and planner options
-
-`Backup` covers the collection and per-part progress but not `vorframe.wishlist.v1`
-or `vorframe.plan.v1`. Restoring on a new machine brings back what you own and
-leaves the planner empty.
-
-### Tooltips use two different engines
-
-`.more-nodes` still uses a native `title=`, which `STYLE.md §4` rules out — native
-tooltips are proportionally spaced and wreck the aligned columns it renders. The
-sidebar labels have all moved to the custom `data-tip` engine, so this is the last
-one left.
-
 ### The planner cannot say how many missions to run
 
-Each relic row estimates the *openings* needed to finish, but not the missions —
-that would be openings divided by how often the relic drops at the chosen node. The
-node list also shows only the top 8 with the next 20 on hover, rather than a full
-browsable table.
+**Deliberately parked.** Each relic row estimates the *openings* needed, but not the
+missions — that would be openings divided by how often the relic drops at the chosen
+node. It is a probability, not a plan: the number would be an expectation with a very
+wide spread, and reading it as "this many runs" would mislead more than it helps. Low
+value, kept only so nobody proposes it again without a better idea.
 
-### Forma is entered twice
-
-The planner's Forma have/need field is separate from the collection page's materials
-list, so the same number is typed in two places. They should share one store.
+Separately and still worth doing: the node list shows the top 8 with the next 20 on
+hover, rather than a full browsable table.
 
 ### Collection does not sync between devices
 
-State lives in `localStorage`, so a phone and a desktop keep separate lists.
-Backup/Import covers it manually; a shareable URL or file export would be smoother.
+**Backup/Import is the answer for now**, and it is complete — it carries the
+collection, per-part progress, materials, the farm list, filters and planner options.
+Automatic sync would need a server and an account, which is exactly what this project
+avoids. Revisit only if a serverless option appears that keeps the data local.
 
-### Cosmetics and Emotes land in the "vaulted" bucket
-
-They have no relic data, so they fall through to vaulted by default. Technically
-true — they are not obtainable — but misleading. They deserve their own "not from
-relics" bucket.
-
-### Prime Resurgence is the only non-first-party source
+### Prime Resurgence is the only non-first-party source — *out of our control*
 
 Everything else comes from Digital Extremes directly. DE's own `worldState.php`
 returns 404 on both `content.` and `origin.warframe.com`, so the live Resurgence
-rotation comes via the WarframeStat proxy. Either find a first-party route or accept
-it and say so explicitly in `PROJECT.md §6`.
+rotation comes via the WarframeStat proxy. **There is no first-party route to find** —
+nothing to do here until DE publishes one. Documented in `PROJECT.md §6` and left
+open only so the search can resume if that changes.
 
-### Enemy levels are missing for 31% of live-relic nodes
+### Enemy levels are missing for 31% of live-relic nodes — *documented, not a defect*
 
 Levels come from DE's `ExportRegions_en.json` (269 nodes, `minEnemyLevel` /
-`maxEnemyLevel`), joined after stripping the `Event:` prefix. The gap is
-Railjack/Proxima nodes, which DE's export omits entirely. Unknown levels sort last
-rather than being guessed at, which is the right default but loses a tie-break.
+`maxEnemyLevel`), joined after stripping the `Event:` prefix. The gap is entirely
+Railjack/Proxima nodes, which DE's export omits.
 
-### Event nodes cannot be tied to their event
+**This is fine as it stands.** Unknown levels sort last rather than being guessed at,
+which is the correct behaviour — a made-up level would silently distort the tie-break
+that levels exist to serve. Kept as a note so the 69% figure is not mistaken for a
+join bug.
+
+### Event nodes cannot be tied to their event — *out of our control*
 
 DE's drop table says only `Event: <planet>/<node>`, never which event, and the live
 worldstate does not link an event back to a drop-table node. The node only exists on
-the star chart while that event runs, which is why event nodes are excluded by
-default. If a mapping is ever found, the planner could show "only during X" instead
-of hiding them.
+the star chart while that event is running.
+
+**So event nodes are excluded from the ranking entirely**, with an opt-in checkbox for
+when you know one is live. Without a first-party mapping there is nothing better to
+do: showing them by default sends you to missions you cannot find. Revisit only if DE
+publishes the link.
 
 ### Relic inventory — deferred, do not re-propose without a better input method
 
@@ -153,24 +143,6 @@ For prime-junk triage: knowing what a spare part is worth to Baro.
 
 When a scheduled build changes what is farmable, write a short summary, so "Frost
 Prime became farmable" is visible without diffing 1.5 MB of JSON.
-
-### No test suite
-
-Everything has been verified with throwaway scripts — the drop-table parser against
-the mirror, the new-Prime recovery path, the warm/cold fetch policy, the degraded
-build matrix. Those checks are worth keeping as real tests instead of being
-rewritten from scratch each time.
-
-### `build_data.py` does three jobs
-
-At roughly 1000 lines it fetches, joins and emits. The parsers already live in
-`official.py`; the join could move out too.
-
-### A failed data refresh silently leaves the old site published
-
-The GitHub Actions `deploy` job only runs after a successful `build`, so a failed
-refresh leaves whatever was last published in place. That is the right behaviour,
-but nothing announces it — a failure notification would help.
 
 ### Workflow actions still run on Node 20
 
