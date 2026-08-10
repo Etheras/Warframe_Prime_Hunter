@@ -39,7 +39,7 @@ is priced as three rounds of Defense. That is the mission-length assumption
 (`PROJECT.md §7`) failing in a specific, fixable way rather than a vague one: for
 these modes the right unit is one mission, not N rounds.
 
-### Disruption min-maxing is documented but not modelled### Disruption rotation B cannot be held indefinitely by the planner
+### Disruption rotation B cannot be held indefinitely by the planner
 
 Rotation A is now modelled as a squad-gated plan (`PROJECT.md §7`), but the third
 strategy is not: with a coordinated squad you can hold **rotation B every single
@@ -53,9 +53,10 @@ Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
 `--txt-faint`, which is below AA (4.5:1) and well below the 7:1 `STYLE.md §3`
 requires. It is deliberately dimmed as secondary information, so raising it changes
 the visual hierarchy on both pages — worth doing, but it is a design decision rather
-than a straight fix. The amber non-standard label was measured at 7.27:1 and passes.
+than a straight fix. The amber non-standard label deliberately matches this same brightness, so it
+shares the problem by design (`STYLE.md §1`).
 
-### Mission length is not modelled at all### Mission length is not modelled at all, and the ranking now leans on it
+### Mission length is not modelled at all, and the ranking now leans on it
 
 A "round" is treated as one unit of effort regardless of mission. So four rounds of
 Disruption score four times a bounty that may well take just as long in real
@@ -65,25 +66,14 @@ they are. This became load-bearing when node ranking moved to whole-run totals
 honest fix is timing real missions and scoring per minute. Until then the per-round
 rate in each row's rotation tooltip is the workaround.
 
-### Artwork is hotlinked, so the app is neither fully offline nor fully private
+### The single-file build carries the collection only
 
-Item images load from `cdn.warframestat.us` while you browse. That CDN therefore
-sees your IP address and which item images were requested — no collection data
-leaks, but it is the only part of the app that talks to anyone during use, and it
-is why Firefox logs *"Cookie has been rejected as third-party"* against files like
-`LavosPrime.png`. It also means the single-file build is not truly standalone.
-
-Measured 2026-08-09: **278 items carry art, mean 63 KB, ~17 MB total**, or 22.8 MB
-base64-inlined — too much to embed in the single-file bundle. The better fix is a
-`--with-images` build flag that downloads into `assets/img/` and rewrites the URLs,
-leaving the bundle free to keep hotlinking or drop art entirely.
-
-### The squad-odds toggle is stored in two places
-
-The collection page keeps it in `vorframe.filters.v1`, the planner in
-`vorframe.plan.v1`, so the two pages can disagree about whether you are farming
-solo. `runMode` was deliberately given a single home to avoid exactly this; squad
-should follow.
+`bundle.py` folds the collection into one `.html`, but the planner is a second page
+with nowhere to live in a one-file build, so its tab is stripped rather than left
+pointing at a file that will not be there. Given the two pages are meant to be equal
+(`PROJECT.md §1`), that is a real gap. Both could be inlined into one file and
+switched with JS instead of a link — the dataset is already shared, so it is mostly
+a question of routing.
 
 ### Backup skips the farm list and planner options
 
@@ -93,11 +83,10 @@ leaves the planner empty.
 
 ### Tooltips use two different engines
 
-`.more-nodes` and the sidebar option labels still use native `title=`, which
-`STYLE.md §4` rules out — native tooltips are proportionally spaced and wreck the
-aligned columns in the refinement tables. The *How far you run* label uses the
-custom `data-tip` engine correctly, so the sidebar currently mixes both. They should
-all move to `data-tip`.
+`.more-nodes` still uses a native `title=`, which `STYLE.md §4` rules out — native
+tooltips are proportionally spaced and wreck the aligned columns it renders. The
+sidebar labels have all moved to the custom `data-tip` engine, so this is the last
+one left.
 
 ### The planner cannot say how many missions to run
 

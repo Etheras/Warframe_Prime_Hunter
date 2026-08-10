@@ -10,13 +10,15 @@ They share your progress, so ticking off a part in one updates the other.
 Everything runs on your own machine. Your collection never leaves it, and there's
 no account.
 
-> **One exception, so you know about it:** the item artwork is loaded from
-> `cdn.warframestat.us` as you browse, rather than being stored locally. That CDN
-> therefore sees your IP address and which item images your browser asked for. No
-> collection data, ticks or farm list is ever sent anywhere. If your browser
-> reports *"Cookie has been rejected as third-party"* against files like
-> `LavosPrime.png`, that is this — and it is your browser refusing the CDN a
-> cookie, which is the outcome you want.
+> **One exception by default:** item artwork loads from `cdn.warframestat.us` as
+> you browse, rather than being stored locally, so that CDN sees your IP address
+> and which item images your browser asked for. No collection data, ticks or farm
+> list is ever sent anywhere. If your browser reports *"Cookie has been rejected as
+> third-party"* against files like `LavosPrime.png`, that is this — your browser
+> refusing the CDN a cookie, which is the outcome you want.
+>
+> **You can turn that off** — see [Downloading the artwork](#downloading-the-artwork)
+> below. One extra flag and nothing is fetched from anywhere while you use the app.
 
 ---
 
@@ -75,6 +77,24 @@ from Digital Extremes. That is the entire setup — nothing is installed.
 > The dataset is deliberately **not** committed to the repository, so a fresh clone
 > always needs this step first. It also means you start with today's data rather
 > than whatever was current when the code was last touched.
+
+### Downloading the artwork
+
+By default, item pictures are fetched from a CDN as you scroll. To pull them down
+once and never touch the network again:
+
+```bash
+python tools/build_data.py --with-images
+```
+
+That adds about **14 MB** in `assets/img/` and repoints every card at the local
+copy — after it, the site makes no external requests at all. Already-downloaded
+pictures are skipped on later runs, so repeating it only fetches genuinely new
+Primes.
+
+The folder is gitignored, for the same reason the dataset is: the artwork belongs
+to Digital Extremes and is not ours to redistribute. Delete `assets/img/` to go
+back to the CDN.
 
 ---
 
@@ -322,6 +342,11 @@ and rebuilds the list.
 ## Taking it with you
 
 ### One file you can copy anywhere
+
+> Note: the single-file build carries the **collection only**. The planner is a
+> second page, and a one-file build has nowhere to put it — so its tab is left out
+> rather than pointing at a file that will not be there. The single file also goes
+> back to CDN artwork, since local image files cannot travel inside one `.html`.
 
 ```bash
 python tools/bundle.py

@@ -266,13 +266,35 @@
     runMode: "reset",
   };
 
-  /* Lives in the planner's store on purpose. Both pages rank nodes with this,
-     and PROJECT.md guarantees they cannot disagree, so there is exactly one
-     copy of it rather than one per page. */
+  /* Both of these live in the planner's store on purpose. Both pages rank nodes
+     with them and PROJECT.md guarantees the two cannot disagree, so there is
+     exactly one copy rather than one per page. `squad` used to be kept here
+     *and* in vorframe.filters.v1, which meant the pages could quietly disagree
+     about whether you were farming solo. */
   try {
     const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
     if (plan && RUN_MODES.includes(plan.runMode)) state.runMode = plan.runMode;
+    if (plan && typeof plan.squad === "boolean") state.squad = plan.squad;
   } catch (e) { /* ignore malformed planner options */ }
+
+  /* One-time migration: adopt the old per-page value if the shared store has
+     never been written, so nobody silently loses the setting. */
+  function writeSharedOption(key, value) {
+    try {
+      const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
+      plan[key] = value;
+      localStorage.setItem("vorframe.plan.v1", JSON.stringify(plan));
+    } catch (e) { /* non-fatal */ }
+  }
+  try {
+    const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
+    const legacy = JSON.parse(localStorage.getItem(KEY_FILTERS) || "null");
+    if ((!plan || typeof plan.squad !== "boolean") &&
+        legacy && typeof legacy.squad === "boolean") {
+      state.squad = legacy.squad;
+      writeSharedOption("squad", state.squad);
+    }
+  } catch (e) { /* non-fatal */ }
 
   try {
     const saved = JSON.parse(localStorage.getItem(KEY_FILTERS) || "null");
@@ -286,7 +308,6 @@
       if (saved.sort) state.sort = saved.sort;
       if (typeof saved.hideVaultedRelics === "boolean")
         state.hideVaultedRelics = saved.hideVaultedRelics;
-      if (typeof saved.squad === "boolean") state.squad = saved.squad;
       if (typeof saved.hideOwnedParts === "boolean")
         state.hideOwnedParts = saved.hideOwnedParts;
     }
@@ -302,7 +323,6 @@
         sort: state.sort,
         hideVaultedRelics: state.hideVaultedRelics,
         hideOwnedParts: state.hideOwnedParts,
-        squad: state.squad,
       }));
     } catch (e) { /* non-fatal */ }
   };
@@ -1338,12 +1358,7 @@
     runSel.value = state.runMode;
     runSel.addEventListener("change", () => {
       state.runMode = runSel.value;
-      // written back to the planner's store, which owns this setting
-      try {
-        const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
-        plan.runMode = state.runMode;
-        localStorage.setItem("vorframe.plan.v1", JSON.stringify(plan));
-      } catch (e) { /* non-fatal */ }
+      writeSharedOption("runMode", state.runMode);   // shared store owns this
       render();
     });
   }
@@ -1351,6 +1366,7 @@
   $("#f-squad").checked = state.squad;
   $("#f-squad").addEventListener("change", (e) => {
     state.squad = e.target.checked;
+    writeSharedOption("squad", state.squad);
     saveFilters();
     const open = drawer.hidden ? null : $("#drawerBody h2");
     if (open) {                       // refresh the odds on screen
