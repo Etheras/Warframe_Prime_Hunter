@@ -22,11 +22,18 @@ Rarity uses the game's own bronze/silver/gold language, so it reads without a
 legend. Never tint a background by rarity *and* put rarity chips on it — that
 was the first attempt and the chips vanished into the gradient.
 
-**A rule that does not apply everywhere gets `--odd` amber** (`#e8944a`, 7.27:1).
+**A rule that does not apply everywhere gets `--odd` amber** (`#684321`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and
 not a rarity. Anything given this colour must carry a tooltip explaining the
 difference, or the colour is just noise.
+
+It sits at the **same brightness as the meta line it lives on** — hue carries the
+signal, not luminance. A first attempt used a bright `#e8944a` at 7.27:1, which read
+as a highlight rather than as an annotation and made the row look like it had an
+error in it. Matching the surrounding text and changing only the hue is the quieter
+and more accurate signal. Note this puts it below the §3 contrast floor, which the
+whole meta line already is — see `TODO.md`.
 
 **Vaulted / unobtainable fades to violet** (`rgba(157,123,234,…)`), matching the
 Resurgence badge, because Prime Resurgence is how vaulted things come back. This

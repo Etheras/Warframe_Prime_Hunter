@@ -75,37 +75,70 @@
      unreachable. Defending fewer is a deliberate min-max: it is the only way to
      reach rotation A, and it can hold you on B indefinitely. The rotation label
      is coloured differently on these nodes and explains this on hover. */
-  const AABC = (r) => "AABC"[(r - 1) % 4];
-  const ROT_PATTERN = { Disruption: (r) => (r <= 2 ? "B" : "C") };
-  const tierAt = (mission, round) => (ROT_PATTERN[mission] || AABC)(round);
-  /* rounds after which the sequence only repeats its last tier */
-  const cycleLen = (mission) => (ROT_PATTERN[mission] ? 3 : 4);
+  /* Every mission type advances A -> A -> B -> C and repeats. Disruption is the
+     sole exception and is listed explicitly; anything not named here gets AABC,
+     so a mission type we have never heard of degrades to the normal rule rather
+     than to nothing. `assertRotationCoverage()` logs what that covers. */
+  const AABC = { plan: (r) => "AABC"[(r - 1) % 4], cycle: 4, squadOnly: false,
+                 name: null };
+  const ROT_PATTERN = {
+    /* Defending all four conduits: B, B, then C for as long as you stay.
+       Needs no coordination - it is simply playing the mission well. */
+    Disruption: [
+      { plan: (r) => (r <= 2 ? "B" : "C"), cycle: 3, squadOnly: false,
+        name: "defending all four conduits" },
+      /* Rotation A exists only if you deliberately UNDER-defend: 3 conduits in
+         round 1, then 2, then 1, which is the only route to it and caps at
+         three. From round 4 the floor is B. Letting conduits die on purpose,
+         to a schedule, without failing the round outright, is not something a
+         random public squad will do - so this plan is offered only when the
+         4-squad option says you have an organised team. */
+      { plan: (r) => (r <= 3 ? "A" : "B"), cycle: 4, squadOnly: true,
+        name: "under-defending on purpose for rotation A" },
+    ],
+  };
+  const plansFor = (mission, squad) =>
+    (ROT_PATTERN[mission] || [AABC]).filter((p) => !p.squadOnly || squad);
 
-  function runValue(rot, runMode, mission) {
-    const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let total = 0, rounds = null, counts = null, stranded = null;
-    if (hasRot) {
-      let n;
-      if (runMode === "full") n = 4;
-      else if (runMode === "aabcaa") n = 6;
-      else {
-        n = 0;                                  // reset: last round that pays
-        for (let r = 1; r <= cycleLen(mission); r++) {
-          if ((rot[tierAt(mission, r)] || 0) > 0) n = r;
-        }
-      }
-      counts = {};
-      for (let r = 1; r <= n; r++) {
-        const t = tierAt(mission, r);
-        counts[t] = (counts[t] || 0) + 1;
-      }
-      Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
-      rounds = n || null;
-      // rotations holding something wanted that this run can never reach
-      stranded = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !counts[t]);
+  function scorePlan(rot, runMode, p) {
+    let n;
+    if (runMode === "full") n = 4;
+    else if (runMode === "aabcaa") n = 6;
+    else {
+      n = 0;                                    // reset: last round that pays
+      for (let r = 1; r <= p.cycle; r++) if ((rot[p.plan(r)] || 0) > 0) n = r;
     }
-    return { total: total + (rot.none || 0), perRound: total / (rounds || 1),
-             rounds, counts, stranded, nonStandard: !!ROT_PATTERN[mission] };
+    const counts = {};
+    for (let r = 1; r <= n; r++) {
+      const t = p.plan(r);
+      counts[t] = (counts[t] || 0) + 1;
+    }
+    let total = 0;
+    Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
+    return { total, counts, rounds: n || null, plan: p };
+  }
+
+  /* Where a mission type offers more than one way to play it, take whichever
+     banks more. Adding a plan can therefore only ever raise a node's score, so
+     ticking the 4-squad box never makes anything look worse. */
+  function runValue(rot, runMode, mission, squad) {
+    const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
+    let best = { total: 0, counts: null, rounds: null, plan: null };
+    if (hasRot) {
+      plansFor(mission, squad).forEach((p) => {
+        const r = scorePlan(rot, runMode, p);
+        if (!best.plan || r.total > best.total + 1e-12) best = r;
+      });
+    }
+    const counts = best.counts;
+    const stranded = hasRot
+      ? ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !(counts && counts[t]))
+      : null;
+    return { total: best.total + (rot.none || 0),
+             perRound: best.total / (best.rounds || 1),
+             rounds: best.rounds, counts, stranded,
+             planName: best.plan ? best.plan.name : null,
+             nonStandard: !!ROT_PATTERN[mission] };
   }
 
   const DATA = window.VORFRAME_DATA;
@@ -117,6 +150,25 @@
       '<p style="padding:40px;font:16px system-ui;color:#e6ebf2">' +
       "Data file missing. Run <code>python tools/build_data.py</code> and reload.</p>";
     return;
+  }
+
+  /* Guard against the mistake that started this: a mission type quietly getting
+     the wrong rotation. Everything not named in ROT_PATTERN uses A->A->B->C, so
+     this lists what that assumption currently covers. Runs once, console only. */
+  function assertRotationCoverage() {
+    const seen = new Set();
+    Object.values(DATA.relics || {}).forEach((r) =>
+      (r.sources || []).forEach((s) => { if (s.mode) seen.add(s.mode); }));
+    const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
+    const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
+    console.info("[VorFrame] rotation model: " + seen.size + " mission types in the data");
+    console.info("  non-standard : " + (odd.length ? odd.join(", ") : "(none)"));
+    console.info("  assumed AABC : " + aabc.join(", "));
+    Object.keys(ROT_PATTERN).forEach((m) => {
+      if (!seen.has(m)) {
+        console.warn("[VorFrame] ROT_PATTERN names '" + m + "' but no source uses it");
+      }
+    });
   }
 
   const ITEMS = DATA.items;
@@ -268,6 +320,8 @@
   }
 
   /* ── the plan ────────────────────────────────────────────────── */
+  assertRotationCoverage();
+
   function buildPlan() {
     const { want, needs, formaShort } = wantedIndex();
 
@@ -311,10 +365,11 @@
 
     // value each node as a whole run, which is what you actually commit to
     nodes.forEach((n) => {
-      const r = runValue(n.rot, opts.runMode, n.mode);
+      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad);
       n.score = r.total; n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
+      n.planName = r.planName;
     });
 
     // Score first, then a lower enemy level (faster clears). Rotation used to
@@ -382,7 +437,7 @@
       lines.push("DISRUPTION pays one reward per round, and the tier depends on");
       lines.push("the round AND how many of the four conduits you defended.");
       lines.push("");
-      lines.push("Defending all four (what this assumes):");
+      lines.push("Defending all four:");
       lines.push("  round   1  2  3  4  5  6+");
       lines.push("  tier    B  B  C  C  C  C");
       lines.push("");
@@ -394,6 +449,10 @@
       lines.push("  rotation B  every round, defending 4 / 3-4 / 2-3 / 1-2");
       lines.push("  rotation C  round 3 onward, defending 3-4");
       lines.push("Losing all four in a round fails the mission.");
+      lines.push("");
+    }
+    if (n.planName) {
+      lines.push("Plan: " + n.planName + ".");
       lines.push("");
     }
     if (n.rounds) {
@@ -417,6 +476,10 @@
     (n.stranded || []).forEach((t) => {
       lines.push("rot " + t + " holds something you want (" + pct(n.rot[t]) +
         ") but this run never reaches it.");
+      if (n.nonStandard && t === "A" && !opts.squad) {
+        lines.push("Rotation A here needs a squad under-defending to a schedule -");
+        lines.push("tick '4-squad, same relic' to let the planner consider it.");
+      }
     });
     if (!n.nonStandard) lines.push(ROT_CYCLE);
 

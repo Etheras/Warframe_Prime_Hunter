@@ -11,26 +11,41 @@ understand, it needs rewriting.
 
 ---
 
-### Only Disruption has been checked for a non-standard rotation
+### Ten rotation-bearing mission types are still unverified
 
-Disruption turned out not to use the A→A→B→C cycle at all, and is now modelled
-properly (`PROJECT.md §7`). Nothing else has been checked. The data holds 31 mission
-types — Void Cascade, Void Flood, Void Armageddon, Alchemy, Ascension, Sanctuary
-Onslaught, Defection, The Circuit and others are all plausible candidates for their
-own rules, since several are newer than the cycle they are assumed to follow.
+Swept 2026-08-10. Of the 31 mission types in the data, 9 carry no rotation at all so
+the cycle never applies, 11 are confirmed A→A→B→C against the wiki (Defense,
+Survival, Interception, Excavation, Defection, Infested Salvage, Alchemy, Sanctuary
+Onslaught, Void Cascade, Void Flood, Void Armageddon), and Disruption is modelled
+explicitly. That leaves ten assumed AABC without confirmation:
 
-`ROT_PATTERN` now makes adding one a two-line change, so this is a research task
-rather than an engineering one: work through the mission types that actually appear
-as relic sources and confirm each against the wiki.
+`Bounty`, `Caches`, `Key`, `Legacyte Harvest`, `Rush`, `Skirmish`, `Special`, `Spy`,
+`The Circuit`, `The Perita Rebellion`.
 
-### Disruption min-maxing is documented but not modelled
+The wiki also names two more exceptions we do not currently see in relic sources —
+**The Index** (A-B-B, with C once after an hour) and **Arbitrations** (A-A-B-B-C-C-C-C)
+— which is evidence that deviation is not rare.
 
-Defending fewer conduits deliberately changes which rotation you get, and it is the
-only way to reach rotation A at all. With a coordinated squad you can hold rotation B
-every single round, or take three rotation A rewards in the first three rounds. The
-tooltip explains all of this, but the planner always assumes four conduits defended
-and cannot plan around it. Would only make sense as an option gated behind the
-existing 4-squad checkbox, since it needs organised players.
+### Several rotation-bearing modes are not round-based at all
+
+Falls out of the sweep above and is probably the more serious half. `Spy`, `Bounty`,
+`Caches` and `Key` carry rotations, but their rotation does not advance per *round* —
+a Spy mission has three vaults, a Bounty has five stages, Caches counts what you
+found. You collect several tiers within a **single mission**, rather than one per
+round.
+
+The planner costs these in "rounds" like an endless mission, so a three-vault Spy run
+is priced as three rounds of Defense. That is the mission-length assumption
+(`PROJECT.md §7`) failing in a specific, fixable way rather than a vague one: for
+these modes the right unit is one mission, not N rounds.
+
+### Disruption min-maxing is documented but not modelled### Disruption rotation B cannot be held indefinitely by the planner
+
+Rotation A is now modelled as a squad-gated plan (`PROJECT.md §7`), but the third
+strategy is not: with a coordinated squad you can hold **rotation B every single
+round** — defend 4, then 3–4, then 2–3, then 1–2 forever. The planner only knows two
+Disruption plans, all-out (B, B, C, C…) and the rotation-A min-max (A, A, A, B…).
+A B-forever plan would matter for a list wanting only rotation B relics.
 
 ### The rotation label sits at 3.48:1 contrast
 

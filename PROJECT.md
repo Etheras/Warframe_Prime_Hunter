@@ -486,8 +486,10 @@ how many of the four conduits you successfully defended that round:
 | 3 | A | B | B | **C** |
 | 4+ | B | B | C | **C** |
 
-**We assume all four are defended**, which is what anyone deliberately farming does.
-That pays `B B C C C C…`, so:
+**Disruption nodes are never excluded** — rotations B and C are reachable by simply
+playing well, and both count normally. What is gated is rotation A alone.
+
+The default assumes all four conduits are defended, which pays `B B C C C C…`, so:
 
 - **Rotation C is unlocked, not periodic.** Past round three, *every* round is another
   C. In an AABC mission C is one round in four, forever. This makes Disruption by far
@@ -504,11 +506,28 @@ Defending *fewer* conduits is a deliberate min-max, and the only route to rotati
 | B | every round — defend 4, then 3–4, then 2–3, then 1–2 |
 | C | round 3 onward, defending 3–4 |
 
-Losing all four in one round fails the mission, so one is the floor. This is not
-modelled — it needs a coordinated squad — but the tooltip documents it.
+Losing all four in one round fails the mission, so one is the floor.
 
-Implementation: `tierAt(mission, round)` in both `plan.js` and `app.js` looks the
-mission type up in `ROT_PATTERN` and falls back to AABC. The run length still comes
+**Rotation A is therefore gated behind the 4-squad option.** Letting conduits die on
+purpose, to a schedule, without failing the round outright is not something a random
+public squad will do, so it is not offered as a default. `ROT_PATTERN` holds a *list*
+of plans per mission type, each flagged `squadOnly`, and `plansFor()` filters by the
+option before `runValue()` takes whichever banks most. Because it is a maximum over
+available plans, **enabling the option can only raise a node's score** — ticking the
+box never makes anything look worse.
+
+With the option off, a Disruption node whose rotation A holds something you want says
+so in its tooltip and names the option, rather than silently scoring it zero.
+
+Holding rotation B indefinitely is a third viable plan and is **not** modelled — see
+`TODO.md`.
+
+Implementation: `plansFor(mission, squad)` in both `plan.js` and `app.js` looks the
+mission type up in `ROT_PATTERN` and falls back to AABC, so a mission type nobody has
+thought about degrades to the normal rule rather than to nothing. `assertRotationCoverage()`
+logs, once per load, how many mission types are in the data and exactly which ones
+are riding on the AABC assumption — the mistake that started this was invisible
+precisely because nothing ever said what was being assumed. The run length still comes
 from `runMode`, so the two concerns stay separate: **mission type decides what a
 round pays, run mode decides how many rounds you stay.** Nodes on a non-standard
 rotation render their label in `--odd` amber with the full explanation on hover.
