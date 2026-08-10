@@ -39,14 +39,6 @@ is priced as three rounds of Defense. That is the mission-length assumption
 (`PROJECT.md §7`) failing in a specific, fixable way rather than a vague one: for
 these modes the right unit is one mission, not N rounds.
 
-### Disruption rotation B cannot be held indefinitely by the planner
-
-Rotation A is now modelled as a squad-gated plan (`PROJECT.md §7`), but the third
-strategy is not: with a coordinated squad you can hold **rotation B every single
-round** — defend 4, then 3–4, then 2–3, then 1–2 forever. The planner only knows two
-Disruption plans, all-out (B, B, C, C…) and the rotation-A min-max (A, A, A, B…).
-A B-forever plan would matter for a list wanting only rotation B relics.
-
 ### The rotation label sits at 3.48:1 contrast
 
 Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
@@ -65,15 +57,6 @@ they are. This became load-bearing when node ranking moved to whole-run totals
 (`PROJECT.md §7`), so it is now the weakest assumption in the whole model. The only
 honest fix is timing real missions and scoring per minute. Until then the per-round
 rate in each row's rotation tooltip is the workaround.
-
-### The single-file build carries the collection only
-
-`bundle.py` folds the collection into one `.html`, but the planner is a second page
-with nowhere to live in a one-file build, so its tab is stripped rather than left
-pointing at a file that will not be there. Given the two pages are meant to be equal
-(`PROJECT.md §1`), that is a real gap. Both could be inlined into one file and
-switched with JS instead of a link — the dataset is already shared, so it is mostly
-a question of routing.
 
 ### The planner cannot say how many missions to run
 

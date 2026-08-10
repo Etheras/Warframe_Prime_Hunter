@@ -536,8 +536,22 @@ box never makes anything look worse.
 With the option off, a Disruption node whose rotation A holds something you want says
 so in its tooltip and names the option, rather than silently scoring it zero.
 
-Holding rotation B indefinitely is a third viable plan and is **not** modelled — see
-`TODO.md`.
+Three plans are modelled, and **rotation A takes priority over all of them**. It is
+exhaustible — three rewards at most, rounds 1–3, impossible from round 4 — so if
+anything you want sits there, the under-defend plan is not one option among several,
+it is the only route that exists. A plan carrying `onlyChanceAt` is selected outright
+rather than compared on value, which is the same bottleneck reasoning behind the
+refinement choice: you cannot optimise throughput on a resource that runs out.
+
+| Plan | Sequence | Needs a premade |
+|---|---|---|
+| all-out | `B B C C C…` | no |
+| rotation A | `A A A` then whichever of B/C is worth more | yes |
+| hold B | `B B B B…` from round 1 | yes |
+
+The rotation-A plan's tail is chosen per node rather than fixed: after the three A
+rewards, round 4 onward is a free choice between defending 1–2 for B or 3–4 for C, so
+assuming B would strand a wanted C.
 
 Implementation: `plansFor(mission, squad)` in both `plan.js` and `app.js` looks the
 mission type up in `ROT_PATTERN` and falls back to AABC, so a mission type nobody has

@@ -2,20 +2,23 @@
 """
 Fold the whole site into one self-contained .html file.
 
-The result has the stylesheet, the script and the dataset inlined, so it is a
+The result has the stylesheet, both scripts and the dataset inlined, so it is a
 single file you can copy to a USB stick, email to yourself, or drop on any
 machine with a browser. No Python, no server, no internet needed to open it.
 
     python tools/bundle.py            -> dist/vorframe.html
 
+It carries **both** views. They are two views of one dataset, so shipping only
+the collection made the standalone build a lesser thing than the served site.
+Both bodies go into one document and the existing tabs switch between them in
+JavaScript rather than navigating. That works because the two pages share
+exactly one element id -- the tab itself -- and both scripts are self-contained
+IIFEs that have finished running before either view is shown.
+
 Only the item artwork still comes from the network; without it the cards fall
 back to a placeholder glyph and everything else keeps working. If the dataset
 was built with --with-images the artwork points at local files, which cannot
 travel inside a single .html, so those paths are rewritten back to the CDN here.
-
-The bundle carries the collection only. The planner is a second page and there
-is nowhere for it to live in a one-file build, so its tab is dropped rather than
-left pointing at a file that will not be there.
 """
 
 from __future__ import annotations
@@ -28,6 +31,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "dist")
 OUT_FILE = os.path.join(OUT_DIR, "vorframe.html")
 
+CLOSE_SCRIPT = "</" + "script>"
+ESCAPED_CLOSE = "<" + chr(92) + "/" + "script>"
+
 
 def read(*parts: str) -> str:
     path = os.path.join(ROOT, *parts)
@@ -37,11 +43,23 @@ def read(*parts: str) -> str:
         return fh.read()
 
 
+def body_after_header(doc: str) -> str:
+    """Everything between </header> and the first <script>."""
+    start = doc.index("</header>") + len("</header>")
+    return doc[start:doc.index("<script", start)]
+
+
 def main() -> int:
     html = read("index.html")
+    plan = read("plan.html")
     css = read("assets", "styles.css")
-    js = read("assets", "app.js")
+    app_js = read("assets", "app.js")
+    plan_js = read("assets", "plan.js")
     data = read("data", "vorframe-data.js")
+
+    def guard(text: str) -> str:
+        # a literal </script> inside inlined JS would close the tag early
+        return text.replace(CLOSE_SCRIPT, ESCAPED_CLOSE)
 
     # --with-images repoints items at assets/img/*, which does not survive being
     # copied around as a lone file. Put them back on the CDN for the bundle only.
@@ -49,44 +67,93 @@ def main() -> int:
     if localised:
         data = data.replace('"assets/img/', '"https://cdn.warframestat.us/img/')
 
-    # </script> anywhere inside inlined JS would close the tag early
-    def guard(text: str) -> str:
-        return text.replace("</script>", "<\\/script>")
+    # The planner's search box lives inside its own header, and we keep only the
+    # collection's header. Carry it into the planner view so adding a Prime works.
+    m = re.search(r'<div class="search-wrap">.*?</div>\s*</div>', plan, re.S)
+    plan_search = m.group(0) if m else ""
 
-    html = html.replace(
+    shell = html[:html.index("</header>") + len("</header>")]
+    shell = shell.replace(
         '<link rel="stylesheet" href="assets/styles.css">',
-        "<style>\n" + css + "\n</style>",
+        "<style>" + os.linesep + css + os.linesep + "</style>",
     )
-    html = html.replace(
-        '<script src="data/vorframe-data.js"></script>',
-        "<script>\n" + guard(data) + "\n</script>",
-    )
-    html = html.replace(
-        '<script src="assets/app.js"></script>',
-        "<script>\n" + guard(js) + "\n</script>",
-    )
+    # the tabs toggle sections instead of navigating to files that are not here
+    shell = shell.replace('href="index.html"', 'href="#collection" data-view="collection"')
+    shell = shell.replace('href="plan.html"', 'href="#planner" data-view="planner"')
 
-    # The planner is a separate page; a one-file build has nowhere to put it.
-    html = re.sub(r'\s*<nav class="viewtabs".*?</nav>', "", html, flags=re.S)
+    switcher = """
+<script>
+/* One file, two views. The served site uses two pages and real links; here the
+   same tabs toggle sections. Both scripts have already run against the whole
+   document by this point, so nothing needs re-initialising on a switch. */
+(function () {
+  var views = {
+    collection: document.getElementById("view-collection"),
+    planner: document.getElementById("view-planner")
+  };
+  /* The collection's search sits in the shared header; the planner's came
+     across with its own view. Only one of them applies at a time. */
+  var headerSearch = document.querySelector("header.topbar .search-wrap");
+  function show(name) {
+    Object.keys(views).forEach(function (k) {
+      if (views[k]) { views[k].hidden = (k !== name); }
+    });
+    if (headerSearch) { headerSearch.hidden = (name !== "collection"); }
+    Array.prototype.forEach.call(document.querySelectorAll(".viewtab"), function (t) {
+      var mine = t.getAttribute("data-view") === name;
+      t.classList.toggle("on", mine);
+      if (mine) { t.setAttribute("aria-current", "page"); }
+      else { t.removeAttribute("aria-current"); }
+    });
+    try { history.replaceState(null, "", "#" + name); } catch (e) { /* file:// */ }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".viewtab[data-view]"), function (t) {
+    t.addEventListener("click", function (e) {
+      e.preventDefault();
+      show(t.getAttribute("data-view"));
+    });
+  });
+  show(location.hash === "#planner" ? "planner" : "collection");
+})();
+</script>
+"""
+
+    parts = [
+        shell,
+        '<div id="view-collection">',
+        body_after_header(html),
+        "</div>",
+        '<div id="view-planner" hidden>',
+        plan_search,
+        body_after_header(plan),
+        "</div>",
+        "<script>", guard(data), CLOSE_SCRIPT,
+        "<script>", guard(app_js), CLOSE_SCRIPT,
+        "<script>", guard(plan_js), CLOSE_SCRIPT,
+        switcher,
+        "</body>",
+        "</html>",
+    ]
+    out = os.linesep.join(parts)
 
     # Nothing external should be left behind. Template placeholders like
     # src="${esc(it.image)}" live inside the inlined script, not the markup.
     leftovers = {
-        m for m in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', html)
+        m for m in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', out)
         if "${" not in m
     }
     if leftovers:
         print("  ! still referencing local files:", ", ".join(sorted(leftovers)))
     if localised:
         print(f"  artwork: {localised} local paths rewritten back to the CDN")
-    print("  note: collection only — the planner needs the full folder")
+    print("  both views inlined: collection + planner")
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_FILE, "w", encoding="utf-8") as fh:
-        fh.write(html)
+        fh.write(out)
 
     size = os.path.getsize(OUT_FILE) / 1024 / 1024
-    print(f"wrote dist/vorframe.html ({size:.2f} MB) — open it anywhere")
+    print(f"wrote {os.path.relpath(OUT_FILE, ROOT)} ({size:.2f} MB) — open it anywhere")
     return 0
 
 

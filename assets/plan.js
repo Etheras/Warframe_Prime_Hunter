@@ -79,6 +79,11 @@
      sole exception and is listed explicitly; anything not named here gets AABC,
      so a mission type we have never heard of degrades to the normal rule rather
      than to nothing. `assertRotationCoverage()` logs what that covers. */
+  /* Once the three rotation A rewards are banked, round 4 onward is a free
+     choice: defend 1-2 conduits for B, or 3-4 for C. Take whichever is worth
+     more here rather than assuming B, which would strand a wanted C. */
+  const tailTier = (rot) => ((rot.C || 0) > (rot.B || 0) ? "C" : "B");
+
   const AABC = { plan: (r) => "AABC"[(r - 1) % 4], cycle: 4, squadOnly: false,
                  name: null };
   const ROT_PATTERN = {
@@ -93,8 +98,22 @@
          to a schedule, without failing the round outright, is not something a
          random public squad will do - so this plan is offered only when the
          4-squad option says you have an organised team. */
-      { plan: (r) => (r <= 3 ? "A" : "B"), cycle: 4, squadOnly: true,
-        name: "under-defending on purpose for rotation A" },
+      /* Rotation A is exhaustible: three rewards at most, rounds 1-3, and
+         flatly impossible from round 4. So this is not one option among
+         several - if anything you want sits on A, it is the only plan that can
+         ever get it, and it takes priority over any plan that banks more.
+         Same reasoning as refinement following the bottleneck rather than the
+         likeliest reward: you cannot optimise throughput on a resource that
+         runs out. */
+      { plan: (r, rot) => (r <= 3 ? "A" : tailTier(rot)), cycle: 4, squadOnly: true,
+        onlyChanceAt: "A",
+        name: "under-defending on purpose for rotation A (the only route to it)" },
+      /* Holding rotation B from the very first round: defend 4, then 3-4, then
+         2-3, then 1-2 forever. Only beats the plan above when rotation A is
+         worth less than B here - otherwise A,A,A,B,B,B... dominates it, since
+         both are B from round four on. Same coordination requirement. */
+      { plan: () => "B", cycle: 1, squadOnly: true,
+        name: "holding rotation B every round" },
     ],
   };
   const plansFor = (mission, squad) =>
@@ -106,11 +125,11 @@
     else if (runMode === "aabcaa") n = 6;
     else {
       n = 0;                                    // reset: last round that pays
-      for (let r = 1; r <= p.cycle; r++) if ((rot[p.plan(r)] || 0) > 0) n = r;
+      for (let r = 1; r <= p.cycle; r++) if ((rot[p.plan(r, rot)] || 0) > 0) n = r;
     }
     const counts = {};
     for (let r = 1; r <= n; r++) {
-      const t = p.plan(r);
+      const t = p.plan(r, rot);
       counts[t] = (counts[t] || 0) + 1;
     }
     let total = 0;
@@ -125,7 +144,11 @@
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let best = { total: 0, counts: null, rounds: null, plan: null };
     if (hasRot) {
-      plansFor(mission, squad).forEach((p) => {
+      const avail = plansFor(mission, squad);
+      // a plan flagged onlyChanceAt owns the sole route to that rotation, so
+      // when something wanted sits there it is used outright, not compared
+      const forced = avail.find((p) => p.onlyChanceAt && (rot[p.onlyChanceAt] || 0) > 0);
+      (forced ? [forced] : avail).forEach((p) => {
         const r = scorePlan(rot, runMode, p);
         if (!best.plan || r.total > best.total + 1e-12) best = r;
       });

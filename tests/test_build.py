@@ -327,9 +327,10 @@ def test_clone_and_build(online: bool) -> None:
 
 def test_bundle_is_self_contained() -> None:
     """
-    The single-file build must reference nothing on disk. Local artwork paths
-    from --with-images cannot travel inside one .html, and the view tabs added a
-    link to plan.html that would not be there.
+    The single-file build must reference nothing on disk, and must carry both
+    views. Local artwork paths from --with-images cannot travel inside one
+    .html, and the view tabs would otherwise link to a plan.html that is not
+    there.
     """
     import re
     r = subprocess.run([sys.executable, "tools/bundle.py"],
@@ -344,6 +345,12 @@ def test_bundle_is_self_contained() -> None:
              if "${" not in m}
     check("bundle: no local file references", local, set())
     check("bundle: no local artwork paths", html.count('"assets/img/'), 0)
+    check_true("bundle: carries the collection view", 'id="view-collection"' in html)
+    check_true("bundle: carries the planner view", 'id="view-planner"' in html)
+    check_true("bundle: planner search came across", 'id="addSearch"' in html)
+    check("bundle: tabs switch instead of navigating", html.count('data-view="'), 2)
+    check_true("bundle: both scripts inlined",
+               "vorframe.plan.v1" in html and "vorframe.collected.v1" in html)
 
 
 def main() -> int:

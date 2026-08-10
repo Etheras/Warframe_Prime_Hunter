@@ -343,10 +343,9 @@ and rebuilds the list.
 
 ### One file you can copy anywhere
 
-> Note: the single-file build carries the **collection only**. The planner is a
-> second page, and a one-file build has nowhere to put it — so its tab is left out
-> rather than pointing at a file that will not be there. The single file also goes
-> back to CDN artwork, since local image files cannot travel inside one `.html`.
+> The single file carries **both** the collection and the planner — the tabs switch
+> between them in place instead of navigating. It does go back to CDN artwork, since
+> local image files cannot travel inside one `.html`.
 
 ```bash
 python tools/bundle.py
