@@ -128,13 +128,6 @@ the star chart while that event runs, which is why event nodes are excluded by
 default. If a mapping is ever found, the planner could show "only during X" instead
 of hiding them.
 
-### Void Storm sources fall off the 40-source cap
-
-Railjack's equivalent of a Void Fissure has its own table (44 rows across 6 groups,
-all for live relics) but drops at 2.5%, below the 9–15% of ordinary nodes, so it is
-cut. Low value and Railjack-only, hence left alone — but raising the cap would bring
-it back.
-
 ### Relic inventory — deferred, do not re-propose without a better input method
 
 This is the single biggest inaccuracy in the planner: every score is *per reward
