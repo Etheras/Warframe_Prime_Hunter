@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>VorFrame — farm planner</title>
-<link rel="stylesheet" href="assets/styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💠</text></svg>">
+<link rel="stylesheet" href="assets/styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%3E%3Ctext%20y=%2726%27%20font-size=%2726%27%3E%F0%9F%92%A0%3C/text%3E%3C/svg%3E" />
 </head>
 <body class="plan-page">
 
@@ -24,8 +24,8 @@
   </nav>
 
   <div class="search-wrap">
-    <input id="addSearch" type="search" placeholder="Add a Prime to your list…  (press /)" autocomplete="off" spellcheck="false">
-    <div id="addResults" class="add-results" hidden></div>
+    <input id="addSearch" type="search" placeholder="Add a Prime to your list…  (press /)" autocomplete="off" spellcheck="false" />
+    <div id="addResults" class="add-results" hidden="hidden"></div>
   </div>
 
   <div class="topbar-right">
@@ -47,12 +47,12 @@
       <h2>Forma</h2>
     </div>
     <div class="forma-row">
-      <label>have <input type="number" id="formaHave" min="0" value="0"></label>
-      <label>want <input type="number" id="formaNeed" min="0" value="0"></label>
+      <label>have <input type="number" id="formaHave" min="0" value="0" /></label>
+      <label>want <input type="number" id="formaNeed" min="0" value="0" /></label>
       <span id="formaShort" class="forma-short"></span>
     </div>
     <p class="hint" id="formaNote">Forma drops from relics, so a shortfall joins the plan.
-      A relic giving 2&times; only counts double if you need 2 or more.</p>
+      A relic giving 2× only counts double if you need 2 or more.</p>
 
     <div class="filter-head gap-lg">
       <h2>Assumptions</h2>
@@ -66,22 +66,22 @@
       </select>
     </label>
     <label class="check">
-      <input type="checkbox" id="p-squad">
+      <input type="checkbox" id="p-squad" />
       <span class="box"></span>
       <span class="lbl" data-tip="A four-player premade cracking the same relic at the same refinement sees four rewards and keeps the best, so a chance p becomes 1 - (1 - p)^4.&#10;&#10;It also unlocks Disruption rotation A, which needs the squad to under-defend conduits to a schedule. Leave off for solo or public runs.">4-man premade</span>
     </label>
     <label class="check">
-      <input type="checkbox" id="p-aya" checked>
+      <input type="checkbox" id="p-aya" checked="checked" />
       <span class="box"></span>
       <span class="lbl" data-tip="One Aya buys one relic of your choosing at Varzia, and Varzia stocks the current Prime Resurgence rotation. That makes an Aya drop worth more than a random relic, because you pick which one.&#10;&#10;It only ever raises the value of a node you were already going to run - it will never put an Aya-only bounty ahead of somewhere carrying a part you actually need.&#10;&#10;Worth nothing here if your list wants nothing from the current rotation, however useful the Aya may be later.">Count Aya drops</span>
     </label>
     <label class="check">
-      <input type="checkbox" id="p-event">
+      <input type="checkbox" id="p-event" />
       <span class="box"></span>
       <span class="lbl" data-tip="Digital Extremes' drop table lists event nodes permanently but never names the event, and the node only exists on your star chart while that event is running — so they are left out by default. Switch on only if you know an event is live.">Include event nodes</span>
     </label>
     <label class="check">
-      <input type="checkbox" id="p-railjack">
+      <input type="checkbox" id="p-railjack" />
       <span class="box"></span>
       <span class="lbl" data-tip="Railjack is a different activity with its own setup, so it is left out of the ranking by default. Five live relics drop only there, though.">Include Railjack</span>
     </label>
@@ -92,12 +92,12 @@
     <div id="planEmpty" class="empty">
       <p>Nothing on your list yet.</p>
       <p class="hint hint-narrow">
-        Search above to add a Prime, or open the collection and use
+        Search above to add a Prime, or open="open" the collection and use
         <b>Add to farm list</b>. Parts you already own are excluded automatically.
       </p>
     </div>
 
-    <section id="planWrap" hidden>
+    <section id="planWrap" hidden="hidden">
       <div class="content-head">
         <div class="result-count" id="planSummary"></div>
       </div>
@@ -132,7 +132,7 @@
   <div class="dlg-actions">
     <button class="btn" id="downloadBtn">Download backup</button>
     <button class="btn" id="uploadBtn">Restore from file</button>
-    <input type="file" id="uploadFile" accept=".json,.txt,application/json" hidden>
+    <input type="file" id="uploadFile" accept=".json,.txt,application/json" hidden="hidden" />
     <button class="btn ghost" id="copyBtn">Copy text</button>
     <button class="btn ghost" id="importBtn">Paste &amp; restore</button>
     <button class="btn ghost" id="dlgCloseBtn">Close</button>

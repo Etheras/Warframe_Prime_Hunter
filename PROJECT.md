@@ -324,6 +324,22 @@ asserted rather than assumed. `.ps1` must also run under **both Windows PowerShe
 being false, the three-argument `Join-Path` is 6.0+, and `??`/`?:` are 7.0+. The
 suite checks for each.
 
+### Markup is held to XML well-formedness, but served as HTML5
+
+The pages parse cleanly as XML and a test keeps them that way — void elements
+self-closed, boolean attributes given values, named entities replaced by literals.
+
+They are still **served as `text/html`**, deliberately. Serving as
+`application/xhtml+xml` would make any well-formedness error fatal at runtime: a
+blank page with an XML error rather than a page a browser quietly repaired. With
+19 `innerHTML` sites building markup from data, one bad fragment would take the
+whole app down in front of whoever was using it.
+
+Checking it in the suite catches the same class of mistake — the ambiguity a
+lenient parser hides — at the cost of a red test instead. Same discipline, failure
+moved earlier and off the user's screen. XHTML prevents no attack, so nothing
+security-related is given up by this choice.
+
 ### What the server exposes, and what it refuses
 
 `serve.py` is `SimpleHTTPRequestHandler` underneath, which the standard library

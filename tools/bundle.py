@@ -73,10 +73,14 @@ def main() -> int:
     plan_search = m.group(0) if m else ""
 
     shell = html[:html.index("</header>") + len("</header>")]
-    shell = shell.replace(
-        '<link rel="stylesheet" href="assets/styles.css">',
-        "<style>" + os.linesep + css + os.linesep + "</style>",
-    )
+    # Matched by pattern rather than exact text: the tag is written self-closing
+    # so the page stays well-formed as XML, and a plain `>` form should keep
+    # working too. An exact-string match silently did nothing when the markup
+    # gained its slash, leaving the bundle pointing at a stylesheet it did not
+    # contain.
+    shell = re.sub(r'<link rel="stylesheet" href="assets/styles\.css"\s*/?>',
+                   lambda _: "<style>" + os.linesep + css + os.linesep + "</style>",
+                   shell, count=1)
     # the tabs toggle sections instead of navigating to files that are not here
     shell = shell.replace('href="index.html"', 'href="#collection" data-view="collection"')
     shell = shell.replace('href="plan.html"', 'href="#planner" data-view="planner"')

@@ -39,8 +39,14 @@ DE's [Terms of Use](https://www.warframe.com/terms) also apply.
 itself. That is deliberate: hotlinking sends every visitor's IP address to a third
 party, which a tool that otherwise keeps everything local has no business doing.
 
+Note that `cdn.warframestat.us` is **WFCD's** CDN, not Digital Extremes'. DE host
+none of this and have no bandwidth either way, so hotlinking is not a courtesy to
+them — it pushes the cost onto a volunteer community project, once per visitor per
+instance. Serving our own copy is the better manners as well as the better privacy.
+
 It does mean this project **redistributes DE's artwork** rather than merely linking
-to it, which is a heavier use of their assets than displaying them privately. It is
+to it. DE's copyright in the images is the same either way; what changes is the
+form of use. It is
 covered by the same Content Policy allowance for non-commercial fan works, and the
 conditions it depends on are the ones already listed above — nothing is charged for,
 nothing is sold, there is no advertising, no DE or Warframe logo is used as branding,

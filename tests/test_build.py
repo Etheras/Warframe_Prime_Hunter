@@ -472,6 +472,29 @@ def test_launchers_are_runnable() -> None:
             check(f"{name}: no {bad.strip()}", bad in code, False, why)
 
 
+def test_markup_is_xml_well_formed() -> None:
+    """
+    The pages are served as HTML5 and always will be, but they are held to XML
+    well-formedness anyway.
+
+    Not for security -- XHTML prevents no attack. For unambiguity: HTML5 parsers
+    silently repair unclosed tags, bare boolean attributes and stray entities,
+    so a genuine mistake looks fine until a different parser disagrees. Checking
+    it here catches the same class of error XHTML would, at the cost of a red
+    test rather than a blank page in front of a user.
+    """
+    import xml.etree.ElementTree as ET
+    for name in ("index.html", "plan.html"):
+        src = re.sub(r"<!doctype html>", "", read_text(os.path.join(ROOT, name)),
+                     flags=re.I)
+        try:
+            ET.fromstring(src)
+            check_true(f"{name}: well-formed as XML", True)
+        except ET.ParseError as exc:
+            check(f"{name}: well-formed as XML", str(exc), "",
+                  "unclosed tag, bare boolean attribute, or a non-XML entity")
+
+
 def test_server_serves_only_the_site() -> None:
     """
     The server used to publish its whole directory with browsable listings. In
@@ -574,6 +597,7 @@ def main() -> int:
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
+                         test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_bundle_is_self_contained]),
         ("online", [lambda: test_clone_and_build(online)]),

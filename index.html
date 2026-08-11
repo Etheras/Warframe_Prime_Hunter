@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>VorFrame — Prime collection tracker</title>
-<link rel="stylesheet" href="assets/styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💠</text></svg>">
+<link rel="stylesheet" href="assets/styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%3E%3Ctext%20y=%2726%27%20font-size=%2726%27%3E%F0%9F%92%A0%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
 
@@ -20,11 +20,11 @@
 
   <nav class="viewtabs" aria-label="Views">
     <a class="viewtab on" href="index.html" aria-current="page">Collection</a>
-    <a class="viewtab" id="planLink" href="plan.html">Planner<span class="viewtab-n" id="planCount" hidden></span></a>
+    <a class="viewtab" id="planLink" href="plan.html">Planner<span class="viewtab-n" id="planCount" hidden="hidden"></span></a>
   </nav>
 
   <div class="search-wrap">
-    <input id="search" type="search" placeholder="Search Primes, parts or relics…  (press /)" autocomplete="off" spellcheck="false">
+    <input id="search" type="search" placeholder="Search Primes, parts or relics…  (press /)" autocomplete="off" spellcheck="false" />
   </div>
 
   <div class="topbar-right">
@@ -45,25 +45,25 @@
         <h2>Availability</h2>
         <button class="mini" data-preset="all">all</button>
       </div>
-      <label class="check"><input type="checkbox" id="f-farmable" checked>
+      <label class="check"><input type="checkbox" id="f-farmable" checked="checked" />
         <span class="box"></span><span class="lbl">Farmable now</span><span class="cnt" data-count="farmable"></span></label>
-      <label class="check"><input type="checkbox" id="f-resurgence" checked>
+      <label class="check"><input type="checkbox" id="f-resurgence" checked="checked" />
         <span class="box"></span><span class="lbl">Prime Resurgence <em>(R)</em></span><span class="cnt" data-count="resurgence"></span></label>
-      <label class="check"><input type="checkbox" id="f-baro" checked>
+      <label class="check"><input type="checkbox" id="f-baro" checked="checked" />
         <span class="box"></span><span class="lbl">Baro Ki'Teer <em>(B)</em></span><span class="cnt" data-count="baro"></span></label>
-      <label class="check" data-tip="Primes that come from somewhere other than relics — a quest, an event, or a special vendor. Open one to see exactly where."><input type="checkbox" id="f-special" checked>
+      <label class="check" data-tip="Primes that come from somewhere other than relics — a quest, an event, or a special vendor. Open one to see exactly where."><input type="checkbox" id="f-special" checked="checked" />
         <span class="box"></span><span class="lbl">Other sources</span><span class="cnt" data-count="special"></span></label>
-      <label class="check"><input type="checkbox" id="f-vaulted" checked>
+      <label class="check"><input type="checkbox" id="f-vaulted" checked="checked" />
         <span class="box"></span><span class="lbl">Vaulted <em>(V)</em></span><span class="cnt" data-count="vaulted"></span></label>
-      <label class="check" data-tip="Only ever available to original Founders. These will never return."><input type="checkbox" id="f-founder" checked>
+      <label class="check" data-tip="Only ever available to original Founders. These will never return."><input type="checkbox" id="f-founder" checked="checked" />
         <span class="box"></span><span class="lbl">Founder exclusive</span><span class="cnt" data-count="founder"></span></label>
     </section>
 
     <section class="filter-block">
       <div class="filter-head"><h2>Collection</h2></div>
-      <label class="check"><input type="checkbox" id="f-collected" checked>
+      <label class="check"><input type="checkbox" id="f-collected" checked="checked" />
         <span class="box"></span><span class="lbl">Show collected</span><span class="cnt" data-count="collected"></span></label>
-      <label class="check"><input type="checkbox" id="f-missing" checked>
+      <label class="check"><input type="checkbox" id="f-missing" checked="checked" />
         <span class="box"></span><span class="lbl">Show not collected</span><span class="cnt" data-count="missing"></span></label>
       <p class="hint">Untick <strong>Show collected</strong> to hide everything you already own.</p>
     </section>
@@ -101,7 +101,7 @@
         <p class="hint">Ranks the farm spots. Shared with the planner.</p>
 
         <label class="check" id="squadRow">
-          <input type="checkbox" id="f-squad">
+          <input type="checkbox" id="f-squad" />
           <span class="box"></span>
           <span class="lbl" data-tip="A four-player premade cracking the same relic at the same refinement sees four rewards and keeps the best, so a chance p becomes 1 - (1 - p)^4.&#10;&#10;It also unlocks Disruption rotation A, which needs the squad to under-defend conduits to a schedule. Leave off for solo or public runs.">4-man premade</span>
         </label>
@@ -110,7 +110,7 @@
         <div class="filter-head gap-md">
           <h2>Materials</h2>
           <span class="mat-actions">
-            <button class="mini" id="addMat" hidden>+ add</button>
+            <button class="mini" id="addMat" hidden="hidden">+ add</button>
             <button class="mini" id="matEdit">edit</button>
           </span>
         </div>
@@ -133,7 +133,7 @@
       </div>
     </div>
     <div id="grid" class="grid"></div>
-    <div id="empty" class="empty" hidden>
+    <div id="empty" class="empty" hidden="hidden">
       <p>Nothing matches these filters.</p>
       <button class="btn" data-preset="all">Reset filters</button>
     </div>
@@ -141,8 +141,8 @@
 </div>
 
 <!-- ────────────── detail drawer ────────────── -->
-<div class="drawer-scrim" id="scrim" hidden></div>
-<aside class="drawer" id="drawer" hidden aria-label="Item details">
+<div class="drawer-scrim" id="scrim" hidden="hidden"></div>
+<aside class="drawer" id="drawer" hidden="hidden" aria-label="Item details">
   <button class="drawer-close" id="drawerClose" aria-label="Close">✕</button>
   <div id="drawerBody"></div>
 </aside>
@@ -155,7 +155,7 @@
   <div class="dlg-actions">
     <button class="btn" id="downloadBtn">Download backup</button>
     <button class="btn" id="uploadBtn">Restore from file</button>
-    <input type="file" id="uploadFile" accept=".json,.txt,application/json" hidden>
+    <input type="file" id="uploadFile" accept=".json,.txt,application/json" hidden="hidden" />
     <button class="btn ghost" id="copyBtn">Copy text</button>
     <button class="btn ghost" id="importBtn">Paste &amp; restore</button>
     <button class="btn ghost" id="dlgCloseBtn">Close</button>
