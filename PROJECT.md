@@ -303,6 +303,48 @@ Files marked GENERATED are rebuilt by `build_data.py`; don't hand-edit them.
 
 ---
 
+### Two stores, and who owns each
+
+VorFrame keeps state in two places and they never mix:
+
+| Store | Holds | Written by | Lost if deleted |
+|---|---|---|---|
+| **Browser storage** | your collection, per-part progress, materials, farm list, filters, planner options | the pages, as you click | your progress — this is exactly what **Backup** copies out |
+| **`.cache/`** | raw responses from DE and the APIs, plus `state.json` | `tools/sources.py` | nothing — it re-downloads. It exists to keep us off DE's servers, not to hold anything of yours |
+
+`assets/img/` is a third, subordinate one: local copies of artwork, rebuilt from
+the CDN on demand and pruned automatically.
+
+**Nothing that writes to disk is allowed to leave orphans.** Every writer either
+uses a fixed filename that overwrites itself (`data/`, `dist/`, `CHANGELOG.md`,
+`state.json`) or prunes what it no longer references — `assets/img/` drops files for
+items that have left the catalogue, and `.cache/` drops `wiki_<Item>` entries for the
+same reason. The `drops_*` mirror files are deliberately *not* pruned on a run that
+used DE directly: they are the fallback that keeps a build working when
+warframe.com is unreachable, so a successful run leaving them untouched is exactly
+when they earn their keep.
+
+### Staleness is checked by the server, not the page
+
+`serve.py` verifies upstream **before handing over the dataset**. The browser asks for
+`data/vorframe-data.js` as it always does; the server checks whether DE has moved on
+since the build, appends `window.VORFRAME_UPSTREAM = {...}` to the file it returns,
+and the banner reads that. The page never talks to Digital Extremes and does not know
+the check happened.
+
+It could not be done from the page in any case — measured, not assumed:
+`warframe.com` and `cdn.warframestat.us` send no CORS headers, so a cross-origin fetch
+fails outright and a `no-cors` one returns an **opaque** response with unreadable
+headers. Having every visitor contact the CDN would also undo the point of holding
+artwork locally.
+
+Three HEAD requests, no downloads, nothing rebuilt — **throttled to once an hour**, so
+reloading the page cannot hammer DE. The first request after a restart takes about two
+seconds and later ones are instant; that delay is deliberate, on the grounds that a
+slow first load beats quietly serving data you have no reason to trust. Upstream being
+unreachable is silent rather than alarming, and on `file://` or GitHub Pages no server
+runs, so the flag is simply absent and the build-age banner carries on alone.
+
 ## 6. Data sources
 
 Ordered by authority. Where two sources overlap, the more official one wins and the

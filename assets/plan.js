@@ -904,17 +904,27 @@
      If the data is behind, say so above the fold and say what to do about it. */
   function staleBanner() {
     const m = DATA.meta || {};
+    /* The server checks upstream before serving this file and plants the
+       answer on it. Nothing is fetched from here - the page never talks to
+       Digital Extremes, and does not know the check happened. Absent on
+       file:// and on GitHub Pages, where no server ran. */
+    const up = window.VORFRAME_UPSTREAM;
     const stale = (m.stale || []).length ? m.stale : null;
     const degraded = (m.degraded || []).length ? m.degraded : null;
     const built = m.generated ? new Date(m.generated) : null;
     const days = built ? Math.floor((Date.now() - built.getTime()) / 86400000) : 0;
-    const old = !stale && !degraded && days >= 14;
-    if (!stale && !degraded && !old) return;
+    const moved = up && up.stale && (up.moved || []).length ? up.moved : null;
+    const old = !stale && !degraded && !moved && days >= 14;
+    if (!stale && !degraded && !moved && !old) return;
 
     const el = document.createElement("div");
     el.className = "databar " + (degraded ? "bad" : "warn");
     const cmd = "python tools/build_data.py";
-    el.innerHTML = degraded
+    el.innerHTML = moved
+      ? "<b>Digital Extremes have published newer data.</b> " +
+        esc(moved.join(", ")) + " changed since this build was made. " +
+        "Re-run <code>" + cmd + "</code> to pick it up."
+      : degraded
       ? "<b>Some data is missing.</b> This build could not reach " +
         esc(degraded.join(", ")) + " and had nothing cached to fall back on, so " +
         "items or drop locations may be absent. Re-run <code>" + cmd + "</code>."

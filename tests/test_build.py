@@ -361,6 +361,36 @@ def test_clone_and_build(online: bool) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_no_writer_leaves_orphans() -> None:
+    """
+    Every writer must either overwrite a fixed name or prune what it no longer
+    references. assets/img/ once kept 110 files and 5.7 MB for items that had
+    left the catalogue, and nothing noticed.
+    """
+    import artwork as art
+    D_path = os.path.join(ROOT, "data", "vorframe-data.json")
+    if not os.path.exists(D_path):
+        print("  skip orphan check (no dataset)")
+        return
+    D = json.load(open(D_path, encoding="utf-8"))
+
+    if art.have_local_images():
+        used = {os.path.basename(i["image"]) for i in D["items"]
+                if (i.get("image") or "").startswith("assets/img/")}
+        ondisk = {f for f in os.listdir(art.IMG_DIR)
+                  if os.path.isfile(os.path.join(art.IMG_DIR, f))}
+        check("orphans: no unused artwork", sorted(ondisk - used), [])
+
+    cache = os.path.join(ROOT, ".cache")
+    if os.path.isdir(cache):
+        # wiki_<Item> entries are the only cache family that can orphan
+        pages = {f[len("wiki_"):-3] for f in os.listdir(cache)
+                 if f.startswith("wiki_") and f.endswith(".gz")} - {"prime"}
+        known = {i["wikiUrl"].rsplit("/", 1)[-1] for i in D["items"]}
+        check("orphans: no stale wiki cache", sorted(pages - known), [],
+              "a Prime leaving the catalogue used to leave its page cached")
+
+
 def test_bundle_is_self_contained() -> None:
     """
     The single-file build must reference nothing on disk, and must carry both
@@ -397,6 +427,7 @@ def main() -> int:
         ("join", [test_normalise_sources, test_no_source_cap]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
+                         test_no_writer_leaves_orphans,
                          test_bundle_is_self_contained]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]

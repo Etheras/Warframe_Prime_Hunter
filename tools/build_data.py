@@ -490,15 +490,20 @@ def main() -> int:
 
     # ---- explain the "special" Primes -----------------------------------
     # The wiki marks these with a bare (S) and no reason, so fetch the reason.
+    wiki_keys: set[str] = set()
     for it in out_items:
         if not it["flags"]["special"]:
             continue
         page = it["wikiUrl"].rsplit("/", 1)[-1]
+        wiki_keys.add(f"wiki_{page}")
         blob = fetch(WIKI_RAW.format(title=page), f"wiki_{page}", off, critical=False)
         if blob:
             summary = acquisition_summary(blob.decode("utf-8", "replace").replace("\xa0", " "))
             if summary:
                 it["acquisition"] = summary
+    # a Prime that leaves the catalogue leaves its wiki page cached behind it
+    sources.prune_cache(wiki_keys)
+
     if aya_sources:
         log(f"aya            {len(aya_sources)} drop rows across "
             f"{len({(a['planet'], a['node']) for a in aya_sources})} nodes")

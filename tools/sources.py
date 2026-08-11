@@ -216,3 +216,36 @@ DROP_FILES = {
     "entratiLabRewards.json": "bounty:Entrati Labs (Deimos)",
     "hexRewards.json": "bounty:Hex (Hollvania)",
 }
+
+
+def prune_cache(live_keys: set[str]) -> int:
+    """
+    Drop cache entries nothing can ask for any more.
+
+    Most keys are fixed - one per upstream - so they overwrite themselves and
+    never accumulate. The exception is `wiki_<Item>`, one file per Prime whose
+    acquisition note we look up: when an item leaves the catalogue its cache
+    file has nothing left to serve and would sit there for good.
+
+    Only that family is pruned. In particular the `drops_*` mirror files are
+    left alone even on a run that used DE directly: they are the fallback that
+    keeps a build working when warframe.com is unreachable, so a successful
+    official run not touching them is exactly when they matter most.
+    """
+    if not os.path.isdir(CACHE_DIR):
+        return 0
+    dropped = 0
+    for fname in os.listdir(CACHE_DIR):
+        if not fname.startswith("wiki_") or not fname.endswith(".gz"):
+            continue
+        key = fname[:-3]
+        if key == "wiki_prime" or key in live_keys:
+            continue
+        try:
+            os.remove(os.path.join(CACHE_DIR, fname))
+            dropped += 1
+        except OSError:
+            pass
+    if dropped:
+        log(f"cache: pruned {dropped} wiki page(s) for items no longer listed")
+    return dropped

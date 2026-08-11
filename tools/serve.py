@@ -22,12 +22,16 @@ from __future__ import annotations
 import argparse
 import functools
 import http.server
+import json
 import os
 import socket
 import socketserver
 import sys
 import threading
+import time
 import webbrowser
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_PORT = 8777        # where the search starts, and the fixed port for --host
@@ -73,9 +77,75 @@ def lan_address() -> str | None:
         return None
 
 
+# Upstream freshness, checked by the server before it hands over stale data.
+#
+# The browser is not involved and does not know this happens. It asks for the
+# data file as usual; we check whether Digital Extremes have moved on since the
+# build, and plant the answer on the file as we serve it. That request blocks
+# while the check runs, which is a deliberate trade - a slow first load beats
+# quietly serving data you have no reason to trust.
+#
+# It could not be done from the page anyway: warframe.com and the artwork CDN
+# send no CORS headers, so a cross-origin fetch fails outright and a no-cors one
+# comes back opaque with unreadable headers. Having every visitor contact the
+# CDN would also undo the point of holding artwork locally.
+#
+# Verification only - three HEAD requests, no downloads, nothing rebuilt. It is
+# throttled to once an hour so a page reload does not hammer DE, and a failure
+# upstream is silent rather than alarming.
+FRESHNESS_TTL = 3600
+_freshness: dict = {"checked": 0.0, "body": None}
+_freshness_lock = threading.Lock()
+
+
+def freshness() -> dict:
+    with _freshness_lock:
+        age = time.time() - _freshness["checked"]
+        if _freshness["body"] is not None and age < FRESHNESS_TTL:
+            return _freshness["body"]
+    try:
+        import sources
+        sig = sources.upstream_signature(False)
+        prev = (sources.load_state() or {}).get("signature") or {}
+        moved = sorted(k for k in set(sig) | set(prev) if sig.get(k) != prev.get(k))
+        body = {"ok": True, "stale": bool(moved), "moved": moved,
+                "checkedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    except Exception as exc:                              # noqa: BLE001
+        # upstream unreachable is not the page's problem - say nothing rather
+        # than cry stale, which would be wrong and unactionable
+        body = {"ok": False, "stale": False, "error": str(exc)[:120]}
+    with _freshness_lock:
+        _freshness["checked"] = time.time()
+        _freshness["body"] = body
+    return body
+
+
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):  # noqa: A003 - keep the console readable
         pass
+
+    def do_GET(self):                                     # noqa: N802
+        """
+        The dataset is the one request worth checking before answering: it is
+        asked for exactly once per page load, by both pages, and it is the thing
+        that would be stale. Everything else is served untouched.
+        """
+        if self.path.split("?")[0].endswith("/data/vorframe-data.js"):
+            path = os.path.join(ROOT, "data", "vorframe-data.js")
+            if os.path.exists(path):
+                with open(path, "rb") as fh:
+                    blob = fh.read()
+                note = json.dumps(freshness())
+                tail = "\nwindow.VORFRAME_UPSTREAM = " + note + ";\n"
+                blob += tail.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/javascript")
+                self.send_header("Content-Length", str(len(blob)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(blob)
+                return
+        super().do_GET()
 
 
 def main() -> int:
