@@ -303,6 +303,27 @@ Files marked GENERATED are rebuilt by `build_data.py`; don't hand-edit them.
 
 ---
 
+### File encodings and line endings
+
+Everything is UTF-8 with no BOM, and line endings are chosen by what each file's
+interpreter actually needs — not by preference. Both are pinned in
+`.gitattributes` and checked by the suite, because neither failure is visible
+while editing:
+
+| Type | Endings | Charset | Why |
+|---|---|---|---|
+| `.cmd` | **CRLF** | ASCII | `cmd.exe` cannot parse an LF-only batch file, and reads them in the OEM codepage rather than UTF-8 |
+| `.ps1` | **CRLF** | ASCII | Windows PowerShell 5.1 reads BOM-less files as ANSI, so non-ASCII becomes mojibake |
+| `.sh` | **LF** | ASCII | A CRLF shell script fails to start at all: `bad interpreter: /usr/bin/env bash^M` |
+| everything else | LF | UTF-8 | Python, browsers and git all handle either; LF keeps diffs consistent |
+
+The two launcher families break in exactly opposite ways, which is why both are
+asserted rather than assumed. `.ps1` must also run under **both Windows PowerShell
+5.1 and pwsh 7+** under `Set-StrictMode`, which rules out a few conveniences —
+`$IsWindows` does not exist before 6.0 and *throws* under strict mode rather than
+being false, the three-argument `Join-Path` is 6.0+, and `??`/`?:` are 7.0+. The
+suite checks for each.
+
 ### Two stores, and who owns each
 
 VorFrame keeps state in two places and they never mix:

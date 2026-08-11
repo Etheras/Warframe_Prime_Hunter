@@ -1,3 +1,4 @@
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Register (or remove) a Windows Scheduled Task that keeps VorFrame's data current.
@@ -8,13 +9,20 @@
     drop table, and reads the trader window, then exits without rewriting anything.
     A full rebuild only happens when an upstream actually changed.
 
-    No LLM is involved at any point — every source is JSON or a regularly
+    No LLM is involved at any point - every source is JSON or a regularly
     structured HTML table, parsed deterministically.
+
+    Runs under both Windows PowerShell 5.1 and PowerShell 7+, under Set-StrictMode.
+    That rules out a few conveniences: $IsWindows does not exist before 6.0, so
+    testing it directly throws under strict mode on 5.1; the three-argument form of
+    Join-Path is 6.0+; and ?? and ?: are 7.0+. None are used here.
+
+    On macOS and Linux there is no Task Scheduler. Use cron instead - see README.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
-    powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 07:30
-    powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
+    pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 07:30
+    pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
 #>
 [CmdletBinding()]
 param(
@@ -24,12 +32,38 @@ param(
     [switch]$RunNow
 )
 
+Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
+
+# 5.1 is always Desktop edition and always Windows. Only ask about $IsWindows on
+# editions that define it, because under strict mode reading an undefined
+# variable is an error rather than $null.
+if ($PSVersionTable.PSEdition -eq "Desktop") {
+    $onWindows = $true
+} else {
+    $var = Get-Variable -Name IsWindows -ErrorAction SilentlyContinue
+    $onWindows = ($null -ne $var) -and [bool]$var.Value
+}
+
+if (-not $onWindows) {
+    Write-Host "Scheduled Tasks are a Windows feature, and this is not Windows."
+    Write-Host "Use cron instead. Run 'crontab -e' and add a daily line such as:"
+    Write-Host ""
+    Write-Host "  30 18 * * * cd /path/to/VorFrame && ./refresh-data.sh --if-changed"
+    Write-Host ""
+    exit 1
+}
+
+if (-not (Get-Module -ListAvailable -Name ScheduledTasks)) {
+    throw "The ScheduledTasks module is unavailable, so a task cannot be registered."
+}
+
 $root = Split-Path -Parent $PSScriptRoot
-$script = Join-Path $root "tools\build_data.py"
+$scriptPath = Join-Path $root "tools\build_data.py"
 
 if ($Remove) {
-    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($null -ne $existing) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         Write-Host "Removed scheduled task '$TaskName'."
     } else {
@@ -38,12 +72,23 @@ if ($Remove) {
     return
 }
 
-$python = (Get-Command python -ErrorAction SilentlyContinue).Source
-if (-not $python) { throw "python is not on PATH — cannot schedule the refresh." }
-if (-not (Test-Path $script)) { throw "Cannot find $script" }
+# Windows installs Python under several names, and the py launcher is common.
+# Take the first that exists rather than assuming; the task stores an absolute
+# path, so whatever is found here is what runs at 18:30.
+$python = $null
+foreach ($name in @("python", "python3", "py")) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($null -ne $cmd) { $python = $cmd.Source; break }
+}
+if ([string]::IsNullOrWhiteSpace($python)) {
+    throw "No Python on PATH (looked for python, python3, py) - cannot schedule the refresh."
+}
+if (-not (Test-Path -LiteralPath $scriptPath)) {
+    throw "Cannot find $scriptPath"
+}
 
 $action = New-ScheduledTaskAction -Execute $python `
-    -Argument "`"$script`" --if-changed" -WorkingDirectory $root
+    -Argument "`"$scriptPath`" --if-changed" -WorkingDirectory $root
 
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
 
@@ -53,12 +98,14 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
     -MultipleInstances IgnoreNew
 
+$description = "Refreshes VorFrame's Prime data from Digital Extremes' drop table " +
+               "and public export. Rebuilds only when upstream changes."
+
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
-    -Settings $settings -Description "Refreshes VorFrame's Prime data from Digital Extremes' drop table and public export. Rebuilds only when upstream changes." `
-    -Force | Out-Null
+    -Settings $settings -Description $description -Force | Out-Null
 
 Write-Host "Scheduled '$TaskName' daily at $Time."
-Write-Host "  runs: $python `"$script`" --if-changed"
+Write-Host "  runs: $python `"$scriptPath`" --if-changed"
 Write-Host "  from: $root"
 Write-Host ""
 Write-Host "Check it:    Get-ScheduledTask -TaskName '$TaskName'"
@@ -67,5 +114,6 @@ Write-Host "Remove it:   powershell -ExecutionPolicy Bypass -File tools\schedule
 
 if ($RunNow) {
     Start-ScheduledTask -TaskName $TaskName
-    Write-Host "`nStarted the task once now."
+    Write-Host ""
+    Write-Host "Started the task once now."
 }

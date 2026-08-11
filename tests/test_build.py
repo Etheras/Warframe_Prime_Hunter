@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -424,6 +425,33 @@ def test_launchers_are_runnable() -> None:
         check(f"{name}: no CR anywhere", raw.count(b"\r"), 0,
               "a CRLF shell script will not run on macOS or Linux")
         check_true(f"{name}: has a shebang", raw.startswith(b"#!"))
+
+    # PowerShell must run under both Windows PowerShell 5.1 and pwsh 7+. These
+    # are the constructs that quietly split them; each is a real trap rather
+    # than a hypothetical one.
+    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.ps1"))):
+        name = os.path.basename(path)
+        text = open(path, encoding="utf-8").read()
+        raw = open(path, "rb").read()
+        check(f"{name}: CRLF endings", raw.count(b"\r" + b"\n"),
+              raw.count(b"\n"),
+              "5.1 is happiest with CRLF, and reads BOM-less files as ANSI")
+        check(f"{name}: pure ASCII", [hex(b) for b in sorted({b for b in raw if b > 127})], [])
+        check_true(f"{name}: declares a minimum version", "#Requires -Version" in text)
+        # $IsWindows does not exist before 6.0, so reading it directly is an
+        # error under Set-StrictMode on 5.1 rather than simply false
+        naked = re.findall(r"(?<!Name )(?<!-Name )" + re.escape("$IsWindows"), text)
+        guarded = "Get-Variable -Name IsWindows" in text
+        check_true(f"{name}: $IsWindows is guarded for 5.1", not naked or guarded,
+                   "reading it unguarded throws under strict mode on 5.1")
+        # strip comments first - the script's own docstring names these
+        # operators to explain why they are avoided, which is not a use of them
+        code = re.sub(r"<#.*?#>", "", text, flags=re.S)
+        code = re.sub(r"^\s*#.*$", "", code, flags=re.M)
+        for bad, why in ((" ?? ", "null-coalescing is 7.0+"),
+                         (" ? ", "ternary is 7.0+"),
+                         ("-Parallel", "ForEach-Object -Parallel is 7.0+")):
+            check(f"{name}: no {bad.strip()}", bad in code, False, why)
 
 
 def test_bundle_is_self_contained() -> None:
