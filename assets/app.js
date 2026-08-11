@@ -938,7 +938,11 @@
             <span class="part-name">${esc(p.name)}</span>
             <span class="part-count">${list.length}${
               list.length !== total ? ` of ${total}` : ""} relic${total === 1 ? "" : "s"}${
-              need > 1 ? " · need " + need : ""}</span>
+              need > 1 ? " · need " + need : ""}${
+              p.ducats ? ` · <span class="ducats" data-tip="${esc(
+                "Baro Ki'Teer pays " + p.ducats + " ducats for a spare " + p.name +
+                "." + "\n" + "A fixed game value, not a market price.")
+              }">${p.ducats}d</span>` : ""}</span>
           </div>`;
 
         if (!list.length) {

@@ -269,6 +269,8 @@ VorFrame/
 ├── index.html              ← the collection: filters, cards, detail drawer
 ├── plan.html               ← the farm planner (Stage 2)
 ├── serve.cmd               ← double-click: serve the site and open a browser
+├── serve-lan.cmd           ← same, but reachable from your network (no login!)
+├── CHANGELOG.md            ← GENERATED — what became farmable between builds
 ├── refresh-data.cmd        ← double-click data refresh
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
@@ -591,11 +593,15 @@ Prime Resurgence rotation. So one Aya is one relic *of your choosing* from that
 rotation — strictly better than a random relic off a drop table, because you pick
 it.
 
-Its value is therefore computed, not assumed: the best value any Resurgence relic
-would have for your list, at its best refinement. Relics carry a `resurgence` flag
-marking the ones an Aya can be spent on (88 of 763 at the time of writing). If your
-list wants nothing from the current rotation, Aya scores **zero** here, however
-useful it may be to bank for a later one.
+**It is a wildcard against the vault, not a voucher for this rotation.** Aya is
+banked, and Varzia's stock turns over every 28 days, so Aya held today buys from
+whatever the *next* rotation offers. Its value is therefore the best **vaulted**
+relic on your list, at its best refinement — not the best relic currently on sale.
+
+It counts only for items that are **not farmable**. Almost any part turns up in some
+vaulted relic somewhere, so without that test a list of purely farmable Primes would
+still score Aya — and if you can simply go and farm it, Aya buys you nothing. So:
+something vaulted on your list means Aya has value; nothing vaulted means zero.
 
 **It only ever inflates a node already worth running.** Same rule as Forma, and for
 the same reason: standing on its own it would send you to a bounty that drops Aya

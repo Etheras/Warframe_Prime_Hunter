@@ -691,6 +691,13 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 
 /* mission type, beside the node name */
 .rounds{color:inherit}
+/* Ducat value of a spare part. Same weight as the rest of the part meta - it
+   is a fact about the part, not a recommendation to sell it. */
+.ducats{
+  text-decoration:underline dotted;text-underline-offset:3px;
+  cursor:help;
+}
+
 /* Aya marker on a node row. No colour of its own: it is one more fact about
    the node, sitting with the level and the relic count, not a state or a
    warning. Dotted only, so it still reads as hoverable (STYLE.md section 4). */

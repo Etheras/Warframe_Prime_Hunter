@@ -415,25 +415,48 @@
     });
 
     /* ── Aya ──────────────────────────────────────────────────────────
-       One Aya buys one relic *of your choosing* at Varzia, and Varzia stocks
-       the current Prime Resurgence rotation. So an Aya drop is worth the best
-       relic you could spend it on - strictly better than a random relic off a
-       drop table, because you pick it. If nothing in the rotation is on your
-       list it is worth nothing to this plan, however much it is worth later.
+       Aya is banked, not spent immediately. Varzia's stock rotates every 28
+       days, so Aya held today buys from whatever the *next* rotation offers -
+       which makes it a wildcard against the vault as a whole, not a voucher
+       for the five items currently on sale. It is worth something for exactly
+       as long as there is a vaulted Prime you still want, and worth nothing
+       the moment there is not.
+
+       That is also why it beats a relic from the farmable rotation: a relic
+       gives you one random reward from its own table, while Aya gives you your
+       pick of any vaulted relic. So it is priced at the best vaulted relic on
+       your list - and only vaulted ones, since anything still farmable needs
+       no Aya to reach.
 
        Crucially it only ever *inflates a node you were already going to run*.
        Letting it stand on its own would send you to a bounty that drops Aya
        and nothing else, ahead of a node carrying a part you actually need -
        the same mistake Forma would make if it could add a relic. */
-    let ayaValue = 0, ayaRelic = null;
+    let ayaValue = 0, ayaRelic = null, ayaBuyableNow = false;
     if (opts.aya) {
+      /* Aya is worth something for exactly as long as something you want is
+         vaulted. A filter is needed because almost any part turns up in some
+         vaulted relic somewhere, so without one a list of purely farmable
+         Primes would still score Aya - and if you can just go and farm it,
+         Aya buys you nothing. The test is the item, not the part: if it is
+         not farmable, Aya is a route to it. */
+      const locked = new Set();
+      wishlist.forEach((id) => {
+        const it = BY_ID.get(id);
+        if (!it || (it.flags || {}).farmable) return;
+        (it.parts || []).forEach((p) => locked.add(`${it.name} ${p.name}`));
+      });
+
       Object.keys(RELICS).forEach((rname) => {
         const rec = RELICS[rname];
-        if (!rec || !rec.resurgence) return;
-        const entries = want.get(rname);
-        if (!entries || !entries.some((e) => !e.bonus)) return;
+        if (!rec || !rec.vaulted) return;      // farmable needs no Aya
+        const entries = (want.get(rname) || []).filter((e) => !e.bonus && locked.has(e.label));
+        if (!entries.length) return;
         const { value } = bestRefinement(entries);
-        if (value > ayaValue) { ayaValue = value; ayaRelic = rname; }
+        if (value > ayaValue) {
+          ayaValue = value; ayaRelic = rname;
+          ayaBuyableNow = !!rec.resurgence;    // on sale this rotation, or a later one
+        }
       });
     }
     if (ayaValue > 0) {
@@ -472,7 +495,8 @@
       return (a.node || "").localeCompare(b.node || "");
     });
 
-    return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic };
+    return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
+             ayaBuyableNow };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -634,7 +658,8 @@
 
   function render() {
     renderWishlist();
-    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic } = buildPlan();
+    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
+            ayaBuyableNow } = buildPlan();
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
     $("#formaShort").classList.toggle("on", formaShort > 0);
@@ -661,9 +686,12 @@
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
-      (ayaValue > 0 ? " Aya counts too — one buys <b>" + esc(ayaRelic) + "</b> at " +
-        "Varzia, worth " + pct(ayaValue) + " to your list — but only at nodes " +
-        "already worth running." : "") +
+      (ayaValue > 0 ? " Aya counts too. It is a wildcard against the vault — banked " +
+        "now, spent on a later rotation — so it is priced at the best vaulted relic " +
+        "on your list, <b>" + esc(ayaRelic) + "</b> at " + pct(ayaValue) +
+        (ayaBuyableNow ? ", which Varzia is selling right now" :
+          ", which a future rotation would have to offer") +
+        ". It only ever raises nodes already worth running." : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
@@ -896,6 +924,100 @@
           "</code> to refresh.";
     const header = document.querySelector("header.topbar");
     if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
+  }
+
+  /* ── backup ───────────────────────────────────────────────────────────
+     The same dialog the collection page carries, because a backup button that
+     only exists on one of two equal views is an odd place to put it.
+
+     Export is identical: every key the app writes. Import validates the shape
+     and the item ids, writes the keys, and reloads - the reload is what makes
+     the collection page pick the new state up, and it keeps the careful
+     per-part merging in app.js as the single implementation rather than
+     copying it here. */
+  const BACKUP_KEYS = {
+    collected: "vorframe.collected.v1",
+    parts: "vorframe.parts.v1",
+    materials: "vorframe.materials.v1",
+    wishlist: KEY_WISH,
+    plan: KEY_PLAN,
+    filters: "vorframe.filters.v1",
+  };
+  const readKey = (k, fallback) => {
+    try { return JSON.parse(localStorage.getItem(k) || "null") ?? fallback; }
+    catch (e) { return fallback; }
+  };
+
+  const dlg = $("#dataDlg");
+  const dbtn = $("#dataBtn");
+  if (dlg && dbtn) {
+    dbtn.addEventListener("click", () => {
+      $("#dataArea").value = JSON.stringify({
+        vorframe: 3,
+        exported: new Date().toISOString(),
+        collected: readKey(BACKUP_KEYS.collected, []),
+        parts: readKey(BACKUP_KEYS.parts, {}),
+        materials: readKey(BACKUP_KEYS.materials, []),
+        wishlist: readKey(BACKUP_KEYS.wishlist, []),
+        filters: readKey(BACKUP_KEYS.filters, null),
+        plan: readKey(BACKUP_KEYS.plan, {}),
+      });
+      $("#dlgMsg").style.color = ""; $("#dlgMsg").textContent = "";
+      dlg.showModal();
+    });
+    $("#dlgCloseBtn").addEventListener("click", () => dlg.close());
+    $("#copyBtn").addEventListener("click", () => {
+      $("#dataArea").select();
+      try { document.execCommand("copy"); $("#dlgMsg").textContent = "Copied."; }
+      catch (e) { $("#dlgMsg").textContent = "Press Ctrl+C to copy."; }
+    });
+    $("#importBtn").addEventListener("click", () => {
+      try {
+        const raw = JSON.parse($("#dataArea").value);
+        const payload = Array.isArray(raw) ? { collected: raw } : raw;
+        if (!payload || typeof payload !== "object" || !Array.isArray(payload.collected)) {
+          throw new Error("this doesn't look like a VorFrame backup");
+        }
+        let skipped = 0;
+        const keep = (ids) => (ids || []).filter((id) => {
+          if (BY_ID.has(id)) return true;
+          skipped++; return false;
+        });
+        const wrote = [];
+        const put = (key, value) => {
+          if (value == null) return;
+          try { localStorage.setItem(key, JSON.stringify(value)); wrote.push(key); }
+          catch (e) { /* non-fatal */ }
+        };
+        put(BACKUP_KEYS.collected, keep(payload.collected));
+        if (Array.isArray(payload.wishlist)) put(BACKUP_KEYS.wishlist, keep(payload.wishlist));
+        if (payload.parts && typeof payload.parts === "object") {
+          const parts = {};
+          Object.keys(payload.parts).forEach((id) => {
+            if (BY_ID.has(id)) parts[id] = payload.parts[id]; else skipped++;
+          });
+          put(BACKUP_KEYS.parts, parts);
+        }
+        if (Array.isArray(payload.materials)) put(BACKUP_KEYS.materials, payload.materials);
+        if (payload.filters) put(BACKUP_KEYS.filters, payload.filters);
+        if (payload.plan && typeof payload.plan === "object") {
+          const cur = readKey(BACKUP_KEYS.plan, {}) || {};
+          ["squad", "event", "railjack", "runMode", "aya"].forEach((k) => {
+            if (payload.plan[k] !== undefined) cur[k] = payload.plan[k];
+          });
+          put(BACKUP_KEYS.plan, cur);
+        }
+        $("#dlgMsg").style.color = "";
+        $("#dlgMsg").textContent =
+          `Imported ${wrote.length} section${wrote.length === 1 ? "" : "s"}` +
+          (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped` : "") +
+          ". Reloading…";
+        setTimeout(() => location.reload(), 700);
+      } catch (err) {
+        $("#dlgMsg").style.color = "var(--red)";
+        $("#dlgMsg").textContent = "Could not read that: " + err.message;
+      }
+    });
   }
 
   staleBanner();

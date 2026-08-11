@@ -243,6 +243,14 @@ def test_built_payload() -> None:
     check("payload: Aya rows are Aya only",
           [a for a in (aya or []) if "ayatan" in str(a.get("item", "")).lower()], [])
 
+    # ducats are a fixed game value, published per component - not a guess
+    parts = [p for i in D["items"] for p in (i.get("parts") or [])]
+    withd = [p for p in parts if p.get("ducats")]
+    check_true("payload: ducat values present", len(withd) > len(parts) * 0.9,
+               "Baro's price per spare part; deterministic, so it should be near-total")
+    check("payload: ducats are the known values",
+          sorted({p["ducats"] for p in withd}), [15, 25, 45, 65, 100])
+
     # part names must be normalised, since saved progress is keyed on them
     raw = [p["name"] for i in D["items"] for p in (i.get("parts") or [])
            if p["name"] != "Blueprint" and p["name"].endswith(" Blueprint")]

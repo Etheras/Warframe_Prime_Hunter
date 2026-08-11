@@ -109,6 +109,13 @@ python tools/serve.py
 Your browser opens at `http://localhost:8777`. Leave the terminal window open while
 you use the site — closing it shuts the server down.
 
+**To open it on your phone**, double-click `serve-lan.cmd` instead (or
+`python tools/serve.py --host 0.0.0.0`). It prints the address to type in. Note there
+is no login and no encryption — anyone on your network can read *and* overwrite your
+collection through the Backup box, so only do this at home. The local-only server
+walks up from port 8777 to find a free one; the network one keeps 8777 fixed, so a
+bookmark on your phone survives a restart.
+
 > You *can* open `index.html` directly instead. It is quicker, but some browsers
 > refuse to persist storage for pages opened over `file://`, so your ticks may not
 > survive a restart. Serving the folder always saves properly.
@@ -269,9 +276,16 @@ detail line — hover for the rate. Two things worth knowing:
 
 - It **only raises the value of a node you were already going to run.** It will never
   put an Aya-only bounty ahead of somewhere carrying a part you need.
-- If your list wants nothing from the current Resurgence rotation, Aya is worth
-  nothing *to this plan* — even though banking it for a later rotation is still
-  sensible.
+- It counts **only for vaulted things**. Aya is a wildcard against the vault — you
+  bank it and spend it on a later rotation — so it is worth the best *vaulted* item on
+  your list. If everything you still want is farmable, Aya is worth nothing, because
+  you can simply go and get those.
+
+### Ducat values
+
+Each part shows what Baro Ki'Teer pays for a spare — `15d`, `65d` and so on. It is a
+fixed game value published per component, not a market price, so it is exact rather
+than an estimate. Useful for deciding which duplicates to keep.
 
 ### Advanced options
 

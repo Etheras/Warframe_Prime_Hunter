@@ -29,6 +29,7 @@
   </div>
 
   <div class="topbar-right">
+    <button class="btn ghost" id="dataBtn" data-tip="Backup or restore everything — collection, parts, farm list and options">Backup</button>
   </div>
 </header>
 
@@ -123,6 +124,18 @@
     </section>
   </main>
 </div>
+
+<dialog id="dataDlg" class="dlg">
+  <h3>Backup / restore</h3>
+  <p class="dlg-note">Everything lives in this browser's local storage — collection, per-part progress, materials, farm list and planner options. Copy the text below to back it up, or paste a backup in and press Import.</p>
+  <textarea id="dataArea" spellcheck="false" rows="8"></textarea>
+  <div class="dlg-actions">
+    <button class="btn" id="importBtn">Import</button>
+    <button class="btn ghost" id="copyBtn">Copy</button>
+    <button class="btn ghost" id="dlgCloseBtn">Close</button>
+  </div>
+  <p class="dlg-msg" id="dlgMsg"></p>
+</dialog>
 
 <script src="data/vorframe-data.js"></script>
 <script src="assets/plan.js"></script>

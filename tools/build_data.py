@@ -129,6 +129,66 @@ def acquire_export(offline: bool):
 
 
 
+def write_changelog(items: list, relics_out: dict,
+                    prev_state: dict, new_state: dict) -> list:
+    """
+    Record what changed in availability since the last build.
+
+    A scheduled build rewrites 1.8 MB of JSON whether or not anything moved, so
+    "Frost Prime became farmable" was invisible without diffing the payload.
+    This keeps a small roster of what was farmable last time, compares, and
+    appends a dated entry to CHANGELOG.md when it differs.
+
+    Only availability is tracked, because that is the part a player acts on -
+    an unvaulting is worth knowing about, a rebalanced drop chance is not.
+    """
+    now = {i["name"]: i["flags"]["farmable"] for i in items if i.get("flags")}
+    live_relics = {n for n, r in relics_out.items() if not r["vaulted"]}
+    prev = prev_state.get("availability") or {}
+    prev_items = prev.get("items") or {}
+    prev_relics = set(prev.get("relics") or [])
+
+    lines_out = []
+    if prev_items:                       # nothing to compare on the first build
+        gained = sorted(n for n, f in now.items() if f and not prev_items.get(n))
+        lost = sorted(n for n, f in prev_items.items() if f and not now.get(n))
+        new_items = sorted(set(now) - set(prev_items))
+        r_in = sorted(live_relics - prev_relics)
+        r_out = sorted(prev_relics - live_relics)
+        if gained:
+            lines_out.append(f"- **Unvaulted** ({len(gained)}): " + ", ".join(gained))
+        if lost:
+            lines_out.append(f"- **Vaulted** ({len(lost)}): " + ", ".join(lost))
+        if new_items:
+            lines_out.append(f"- **New to the catalogue** ({len(new_items)}): "
+                         + ", ".join(new_items))
+        if r_in:
+            lines_out.append(f"- Relics now dropping ({len(r_in)}): " + ", ".join(r_in))
+        if r_out:
+            lines_out.append(f"- Relics no longer dropping ({len(r_out)}): " + ", ".join(r_out))
+
+    if lines_out:
+        path = os.path.join(ROOT, "CHANGELOG.md")
+        NL = chr(10)
+        header = ("# Availability changelog" + NL + NL +
+                  "What became farmable, or stopped being farmable, between builds."
+                  + NL + "Written by `tools/build_data.py`; nothing else edits it." + NL)
+        old = ""
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as fh:
+                old = fh.read()
+            if old.startswith("# Availability"):
+                old = old.split(NL, 4)[-1]
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(header + NL + "## " + stamp + NL + NL
+                     + NL.join(lines_out) + NL + NL + old.lstrip())
+        log(f"changelog     {len(lines_out)} availability change(s) -> CHANGELOG.md")
+
+    new_state["availability"] = {"items": now, "relics": sorted(live_relics)}
+    return lines_out
+
+
 def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
@@ -351,6 +411,10 @@ def main() -> int:
             parts.append({
                 "name": normalise_part(comp.get("name")),
                 "itemCount": comp.get("itemCount"),
+                # What Baro pays for a spare. A fixed game constant, published
+                # per component in the item database, so it needs no guessing -
+                # a duplicate Blueprint is 15 ducats whoever you ask.
+                "ducats": comp.get("ducats"),
                 "relics": part_relics,
             })
 
@@ -566,12 +630,15 @@ def main() -> int:
         fh.write(";\n")
 
     # remember what upstream looked like, so --if-changed can skip next time
-    save_state({
+    new_state = {
         "built": payload["meta"]["generated"],
         "signature": upstream_signature(off) if not off else (state.get("signature") or {}),
         "exportHash": export_hash,
         "dropSource": drop_source,
-    })
+    }
+    # compares against the roster the *last* build left behind
+    write_changelog(out_items, relics_out, state, new_state)
+    save_state(new_state)
 
     # ---- report ----------------------------------------------------------
     print("-" * 60)
