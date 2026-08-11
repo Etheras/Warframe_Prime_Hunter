@@ -55,6 +55,36 @@ per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
 
+### Serving to a network has no access control at all
+
+Raised 2026-08-11 while planning a Raspberry Pi deployment, and the reason that
+deployment was shelved rather than done.
+
+`serve-lan.cmd` / `serve-lan.sh` bind to every interface so a phone can reach the
+site. There is no login, no encryption, and **Backup/Restore is in the page** — so
+anyone who can reach the port can read your collection *and* overwrite it. On a
+laptop you close, that is a short window you control. On an always-on Pi it is
+permanent, and the box is likely running other things worth not exposing.
+
+The scripts say so plainly before starting, which is honest but is not a control.
+Nothing here is secret — it is public game data plus your own tick-list — so this
+is about integrity rather than confidentiality: the realistic damage is someone
+wiping your progress, by accident or otherwise.
+
+**Options, roughly in order of effort:**
+
+1. **Read-only mode.** A `--read-only` flag that serves the site with Backup/Restore
+   and every tick disabled. Turns a write risk into a view-only one and needs no
+   credentials at all. Probably the right answer for a shared Pi.
+2. **Bind to one interface** rather than `0.0.0.0`, so it is reachable from the
+   subnet you mean and not, say, a guest VLAN.
+3. **Basic auth**, which means HTTPS to be worth anything, which means certificates —
+   a lot of machinery for a personal tracker.
+4. **Leave it as is** and treat the warning as sufficient, on the grounds that a home
+   LAN is a trusted network. Defensible; just decide it deliberately.
+
+Whichever way, decide before putting it on a box that is always on.
+
 ### The banner guesses who is reading it from the hostname
 
 `staleBanner()` decides whether to add "Double-click `refresh-data.cmd` to update it"
