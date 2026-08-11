@@ -273,7 +273,7 @@ VorFrame/
 ├── serve.cmd               ← double-click: serve the site and open a browser
 ├── serve-lan.cmd           ← same, but reachable from your network (no login!)
 ├── CHANGELOG.md            ← GENERATED — what became farmable between builds
-├── refresh-data.cmd        ← double-click data refresh
+├── refresh-data.cmd        ← double-click: the one way to look after the site
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
 │   ├── app.js              ← filtering, collection state, detail drawer

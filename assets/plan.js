@@ -171,7 +171,7 @@
   if (!DATA || !DATA.items) {
     document.body.innerHTML =
       '<p style="padding:40px;font:16px system-ui;color:#e6ebf2">' +
-      "Data file missing. Run <code>python tools/build_data.py</code> and reload.</p>";
+      "No data yet. Double-click <code>refresh-data.cmd</code>, then reload this page.</p>";
     return;
   }
 
@@ -919,24 +919,28 @@
 
     const el = document.createElement("div");
     el.className = "databar " + (degraded ? "bad" : "warn");
-    const cmd = "python tools/build_data.py";
+
+    /* Two audiences. Whoever runs the server can fix this and is told how, in
+       the only terms that matter to them - the file they double-click. Anyone
+       else is just reading someone else's copy: telling them to run a script
+       they do not have is noise, so they get the warning and nothing more.
+       Being on localhost is the closest thing to "this is your copy" that the
+       page can actually know. */
+    const yours = ["localhost", "127.0.0.1", "::1", ""].indexOf(location.hostname) >= 0;
+    const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
+
     el.innerHTML = moved
-      ? "<b>Digital Extremes have published newer data.</b> " +
-        esc(moved.join(", ")) + " changed since this build was made. " +
-        "Re-run <code>" + cmd + "</code> to pick it up."
+      ? "<b>Out of date.</b> Digital Extremes have published newer data than this." + fix
       : degraded
-      ? "<b>Some data is missing.</b> This build could not reach " +
-        esc(degraded.join(", ")) + " and had nothing cached to fall back on, so " +
-        "items or drop locations may be absent. Re-run <code>" + cmd + "</code>."
-      : stale
-        ? "<b>Showing older data.</b> The last refresh could not reach " +
-          esc(stale.join(", ")) + ", so a cached copy is being used" +
-          (days ? " (built " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
-          ". Vaulting and Resurgence may be out of date — use with care, and " +
-          "re-run <code>" + cmd + "</code>."
-        : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
-          "28 days and drop tables change with each update. Re-run <code>" + cmd +
-          "</code> to refresh.";
+        ? "<b>Some data is missing.</b> This copy was built without " +
+          esc(degraded.join(", ")) + ", so items or drop locations may be absent." + fix
+        : stale
+          ? "<b>Showing older data.</b> The last update could not reach " +
+            esc(stale.join(", ")) + ", so an earlier copy is being shown" +
+            (days ? " (from " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
+            ". Vaulting and Resurgence may have moved on since." + fix
+          : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
+            "28 days, and drop tables change with each update." + fix;
     const header = document.querySelector("header.topbar");
     if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
   }
@@ -1032,6 +1036,56 @@
         $("#dlgMsg").style.color = "var(--red)";
         $("#dlgMsg").textContent = "Could not read that: " + err.message;
       }
+    });
+  }
+
+  /* Save to a file / restore from a file.
+
+     Copy-and-paste works and stays, but it assumes you know what to do with a
+     wall of JSON. These two do the same job for anyone who does not: one
+     downloads a dated .json, the other reads one back and runs the same import
+     the textarea does, so there is only one code path to be right. */
+  function backupFilename() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `vorframe-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+  }
+  const dl = document.getElementById("downloadBtn");
+  if (dl) {
+    dl.addEventListener("click", () => {
+      const blob = new Blob([document.getElementById("dataArea").value],
+                            { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = backupFilename();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      const msg = document.getElementById("dlgMsg");
+      msg.style.color = "";
+      msg.textContent = "Saved as " + a.download + " — keep it somewhere safe.";
+    });
+  }
+  const up = document.getElementById("uploadBtn");
+  const upFile = document.getElementById("uploadFile");
+  if (up && upFile) {
+    up.addEventListener("click", () => upFile.click());
+    upFile.addEventListener("change", () => {
+      const file = upFile.files && upFile.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById("dataArea").value = String(reader.result || "");
+        document.getElementById("importBtn").click();   // one import, not two
+      };
+      reader.onerror = () => {
+        const msg = document.getElementById("dlgMsg");
+        msg.style.color = "var(--red)";
+        msg.textContent = "Could not read that file.";
+      };
+      reader.readAsText(file);
+      upFile.value = "";                                 // same file twice works
     });
   }
 

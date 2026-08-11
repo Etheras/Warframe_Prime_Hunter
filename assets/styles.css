@@ -706,23 +706,29 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   cursor:help;
 }
 
-/* Data-freshness bar, shown under the top bar when a refresh failed or the
-   build is old. Gold for "behind", red for "incomplete" - it reports a state of
-   the data, not a rarity or an action, so it gets its own left-edge accent
-   rather than borrowing a palette that means something else. */
+/* Data-freshness bar. Deliberately the loudest thing on the page: it only
+   appears when what you are looking at cannot be trusted, and it competes with
+   a screen already full of gold and violet. Amber for "behind", red for
+   "incomplete" - a solid fill rather than a left edge, because the left-edge
+   version read as decoration and got scrolled past. */
 .databar{
-  padding:10px 20px;
-  font-size:13px;line-height:1.5;
-  background:var(--panel);
-  border-bottom:1px solid var(--line);
-  border-left:3px solid var(--gold);
-  color:var(--txt);
+  padding:11px 20px;
+  font-size:13.5px;line-height:1.5;
+  background:linear-gradient(90deg,#f0a03a,#e8893a);
+  color:#231402;
+  border-bottom:1px solid #8a5a18;
+  font-weight:500;
 }
-.databar.bad{border-left-color:var(--red)}
+.databar b{font-weight:700}
+.databar.bad{
+  background:linear-gradient(90deg,#e8607a,#d9455f);
+  color:#2a0710;
+  border-bottom-color:#8a2438;
+}
 .databar code{
-  padding:1px 6px;border-radius:5px;
-  background:var(--bg);color:var(--txt-dim);
-  font-size:12px;
+  padding:1px 7px;border-radius:5px;
+  background:rgba(0,0,0,.22);color:inherit;
+  font-size:12.5px;font-weight:600;
 }
 
 /* a rotation that does not follow A->A->B->C. Its own colour so it reads as

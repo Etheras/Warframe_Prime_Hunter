@@ -35,6 +35,17 @@ error in it. Matching the surrounding text and changing only the hue is the quie
 and more accurate signal. Note this puts it below the §3 contrast floor, which the
 whole meta line already is — see `TODO.md`.
 
+**The data banner is deliberately the loudest thing on the page.** Solid amber for
+"behind", solid red for "incomplete" — not a tinted panel with a coloured edge, which
+is what it was first and which read as decoration and got scrolled past. It is the one
+element allowed to shout, because it only appears when what you are looking at cannot
+be trusted.
+
+**Write for whoever is actually reading.** The same banner is seen by the person who
+runs the server and by anyone they shared the address with. Only the first can fix
+anything, so only they are told how — and in their terms, the file they double-click,
+never a command line. Everyone else gets the warning and nothing they cannot act on.
+
 **Vaulted / unobtainable fades to violet** (`rgba(157,123,234,…)`), matching the
 Resurgence badge, because Prime Resurgence is how vaulted things come back. This
 is our convention, not a Digital Extremes palette — none is published.

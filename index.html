@@ -150,11 +150,14 @@
 <!-- ────────────── backup dialog ────────────── -->
 <dialog id="dataDlg" class="dlg">
   <h3>Backup / restore collection</h3>
-  <p class="dlg-note">Your collection lives in this browser's local storage. Copy the text below to back it up, or paste a backup in and press Import.</p>
+  <p class="dlg-note">Save your collection to a file, or restore one you saved before. The box below is the same thing as text, if you would rather copy and paste it.</p>
   <textarea id="dataArea" spellcheck="false" rows="8"></textarea>
   <div class="dlg-actions">
-    <button class="btn" id="importBtn">Import</button>
-    <button class="btn ghost" id="copyBtn">Copy</button>
+    <button class="btn" id="downloadBtn">Download backup</button>
+    <button class="btn" id="uploadBtn">Restore from file</button>
+    <input type="file" id="uploadFile" accept=".json,.txt,application/json" hidden>
+    <button class="btn ghost" id="copyBtn">Copy text</button>
+    <button class="btn ghost" id="importBtn">Paste &amp; restore</button>
     <button class="btn ghost" id="dlgCloseBtn">Close</button>
   </div>
   <p class="dlg-msg" id="dlgMsg"></p>

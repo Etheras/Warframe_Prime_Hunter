@@ -64,15 +64,19 @@ No release download is published — the repository *is* the app.
 
 ## Setup
 
-Fetch the game data once. On Windows, double-click `refresh-data.cmd`, or from a
-terminal on any platform:
+On Windows, **double-click `refresh-data.cmd`**. On macOS or Linux:
 
 ```bash
-python tools/build_data.py
+python tools/build_data.py --with-images
 ```
 
-It takes about a minute and downloads the current Prime and relic data straight
-from Digital Extremes. That is the entire setup — nothing is installed.
+That is the whole setup — nothing is installed. It fetches the current Prime and
+relic data straight from Digital Extremes, and pulls the item artwork down so the
+site needs no internet connection while you use it. First run takes a couple of
+minutes, mostly pictures; later runs are quick, and only fetch what changed.
+
+`refresh-data.cmd` is how you look after the site from then on. Run it whenever you
+want fresher data — it updates everything, and cleans up anything it no longer needs.
 
 > The dataset is deliberately **not** committed to the repository, so a fresh clone
 > always needs this step first. It also means you start with today's data rather
@@ -323,8 +327,14 @@ At the bottom of the sidebar:
 
 ## Backing up your progress
 
-Your ticks are stored in your browser, and both pages read the same store. Click **Backup** at the top right to copy
-them out as text, or paste a saved copy back in and press **Import**.
+Your ticks are stored in your browser, and both pages read the same store. Click
+**Backup** at the top right, then:
+
+- **Download backup** saves everything to a dated `.json` file. Keep it somewhere safe.
+- **Restore from file** reads one back.
+
+There is also a text box with the same content, if you would rather copy and paste it
+somewhere yourself.
 
 The backup covers everything: whole-item ticks, per-part progress, and your
 materials list. Old backups from an earlier version still import — they're treated
