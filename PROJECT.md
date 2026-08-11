@@ -270,10 +270,10 @@ VorFrame/
 ├── NOTICE.md               ← upstream sources and their terms
 ├── index.html              ← the collection: filters, cards, detail drawer
 ├── plan.html               ← the farm planner (Stage 2)
-├── serve.cmd               ← double-click: serve the site and open a browser
-├── serve-lan.cmd           ← same, but reachable from your network (no login!)
+├── serve.cmd / serve.sh    ← serve the site and open a browser
+├── serve-lan.cmd / .sh     ← same, but reachable from your network (no login!)
 ├── CHANGELOG.md            ← GENERATED — what became farmable between builds
-├── refresh-data.cmd        ← double-click: the one way to look after the site
+├── refresh-data.cmd / .sh  ← the one way to look after the site
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
 │   ├── app.js              ← filtering, collection state, detail drawer

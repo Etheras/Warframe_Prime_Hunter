@@ -1,9 +1,12 @@
 # Normalise to LF inside the repo so diffs stay clean across machines.
 * text=auto eol=lf
 
-# ...except the Windows scripts, which must keep CRLF to run reliably.
+# The launchers break in opposite ways, so both are pinned. cmd.exe cannot parse
+# an LF-only batch file; a shell script with CRLF fails to start at all on macOS
+# and Linux, with "bad interpreter: /usr/bin/env bash^M".
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+*.sh  text eol=lf
 
 # Generated payload: big, machine-written, and not useful to read in a diff.
 data/vorframe-data.js linguist-generated=true -diff

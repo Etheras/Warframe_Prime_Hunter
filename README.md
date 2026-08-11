@@ -29,9 +29,18 @@ no account.
 - Windows, macOS or Linux
 
 Nothing else. There are no dependencies to install: no Node, no npm, no `pip
-install`, no build step. The `.cmd` helper scripts are Windows convenience
-wrappers; on macOS and Linux you run the same Python commands directly, given
-alongside each step below.
+install`, no build step.
+
+Every task has a launcher for both platforms — `.cmd` to double-click on Windows,
+`.sh` to run on macOS and Linux — and they do exactly the same thing. The Python
+underneath is identical on all three; only the launchers and the scheduler differ.
+
+| Task | Windows | macOS / Linux |
+|---|---|---|
+| Get or update the data | `refresh-data.cmd` | `./refresh-data.sh` |
+| Open the site | `serve.cmd` | `./serve.sh` |
+| Open it to your network | `serve-lan.cmd` | `./serve-lan.sh` |
+| Keep it updated daily | `tools\schedule.ps1` | `cron` — see below |
 
 Check Python is available:
 
@@ -67,7 +76,7 @@ No release download is published — the repository *is* the app.
 On Windows, **double-click `refresh-data.cmd`**. On macOS or Linux:
 
 ```bash
-python tools/build_data.py --with-images
+./refresh-data.sh
 ```
 
 That is the whole setup — nothing is installed. It fetches the current Prime and
@@ -114,17 +123,17 @@ local copies for good.
 
 ## Opening the site
 
-On Windows, double-click `serve.cmd`. On any platform, from a terminal:
+On Windows, double-click `serve.cmd`. On macOS or Linux:
 
 ```bash
-python tools/serve.py
+./serve.sh
 ```
 
 Your browser opens at `http://localhost:8777`. Leave the terminal window open while
 you use the site — closing it shuts the server down.
 
-**To open it on your phone**, double-click `serve-lan.cmd` instead (or
-`python tools/serve.py --host 0.0.0.0`). It prints the address to type in. Note there
+**To open it on your phone**, use `serve-lan.cmd` on Windows or `./serve-lan.sh`
+on macOS and Linux. It prints the address to type in. Note there
 is no login and no encryption — anyone on your network can read *and* overwrite your
 collection through the Backup box, so only do this at home. The local-only server
 walks up from port 8777 to find a free one; the network one keeps 8777 fixed, so a

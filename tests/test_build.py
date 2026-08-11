@@ -391,10 +391,12 @@ def test_no_writer_leaves_orphans() -> None:
               "a Prime leaving the catalogue used to leave its page cached")
 
 
-def test_batch_files_are_runnable() -> None:
+def test_launchers_are_runnable() -> None:
     """
-    cmd.exe cannot parse an LF-only batch file, and reads batch files in the
-    OEM codepage rather than UTF-8. Both bit at once: refresh-data.cmd was
+    Launchers break in opposite ways on the two platforms, and neither failure
+    is visible while editing. cmd.exe cannot parse an LF-only batch file and
+    reads them in the OEM codepage rather than UTF-8; a shell script with CRLF
+    fails to start at all on macOS and Linux. Both bit at once: refresh-data.cmd was
     written with LF endings and em dashes, and every REM line came back as
     "'M' is not recognized as an internal or external command".
 
@@ -412,6 +414,16 @@ def test_batch_files_are_runnable() -> None:
         bad = sorted({b for b in raw if b > 127})
         check(f"{name}: pure ASCII", [hex(b) for b in bad], [],
               "cmd.exe reads these in the OEM codepage, not UTF-8")
+
+    # Shell scripts are the exact mirror: a CRLF one dies on Linux with
+    # "bad interpreter: /usr/bin/env bash^M", which names the file rather than
+    # the problem and is a genuinely baffling first thing to hit.
+    for path in sorted(glob.glob(os.path.join(ROOT, "*.sh"))):
+        name = os.path.basename(path)
+        raw = open(path, "rb").read()
+        check(f"{name}: no CR anywhere", raw.count(b"\r"), 0,
+              "a CRLF shell script will not run on macOS or Linux")
+        check_true(f"{name}: has a shebang", raw.startswith(b"#!"))
 
 
 def test_bundle_is_self_contained() -> None:
@@ -451,7 +463,7 @@ def main() -> int:
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
-                         test_batch_files_are_runnable,
+                         test_launchers_are_runnable,
                          test_bundle_is_self_contained]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]
