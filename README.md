@@ -281,9 +281,10 @@ detail line — hover for the rate. Two things worth knowing:
   bank it, but the planner cannot tell you when your Prime will come round.
 - If everything you still want is farmable, Aya is worth nothing either: you can
   simply go and get those.
-- **If no Resurgence rotation is running at all**, there is nothing on sale to price
-  against, so it falls back to the best vaulted item on your list — what a future
-  rotation would have to offer. The tooltip says when this is happening.
+- **If no Resurgence rotation is running at all**, it falls back to the best vaulted
+  item on your list. You should never see this: Aya is Resurgence's currency and does
+  not drop while no rotation is on, so it is a safety net for a stale dataset rather
+  than a situation you will meet in game.
 
 ### Ducat values
 

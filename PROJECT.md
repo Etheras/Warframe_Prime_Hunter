@@ -602,12 +602,17 @@ It counts only for items that are **not farmable**. Almost any part turns up in 
 vaulted relic somewhere, so without that test a list of purely farmable Primes would
 still score Aya — and if you can go and farm it, Aya buys you nothing.
 
-**When no rotation is running** there is nothing on sale to price against. Rather than
-score zero and imply Aya is worthless — you would still bank it — it falls back to the
-best *vaulted* relic on your list, which is what a future rotation could offer. The
-row tooltip and the summary both say which of the two is in play. A rotation counts as
-over when `meta.resurgence.expiry` has passed, so a stale build does not keep pricing
-against a rotation that ended.
+**When no rotation is running** there is nothing on sale to price against, and it
+falls back to the best *vaulted* relic on your list — what a future rotation could
+offer. The row tooltip and the summary both say which of the two is in play.
+
+That branch is a **guard, not a feature**. Aya exists as Prime Resurgence's currency
+and does not drop while no rotation is running, so in the game the case should not
+arise: no rotation means no Aya to value in the first place. If the fallback ever does
+fire, the likely cause is on our side — a build old enough that
+`meta.resurgence.expiry` has passed while DE's static drop table still lists Aya rows.
+Falling back to the vault-wide value is the least wrong thing to do with a dataset in
+that state, and the stale-data banner should be showing by then anyway.
 
 **A known consequence, chosen deliberately:** wanting a vaulted Prime that is *not* in
 the current rotation scores Aya zero, even though you would sensibly bank Aya against
