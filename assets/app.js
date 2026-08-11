@@ -10,7 +10,7 @@
 
   if (!DATA || !DATA.items) {
     document.body.innerHTML =
-      '<p style="padding:40px;font:16px system-ui;color:#e6ebf2">' +
+      '<p class="nodata">' +
       "No data yet. Double-click <code>refresh-data.cmd</code>, then reload this page.</p>";
     return;
   }
@@ -468,7 +468,7 @@
     const has = collected.has(it.id);
     const art = it.image
       ? `<img src="${esc(it.image)}" alt="" loading="lazy"
-             onerror="this.parentNode.innerHTML='<span class=noimg>◈</span>'">`
+             data-fallback="glyph">`
       : '<span class="noimg">◈</span>';
     const badges = badgeHTML(it);
     return `<article class="card${has ? " is-collected" : ""}" data-id="${esc(it.id)}" tabindex="0">
@@ -790,7 +790,7 @@
     const f = it.flags;
 
     const art = it.image
-      ? `<img src="${esc(it.image)}" alt="" onerror="this.style.display='none'">`
+      ? `<img src="${esc(it.image)}" alt="" data-fallback="hide">`
       : "◈";
     const badges = badgeHTML(it);
 
@@ -872,7 +872,7 @@
           <div class="spot">
             <div class="spot-where">${esc(s.node)}
               <span class="spot-mode">(${esc(s.mode)})</span>${
-              s.kind === "mission" ? ` <span style="color:var(--txt-faint);font-weight:400">— ${esc(s.planet)}</span>` : ""}</div>
+              s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""}</div>
             <div class="spot-meta">${
               s.rotations.length ? rotListTag(s.rotations, s.nonStandard) : "no rotation"}${
               s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
@@ -1202,6 +1202,25 @@
     saveCollected(); render();
   });
 
+  /* Artwork that fails to load, handled without inline onerror attributes.
+
+     Those were the only thing standing between this app and a strict
+     Content-Security-Policy: with 167 of them on a full page, script-src 'self'
+     would have blocked every one. Error events do not bubble, so this listens
+     in the capture phase rather than delegating on bubble. */
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== "IMG" || !img.dataset || !img.dataset.fallback) return;
+    if (img.dataset.fallback === "hide") {
+      img.style.display = "none";
+    } else if (img.parentNode) {
+      const span = document.createElement("span");
+      span.className = "noimg";
+      span.textContent = "◈";
+      img.parentNode.replaceChild(span, img);
+    }
+  }, true);
+
   /* backup dialog */
   const dlg = $("#dataDlg");
   $("#dataBtn").addEventListener("click", () => {
@@ -1483,10 +1502,10 @@
        (MIT / Apache-2.0). VorFrame's own code is MIT licensed.
      </span>` +
     ((m.stale && m.stale.length)
-      ? `<br><span style="color:var(--txt-dim)">Reused cached data for
+      ? `<br><span class="note-dim">Reused cached data for
          ${esc(m.stale.join(", "))} — slightly behind.</span>` : "") +
     ((m.degraded && m.degraded.length)
-      ? `<br><span style="color:var(--gold)">Built without ${esc(m.degraded.join(", "))}
+      ? `<br><span class="note-warn">Built without ${esc(m.degraded.join(", "))}
          — some items or artwork are missing.</span>` : "");
 
   /* A failed refresh used to be a line in the footer, which nobody scrolls to.

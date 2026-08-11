@@ -39,6 +39,24 @@ import official  # noqa: E402
 import relics  # noqa: E402
 import sources  # noqa: E402
 
+# Read and close, rather than relying on the garbage collector to get round to
+# it. `python -X dev` reports every one of these as a ResourceWarning, and a
+# test suite that leaks handles is a poor advert for the code it checks.
+def read_text(path: str) -> str:
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def read_bytes(path: str) -> bytes:
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
+def read_json(path: str):
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 FAILURES: list[tuple[str, str]] = []
 PASSED = 0
 
@@ -194,7 +212,7 @@ def test_built_payload() -> None:
     if not os.path.exists(path):
         print("  skip built payload (run tools/build_data.py first)")
         return
-    D = json.load(open(path, encoding="utf-8"))
+    D = read_json(path)
 
     check_true("payload: has items", len(D["items"]) > 100)
     check_true("payload: has relics", len(D["relics"]) > 500)
@@ -289,10 +307,10 @@ def test_offline_build() -> None:
                        cwd=ROOT, capture_output=True, text=True)
     check("offline build: exits 0", r.returncode, 0, r.stderr[-400:])
 
-    first = json.load(open(os.path.join(ROOT, "data", "vorframe-data.json"), encoding="utf-8"))
+    first = read_json(os.path.join(ROOT, "data", "vorframe-data.json"))
     subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
                    cwd=ROOT, capture_output=True, text=True)
-    second = json.load(open(os.path.join(ROOT, "data", "vorframe-data.json"), encoding="utf-8"))
+    second = read_json(os.path.join(ROOT, "data", "vorframe-data.json"))
     for d in (first, second):
         d["meta"].pop("generated", None)
     check("offline build: deterministic", first == second,  True,
@@ -354,7 +372,7 @@ def test_clone_and_build(online: bool) -> None:
         built = os.path.join(tmp, "data", "vorframe-data.json")
         check_true("clone: dataset written", os.path.exists(built))
         if os.path.exists(built):
-            D = json.load(open(built, encoding="utf-8"))
+            D = read_json(built)
             check_true("clone: catalogue is populated", len(D["items"]) > 100)
             check_true("clone: relics are populated", len(D["relics"]) > 500)
             check("clone: no degraded sources", D["meta"].get("degraded"), [])
@@ -373,7 +391,7 @@ def test_no_writer_leaves_orphans() -> None:
     if not os.path.exists(D_path):
         print("  skip orphan check (no dataset)")
         return
-    D = json.load(open(D_path, encoding="utf-8"))
+    D = read_json(D_path)
 
     if art.have_local_images():
         used = {os.path.basename(i["image"]) for i in D["items"]
@@ -407,7 +425,7 @@ def test_launchers_are_runnable() -> None:
     import glob
     for path in sorted(glob.glob(os.path.join(ROOT, "*.cmd"))):
         name = os.path.basename(path)
-        raw = open(path, "rb").read()
+        raw = read_bytes(path)
         lf = raw.count(b"\n")
         crlf = raw.count(b"\r\n")
         check(f"{name}: every line ends CRLF", lf, crlf,
@@ -421,7 +439,7 @@ def test_launchers_are_runnable() -> None:
     # the problem and is a genuinely baffling first thing to hit.
     for path in sorted(glob.glob(os.path.join(ROOT, "*.sh"))):
         name = os.path.basename(path)
-        raw = open(path, "rb").read()
+        raw = read_bytes(path)
         check(f"{name}: no CR anywhere", raw.count(b"\r"), 0,
               "a CRLF shell script will not run on macOS or Linux")
         check_true(f"{name}: has a shebang", raw.startswith(b"#!"))
@@ -431,8 +449,8 @@ def test_launchers_are_runnable() -> None:
     # than a hypothetical one.
     for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.ps1"))):
         name = os.path.basename(path)
-        text = open(path, encoding="utf-8").read()
-        raw = open(path, "rb").read()
+        text = read_text(path)
+        raw = read_bytes(path)
         check(f"{name}: CRLF endings", raw.count(b"\r" + b"\n"),
               raw.count(b"\n"),
               "5.1 is happiest with CRLF, and reads BOM-less files as ANSI")
@@ -454,6 +472,45 @@ def test_launchers_are_runnable() -> None:
             check(f"{name}: no {bad.strip()}", bad in code, False, why)
 
 
+def test_server_serves_only_the_site() -> None:
+    """
+    The server used to publish its whole directory with browsable listings. In
+    this folder that meant .git -- pack files and all, from which a private
+    repository can be reconstructed -- plus .cache, tools and tests.
+
+    An allowlist rather than a blocklist: a blocklist has to predict what is
+    worth hiding, and .git was on nobody's list until it was checked.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import serve
+
+    for path in ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
+                 "assets/styles.css", "data/vorframe-data.js",
+                 "assets/img/AshPrime.png"):
+        check_true(f"serves {path}", serve.allowed(path))
+
+    for path in (".git/config", ".git/HEAD", ".git/objects/info/packs",
+                 ".cache/api_items.gz", ".cache/state.json", "tools/serve.py",
+                 "tests/test_build.py", ".gitignore", "PROJECT.md",
+                 "dist/vorframe.html", "assets/img/sub/nested.png"):
+        check(f"refuses {path}", serve.allowed(path), False)
+
+    # the policy is only worth setting if the app can live inside it
+    check_true("CSP has no unsafe-inline", "unsafe-inline" not in serve.CSP)
+    check_true("CSP has no unsafe-eval", "unsafe-eval" not in serve.CSP)
+    check_true("CSP denies framing", "frame-ancestors 'none'" in serve.CSP)
+
+    # inline handlers and style attributes are exactly what that policy blocks
+    for name in ("index.html", "plan.html"):
+        markup = read_text(os.path.join(ROOT, name))
+        check(f"{name}: no inline style attributes", 'style="' in markup, False)
+    for name in ("assets/app.js", "assets/plan.js"):
+        code = read_text(os.path.join(ROOT, name))
+        check(f"{name}: emits no inline style attributes", 'style="' in code, False)
+        check(f"{name}: emits no inline event handlers",
+              bool(re.search(r'\son(?:error|click|load|change)="', code)), False)
+
+
 def test_bundle_is_self_contained() -> None:
     """
     The single-file build must reference nothing on disk, and must carry both
@@ -469,7 +526,7 @@ def test_bundle_is_self_contained() -> None:
     if not os.path.exists(out):
         check_true("bundle: file written", False)
         return
-    html = open(out, encoding="utf-8").read()
+    html = read_text(out)
     local = {m for m in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', html)
              if "${" not in m}
     check("bundle: no local file references", local, set())
@@ -492,6 +549,7 @@ def main() -> int:
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
+                         test_server_serves_only_the_site,
                          test_bundle_is_self_contained]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]

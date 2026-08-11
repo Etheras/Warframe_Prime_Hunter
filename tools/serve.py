@@ -27,6 +27,7 @@ import os
 import socket
 import socketserver
 import sys
+import urllib.parse
 import threading
 import time
 import webbrowser
@@ -120,23 +121,111 @@ def freshness() -> dict:
     return body
 
 
-class QuietHandler(http.server.SimpleHTTPRequestHandler):
+# Exactly what the site asks for, and nothing else. The pages request six files
+# plus artwork; serving the containing folder handed out a great deal more.
+#
+# An allowlist rather than a blocklist, deliberately: a blocklist has to predict
+# what is worth hiding, and the thing that made this urgent -- a whole .git
+# directory, pack files and all, from which a private repository can be
+# reconstructed -- was not on anyone's list of things to think about.
+ALLOWED_FILES = frozenset({
+    "index.html", "plan.html",
+    "assets/styles.css", "assets/app.js", "assets/plan.js",
+    "data/vorframe-data.js",
+})
+ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
+
+# No 'unsafe-inline' and no 'unsafe-eval': the app is two script files and one
+# stylesheet of its own. frame-ancestors 'none' stops the page being framed,
+# form-action 'none' because there is no form to submit anywhere.
+CSP = ("default-src 'none'; "
+       "script-src 'self'; "
+       "style-src 'self'; "
+       "img-src 'self' data: https://cdn.warframestat.us; "
+       "connect-src 'self'; "
+       "base-uri 'none'; "
+       "form-action 'none'; "
+       "frame-ancestors 'none'")
+
+
+def allowed(rel: str) -> bool:
+    if rel in ALLOWED_FILES:
+        return True
+    return any(rel.startswith(d) and "/" not in rel[len(d):] for d in ALLOWED_DIRS)
+
+
+class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
+    """
+    Serves the site and refuses everything else.
+
+    SimpleHTTPRequestHandler is not a hardened server and the standard library
+    says as much. It does get path traversal right - ../ and its encodings were
+    tested and all return 404 - but by default it publishes the entire directory
+    it is pointed at, with browsable listings. For this folder that meant .git,
+    .cache, tools and tests.
+    """
+
     def log_message(self, fmt, *args):  # noqa: A003 - keep the console readable
         pass
 
+    def end_headers(self):
+        """
+        Headers a browser will act on, which cost nothing to send.
+
+        The CSP is the substantive one: everything the app runs is its own two
+        script files, so 'self' is enough and there is no 'unsafe-inline'
+        anywhere. That is only true because the two inline onerror attributes on
+        artwork were replaced with a capture-phase listener - with those in place
+        this policy would have blocked every card image's fallback.
+
+        img-src allows data: for the favicon, which is an inline SVG in the
+        page head, and the CDN because a build without --with-images points
+        artwork there. With local artwork nothing off-site
+        is ever requested and the extra source simply goes unused.
+        """
+        self.send_header("Content-Security-Policy", CSP)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        super().end_headers()
+
+    def _reject(self):
+        self.send_error(404, "Not Found")
+
+    def _relative(self) -> str:
+        """Path relative to the site root, normalised, or "" if it escapes."""
+        path = self.path.split("?", 1)[0].split("#", 1)[0]
+        path = urllib.parse.unquote(path)
+        full = os.path.normpath(os.path.join(ROOT, path.lstrip("/")))
+        try:
+            rel = os.path.relpath(full, ROOT)
+        except ValueError:                    # different drive on Windows
+            return ""
+        if rel.startswith(".."):
+            return ""
+        return rel.replace(os.sep, "/")
+
+    def do_HEAD(self):                                    # noqa: N802
+        if not allowed(self._relative()):
+            return self._reject()
+        super().do_HEAD()
+
     def do_GET(self):                                     # noqa: N802
-        """
-        The dataset is the one request worth checking before answering: it is
-        asked for exactly once per page load, by both pages, and it is the thing
-        that would be stale. Everything else is served untouched.
-        """
-        if self.path.split("?")[0].endswith("/data/vorframe-data.js"):
+        rel = self._relative()
+        if rel in ("", "."):
+            rel = "index.html"
+            self.path = "/index.html"
+        if not allowed(rel):
+            return self._reject()
+
+        # The dataset is the one request worth checking before answering: asked
+        # for once per page load, and the thing that would be stale.
+        if rel == "data/vorframe-data.js":
             path = os.path.join(ROOT, "data", "vorframe-data.js")
             if os.path.exists(path):
                 with open(path, "rb") as fh:
                     blob = fh.read()
-                note = json.dumps(freshness())
-                tail = "\nwindow.VORFRAME_UPSTREAM = " + note + ";\n"
+                tail = "\nwindow.VORFRAME_UPSTREAM = " + json.dumps(freshness()) + ";\n"
                 blob += tail.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/javascript")
@@ -179,11 +268,19 @@ def main() -> int:
     else:
         port = pick_port(host)
     url = f"http://localhost:{port}"
-    handler = functools.partial(QuietHandler, directory=ROOT)
+    handler = functools.partial(VorFrameHandler, directory=ROOT)
 
-    socketserver.TCPServer.allow_reuse_address = True
+    # Threaded, because the single-threaded server could be taken down by one
+    # client opening a socket and never finishing its request - measured: a
+    # second client waited the full timeout. A timeout as well, so a stalled
+    # connection releases its thread rather than holding it for ever.
+    class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+        timeout = 30
+
     try:
-        httpd = socketserver.TCPServer((host, port), handler)
+        httpd = Server((host, port), handler)
     except OSError as exc:
         print(f"Could not start a server on {host}:{port} — {exc}")
         return 1

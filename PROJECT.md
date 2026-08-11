@@ -324,6 +324,35 @@ asserted rather than assumed. `.ps1` must also run under **both Windows PowerShe
 being false, the three-argument `Join-Path` is 6.0+, and `??`/`?:` are 7.0+. The
 suite checks for each.
 
+### What the server exposes, and what it refuses
+
+`serve.py` is `SimpleHTTPRequestHandler` underneath, which the standard library
+does not present as a hardened server. It gets path traversal right — `../` and
+its encodings were tried and all return 404 — but by default it publishes the
+whole directory it is pointed at, with browsable listings.
+
+For this folder that meant **`.git`**, pack files included, from which a private
+repository can be reconstructed; plus `.cache/`, `tools/` and `tests/`. So it
+serves an **allowlist** instead: six files and `assets/img/`, which is everything
+the two pages request and nothing else. An allowlist rather than a blocklist
+deliberately — a blocklist has to predict what is worth hiding, and `.git` was
+on nobody's list until someone checked.
+
+It also sends a Content-Security-Policy with **no `unsafe-inline` and no
+`unsafe-eval`**, which is only possible because the app has no inline scripts,
+no inline event handlers and no `style=` attributes. Two `onerror` attributes on
+artwork were the last obstacle, and became one capture-phase listener; four
+`style=` attributes became utility classes. `img-src` allows `data:` for the
+inline SVG favicon and the CDN for builds without local artwork.
+
+The server is threaded. Single-threaded, one client opening a socket and never
+finishing its request blocked every other client for the full timeout — measured
+before and after: 6 s versus 0.02 s.
+
+**What it still is not.** No HTTPS, no authentication, no rate limiting, no
+request log. That is fine on a home network and is *not* enough to put on the
+open internet, where the right answer is a real server in front of it.
+
 ### Two stores, and who owns each
 
 VorFrame keeps state in two places and they never mix:

@@ -170,7 +170,7 @@
 
   if (!DATA || !DATA.items) {
     document.body.innerHTML =
-      '<p style="padding:40px;font:16px system-ui;color:#e6ebf2">' +
+      '<p class="nodata">' +
       "No data yet. Double-click <code>refresh-data.cmd</code>, then reload this page.</p>";
     return;
   }
@@ -713,7 +713,7 @@
       return `<div class="spot">
         <div class="spot-where">${esc(n.node)}
           <span class="spot-mode">(${esc(n.mode)})</span>
-          <span style="color:var(--txt-faint);font-weight:400">— ${esc(n.planet)}</span>
+          <span class="src-planet">— ${esc(n.planet)}</span>
           ${n.railjack ? `<span class="tag">railjack</span>` : ""}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
         <div class="spot-meta">${runTag(n)}${
