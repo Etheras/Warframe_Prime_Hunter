@@ -22,16 +22,19 @@ everywhere. It does not, and these three are the same flaw seen from different
 angles — worth tackling together, because fixing the last one properly subsumes the
 other two.
 
-### 1. Ten rotation-bearing mission types are still unverified
+### 1. Nine rotation-bearing mission types are still unverified
 
 Swept 2026-08-10. Of the 31 mission types in the data, 9 carry no rotation at all so
 the cycle never applies, 11 are confirmed A→A→B→C against the wiki (Defense,
 Survival, Interception, Excavation, Defection, Infested Salvage, Alchemy, Sanctuary
 Onslaught, Void Cascade, Void Flood, Void Armageddon), and Disruption is modelled
-explicitly. That leaves ten assumed AABC without confirmation:
+explicitly. That leaves nine assumed AABC without confirmation:
 
-`Bounty`, `Caches`, `Key`, `Legacyte Harvest`, `Rush`, `Skirmish`, `Special`, `Spy`,
+`Caches`, `Key`, `Legacyte Harvest`, `Rush`, `Skirmish`, `Special`, `Spy`,
 `The Circuit`, `The Perita Rebellion`.
+
+`Bounty` was the tenth and is now settled — it is not a round-based cycle at all, see
+*Bounty rotation is a wall clock* below.
 
 The wiki also names two more exceptions we do not currently see in relic sources —
 **The Index** (A-B-B, with C once after an hour) and **Arbitrations** (A-A-B-B-C-C-C-C)
@@ -39,10 +42,10 @@ The wiki also names two more exceptions we do not currently see in relic sources
 
 ### 2. Several of those modes are not round-based at all
 
-`Spy`, `Bounty`, `Caches` and `Key` carry rotations, but the rotation does not advance
-per *round* — a Spy mission has three vaults, a Bounty five stages, Caches counts what
-you found. You collect several tiers inside a **single mission**. We cost a
-three-vault Spy run as three rounds of Defense.
+`Spy`, `Caches` and `Key` carry rotations, but the rotation does not advance per
+*round* — a Spy mission has three vaults, Caches counts what you found. You collect
+several tiers inside a **single mission**. We cost a three-vault Spy run as three
+rounds of Defense.
 
 ### 3. Mission length is not modelled, and the ranking leans on it
 
@@ -54,6 +57,48 @@ scoring per minute, which needs data neither the wiki nor DE publishes. Until th
 per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
+
+### The Ghoul and Plague Star detection has never seen a live event
+
+The bounty clock and the event gating both shipped on 2026-08-12
+(`PROJECT.md §7`). One part of it is unverified and cannot be verified on demand:
+**neither the Ghoul Purge nor Plague Star was running when it was written**, so the
+shape the worldstate gives those events was never observed.
+
+The detection is deliberately loose because of that — a keyword scan across both
+`/pc/events` and `/pc/syndicateMissions`, matching on several fields, so an
+unexpected shape degrades to "not running" rather than crashing. And a missed
+detection is a nuisance rather than a dead end: the *include event nodes* checkbox
+still forces those bounties back into the ranking.
+
+**What to do when one of them next runs:** refresh the data, check the build log
+says `limited-time events running - Ghoul Purge` (or `Plague Star`), and confirm
+the bounty appears in the planner without the checkbox. If it does not, capture the
+raw worldstate entry — that is the fixture this cannot be written against today.
+Plague Star matters most: it carries 26 relics, more than any other bounty.
+
+### The rotation model is written out twice
+
+`assets/app.js` and `assets/plan.js` each carry their own copy of the whole
+rotation model — `RESET_STOPS`, `ROT_PATTERN`, `scorePlan`, `runValue`, and now the
+bounty clock as well. They are kept in step by hand, which is exactly the setup
+where the two pages drift apart and rank the same node differently.
+
+Extracting an `assets/rotation.js` that both load is the fix. It is not free:
+`index.html` and `plan.html` both need the extra `<script>`, and `tools/bundle.py`
+inlines the scripts by name, so it needs the third. Worth doing before the next
+change to the model rather than after.
+
+### Two bounty tiers publish only two rotations
+
+`Level 30 - 40 Cambion Drift Bounty` publishes rotations A and B, not A/B/C, and it
+is not alone. When the board is on the letter such a bounty does not publish, there
+is no honest answer about what it pays: it is scored at the average of the letters
+it does have, and the row says so on hover.
+
+Only Aya is affected today, on one node. Worth revisiting if DE's table starts
+disagreeing with the board more widely — the alternative reading is that those
+tiers run a two-letter cycle of their own, which nothing currently confirms.
 
 ### Serving to a network exposes the folder, read-only
 

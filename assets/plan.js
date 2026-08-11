@@ -137,10 +137,48 @@
     return { total, counts, rounds: n || null, plan: p };
   }
 
+  /* A bounty is not costed in rounds at all. One run pays the stages of
+     whichever letter the clock has up, so what going now is worth is that
+     letter and nothing else - the others are a wait, not a longer run. See the
+     bounty clock further down for where the letter comes from.
+
+     With no letter to name - a mirror build, a worldstate that could not be
+     read, or a bounty that publishes two letters while the board is on the
+     third - every letter it does publish is as likely as any other, so the run
+     is valued at their mean and labelled unknown. Counting all of them, which
+     is what the round model did, is the one answer that is certainly wrong. */
+  function bountyRun(rot, live) {
+    const pays = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0);
+    const flat = rot.none || 0;
+    const onTable = !live.published || live.published.indexOf(live.letter) >= 0;
+    const letter = live.letter && onTable ? live.letter : null;
+
+    if (letter) {
+      const v = rot[letter] || 0;
+      return {
+        total: v + flat, perRound: v + flat, rounds: null,
+        counts: pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null,
+        stranded: pays.filter((t) => t !== letter),
+        planName: null, nonStandard: false,
+        bounty: { letter, endsAt: live.endsAt, published: live.published,
+                  offTable: false, unknown: false },
+      };
+    }
+    const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
+    return {
+      total: mean + flat, perRound: mean + flat, rounds: null,
+      counts: null, stranded: null, planName: null, nonStandard: false,
+      bounty: { letter: null, endsAt: live.endsAt, published: live.published,
+                offTable: !!live.letter, unknown: pays.length > 1,
+                live: live.letter },
+    };
+  }
+
   /* Where a mission type offers more than one way to play it, take whichever
      banks more. Adding a plan can therefore only ever raise a node's score, so
      ticking the 4-squad box never makes anything look worse. */
-  function runValue(rot, runMode, mission, squad) {
+  function runValue(rot, runMode, mission, squad, live) {
+    if (live) return bountyRun(rot, live);
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let best = { total: 0, counts: null, rounds: null, plan: null };
     if (hasRot) {
@@ -181,7 +219,12 @@
   function assertRotationCoverage() {
     const seen = new Set();
     Object.values(DATA.relics || {}).forEach((r) =>
-      (r.sources || []).forEach((s) => { if (s.mode) seen.add(s.mode); }));
+      // bounties are not on the round cycle at all - they run on the clock, so
+      // the AABC assumption never applies to them and listing them here as
+      // "assumed" was itself the mistake this check exists to catch
+      (r.sources || []).forEach((s) => {
+        if (s.mode && s.kind !== "bounty") seen.add(s.mode);
+      }));
     const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
     const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
     console.info("[VorFrame] rotation model: " + seen.size + " mission types in the data");
@@ -263,11 +306,82 @@
     "Orvin-Haarc", "Vesper Strait",
   ]);
   const isRailjack = (s) => RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
+
+  /* ── the bounty clock ────────────────────────────────────────────
+     A bounty's rotation letter is the time of day, not how long you stay. One
+     letter is live for everyone at once, it changes when the bounty board
+     refreshes - every 150 minutes, a full day/night of the landscape - and it
+     walks A -> B -> C -> A. A run therefore pays the stages of one letter, and
+     the only way to reach another is to wait.
+
+     The build names the letter that was live when it ran, by matching the
+     rewards the worldstate says are on offer against what DE's table says each
+     letter pays. From that one reading the rest is arithmetic, done here so it
+     stays right between refreshes: count whole cycles since that window ended
+     and walk the sequence forward. UTC throughout, so no timezone can move it.
+
+     There are two clocks. The Isolation Vaults run a phase of their own - one
+     step behind the standard bounties when this was written - so each family
+     carries its own letter and neither is inferred from the other. */
+  const BOUNTY = (DATA.meta || {}).bounties || null;
+  const SEQ = (BOUNTY && BOUNTY.sequence) || "ABC";
+  const CYCLE_MS = ((BOUNTY && BOUNTY.cycleMinutes) || 150) * 60000;
+
+  function bountyGroup(node) {
+    return (BOUNTY && BOUNTY.groups && BOUNTY.groups[node]) || null;
+  }
+
+  /* Where one family's clock has got to, now. */
+  function familyState(name) {
+    const fam = (BOUNTY && (BOUNTY.families || {})[name]) || null;
+    const end = fam && fam.windowEnd ? new Date(fam.windowEnd).getTime() : NaN;
+    const at = SEQ.indexOf(fam ? fam.letter : "");
+    if (!isFinite(end) || at < 0) return { letter: null, endsAt: null };
+    const now = Date.now();
+    const steps = now < end ? 0 : Math.floor((now - end) / CYCLE_MS) + 1;
+    return { letter: SEQ[(at + steps) % SEQ.length],
+             endsAt: end + steps * CYCLE_MS };
+  }
+
+  /* {letter, endsAt, published} for a bounty node. letter is null when it
+     genuinely cannot be named - a mirror build, or a worldstate that could not
+     be read - which the planner says out loud rather than papering over with
+     a guess. */
+  function liveRotation(node) {
+    const g = bountyGroup(node);
+    if (!g) return { letter: null, endsAt: null, published: "" };
+    return Object.assign(familyState(g.family), { published: g.rotations || "" });
+  }
+
+  /* "42 min", "3h 12m" - how long the current letter has left. */
+  function untilText(ms) {
+    const mins = Math.max(0, Math.round((ms - Date.now()) / 60000));
+    return mins < 60 ? mins + " min"
+      : Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+  }
+
+  /* Bounties that only exist while an event is running: the two Ghoul tiers and
+     Plague Star. The build records the window rather than a yes/no, so a
+     week-old build still knows a purge ends tomorrow. */
+  const bountyEvent = (s) =>
+    (s.kind === "bounty" && BOUNTY && (BOUNTY.events || {})[s.node]) || null;
+  function eventRunning(e) {
+    if (!e || !e.expiry) return false;
+    const now = Date.now();
+    return new Date(e.expiry).getTime() > now &&
+      (!e.activation || new Date(e.activation).getTime() <= now);
+  }
+
   /* DE's drop table lists event nodes permanently but never says which event
      they belong to, and the node only exists in the game while that event is
      running. Recommending one you cannot reach is worse than leaving it out, so
-     they are excluded by default and can be switched back on. */
-  const isEvent = (s) => /^Event:/i.test(s.planet || "");
+     they are excluded by default and can be switched back on.
+
+     The limited-time bounties are the same problem with an answer: the
+     worldstate does say whether they are running, so they are excluded only
+     while they are not. */
+  const isEvent = (s) => /^Event:/i.test(s.planet || "") ||
+    !!(bountyEvent(s) && !eventRunning(bountyEvent(s)));
 
   /* ── what you still want ─────────────────────────────────────── */
   function wantedIndex() {
@@ -401,6 +515,7 @@
         if (!n) {
           n = { planet: s.planet, node: s.node, mode: s.mode,
                 kind: s.kind, lvl: s.lvl || null, event: isEvent(s),
+                eventBounty: bountyEvent(s),
                 railjack: isRailjack(s), score: 0,
                 rot: { A: 0, B: 0, C: 0, none: 0 }, relics: new Map() };
           nodes.set(key, n);
@@ -487,11 +602,12 @@
 
     // value each node as a whole run, which is what you actually commit to
     nodes.forEach((n) => {
-      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad);
+      const live = n.kind === "bounty" ? liveRotation(n.node) : null;
+      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live);
       n.score = r.total; n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
-      n.planName = r.planName;
+      n.planName = r.planName; n.bounty = r.bounty;
     });
 
     // Score first, then a lower enemy level (faster clears). Rotation used to
@@ -549,7 +665,72 @@
   /* What this node pays over the run being costed, and what that run is. The
      interesting part is invisible otherwise: on AABCAA you are also collecting
      the B and C rewards, which is why they count towards the node at all. */
+  /* When a letter next comes up. The current one runs until endsAt, and each
+     one after it holds the board for a full cycle, so this is arithmetic on
+     the sequence rather than anything the data has to carry. */
+  function nextWindow(n, letter) {
+    const at = SEQ.indexOf(n.bounty.letter), to = SEQ.indexOf(letter);
+    if (at < 0 || to < 0 || !n.bounty.endsAt) return null;
+    return n.bounty.endsAt + (((to - at - 1) % SEQ.length + SEQ.length)
+                              % SEQ.length) * CYCLE_MS;
+  }
+
+  /* A bounty row says which letter is up and how long it has left, because
+     that is the whole decision: the same bounty is worth something different
+     in an hour, and no amount of staying in the mission changes it. */
+  function bountyTag(n) {
+    const b = n.bounty;
+    const lines = ["A bounty pays one rotation - the one the board is on now."];
+    lines.push("It changes every " + (CYCLE_MS / 60000) + " minutes, A -> B -> C -> A,");
+    lines.push("for everyone at once. Staying longer cannot reach another.");
+    lines.push("");
+
+    if (b.letter) {
+      lines.push("Live now   rot " + b.letter + "   worth " +
+        pct(n.rot[b.letter] || 0) + ", for another " + untilText(b.endsAt));
+      if ((n.rot.none || 0) > 0) {
+        lines.push("Plus       no rotation   worth " + pct(n.rot.none));
+      }
+      lines.push("Whole run  " + pct(n.score) + "   <- ranked on this");
+      if ((n.stranded || []).length) {
+        lines.push("");
+        (n.stranded || []).forEach((t) => {
+          const at = nextWindow(n, t);
+          lines.push("rot " + t + " holds " + pct(n.rot[t]) +
+            " you want" + (at ? ", and is up in " + untilText(at) : ""));
+        });
+      }
+    } else if (b.offTable) {
+      lines.push("The board is on rot " + b.live + ", which this bounty does not");
+      lines.push("publish - DE's table gives it rot " + (n.bounty.published || "?").split("").join(" and rot ") + " only.");
+      lines.push("So it is valued at the average of the rotations it does have.");
+    } else if (b.unknown) {
+      lines.push("Which rotation is live could not be read, so this is the");
+      lines.push("average of the ones it pays. Refresh the data to name it.");
+    } else {
+      lines.push("This bounty has a single reward table, so there is nothing");
+      lines.push("to wait for - every run pays the same one.");
+      lines.push("Whole run  " + pct(n.score));
+    }
+
+    if (n.eventBounty) {
+      lines.push("");
+      lines.push(eventRunning(n.eventBounty)
+        ? n.eventBounty.event + " is running until " +
+          String(n.eventBounty.expiry).slice(0, 10) + "."
+        : n.eventBounty.event + " is not running, so this bounty is not on the board.");
+    }
+
+    const label = b.letter ? "rot " + b.letter
+      : b.offTable || b.unknown ? "rot ?" : "one table";
+    const tail = b.letter && b.endsAt
+      ? ` · <span class="rounds" data-until="${b.endsAt}">${
+          esc(untilText(b.endsAt))} left</span>` : "";
+    return `<abbr class="rot" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` + tail;
+  }
+
   function runTag(n) {
+    if (n.bounty) return bountyTag(n);
     const pays = n.counts
       ? Object.keys(n.counts).filter((r) => (n.rot[r] || 0) > 0)
       : [];
@@ -701,6 +882,12 @@
         (ayaRotationLive ? " — the best relic Varzia is selling this rotation."
                          : " — no rotation is running, so the best a future one could offer.") +
         " It only ever raises nodes already worth running." : "") +
+      (ranked.some((n) => n.bounty)
+        ? " Bounties are the exception to all of that: one rotation is live for " +
+          "everyone at a time and it changes every " + (CYCLE_MS / 60000) +
+          " minutes, so a bounty is scored on the letter that is up <b>now</b> " +
+          "and the row says how long that has left."
+        : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
@@ -1095,4 +1282,27 @@
 
   staleBanner();
   render();
+
+  /* The bounty clock moves while the page is open: a countdown left alone goes
+     stale within the minute, and once the letter turns over the ranking behind
+     it is wrong, not merely old.
+
+     Both are handled, but not the same way. The countdown is rewritten in
+     place, which disturbs nothing; a full re-render is kept for the letter
+     actually changing, because it replaces the list under whoever is reading
+     it. */
+  const rotationStamp = () => Object.keys((BOUNTY && BOUNTY.families) || {})
+    .sort().map((f) => familyState(f).letter || "?").join("");
+
+  if (BOUNTY && Object.keys(BOUNTY.groups || {}).length) {
+    let seen = rotationStamp();
+    setInterval(() => {
+      if (document.hidden) return;
+      const now = rotationStamp();
+      if (now !== seen) { seen = now; render(); return; }
+      $$("[data-until]").forEach((el) => {
+        el.textContent = untilText(Number(el.dataset.until)) + " left";
+      });
+    }, 30000);
+  }
 })();

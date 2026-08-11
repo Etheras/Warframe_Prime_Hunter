@@ -438,6 +438,7 @@ other becomes an automatic fallback.
 | [wiki.warframe.com/w/Prime](https://wiki.warframe.com/w/Prime) | Categories and the (V)/(P)/(B)/(S)/Founder markers | The grouping you asked for; the export fills any gaps |
 | [api.warframestat.us/items](https://api.warframestat.us/items) | Component names, artwork filenames, vault state | Convenience layer; the drop table can reconstruct parts without it |
 | [`/pc/vaultTrader`](https://api.warframestat.us/pc/vaultTrader) | Live **Prime Resurgence** rotation | Proxies the game worldstate — DE's own `worldState.php` is 404 (see §7) |
+| [`/pc/syndicateMissions`](https://api.warframestat.us/pc/syndicateMissions) + [`/pc/events`](https://api.warframestat.us/pc/events) | Which **bounty rotation** is live, and whether the Ghoul Purge or Plague Star is running | Same proxy, same reason. The rotation letter is not published anywhere — it is derived by matching the bounties on offer against DE's table (§7) |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
 
@@ -481,7 +482,13 @@ Verified across four states: warm-with-blocked-source (315 items + alert), cold
 ```js
 {
   meta: { generated, itemCount, relicCount, farmableRelicCount, dropSource,
-          newCount, resurgence: { activation, expiry, location }, sources },
+          newCount, resurgence: { activation, expiry, location }, sources,
+          bounties: {
+            cycleMinutes: 150, sequence: "ABC", checked,
+            families: { standard: { letter, windowEnd, votes, of }, vault: {…} },
+            groups:   { "Level 5 - 15 Cetus Bounty": { family, rotations } },
+            events:   { "Level 15 - 25 Plague Star": { event, activation, expiry } },
+          } },
   categories: [{ name, count }],
   items: [{
     id, name, category, type, image, wikiUrl, masteryReq, releaseDate, isNew,
@@ -503,6 +510,75 @@ Verified across four states: warm-with-blocked-source (315 items + alert), cold
 
 `chances` is keyed by refinement: `{ Intact, Exceptional, Flawless, Radiant }`.
 `kind` is one of `mission`, `bounty`, `key`, `transient`, `enemy`.
+
+### A bounty's rotation is a wall clock, not a depth
+
+Every other rotation-bearing mission advances A → A → B → C as you play. A bounty
+does not advance at all. **One letter is live for everyone at once**, it changes when
+the bounty board refreshes — every 150 minutes, a full day/night cycle of the
+landscape — and it walks A → B → C → A. A run therefore pays the stages of *one*
+letter, and the only way to reach another is to wait. DE's table says as much if you
+read the nesting: the rotation is the outer heading and every stage sits inside it.
+
+The planner used to cost a bounty as four rounds of Defense, which both invented
+rewards you cannot collect in that run and hid the wait. What it misprices, in the
+data as it stands, is Aya (the final stage of every standard Cetus, Orb Vallis and
+Cambion Drift bounty, listed under all three letters) and the Isolation Vault relics
+(six tiers, ten relics each, again split A/B/C). Relics otherwise barely touch
+bounties — outside the vaults only the Ghoul tiers and Plague Star drop them, and all
+three publish rotation A alone.
+
+**The phase is derived, not observed.** The 150-minute period is documented; the
+phase is not, and a countdown labelled with the wrong letter is worse than none — it
+sends you to a bounty for loot that is not in the current pool. So the build matches
+the reward pool of every bounty the worldstate says is on offer against what DE's
+table says each letter pays. Exactly one rotation containing everything on offer
+names the letter; anything ambiguous abstains. It re-anchors on every refresh rather
+than trusting a constant to survive DE's updates, and the page walks the sequence
+forward from there in UTC, so it stays right between builds and works offline.
+
+**There are two clocks.** Read at 2026-08-11T21:00Z the standard bounties of Cetus,
+Fortuna *and* the Cambion Drift were all on C while all three Isolation Vault
+chambers were on B — offset by one step, same period, same changeover instant. The
+wiki claims a single letter everywhere; our own reading says otherwise, so the two
+families are derived separately and neither is inferred from the other.
+
+The model was then checked across a real changeover rather than assumed. Two builds
+either side of 2026-08-11T21:55:23Z:
+
+| | before | after | window moved by |
+|---|---|---|---|
+| standard | C (16/16) | A (16/16) | 150 min exactly |
+| vault | B (6/6) | C (6/6) | 150 min exactly |
+
+Both families advanced exactly one step, in lockstep and unanimously, and the new
+window ended 150 minutes after the old one. That is the sequence, the period and the
+offset all confirmed against live data instead of the wiki — and it is precisely what
+the page's own extrapolation would have predicted from the earlier anchor.
+
+Two smaller consequences worth knowing:
+
+- **Only a bounty publishing all three letters votes.** A couple of tiers publish
+  two (Level 30–40 Cambion Drift is one), where a single match says nothing about
+  which letter is up. Those are scored at the average of what they do publish.
+- **The bounty window is deliberately kept out of `upstream_signature`.** It changes
+  every 150 minutes, so including it would make `--if-changed` rebuild on every run.
+  It does not need to: the page extrapolates the letter from the last anchor.
+
+### Two bounties only exist sometimes
+
+`Level 15 - 25 Plague Star` carries **26 relics** — the largest bounty source in the
+data — and exists only while Operation: Plague Star runs, a few weeks a year. The two
+Ghoul tiers carry one relic each plus Aya, and exist only during a Ghoul Purge, which
+the wiki puts at "once every few weeks" with no published schedule. DE's drop table
+lists all three permanently.
+
+They are now gated on the worldstate: included while running, excluded otherwise, and
+reachable anyway through the existing *include event nodes* checkbox — so a detection
+that misses a live event is a nuisance rather than a dead end. The build records the
+**window** rather than a yes/no, so a week-old build still knows when a purge ends.
+The inherited limit is that "running" means running as of the last `refresh-data`;
+these events last days, and the staleness banner already carries that message.
 
 ### Three derived ideas worth knowing
 
@@ -904,6 +980,9 @@ As of the last data build (official drop table, 2026-06-25 revision):
 - **0 Primes** in DE's export missing from the wiki — the wiki page is currently complete
 - Resurgence rotation runs **2026-08-06 → 2026-09-03** (Baruuk, Revenant, Phantasma,
   Afuris, Tatsu)
+- Bounties were on rotation **A** (standard) and **C** (Isolation Vaults) at the last
+  build, unanimously across 16 and 6 bounties, until 2026-08-12T00:25Z; neither the
+  Ghoul Purge nor Plague Star was running
 
 Switching to the official drop table also picked up sources the mirror lacked:
 enemy drops (e.g. Hemocyte drops several relics) and `Event:` star chart nodes.
@@ -913,8 +992,8 @@ Known limits:
 - Cosmetics and Emotes have no relic data — they come from Prime Access or accessory
   bundles, and the drawer says so rather than inventing a farm route.
 - Excalibur, Lato and Skana Prime are Founder-exclusive and have no relics by design.
-- Relic *sources* are capped at 40 per relic in the payload (deduped and sorted by
-  drop chance first, so the useful ones survive).
+- Relic *sources* are deduped and sorted by drop chance, but never capped — an
+  earlier 40-row cap silently hid whole rotations and was removed (`TODO.md`).
 - Parts reconstructed from the drop table use DE's raw part names
   (`"Chassis Blueprint"` rather than the API's `"Chassis"`). Cosmetic only.
 

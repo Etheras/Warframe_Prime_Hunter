@@ -246,10 +246,40 @@
     return { total, counts, rounds: n || null, plan: p };
   }
 
+  /* A bounty is not costed in rounds. One run pays the stages of whichever
+     letter the clock has up, and no amount of staying reaches another - see
+     the bounty clock below. Kept in step with the planner's copy by hand: the
+     whole rotation model is duplicated across the two files, which is worth
+     fixing but not by leaving one of them wrong in the meantime. */
+  function bountyRun(rot, live) {
+    const pays = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0);
+    const flat = rot.none || 0;
+    const onTable = !live.published || live.published.indexOf(live.letter) >= 0;
+    const letter = live.letter && onTable ? live.letter : null;
+
+    if (letter) {
+      const v = rot[letter] || 0;
+      return {
+        total: v + flat, perRound: v + flat, rounds: null,
+        counts: pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null,
+        stranded: pays.filter((t) => t !== letter),
+        planName: null, nonStandard: false,
+        bounty: { letter, endsAt: live.endsAt },
+      };
+    }
+    const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
+    return {
+      total: mean + flat, perRound: mean + flat, rounds: null,
+      counts: null, stranded: null, planName: null, nonStandard: false,
+      bounty: { letter: null, endsAt: live.endsAt },
+    };
+  }
+
   /* Where a mission type offers more than one way to play it, take whichever
      banks more. Adding a plan can therefore only ever raise a node's score, so
      ticking the 4-squad box never makes anything look worse. */
-  function runValue(rot, runMode, mission, squad) {
+  function runValue(rot, runMode, mission, squad, live) {
+    if (live) return bountyRun(rot, live);
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let best = { total: 0, counts: null, rounds: null, plan: null };
     if (hasRot) {
@@ -628,11 +658,12 @@
 
     // value each node as a whole run, the same way the planner does
     map.forEach((e) => {
-      const r = runValue(e.rot, state.runMode, e.mode, state.squad);
+      const live = e.kind === "bounty" ? liveRotation(e.node) : null;
+      const r = runValue(e.rot, state.runMode, e.mode, state.squad, live);
       e.score = r.total; e.perRound = r.perRound;
       e.rounds = r.rounds; e.counts = r.counts;
       e.stranded = r.stranded; e.nonStandard = r.nonStandard;
-      e.planName = r.planName;
+      e.planName = r.planName; e.bounty = r.bounty;
     });
 
     return Array.from(map.values())
@@ -730,10 +761,53 @@
   const isRailjack = (s) =>
     RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
 
+  /* ── the bounty clock ────────────────────────────────────────────
+     One rotation letter is live for everyone, it changes every 150 minutes
+     A → B → C, and a bounty run pays the stages of whichever is up. The build
+     names the letter that was live when it ran by reading the worldstate; the
+     arithmetic here walks it forward so it stays right between refreshes.
+     The Isolation Vaults run a phase of their own, so each family is tracked
+     separately. Mirrors the planner's copy in assets/plan.js. */
+  const BOUNTY = (DATA.meta || {}).bounties || null;
+  const SEQ = (BOUNTY && BOUNTY.sequence) || "ABC";
+  const CYCLE_MS = ((BOUNTY && BOUNTY.cycleMinutes) || 150) * 60000;
+
+  function familyState(name) {
+    const fam = (BOUNTY && (BOUNTY.families || {})[name]) || null;
+    const end = fam && fam.windowEnd ? new Date(fam.windowEnd).getTime() : NaN;
+    const at = SEQ.indexOf(fam ? fam.letter : "");
+    if (!isFinite(end) || at < 0) return { letter: null, endsAt: null };
+    const now = Date.now();
+    const steps = now < end ? 0 : Math.floor((now - end) / CYCLE_MS) + 1;
+    return { letter: SEQ[(at + steps) % SEQ.length],
+             endsAt: end + steps * CYCLE_MS };
+  }
+
+  function liveRotation(node) {
+    const g = (BOUNTY && BOUNTY.groups && BOUNTY.groups[node]) || null;
+    if (!g) return { letter: null, endsAt: null, published: "" };
+    return Object.assign(familyState(g.family), { published: g.rotations || "" });
+  }
+
+  /* Bounties that only exist while an event is running - the two Ghoul tiers
+     and Plague Star. The build records the window rather than a yes/no, so a
+     week-old build still knows when a purge ends. */
+  const bountyEvent = (s) =>
+    (s.kind === "bounty" && BOUNTY && (BOUNTY.events || {})[s.node]) || null;
+  function eventRunning(e) {
+    if (!e || !e.expiry) return false;
+    const now = Date.now();
+    return new Date(e.expiry).getTime() > now &&
+      (!e.activation || new Date(e.activation).getTime() <= now);
+  }
+
   /* Event nodes only exist while their event is running, and DE's drop table
      never says which event that is — so they are left out of the ranking here
-     rather than sending you looking for a node that isn't on your star chart. */
-  const isEventNode = (s) => /^Event:/i.test(s.planet || "");
+     rather than sending you looking for a node that isn't on your star chart.
+     The limited-time bounties are the same problem with an answer: the
+     worldstate does say whether they are running. */
+  const isEventNode = (s) => /^Event:/i.test(s.planet || "") ||
+    !!(bountyEvent(s) && !eventRunning(bountyEvent(s)));
 
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
      really "stay for the 4th reward". Spelled out on hover because the letters
@@ -745,11 +819,63 @@
     C: "Can drop as the 4th reward.",
   };
 
-  function rotTag(rot, prefix) {
+  /* A bounty's letter is not a depth you play to. One letter is live for
+     everyone, it changes every 150 minutes A → B → C, and a run pays the
+     stages of whichever is up - so "rotation C" here means "come back when
+     the board is on C", not "stay for the 4th reward". The planner does the
+     arithmetic and says which one is live; this page only has to avoid
+     telling you the opposite. */
+  const BOUNTY_CYCLE =
+    "Bounties do not work that way: one rotation is live for everyone,\n" +
+    "it changes every 150 minutes (A → B → C → repeat), and a run pays\n" +
+    "the stages of whichever is up. Staying longer cannot reach another.\n" +
+    "The planner says which rotation is live and how long it has left.";
+
+  function rotTag(rot, prefix, isBounty) {
     if (!rot) return "";
     const key = String(rot).toUpperCase();
-    const help = (ROT_WHEN[key] ? ROT_WHEN[key] + "\n\n" : "") + ROT_CYCLE;
+    const help = isBounty ? BOUNTY_CYCLE
+      : (ROT_WHEN[key] ? ROT_WHEN[key] + "\n\n" : "") + ROT_CYCLE;
     return `<abbr class="rot" data-tip="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
+  }
+
+  /* "42 min", "3h 12m" — how long the live rotation has left. */
+  function untilText(ms) {
+    const mins = Math.max(0, Math.round((ms - Date.now()) / 60000));
+    return mins < 60 ? mins + " min"
+      : Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+  }
+
+  /* A bounty row names the letter that is live and how long it has left,
+     because that is the whole decision — the same bounty is worth something
+     different in an hour, and staying longer changes nothing. */
+  function bountyRotTag(s) {
+    const b = s.bounty || {};
+    const lines = [BOUNTY_CYCLE];
+    if (b.letter) {
+      lines.push("");
+      lines.push("Live now: rotation " + b.letter +
+        (b.endsAt ? ", for another " + untilText(b.endsAt) : "") + ".");
+      // what this node holds that the clock has not reached, and when it will -
+      // the reason a bounty can be worth nothing now and worth running later
+      const at = SEQ.indexOf(b.letter);
+      (s.stranded || []).forEach((t) => {
+        const to = SEQ.indexOf(t);
+        const when = at >= 0 && to >= 0 && b.endsAt
+          ? b.endsAt + (((to - at - 1) % SEQ.length + SEQ.length) % SEQ.length) * CYCLE_MS
+          : null;
+        lines.push("Rotation " + t + " holds something you want" +
+          (when ? ", and is up in " + untilText(when) : "") + ".");
+      });
+    } else if ((s.rotations || []).length > 1) {
+      lines.push("");
+      lines.push("Which rotation is live could not be read, so this node is");
+      lines.push("scored at the average of the ones it pays.");
+    }
+    const label = b.letter ? "rotation " + b.letter : "one reward table";
+    return `<abbr class="rot" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` +
+      (b.letter && b.endsAt
+        ? ` · <span class="rounds">${esc(untilText(b.endsAt))} left</span>` : "");
   }
 
   function rotListTag(rots, nonStandard) {
@@ -874,7 +1000,9 @@
               <span class="spot-mode">(${esc(s.mode)})</span>${
               s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""}</div>
             <div class="spot-meta">${
-              s.rotations.length ? rotListTag(s.rotations, s.nonStandard) : "no rotation"}${
+              s.kind === "bounty" ? bountyRotTag(s)
+                : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)
+                : "no rotation"}${
               s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
               s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
               s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
@@ -967,7 +1095,8 @@
             const shownSrc = all.slice(0, 2);
             const top = shownSrc.map((s) =>
               `<span>${esc(s.node)}${s.kind === "mission" ? " (" + esc(s.planet) + ")" : ""}${
-                s.rotation ? " · " + rotTag(s.rotation, "rot ") : ""} · ${s.chance}%</span>`).join("");
+                s.rotation ? " · " + rotTag(s.rotation, "rot ", s.kind === "bounty") : ""
+              } · ${s.chance}%</span>`).join("");
 
             // everything else, condensed into the "+N more" tooltip
             const restCount = (rec.sourceCount || all.length) - shownSrc.length;

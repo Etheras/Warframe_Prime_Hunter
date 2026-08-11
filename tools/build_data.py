@@ -53,9 +53,9 @@ import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
                      DROP_FILES, EXPORT_MANIFEST, EXPORT_WANTED, IMG_CDN, ITEMS_API,
-                     MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, VAULT_TRADER,
-                     WIKI_RAW, fetch, fetch_json, head, load_state, log,
-                     save_state, upstream_signature)
+                     MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, SYNDICATE_MISSIONS,
+                     VAULT_TRADER, WORLD_EVENTS, WIKI_RAW, fetch, fetch_json, head,
+                     load_state, log, save_state, upstream_signature)
 from artwork import cache_images                          # noqa: E402
 from catalogue import (CATEGORY_ORDER, NAME_ALIASES,                # noqa: E402
                        NON_RELIC_CATEGORIES, REFINEMENTS, TIER_ORDER,
@@ -73,7 +73,8 @@ from relics import (collect_relic_contents, collect_relic_sources,   # noqa: E40
 # than in sources.py, which would have made the two modules import each other.
 def acquire_drops(offline: bool, prefer: str, verbose: bool):
     """
-    Returns (relic_contents, relic_sources, source_label).
+    Returns (relic_contents, relic_sources, source_label, aya_sources,
+             bounty_rotation_pools).
 
     DE's own drop table is tried first; the community mirror is the fallback.
     A sanity gate guards against a silent format change upstream turning the
@@ -85,7 +86,8 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
             page = fetch(OFFICIAL_DROPTABLES, "official_droptables", offline).decode("utf-8", "replace")
             contents, sources, aya = official.parse_droptables(page)
             if len(contents) >= 200 and len(sources) >= 10:
-                return contents, normalise_sources(sources), "official", aya
+                return (contents, normalise_sources(sources), "official", aya,
+                        official.bounty_rotation_pools(page))
             log(f"! official drop table parsed thin ({len(contents)} relics, "
                 f"{len(sources)} farmable) - falling back to the mirror")
         except Exception as exc:
@@ -96,10 +98,12 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
         log(f"drops: {fname} (mirror)")
         payloads[fname] = fetch_json(DROPS.format(name=fname), f"drops_{fname}", offline)
     # the mirror splits its data differently and has no Aya table we can key on,
-    # so an Aya-less build is simply one without the bonus - never an error
+    # so an Aya-less build is simply one without the bonus - never an error.
+    # It also yields no rotation pools, so a mirror build cannot name the live
+    # bounty rotation; the planner says "unknown" rather than guessing.
     return (collect_relic_contents(payloads["relics.json"]),
             collect_relic_sources(payloads, verbose),
-            "mirror", [])
+            "mirror", [], {})
 
 
 def acquire_export(offline: bool):
@@ -231,6 +235,204 @@ def build_resurgence_set(vault_trader: dict, catalog_names: list[str]) -> tuple[
     return active, window
 
 
+# --------------------------------------------------------------------------
+# bounties: which rotation is live, and which limited-time ones exist today
+# --------------------------------------------------------------------------
+
+# Which drop-table section each syndicate hands out bounties from. Anything not
+# named here (Nightwave, the six old star-chart syndicates) offers no bounties.
+SYNDICATE_SECTION = {
+    "Ostrons": "cetusRewards",
+    "Solaris United": "solarisRewards",
+    "Entrati": "deimosRewards",
+    "The Holdfasts": "zarimanRewards",
+    "Cavia": "entratiLabRewards",
+    "The Hex": "hexRewards",
+}
+
+# Bounties that only exist while an event is running, and the event to look for
+# in the worldstate. Both are Cetus events, and between them they carry 28 of
+# the 30 relic-bearing bounty rows outside the Isolation Vaults - so ranking
+# them as permanent sends you to a bounty board that has no such bounty on it.
+EVENT_BOUNTIES = {
+    "Level 15 - 25 Ghoul Bounty": "Ghoul Purge",
+    "Level 40 - 50 Ghoul Bounty": "Ghoul Purge",
+    "Level 15 - 25 Plague Star": "Plague Star",
+}
+EVENT_PATTERNS = {
+    "Ghoul Purge": re.compile(r"ghoul", re.I),
+    "Plague Star": re.compile(r"plague\s*star", re.I),
+}
+
+CYCLE_MINUTES = 150       # one full day/night of the landscape
+SEQUENCE = "ABC"
+
+
+def bounty_family(group: str) -> str:
+    """
+    Which clock a bounty's rotation letter runs on.
+
+    The wiki says every bounty everywhere shares one letter. Our own reading of
+    the worldstate says otherwise: at 2026-08-11T21:00Z the standard bounties of
+    Cetus, Fortuna and the Cambion Drift were all on C while every Isolation
+    Vault chamber was on B - same 150-minute period, same changeover instant,
+    one step apart. So the two are derived separately and neither is assumed
+    from the other.
+    """
+    return "vault" if "Isolation Vault" in group else "standard"
+
+
+def _instant(value) -> datetime | None:
+    """Parse a worldstate timestamp. They are ISO-8601 UTC with a Z suffix."""
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_live(entry: dict, now: datetime) -> bool:
+    """
+    Is this the bounty set on the board right now?
+
+    Worth checking rather than assuming. Minutes before a changeover the
+    worldstate carries the *next* set as well, and counting both halves the
+    vote: read at 21:53 against a window ending 21:55, the standard bounties
+    came back 16 for C and 16 for A, and the vaults 6 for B and 6 for C. The
+    tie went to the wrong letter for the vaults - a whole window out.
+    """
+    start, end = _instant(entry.get("activation")), _instant(entry.get("expiry"))
+    return bool(end and end > now and (not start or start <= now))
+
+
+def derive_bounty_rotation(pools: dict, syndicate_missions: list,
+                           now: datetime | None = None) -> dict:
+    """
+    Name the rotation letter that is live right now, per family.
+
+    DE publishes what each letter pays; the worldstate publishes what the
+    bounties on offer pay. Matching one against the other names the letter,
+    which is otherwise unknowable - the period (150 minutes) is documented but
+    the phase is not, and a countdown labelled with the wrong letter is worse
+    than no countdown at all.
+
+    A job votes only when exactly one rotation of its bounty contains every
+    reward it is currently offering. Ties abstain: several Cambion Drift tiers
+    pay the same handful of resources in all three rotations and genuinely
+    carry no information. In the reading above 20 jobs voted and none dissented.
+    """
+    votes: dict[str, dict[str, int]] = {}
+    ends: dict[str, list[str]] = {}
+    now = now or datetime.now(timezone.utc)
+
+    for entry in syndicate_missions or []:
+        sid = SYNDICATE_SECTION.get(entry.get("syndicate"))
+        if not sid or not _is_live(entry, now):
+            continue
+        for job in entry.get("jobs") or []:
+            live = set(job.get("rewardPool") or [])
+            levels = job.get("enemyLevels") or []
+            if not live or not levels:
+                continue
+            for group, rotations in (pools.get(sid) or {}).items():
+                # Only a bounty publishing all three letters can distinguish
+                # them. A couple of tiers publish two - Level 30-40 Cambion
+                # Drift is one - and there a single subset hit says nothing
+                # about which letter is up, only that one of the two tables it
+                # does publish happens to cover today's rewards.
+                if set(rotations) != set(SEQUENCE):
+                    continue
+                if official.group_levels(group) != list(levels):
+                    continue
+                hits = [rot for rot, names in rotations.items() if live <= names]
+                if len(hits) != 1:
+                    continue                      # ambiguous: abstain
+                fam = bounty_family(group)
+                votes.setdefault(fam, {})
+                votes[fam][hits[0]] = votes[fam].get(hits[0], 0) + 1
+                if entry.get("expiry"):
+                    ends.setdefault(fam, []).append(entry["expiry"])
+
+    families = {}
+    for fam, tally in votes.items():
+        letter = max(tally, key=lambda k: (tally[k], k))
+        families[fam] = {
+            "letter": letter,
+            # when this letter stops being the live one; the page counts down to
+            # it and walks the sequence forward from there
+            "windowEnd": min(ends[fam]) if ends.get(fam) else None,
+            "votes": tally[letter],
+            "of": sum(tally.values()),
+        }
+    return families
+
+
+def find_live_events(events: list, syndicate_missions: list) -> dict:
+    """
+    {event name: {activation, expiry}} for the ones the worldstate is carrying.
+
+    Deliberately a keyword scan across both endpoints rather than a match on
+    one known field. Neither event was running while this was written, so the
+    exact shape DE gives them could not be observed, and a scan that looks in
+    several places degrades to "not running" instead of to a crash. The window
+    is emitted rather than a boolean so the page can expire it against its own
+    clock - a build from three days ago still knows a purge ends tomorrow.
+    """
+    found: dict[str, dict] = {}
+
+    def consider(name: str, blob: str, activation, expiry) -> None:
+        if not expiry or not EVENT_PATTERNS[name].search(blob):
+            return
+        prev = found.get(name)
+        if prev is None or (prev.get("expiry") or "") < expiry:
+            found[name] = {"activation": activation, "expiry": expiry}
+
+    for ev in events or []:
+        blob = " ".join(str(ev.get(k) or "") for k in
+                        ("description", "tooltip", "node", "tag", "name"))
+        for name in EVENT_PATTERNS:
+            consider(name, blob, ev.get("activation"), ev.get("expiry"))
+
+    for entry in syndicate_missions or []:
+        # a purge arrives as its own syndicate whose tag WFCD does not map, so
+        # the raw name ("GhoulEmergenceSyndicate") comes through as-is
+        blob = str(entry.get("syndicate") or "")
+        if not (entry.get("jobs") or []):
+            continue
+        for name in EVENT_PATTERNS:
+            consider(name, blob, entry.get("activation"), entry.get("expiry"))
+
+    return found
+
+
+def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
+                      now: datetime | None = None) -> dict:
+    """The whole bounty block of the payload."""
+    families = derive_bounty_rotation(pools, syndicate_missions, now) if checked else {}
+    live = find_live_events(events, syndicate_missions) if checked else {}
+
+    # Every bounty whose payout depends on the letter, with the letters it
+    # actually publishes: a couple of tiers publish two rather than three, and
+    # the page has to be able to tell "you want nothing in rotation C" apart
+    # from "this bounty has no rotation C".
+    groups = {}
+    for sid, by_group in (pools or {}).items():
+        for group, rotations in by_group.items():
+            if len(rotations) >= 2:
+                groups[group] = {"family": bounty_family(group),
+                                 "rotations": "".join(sorted(rotations))}
+
+    return {
+        "cycleMinutes": CYCLE_MINUTES,
+        "sequence": SEQUENCE,
+        "checked": bool(checked),
+        "families": families,
+        "groups": groups,
+        # every limited-time bounty we know of, with the window if it is running
+        "events": {group: {"event": name, **(live.get(name) or {})}
+                   for group, name in EVENT_BOUNTIES.items()},
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the VorFrame data payload.")
     ap.add_argument("--offline", action="store_true", help="rebuild from the HTTP cache only")
@@ -295,11 +497,16 @@ def main() -> int:
         log("! vault trader unavailable - Resurgence flags will be empty")
         vault_trader = {}
 
+    log("api: bounties on offer + world events (live rotation, Ghoul, Plague Star)")
+    syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
+                                    off, critical=False)
+    world_events = fetch_json(WORLD_EVENTS, "api_events", off, critical=False)
+
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash = acquire_export(off)
 
-    relic_contents, relic_sources, drop_source, aya_sources = acquire_drops(
-        off, args.source, args.verbose)
+    relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
+        acquire_drops(off, args.source, args.verbose)
 
     # ---- transform -------------------------------------------------------
     print("-" * 60)
@@ -363,6 +570,18 @@ def main() -> int:
     resurgence, resurgence_window = build_resurgence_set(vault_trader, catalog_names)
     log(f"resurgence: {len(resurgence)} items live at Varzia "
         f"({resurgence_window.get('activation', '?')[:10]} -> {resurgence_window.get('expiry', '?')[:10]})")
+
+    bounties = build_bounty_meta(rotation_pools, syndicate_missions, world_events,
+                                 checked=bool(rotation_pools and syndicate_missions))
+    if bounties["families"]:
+        for fam, f in sorted(bounties["families"].items()):
+            log(f"bounties: {fam} on rotation {f['letter']} "
+                f"({f['votes']}/{f['of']} bounties agree, until {f['windowEnd']})")
+    else:
+        log("! bounties: the live rotation could not be read - the planner will "
+            "say so rather than guess")
+    running = sorted({e["event"] for e in bounties["events"].values() if e.get("expiry")})
+    log(f"bounties: limited-time events running - {', '.join(running) or 'none'}")
 
     used_relics: set[str] = set()
     out_items: list[dict] = []
@@ -604,6 +823,11 @@ def main() -> int:
             "relicCount": len(relics_out),
             "farmableRelicCount": sum(1 for r in relics_out.values() if not r["vaulted"]),
             "resurgence": resurgence_window,
+            # which bounty rotation is live, and which limited-time bounties
+            # exist at all today. A bounty run pays one rotation - the one the
+            # clock says - so without this the planner counts rewards you
+            # cannot collect. See build_bounty_meta.
+            "bounties": bounties,
             "refinements": REFINEMENTS,
             "dropSource": drop_source,
             "newCount": len(fresh) if prime_wikitext else 0,
@@ -619,6 +843,8 @@ def main() -> int:
                           if drop_source == "official"
                           else "https://drops.warframestat.us/data (community mirror)"),
                 "resurgence": "https://api.warframestat.us/pc/vaultTrader (live worldstate)",
+                "bounties": "https://api.warframestat.us/pc/syndicateMissions + /pc/events"
+                            " (live worldstate)",
                 "images": ("assets/img (local copies; nothing fetched at runtime)"
                            if local_images else "https://cdn.warframestat.us/img"),
             },

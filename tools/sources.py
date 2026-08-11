@@ -44,6 +44,11 @@ ITEMS_API = (
     "releaseDate,vaultDate,estimatedVaultDate,tradable,wikiaUrl"
 )
 VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
+# The bounties on offer right now, and the world events that add temporary
+# ones. Both proxy the game worldstate, the same route Prime Resurgence takes
+# and for the same reason: DE's own worldState.php is 404 (PROJECT.md §6).
+SYNDICATE_MISSIONS = "https://api.warframestat.us/pc/syndicateMissions?language=en"
+WORLD_EVENTS = "https://api.warframestat.us/pc/events?language=en"
 IMG_CDN = "https://cdn.warframestat.us/img/"
 
 # Digital Extremes, first party

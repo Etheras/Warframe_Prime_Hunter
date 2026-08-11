@@ -273,6 +273,58 @@ def parse_droptables(page: str):
     return relic_contents, relic_sources, aya_sources
 
 
+# ── bounty rotation pools ─────────────────────────────────────────────────
+
+# "Level 15 - 25 Ghoul Bounty" -> (15, 25). The live worldstate identifies a
+# bounty by its enemy level range and nothing else, so this is the join key.
+_GROUP_LEVELS = re.compile(r"Level\s+(\d+)\s*-\s*(\d+)")
+
+BOUNTY_SECTIONS = [sid for sid, (kind, _) in SECTIONS.items() if kind == "bounty"]
+
+
+def bounty_rotation_pools(page: str) -> dict[str, dict[str, dict[str, set[str]]]]:
+    """
+    {section id: {bounty: {rotation letter: {every reward name in it}}}}
+
+    The whole pool, not just the relics — non-relic rewards are most of what
+    distinguishes one rotation from another, and this table exists to be
+    matched against the live worldstate rather than shown to anyone.
+
+    A bounty's rotation letter is wall-clock state: one letter is live for
+    everyone, it advances A -> B -> C every 150 minutes, and a run pays the
+    stages of whichever letter is up. So the letter cannot be read off the drop
+    table alone; the table only says what each letter *would* pay. Naming the
+    live one is `build_data.derive_bounty_rotation`'s job, and this is the half
+    of the comparison DE publishes.
+    """
+    out: dict[str, dict[str, dict[str, set[str]]]] = {}
+    sections = _slice_sections(page)
+    for sid in BOUNTY_SECTIONS:
+        group = rotation = None
+        for is_head, cells in _rows(sections.get(sid, "")):
+            head = cells[0]
+            if is_head:
+                rot = _ROT_HDR.match(head)
+                if rot:
+                    rotation = rot.group(1).upper()
+                    continue
+                if re.match(r"^(final\s+)?stage\b", head, re.I):
+                    continue          # stages all sit inside one rotation
+                group = head
+                rotation = None
+                continue
+            if not group or rotation is None or len(cells) < 2:
+                continue
+            out.setdefault(sid, {}).setdefault(group, {}) \
+               .setdefault(rotation, set()).add(cells[-2])
+    return out
+
+
+def group_levels(group: str) -> list[int] | None:
+    m = _GROUP_LEVELS.search(group or "")
+    return [int(m.group(1)), int(m.group(2))] if m else None
+
+
 # ── public export ─────────────────────────────────────────────────────────
 
 def decode_index(blob: bytes) -> dict[str, str]:

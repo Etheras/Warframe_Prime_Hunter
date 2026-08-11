@@ -22,6 +22,7 @@ each says which.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -34,6 +35,7 @@ import traceback
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
+import build_data  # noqa: E402
 import catalogue  # noqa: E402
 import official  # noqa: E402
 import relics  # noqa: E402
@@ -201,6 +203,169 @@ def test_no_source_cap() -> None:
     out = relics.normalise_sources(rows)["Axi S20"]
     check("sources: nothing is capped", len(out), 90,
           "the 40-row cap made the planner blind to real farms")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# bounties: the live rotation, and the ones that only exist sometimes
+# ─────────────────────────────────────────────────────────────────────────────
+
+# One bounty tier as DE publishes it: the rotation is the outer heading and
+# every stage sits inside it, so a run pays the stages of ONE letter. Trimmed
+# to two stages and three rewards each; the real page has five of each.
+_BOUNTY_PAGE = """
+<h3 id="cetusRewards">Cetus</h3>
+<table>
+<tr><th>Level 5 - 15 Cetus Bounty</th></tr>
+<tr><th>Rotation A</th></tr>
+<tr><th>Stage 1</th></tr>
+<tr><td>Redirection</td><td>Uncommon (20.00%)</td></tr>
+<tr><td>100X Oxium</td><td>Uncommon (20.00%)</td></tr>
+<tr><th>Final Stage</th></tr>
+<tr><td>Point Blank</td><td>Uncommon (30.56%)</td></tr>
+<tr><th>Rotation B</th></tr>
+<tr><th>Stage 1</th></tr>
+<tr><td>Pressure Point</td><td>Uncommon (20.00%)</td></tr>
+<tr><td>100X Cryotic</td><td>Uncommon (20.00%)</td></tr>
+<tr><th>Final Stage</th></tr>
+<tr><td>Stretch</td><td>Uncommon (30.56%)</td></tr>
+<tr><th>Rotation C</th></tr>
+<tr><th>Stage 1</th></tr>
+<tr><td>Vitality</td><td>Uncommon (20.00%)</td></tr>
+<tr><td>200X Plastids</td><td>Uncommon (20.00%)</td></tr>
+<tr><th>Final Stage</th></tr>
+<tr><td>Intensify</td><td>Uncommon (30.56%)</td></tr>
+<tr><th>Level 15 - 25 Ghoul Bounty</th></tr>
+<tr><th>Rotation A</th></tr>
+<tr><th>Stage 1</th></tr>
+<tr><td>Neo C7 Relic</td><td>Uncommon (18.45%)</td></tr>
+<h3 id="solarisRewards">Fortuna</h3>
+"""
+
+
+def test_bounty_rotation_pools() -> None:
+    """
+    The stage headings nest INSIDE the rotation heading. Reading them as
+    siblings would file "Final Stage" as a bounty of its own - the bug that
+    put 61 rows under a phantom node of that name - and would leave each
+    rotation holding only its first stage.
+    """
+    pools = official.bounty_rotation_pools(_BOUNTY_PAGE)["cetusRewards"]
+    tier = pools["Level 5 - 15 Cetus Bounty"]
+    check("bounty pools: three rotations", sorted(tier), ["A", "B", "C"])
+    check("bounty pools: every stage folded into its rotation",
+          sorted(tier["A"]), ["100X Oxium", "Point Blank", "Redirection"])
+    check("bounty pools: rotations do not bleed into each other",
+          "Vitality" in tier["A"], False)
+    check("bounty pools: a single-rotation bounty stays single",
+          sorted(pools["Level 15 - 25 Ghoul Bounty"]), ["A"])
+    check("bounty levels parsed", official.group_levels("Level 15 - 25 Ghoul Bounty"),
+          [15, 25])
+
+
+# 21:00Z sits inside the window below, so the fixtures do not rot with the clock
+_NOW = datetime.datetime(2026, 8, 11, 21, 0, tzinfo=datetime.timezone.utc)
+
+
+def _syndicate(jobs, activation="2026-08-11T19:25:24.467Z",
+               expiry="2026-08-11T21:55:23.341Z"):
+    return [{"syndicate": "Ostrons", "activation": activation,
+             "expiry": expiry, "jobs": jobs}]
+
+
+def test_derive_bounty_rotation() -> None:
+    """
+    The period (150 minutes) is documented; the phase is not. It is recovered by
+    matching what the worldstate says is on offer against what DE's table says
+    each letter pays - the only route to it that needs no in-game observation.
+    """
+    pools = official.bounty_rotation_pools(_BOUNTY_PAGE)
+
+    live = _syndicate([{"type": "Reclaim the Stolen Artifact", "enemyLevels": [5, 15],
+                        "rewardPool": ["Vitality", "200X Plastids"]}])
+    fams = build_data.derive_bounty_rotation(pools, live, _NOW)
+    check("rotation: named from the live reward pool", fams["standard"]["letter"], "C")
+    check("rotation: window carried through", fams["standard"]["windowEnd"],
+          "2026-08-11T21:55:23.341Z")
+
+    # Minutes before a changeover the worldstate carries the NEXT set as well.
+    # Counting it halves the vote and, on a tie, can land a whole window out.
+    upcoming = _syndicate([{"type": "x", "enemyLevels": [5, 15],
+                            "rewardPool": ["Redirection", "100X Oxium"]}],
+                          activation="2026-08-11T21:55:23.341Z",
+                          expiry="2026-08-12T00:25:23.341Z")
+    fams = build_data.derive_bounty_rotation(pools, live + upcoming, _NOW)
+    check("rotation: the next window does not vote", fams["standard"]["letter"], "C")
+    check("rotation: and does not dilute the count", fams["standard"]["of"], 1)
+
+    # a pool that fits more than one rotation says nothing, and must not vote
+    tie = _syndicate([{"type": "x", "enemyLevels": [5, 15], "rewardPool": []}])
+    check("rotation: an empty pool abstains",
+          build_data.derive_bounty_rotation(pools, tie, _NOW), {})
+
+    # the Ghoul tier publishes one letter, so a match against it is not evidence
+    ghoul = _syndicate([{"type": "x", "enemyLevels": [15, 25],
+                         "rewardPool": ["Neo C7 Relic"]}])
+    check("rotation: a bounty with one rotation cannot vote",
+          build_data.derive_bounty_rotation(pools, ghoul, _NOW), {})
+
+    # Level 30-40 Cambion Drift publishes A and B only: a hit there is ambiguous
+    partial = dict(pools)
+    partial["cetusRewards"] = dict(pools["cetusRewards"])
+    partial["cetusRewards"]["Level 5 - 15 Cetus Bounty"] = {
+        "A": {"Redirection"}, "B": {"Pressure Point"}}
+    check("rotation: a two-rotation bounty cannot vote",
+          build_data.derive_bounty_rotation(
+              partial, _syndicate([{"type": "x", "enemyLevels": [5, 15],
+                                    "rewardPool": ["Redirection"]}]), _NOW), {})
+
+
+def test_bounty_family_split() -> None:
+    """
+    Read at 2026-08-11T21:00Z the standard bounties were on C while every
+    Isolation Vault was on B. One letter for everything - which is what the
+    wiki says - would have been wrong for six bounty tiers.
+    """
+    check("family: vaults run their own clock",
+          build_data.bounty_family("Level 30 - 40 Isolation Vault"), "vault")
+    check("family: arcana vaults too",
+          build_data.bounty_family("Level 50 - 60 Arcana Isolation Vault"), "vault")
+    check("family: everything else is one clock",
+          build_data.bounty_family("Level 5 - 15 Cetus Bounty"), "standard")
+
+
+def test_live_event_bounties() -> None:
+    """
+    Plague Star carries 26 relics and only exists a few weeks a year; the Ghoul
+    tiers only exist during a purge. Ranking them as permanent sends you to a
+    bounty board that has no such bounty on it.
+    """
+    events = [{"description": "Operation: Plague Star", "node": "Cetus (Earth)",
+               "activation": "2026-08-01T00:00:00Z", "expiry": "2026-08-20T00:00:00Z"},
+              {"description": "Thermia Fractures", "node": "Orb Vallis (Venus)",
+               "activation": "2026-08-01T00:00:00Z", "expiry": "2026-08-24T00:00:00Z"}]
+    found = build_data.find_live_events(events, [])
+    check("events: Plague Star found", "Plague Star" in found, True)
+    check("events: unrelated events ignored", "Ghoul Purge" in found, False)
+
+    # a purge arrives as a syndicate whose tag WFCD does not map
+    purge = [{"syndicate": "GhoulEmergenceSyndicate", "jobs": [{"type": "Ghoul Bounty"}],
+              "activation": "2026-08-10T00:00:00Z", "expiry": "2026-08-17T00:00:00Z"}]
+    check("events: a purge found on the syndicate list",
+          build_data.find_live_events([], purge)["Ghoul Purge"]["expiry"],
+          "2026-08-17T00:00:00Z")
+
+    meta = build_data.build_bounty_meta(
+        official.bounty_rotation_pools(_BOUNTY_PAGE), [], events, True, _NOW)
+    star = meta["events"]["Level 15 - 25 Plague Star"]
+    check("events: window emitted, not a boolean", star.get("expiry"),
+          "2026-08-20T00:00:00Z")
+    check("events: a bounty nobody is running has no window",
+          meta["events"]["Level 15 - 25 Ghoul Bounty"].get("expiry"), None)
+    check("events: single-rotation bounties are not clocked",
+          "Level 15 - 25 Ghoul Bounty" in meta["groups"], False)
+    check("events: the clocked ones carry their letters",
+          meta["groups"]["Level 5 - 15 Cetus Bounty"],
+          {"family": "standard", "rotations": "ABC"})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -593,6 +758,8 @@ def main() -> int:
         ("parsers", [test_rarity_from_intact, test_split_rate, test_normalise_part,
                      test_relic_key, test_parse_prime_page]),
         ("join", [test_normalise_sources, test_no_source_cap]),
+        ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
+                      test_bounty_family_split, test_live_event_bounties]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
