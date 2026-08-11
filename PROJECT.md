@@ -593,21 +593,27 @@ Prime Resurgence rotation. So one Aya is one relic *of your choosing* from that
 rotation — strictly better than a random relic off a drop table, because you pick
 it.
 
-**It is a wildcard against the vault, not a voucher for this rotation.** Aya is
-banked, and Varzia's stock turns over every 28 days, so Aya held today buys from
-whatever the *next* rotation offers. Its value is therefore the best **vaulted**
-relic on your list, at its best refinement — not the best relic currently on sale.
-
-Its value is in the planner's own unit — expected wanted parts per opening, the
-number every other row is scored in — because it comes from the same
-`bestRefinement()` call used for every relic. **Ducats are not involved anywhere.**
-They are a separate, display-only fact on the collection page's part rows and feed no
-calculation; nothing in the planner reads them.
+**It is valued at the best relic it could buy you right now.** Varzia stocks the
+current Prime Resurgence rotation, so with a rotation running Aya is priced against
+that rotation's relics only — the same `bestRefinement()` call every other relic on
+the page is scored with, so the number is in the same unit and directly comparable.
 
 It counts only for items that are **not farmable**. Almost any part turns up in some
 vaulted relic somewhere, so without that test a list of purely farmable Primes would
-still score Aya — and if you can simply go and farm it, Aya buys you nothing. So:
-something vaulted on your list means Aya has value; nothing vaulted means zero.
+still score Aya — and if you can go and farm it, Aya buys you nothing.
+
+**When no rotation is running** there is nothing on sale to price against. Rather than
+score zero and imply Aya is worthless — you would still bank it — it falls back to the
+best *vaulted* relic on your list, which is what a future rotation could offer. The
+row tooltip and the summary both say which of the two is in play. A rotation counts as
+over when `meta.resurgence.expiry` has passed, so a stale build does not keep pricing
+against a rotation that ended.
+
+**A known consequence, chosen deliberately:** wanting a vaulted Prime that is *not* in
+the current rotation scores Aya zero, even though you would sensibly bank Aya against
+its eventual return. Pricing on the live rotation is exact about what Aya buys today;
+pricing on the whole vault would be right in expectation but optimistic about which
+rotation turns up. This is the first of those.
 
 **It only ever inflates a node already worth running.** Same rule as Forma, and for
 the same reason: standing on its own it would send you to a bounty that drops Aya

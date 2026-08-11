@@ -415,31 +415,33 @@
     });
 
     /* ── Aya ──────────────────────────────────────────────────────────
-       Aya is banked, not spent immediately. Varzia's stock rotates every 28
-       days, so Aya held today buys from whatever the *next* rotation offers -
-       which makes it a wildcard against the vault as a whole, not a voucher
-       for the five items currently on sale. It is worth something for exactly
-       as long as there is a vaulted Prime you still want, and worth nothing
-       the moment there is not.
+       One Aya buys one relic at Varzia, so it is valued at the best relic it
+       could buy you *right now* - the same bestRefinement() call every other
+       relic on the page is scored with, so the number is directly comparable
+       and in the same unit. Nothing to do with ducats.
 
-       That is also why it beats a relic from the farmable rotation: a relic
-       gives you one random reward from its own table, while Aya gives you your
-       pick of any vaulted relic. So it is priced at the best vaulted relic on
-       your list - and only vaulted ones, since anything still farmable needs
-       no Aya to reach.
+       Only for items that are not farmable. Almost any part turns up in some
+       vaulted relic somewhere, so without that test a list of purely farmable
+       Primes would still score Aya - and if you can go and farm it, Aya buys
+       you nothing.
+
+       When no Prime Resurgence rotation is running there is nothing to buy, so
+       there is nothing to price it against. Rather than score zero and pretend
+       Aya is worthless - you would still bank it for the next rotation - it
+       falls back to the best vaulted relic on your list, which is what a future
+       rotation could offer. The tooltip says which of the two is in play.
 
        Crucially it only ever *inflates a node you were already going to run*.
        Letting it stand on its own would send you to a bounty that drops Aya
        and nothing else, ahead of a node carrying a part you actually need -
-       the same mistake Forma would make if it could add a relic. */
-    let ayaValue = 0, ayaRelic = null, ayaBuyableNow = false;
+       the same rule Forma follows, and for the same reason. */
+    let ayaValue = 0, ayaRelic = null, ayaBuyableNow = false, ayaRotationLive = false;
     if (opts.aya) {
-      /* Aya is worth something for exactly as long as something you want is
-         vaulted. A filter is needed because almost any part turns up in some
-         vaulted relic somewhere, so without one a list of purely farmable
-         Primes would still score Aya - and if you can just go and farm it,
-         Aya buys you nothing. The test is the item, not the part: if it is
-         not farmable, Aya is a route to it. */
+      const expiry = ((DATA.meta || {}).resurgence || {}).expiry;
+      const anyOnSale = Object.keys(RELICS).some((n) => RELICS[n].resurgence);
+      ayaRotationLive = anyOnSale &&
+        (!expiry || new Date(expiry).getTime() > Date.now());
+
       const locked = new Set();
       wishlist.forEach((id) => {
         const it = BY_ID.get(id);
@@ -449,16 +451,19 @@
 
       Object.keys(RELICS).forEach((rname) => {
         const rec = RELICS[rname];
-        if (!rec || !rec.vaulted) return;      // farmable needs no Aya
+        if (!rec || !rec.vaulted) return;              // farmable needs no Aya
+        // with a rotation running, only what Varzia is actually selling
+        if (ayaRotationLive && !rec.resurgence) return;
         const entries = (want.get(rname) || []).filter((e) => !e.bonus && locked.has(e.label));
         if (!entries.length) return;
         const { value } = bestRefinement(entries);
         if (value > ayaValue) {
           ayaValue = value; ayaRelic = rname;
-          ayaBuyableNow = !!rec.resurgence;    // on sale this rotation, or a later one
+          ayaBuyableNow = !!rec.resurgence;
         }
       });
     }
+
     if (ayaValue > 0) {
       const byNode = new Map();
       (DATA.aya || []).forEach((a) => {
@@ -496,7 +501,7 @@
     });
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-             ayaBuyableNow };
+             ayaBuyableNow, ayaRotationLive };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -659,7 +664,7 @@
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-            ayaBuyableNow } = buildPlan();
+            ayaBuyableNow, ayaRotationLive } = buildPlan();
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
     $("#formaShort").classList.toggle("on", formaShort > 0);
@@ -686,12 +691,12 @@
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
-      (ayaValue > 0 ? " Aya counts too. It is a wildcard against the vault — banked " +
-        "now, spent on a later rotation — so it is priced at the best vaulted relic " +
-        "on your list, <b>" + esc(ayaRelic) + "</b> at " + pct(ayaValue) +
-        (ayaBuyableNow ? ", which Varzia is selling right now" :
-          ", which a future rotation would have to offer") +
-        ". It only ever raises nodes already worth running." : "") +
+      (ayaValue > 0 ? " Aya counts too, valued at the best relic it could buy you: " +
+        "<b>" + esc(ayaRelic) + "</b> at " + pct(ayaValue) +
+        (ayaRotationLive ? ", which Varzia is selling this rotation." :
+          ". No Resurgence rotation is running, so that is what a future one " +
+          "would have to offer — Aya is being banked, not spent.") +
+        " It only ever raises nodes already worth running." : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 

@@ -276,10 +276,14 @@ detail line — hover for the rate. Two things worth knowing:
 
 - It **only raises the value of a node you were already going to run.** It will never
   put an Aya-only bounty ahead of somewhere carrying a part you need.
-- It counts **only for vaulted things**. Aya is a wildcard against the vault — you
-  bank it and spend it on a later rotation — so it is worth the best *vaulted* item on
-  your list. If everything you still want is farmable, Aya is worth nothing, because
-  you can simply go and get those.
+- It is worth **the best relic Varzia is selling this rotation** that is on your list.
+  If nothing you still want is in the current rotation, Aya scores nothing — you would
+  bank it, but the planner cannot tell you when your Prime will come round.
+- If everything you still want is farmable, Aya is worth nothing either: you can
+  simply go and get those.
+- **If no Resurgence rotation is running at all**, there is nothing on sale to price
+  against, so it falls back to the best vaulted item on your list — what a future
+  rotation would have to offer. The tooltip says when this is happening.
 
 ### Ducat values
 
