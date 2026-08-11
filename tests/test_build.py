@@ -391,6 +391,29 @@ def test_no_writer_leaves_orphans() -> None:
               "a Prime leaving the catalogue used to leave its page cached")
 
 
+def test_batch_files_are_runnable() -> None:
+    """
+    cmd.exe cannot parse an LF-only batch file, and reads batch files in the
+    OEM codepage rather than UTF-8. Both bit at once: refresh-data.cmd was
+    written with LF endings and em dashes, and every REM line came back as
+    "'M' is not recognized as an internal or external command".
+
+    Nothing about editing these files makes the problem visible - they look
+    perfect in an editor - so it has to be checked rather than remembered.
+    """
+    import glob
+    for path in sorted(glob.glob(os.path.join(ROOT, "*.cmd"))):
+        name = os.path.basename(path)
+        raw = open(path, "rb").read()
+        lf = raw.count(b"\n")
+        crlf = raw.count(b"\r\n")
+        check(f"{name}: every line ends CRLF", lf, crlf,
+              "cmd.exe mis-parses LF-only batch files")
+        bad = sorted({b for b in raw if b > 127})
+        check(f"{name}: pure ASCII", [hex(b) for b in bad], [],
+              "cmd.exe reads these in the OEM codepage, not UTF-8")
+
+
 def test_bundle_is_self_contained() -> None:
     """
     The single-file build must reference nothing on disk, and must carry both
@@ -428,6 +451,7 @@ def main() -> int:
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
+                         test_batch_files_are_runnable,
                          test_bundle_is_self_contained]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]

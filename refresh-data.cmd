@@ -1,5 +1,5 @@
 @echo off
-REM Refresh everything VorFrame needs. This is the normal way to run it —
+REM Refresh everything VorFrame needs. This is the normal way to run it -
 REM double-click and wait.
 REM
 REM It does the lot, first run and every run after:
@@ -7,7 +7,7 @@ REM
 REM   * drop tables, item database and the live Prime Resurgence rotation,
 REM     straight from Digital Extremes
 REM   * item artwork into assets\img, so the site fetches nothing from the
-REM     internet while you use it (about 8 MB, first run only — later runs
+REM     internet while you use it (about 8 MB, first run only - later runs
 REM     just pick up new Primes and delete pictures no longer needed)
 REM   * the single-file build in dist\, so it is never older than your data
 REM
