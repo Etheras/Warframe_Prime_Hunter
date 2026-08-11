@@ -349,9 +349,24 @@ The server is threaded. Single-threaded, one client opening a socket and never
 finishing its request blocked every other client for the full timeout — measured
 before and after: 6 s versus 0.02 s.
 
-**What it still is not.** No HTTPS, no authentication, no rate limiting, no
-request log. That is fine on a home network and is *not* enough to put on the
-open internet, where the right answer is a real server in front of it.
+**Rate limiting, holding nothing.** A token bucket per client: 60 requests back
+to back, refilling at 10/s, then `429` with `Retry-After`. Measured at 101 req/s:
+71 served, 49 refused. The address is keyed-hashed with a salt generated at
+start-up and kept in memory, so buckets cannot be tied to a person, correlated
+across restarts, or found on disk. The basis is legitimate interest in
+availability (GDPR Art. 6(1)(f), Recital 49), and the footer says so.
+
+**No request log**, deliberately. Shutdown prints totals — served, refused,
+rate-limited — and totals identify nobody. A conventional access log would be
+the one place personal data accumulated, and nothing here needs it.
+
+**What it still is not: HTTPS.** Without it, anyone on the path can read and
+*alter* the page in transit, which is the real argument rather than secrecy.
+Authentication is genuinely not needed — nothing served is secret or personal —
+but transport security is. For anything beyond a home network, terminate TLS in
+front: a Cloudflare Tunnel needs no port forwarding and never publishes your home
+address, Caddy gets a certificate automatically given a domain, and Tailscale
+avoids public exposure altogether.
 
 ### Two stores, and who owns each
 

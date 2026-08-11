@@ -33,6 +33,41 @@ that it is unofficial.
 
 DE's [Terms of Use](https://www.warframe.com/terms) also apply.
 
+### Serving artwork rather than hotlinking it
+
+`build_data.py --with-images` downloads item artwork and the site then serves it
+itself. That is deliberate: hotlinking sends every visitor's IP address to a third
+party, which a tool that otherwise keeps everything local has no business doing.
+
+It does mean this project **redistributes DE's artwork** rather than merely linking
+to it, which is a heavier use of their assets than displaying them privately. It is
+covered by the same Content Policy allowance for non-commercial fan works, and the
+conditions it depends on are the ones already listed above — nothing is charged for,
+nothing is sold, there is no advertising, no DE or Warframe logo is used as branding,
+and every page says the project is unofficial. **If any of those ever stops being
+true, this arrangement stops being covered.**
+
+The artwork itself is not committed to this repository (see `.gitignore`); each
+installation downloads its own copy from `cdn.warframestat.us`.
+
+## Privacy
+
+No account, no cookies, no analytics, no third-party requests. Your collection lives
+in your browser's `localStorage` and is never transmitted — the server has no idea
+what you own, and could not tell you if asked.
+
+The one piece of personal data touched is the visitor's IP address, which `serve.py`
+uses transiently for rate limiting. It is keyed-hashed with a salt generated at
+start-up and held only in memory, never written to disk, and discarded when the
+process exits, so buckets cannot be linked back to an address or correlated across
+restarts. The basis is legitimate interest in the security and availability of the
+service (GDPR Art. 6(1)(f), with Recital 49 naming network and information security
+explicitly). No request log is kept: shutdown prints totals only.
+
+This is a description of what the software does, not legal advice. Anyone publishing
+an instance is the data controller for it and should satisfy themselves it fits their
+circumstances.
+
 ## WARFRAME Wiki — wiki.warframe.com
 
 The Prime catalogue's categories and availability markers are parsed from

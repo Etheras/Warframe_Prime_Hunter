@@ -495,10 +495,35 @@ def test_server_serves_only_the_site() -> None:
                  "dist/vorframe.html", "assets/img/sub/nested.png"):
         check(f"refuses {path}", serve.allowed(path), False)
 
+    # Rate limiting that keeps nothing. The address is hashed with a salt made
+    # at start-up and held in memory, so a bucket cannot be tied to a person,
+    # correlated across restarts, or found on disk afterwards.
+    key = serve._client_key("203.0.113.9")
+    check_true("rate limit: key is not the address", "203.0.113.9" not in key)
+    check("rate limit: key is a fixed-width digest", len(key), 32)
+    check_true("rate limit: salt is per-process and in memory",
+               isinstance(serve._SALT, bytes) and len(serve._SALT) == 16)
+    allowed = sum(1 for _ in range(serve.RATE_BURST + 30)
+                  if serve.allow_request("198.51.100.77"))
+    check_true("rate limit: a burst is capped", allowed <= serve.RATE_BURST)
+    check_true("rate limit: other clients unaffected", serve.allow_request("198.51.100.78"))
+    src = read_text(os.path.join(ROOT, "tools", "serve.py"))
+    check_true("rate limit: nothing about a client is written to disk",
+               "open(" not in src.split("def allow_request")[1].split("def ")[0])
+    check_true("no request logging", "def log_message" in src and "pass" in src)
+
     # the policy is only worth setting if the app can live inside it
     check_true("CSP has no unsafe-inline", "unsafe-inline" not in serve.CSP)
     check_true("CSP has no unsafe-eval", "unsafe-eval" not in serve.CSP)
     check_true("CSP denies framing", "frame-ancestors 'none'" in serve.CSP)
+    # With artwork local the CDN is not merely unused, it is disallowed - so a
+    # visitor's address cannot reach a third party even by accident.
+    import artwork as art
+    if art.have_local_images():
+        payload = read_text(os.path.join(ROOT, "data", "vorframe-data.js"))
+        if "cdn.warframestat.us" not in payload:
+            check("CSP forbids the CDN when artwork is local",
+                  "cdn.warframestat.us" in serve.build_csp(), False)
 
     # inline handlers and style attributes are exactly what that policy blocks
     for name in ("index.html", "plan.html"):

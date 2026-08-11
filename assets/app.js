@@ -1495,6 +1495,12 @@
        <a href="https://www.warframe.com/en/contentpolicy" target="_blank" rel="noopener">Content Policy</a>
        for non-commercial fan works. VorFrame is an unofficial fan project, not
        affiliated with or endorsed by Digital Extremes.
+       <br><b>Privacy:</b> your collection is stored in this browser and is sent
+       nowhere &mdash; there is no account, no cookie, and no analytics. Artwork
+       and data are served from this site, so no third party sees your visit.
+       The server counts requests per visitor briefly, in memory only, purely to
+       stop one client overwhelming it; addresses are keyed-hashed with a
+       per-session salt, never written down, and discarded when it stops.
        <br>Catalogue data from the
        <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">WARFRAME Wiki</a>
        (CC BY-SA); item and worldstate data via

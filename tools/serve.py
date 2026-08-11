@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import http.server
 import json
 import os
@@ -138,20 +139,87 @@ ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 # No 'unsafe-inline' and no 'unsafe-eval': the app is two script files and one
 # stylesheet of its own. frame-ancestors 'none' stops the page being framed,
 # form-action 'none' because there is no form to submit anywhere.
-CSP = ("default-src 'none'; "
-       "script-src 'self'; "
-       "style-src 'self'; "
-       "img-src 'self' data: https://cdn.warframestat.us; "
-       "connect-src 'self'; "
-       "base-uri 'none'; "
-       "form-action 'none'; "
-       "frame-ancestors 'none'")
+#
+# img-src is decided from the dataset rather than fixed. When artwork has been
+# pulled local -- which refresh-data does by default -- no third party is
+# involved and the policy says so, which turns "we do not call the CDN" from an
+# intention into something the browser enforces. A visitor's IP then reaches
+# nobody but this server.
+def build_csp() -> str:
+    img = "'self' data:"
+    try:
+        with open(os.path.join(ROOT, "data", "vorframe-data.js"), encoding="utf-8") as fh:
+            if "cdn.warframestat.us" in fh.read():
+                img += " https://cdn.warframestat.us"
+    except OSError:
+        pass
+    return ("default-src 'none'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            f"img-src {img}; "
+            "connect-src 'self'; "
+            "base-uri 'none'; "
+            "form-action 'none'; "
+            "frame-ancestors 'none'")
+
+
+CSP = build_csp()
 
 
 def allowed(rel: str) -> bool:
     if rel in ALLOWED_FILES:
         return True
     return any(rel.startswith(d) and "/" not in rel[len(d):] for d in ALLOWED_DIRS)
+
+
+# ── abuse control, without keeping anything about anybody ──────────────────
+#
+# A token bucket per client. The GDPR question this raises is a fair one: an IP
+# address is personal data, so rate limiting does process it. Three choices keep
+# that proportionate, and they are design decisions rather than paperwork:
+#
+#   * The address is never stored. It is hashed with a salt generated fresh at
+#     start-up and held only in memory, so buckets cannot be tied back to an
+#     address, cannot be correlated across restarts, and vanish when the process
+#     exits. Nothing is written to disk, ever.
+#   * Buckets expire on their own, so there is no retention period to define
+#     beyond "until it goes idle".
+#   * The purpose is security. Recital 49 names network and information security
+#     as a legitimate interest, which is the basis this relies on -- and the
+#     footer says so plainly rather than burying it.
+#
+# What is deliberately absent: no request log, no addresses, no user agents, no
+# referrers, no analytics. The counters below are totals, and totals are not
+# personal data.
+_SALT = os.urandom(16)
+RATE_BURST = 60          # requests a client may make back to back
+RATE_PER_SEC = 10.0      # and the rate it refills at afterwards
+_buckets: dict = {}
+_bucket_lock = threading.Lock()
+STATS = {"served": 0, "refused": 0, "limited": 0}
+
+
+def _client_key(addr: str) -> str:
+    return hashlib.blake2b(addr.encode("utf-8"), key=_SALT, digest_size=16).hexdigest()
+
+
+def allow_request(addr: str) -> bool:
+    """Token bucket. True to serve, False to answer 429."""
+    now = time.monotonic()
+    key = _client_key(addr)
+    with _bucket_lock:
+        tokens, seen = _buckets.get(key, (float(RATE_BURST), now))
+        tokens = min(RATE_BURST, tokens + (now - seen) * RATE_PER_SEC)
+        if tokens < 1.0:
+            _buckets[key] = (tokens, now)
+            return False
+        _buckets[key] = (tokens - 1.0, now)
+        # opportunistic sweep, so idle clients do not accumulate for ever
+        if len(_buckets) > 4096:
+            cutoff = now - 300
+            for k in [k for k, (_, t) in _buckets.items() if t < cutoff]:
+                del _buckets[k]
+    return True
 
 
 class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
@@ -190,7 +258,15 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def _reject(self):
+        STATS["refused"] += 1
         self.send_error(404, "Not Found")
+
+    def _too_many(self):
+        STATS["limited"] += 1
+        self.send_response(429, "Too Many Requests")
+        self.send_header("Retry-After", "10")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _relative(self) -> str:
         """Path relative to the site root, normalised, or "" if it escapes."""
@@ -206,11 +282,15 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
         return rel.replace(os.sep, "/")
 
     def do_HEAD(self):                                    # noqa: N802
+        if not allow_request(self.client_address[0]):
+            return self._too_many()
         if not allowed(self._relative()):
             return self._reject()
         super().do_HEAD()
 
     def do_GET(self):                                     # noqa: N802
+        if not allow_request(self.client_address[0]):
+            return self._too_many()
         rel = self._relative()
         if rel in ("", "."):
             rel = "index.html"
@@ -232,8 +312,10 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(blob)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
+                STATS["served"] += 1
                 self.wfile.write(blob)
                 return
+        STATS["served"] += 1
         super().do_GET()
 
 
