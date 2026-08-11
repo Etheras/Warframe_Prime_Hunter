@@ -132,10 +132,17 @@ On Windows, double-click `serve.cmd`. On macOS or Linux:
 Your browser opens at `http://localhost:8777`. Leave the terminal window open while
 you use the site — closing it shuts the server down.
 
-**To open it on your phone**, use `serve-lan.cmd` on Windows or `./serve-lan.sh`
-on macOS and Linux. It prints the address to type in. Note there
-is no login and no encryption — anyone on your network can read *and* overwrite your
-collection through the Backup box, so only do this at home. The local-only server
+**To open it on your phone**, use `serve-lan.cmd` on Windows or `./serve-lan.sh` on
+macOS and Linux. It prints the address to type in.
+
+Your collection is safe from anyone else who opens it: **ticks live in each browser**,
+not on the server, so a visitor gets their own empty tracker and cannot see or change
+yours. Nothing about your progress is ever sent to the server, and the server accepts
+no writes at all — it answers `GET` and nothing else.
+
+What sharing the address *does* expose is read access to the VorFrame folder, `.cache`
+included, and directory listings of it. That is all public game data, so the practical
+advice is simply: keep private files out of the folder. The local-only server
 walks up from port 8777 to find a free one; the network one keeps 8777 fixed, so a
 bookmark on your phone survives a restart.
 

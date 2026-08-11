@@ -55,35 +55,35 @@ per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
 
-### Serving to a network has no access control at all
+### Serving to a network exposes the folder, read-only
 
-Raised 2026-08-11 while planning a Raspberry Pi deployment, and the reason that
-deployment was shelved rather than done.
+Raised 2026-08-11 while planning a Raspberry Pi deployment.
 
-`serve-lan.cmd` / `serve-lan.sh` bind to every interface so a phone can reach the
-site. There is no login, no encryption, and **Backup/Restore is in the page** — so
-anyone who can reach the port can read your collection *and* overwrite it. On a
-laptop you close, that is a short window you control. On an always-on Pi it is
-permanent, and the box is likely running other things worth not exposing.
+**Corrected the same day** — the original version of this entry claimed a visitor
+could overwrite your collection through the Backup box. That is wrong, and worth
+recording so nobody reasons from it again:
 
-The scripts say so plainly before starting, which is honest but is not a control.
-Nothing here is secret — it is public game data plus your own tick-list — so this
-is about integrity rather than confidentiality: the realistic damage is someone
-wiping your progress, by accident or otherwise.
+- Ticks live in `localStorage`, scoped to origin *and browser profile and device*.
+  A visitor gets their own empty tracker. Your collection never reaches the server,
+  so there is nothing there for anyone to read or change.
+- `serve.py` accepts no writes. It is `SimpleHTTPRequestHandler`, which implements
+  GET and HEAD only — POST, PUT, DELETE and PATCH all return `501` — and the server
+  writes nothing to disk while running.
 
-**Options, roughly in order of effort:**
+What is genuinely exposed is **read access to the whole VorFrame folder**, including
+`.cache/` with its raw copies of DE's responses, plus directory listings. All of it
+is public game data, so the honest summary is "keep private files out of the folder"
+rather than anything about credentials.
 
-1. **Read-only mode.** A `--read-only` flag that serves the site with Backup/Restore
-   and every tick disabled. Turns a write risk into a view-only one and needs no
-   credentials at all. Probably the right answer for a shared Pi.
-2. **Bind to one interface** rather than `0.0.0.0`, so it is reachable from the
-   subnet you mean and not, say, a guest VLAN.
-3. **Basic auth**, which means HTTPS to be worth anything, which means certificates —
-   a lot of machinery for a personal tracker.
-4. **Leave it as is** and treat the warning as sufficient, on the grounds that a home
-   LAN is a trusted network. Defensible; just decide it deliberately.
+Worth doing anyway, cheaply:
 
-Whichever way, decide before putting it on a box that is always on.
+1. **Turn off directory listing**, so the folder is not browsable even though its
+   contents are harmless. A few lines in the request handler.
+2. **Do not serve `.cache/`.** Nothing in the page needs it, and it is the only
+   directory whose presence invites a second look.
+
+Neither needs authentication, and both are small. Deferred rather than urgent,
+because nothing served is sensitive.
 
 ### The banner guesses who is reading it from the hostname
 

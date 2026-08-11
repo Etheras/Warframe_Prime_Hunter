@@ -7,21 +7,23 @@ REM it - handy for ticking parts off while you play.
 REM
 REM Read this before you use it:
 REM
-REM   * There is no login and no encryption. Anyone who can reach your machine
-REM     on this port can see your collection and, because Backup/Import is in
-REM     the page, overwrite it. Only use it on a network you trust - your home
-REM     Wi-Fi, not a hotel or a cafe.
+REM   * Your collection is NOT shared and cannot be touched. Ticks live in each
+REM     browser, so anyone who opens the site gets their own empty tracker.
+REM     They cannot see or change yours, and nothing about it ever reaches this
+REM     server. Nothing can be written either - it answers GET only.
 REM   * Windows Firewall will almost certainly ask for permission the first
 REM     time. "Private networks" is the right answer; "Public networks" is not.
-REM   * It serves the whole folder, including data/ and .cache/. Nothing there
-REM     is secret - it is all public game data - but be aware it is readable.
+REM   * What IS readable is this whole folder, including .cache and its copies
+REM     of DE's data, plus directory listings. All public game data - but keep
+REM     private files out of the folder.
 REM
 REM Close this window to stop the server.
 
 cd /d "%~dp0"
 echo.
 echo   Serving VorFrame to the local network.
-echo   Anyone on this network can view AND change your collection.
+echo   Anyone here can open it and gets their own tracker; yours is untouched.
+echo   This folder is readable, so keep private files out of it.
 echo   Close this window to stop.
 echo.
 python tools\serve.py --host 0.0.0.0 %*

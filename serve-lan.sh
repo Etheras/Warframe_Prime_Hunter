@@ -8,10 +8,13 @@
 #
 # Read this before you use it:
 #
-#   * There is no login and no encryption. Anyone who can reach your machine on
-#     this port can see your collection and, because Backup/Restore is in the
-#     page, overwrite it. Only use it on a network you trust - your home Wi-Fi,
-#     not a hotel or a cafe.
+#   * Your collection is NOT shared and cannot be touched. Ticks live in each
+#     browser, so anyone who opens the site gets their own empty tracker - they
+#     cannot see or change yours, and nothing about it reaches this server.
+#     Nothing can be written either: the server answers GET only.
+#   * What IS readable is this whole folder, including .cache and its copies of
+#     DE's data, plus directory listings. All public game data - but keep
+#     private files out of the folder.
 #   * Your firewall may ask for permission the first time. Allow it for private
 #     networks only.
 #   * It serves the whole folder, including data/ and .cache/. Nothing there is
@@ -34,7 +37,8 @@ fi
 
 echo
 echo "  Serving VorFrame to the local network."
-echo "  Anyone on this network can view AND change your collection."
+echo "  Anyone here can open it and gets their own tracker; yours is untouched."
+echo "  This folder is readable, so keep private files out of it."
 echo "  Press Ctrl+C to stop."
 echo
 

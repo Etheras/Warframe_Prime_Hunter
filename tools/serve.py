@@ -197,9 +197,10 @@ def main() -> int:
             lines.append(f"  On this network:        http://{addr}:{port}")
         lines += [
             "",
-            "  Reachable by anyone on your network. There is no login, and the",
-            "  Backup box in the page can overwrite your collection, so only do",
-            "  this on a network you trust.",
+            "  Anyone on this network can open it. They get their own tracker -",
+            "  ticks live in each browser, so yours is neither visible nor",
+            "  changeable by them. This folder is readable though, .cache and",
+            "  all, so keep private files out of it.",
         ]
     lines += ["", "  Keep this window open while you use the site.",
               "  Close it (or press Ctrl+C) to stop.", ""]
