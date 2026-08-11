@@ -55,6 +55,37 @@ per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
 
+### The banner guesses who is reading it from the hostname
+
+`staleBanner()` decides whether to add "Double-click `refresh-data.cmd` to update it"
+by checking whether `location.hostname` is localhost. That is a guess standing in for
+identity, and it is wrong in two directions:
+
+- Browse **your own** server by its LAN address (`http://192.168.1.169:8777`) and you
+  are treated as a guest, so you get the warning without the fix.
+- Open the **single-file build** or any `file://` copy and the hostname is empty, which
+  currently counts as owner — reasonable, since you must have the folder to have the
+  file, but it is luck rather than reasoning.
+
+It errs toward saying less, so nobody is misled — a guest is never told to run
+something they do not have. Worth fixing properly all the same.
+
+**Suggested fix, in order of preference:**
+
+1. **Let the server say so.** It already decorates `data/vorframe-data.js` with
+   `window.VORFRAME_UPSTREAM` before serving, and it knows the peer address —
+   `self.client_address[0]` in the request handler. Adding `owner: <peer is loopback>`
+   to that payload replaces the guess with the actual answer, costs nothing, and needs
+   no new request. The page then reads the flag instead of sniffing its own URL.
+2. **Make it explicit.** A `serve.py --guest` flag for anyone deliberately serving to
+   other people, which suppresses every maintenance instruction regardless of address.
+   Useful alongside 1 rather than instead of it.
+3. **Say nothing to anyone.** Drop the instruction entirely and let the banner state
+   the problem only. Simplest, and defensible — but it loses the one prompt that
+   actually gets the data refreshed.
+
+Option 1 is the real fix; the plumbing for it is already there.
+
 ### The rotation label sits at 3.48:1 contrast
 
 Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
