@@ -216,7 +216,7 @@ def parse_droptables(page: str):
     for sid in ("keyRewards", "transientRewards", "cetusRewards", "solarisRewards",
                 "deimosRewards", "zarimanRewards", "entratiLabRewards", "hexRewards"):
         kind, label = SECTIONS[sid]
-        group = rotation = None
+        group = rotation = stage = None
         for is_head, cells in _rows(sections.get(sid, "")):
             if is_head:
                 head = cells[0]
@@ -224,11 +224,24 @@ def parse_droptables(page: str):
                 if rot:
                     rotation = rot.group(1).upper()
                     continue
-                # "Stage 1", "Stage 2, Stage 3 of 4..." — a sub-heading, not a new group
-                if re.match(r"^Stage\b", head, re.I):
+                # DE nests stages under each bounty:
+                #
+                #     Level 5 - 15 Cetus Bounty
+                #       Rotation A
+                #         Stage 1
+                #         Stage 2, Stage 3 of 4, and Stage 3 of 5
+                #         Final Stage
+                #
+                # Each of those is a sub-heading, not a new bounty. Matching only
+                # "^Stage" missed "Final Stage", so it became a group of its own
+                # and 61 source rows were filed under a phantom node of that name,
+                # detached from the bounty they belong to.
+                if re.match(r"^(final\s+)?stage\b", head, re.I):
+                    stage = head
                     continue
                 group = head
                 rotation = None
+                stage = None
                 continue
             if not group or len(cells) < 2:
                 continue
@@ -237,6 +250,10 @@ def parse_droptables(page: str):
                 "kind": kind, "planet": label, "node": group,
                 "mode": "Bounty" if kind == "bounty" else ("Key" if kind == "key" else "Special"),
                 "rotation": rotation, "chance": chance, "rarity": rarity,
+                # which stage of the bounty pays this, so the planner can say
+                # "you have to finish the whole thing" rather than implying a
+                # reward you can take and leave
+                "stage": stage,
             })
 
     # ---- relics dropped by enemies --------------------------------------
