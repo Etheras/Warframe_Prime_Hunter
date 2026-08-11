@@ -723,9 +723,18 @@ current Prime Resurgence rotation, so with a rotation running Aya is priced agai
 that rotation's relics only — the same `bestRefinement()` call every other relic on
 the page is scored with, so the number is in the same unit and directly comparable.
 
-It counts only for items that are **not farmable**. Almost any part turns up in some
-vaulted relic somewhere, so without that test a list of purely farmable Primes would
-still score Aya — and if you can go and farm it, Aya buys you nothing.
+**Its value comes from the collection, not the farm list.** Aya is worth banking for
+as long as *anything* vaulted is still missing from what you own — you pick it up
+because the vault holds Primes you do not have, whether or not you are chasing them
+this week. Keying it to the farm list was wrong, and scored zero for exactly the
+player who should have been collecting Aya.
+
+It counts only for items that are **not farmable**: if you can go and farm it, Aya
+buys you nothing. It reaches zero once every vaulted Prime is collected.
+
+Parts are matched through each part's own relic list rather than by name. A reward is
+called `Baruuk Prime Chassis Blueprint` while the part is `Chassis`, so a string match
+quietly works for `Blueprint` and fails for the other three.
 
 **When no rotation is running** there is nothing on sale to price against, and it
 falls back to the best *vaulted* relic on your list — what a future rotation could

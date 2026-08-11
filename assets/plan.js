@@ -415,52 +415,56 @@
     });
 
     /* ── Aya ──────────────────────────────────────────────────────────
-       One Aya buys one relic at Varzia, so it is valued at the best relic it
-       could buy you *right now* - the same bestRefinement() call every other
-       relic on the page is scored with, so the number is directly comparable
-       and in the same unit. Nothing to do with ducats.
+       Aya is banked, not spent on sight, so it is worth something for as long
+       as anything vaulted is still missing from your *collection* - not merely
+       from your farm list. You pick it up because the vault holds Primes you do
+       not own, whether or not you are chasing them this week. Requiring them to
+       be on the farm list first was wrong: it scored zero for exactly the
+       player who should be collecting Aya.
 
-       Only for items that are not farmable. Almost any part turns up in some
-       vaulted relic somewhere, so without that test a list of purely farmable
-       Primes would still score Aya - and if you can go and farm it, Aya buys
-       you nothing.
+       Valued at the best relic Varzia is selling this rotation that holds
+       something you are missing. With no rotation running there is nothing to
+       buy, so it falls back to the best vaulted relic - though in practice Aya
+       does not drop then either, so that branch is a guard rather than a path.
 
-       When no Prime Resurgence rotation is running there is nothing to buy, so
-       there is nothing to price it against. Rather than score zero and pretend
-       Aya is worthless - you would still bank it for the next rotation - it
-       falls back to the best vaulted relic on your list, which is what a future
-       rotation could offer. The tooltip says which of the two is in play.
+       Zero once every vaulted Prime is collected, which is the condition asked
+       for. And it only ever inflates a node already worth running, the same
+       rule Forma follows.
 
-       Crucially it only ever *inflates a node you were already going to run*.
-       Letting it stand on its own would send you to a bounty that drops Aya
-       and nothing else, ahead of a node carrying a part you actually need -
-       the same rule Forma follows, and for the same reason. */
-    let ayaValue = 0, ayaRelic = null, ayaBuyableNow = false, ayaRotationLive = false;
+       Matched through each part's own relic list rather than by name: a reward
+       is called "Baruuk Prime Chassis Blueprint" while the part is "Chassis",
+       so string matching would quietly work for Blueprint and fail for the
+       other three. */
+    let ayaValue = 0, ayaRelic = null, ayaRotationLive = false, ayaMissing = 0;
     if (opts.aya) {
       const expiry = ((DATA.meta || {}).resurgence || {}).expiry;
       const anyOnSale = Object.keys(RELICS).some((n) => RELICS[n].resurgence);
       ayaRotationLive = anyOnSale &&
         (!expiry || new Date(expiry).getTime() > Date.now());
 
-      const locked = new Set();
-      wishlist.forEach((id) => {
-        const it = BY_ID.get(id);
-        if (!it || (it.flags || {}).farmable) return;
-        (it.parts || []).forEach((p) => locked.add(`${it.name} ${p.name}`));
+      const vaultWanted = new Map();
+      ITEMS.forEach((it) => {
+        if ((it.flags || {}).farmable) return;      // farmable needs no Aya
+        (it.parts || []).forEach((p) => {
+          const short = needOf(p) - haveOf(it.id, p.name);
+          if (short <= 0) return;
+          ayaMissing += 1;
+          (p.relics || []).forEach((r) => {
+            if (!vaultWanted.has(r.relic)) vaultWanted.set(r.relic, []);
+            vaultWanted.get(r.relic).push({
+              label: `${it.name} ${p.name}`,
+              chances: r.chances || {}, qty: 1, stillNeed: short,
+            });
+          });
+        });
       });
 
-      Object.keys(RELICS).forEach((rname) => {
+      vaultWanted.forEach((entries, rname) => {
         const rec = RELICS[rname];
-        if (!rec || !rec.vaulted) return;              // farmable needs no Aya
-        // with a rotation running, only what Varzia is actually selling
-        if (ayaRotationLive && !rec.resurgence) return;
-        const entries = (want.get(rname) || []).filter((e) => !e.bonus && locked.has(e.label));
-        if (!entries.length) return;
+        if (!rec || !rec.vaulted) return;
+        if (ayaRotationLive && !rec.resurgence) return;   // only what is on sale
         const { value } = bestRefinement(entries);
-        if (value > ayaValue) {
-          ayaValue = value; ayaRelic = rname;
-          ayaBuyableNow = !!rec.resurgence;
-        }
+        if (value > ayaValue) { ayaValue = value; ayaRelic = rname; }
       });
     }
 
@@ -501,7 +505,7 @@
     });
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-             ayaBuyableNow, ayaRotationLive };
+             ayaRotationLive, ayaMissing };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -664,7 +668,7 @@
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-            ayaBuyableNow, ayaRotationLive } = buildPlan();
+            ayaRotationLive, ayaMissing } = buildPlan();
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
     $("#formaShort").classList.toggle("on", formaShort > 0);
@@ -691,11 +695,11 @@
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
         "running, but never adds one." : "") +
-      (ayaValue > 0 ? " Aya counts too, valued at the best relic it could buy you: " +
-        "<b>" + esc(ayaRelic) + "</b> at " + pct(ayaValue) +
-        (ayaRotationLive ? ", which Varzia is selling this rotation." :
-          ". No Resurgence rotation is running, so that is what a future one " +
-          "would have to offer — Aya is being banked, not spent.") +
+      (ayaValue > 0 ? " Aya counts too: you are still missing " + ayaMissing +
+        " vaulted part" + (ayaMissing === 1 ? "" : "s") + ", so it is worth " +
+        "banking. Valued at <b>" + esc(ayaRelic) + "</b>, " + pct(ayaValue) +
+        (ayaRotationLive ? " — the best relic Varzia is selling this rotation."
+                         : " — no rotation is running, so the best a future one could offer.") +
         " It only ever raises nodes already worth running." : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
