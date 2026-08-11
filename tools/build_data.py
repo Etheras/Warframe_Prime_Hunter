@@ -243,7 +243,13 @@ def main() -> int:
                     help="report whether upstream changed, then exit; writes nothing")
     ap.add_argument("--with-images", action="store_true",
                     help="download item artwork into assets/img/ so the site needs "
-                         "no CDN (about 17 MB, cached between runs)")
+                         "no CDN (about 14 MB). Only needed once - after that the "
+                         "folder is kept up to date automatically")
+    ap.add_argument("--no-images", action="store_true",
+                    help="ignore assets/img/ this run and point the site at the CDN")
+    ap.add_argument("--refresh-images", action="store_true",
+                    help="also re-check artwork already on disk against the CDN "
+                         "(adds about a minute; only needed if DE repaints an item)")
     ap.add_argument("--allow-degraded", action="store_true",
                     help="publish even if a source was unreachable with nothing cached "
                          "(default: refuse, so a cold failure never silently thins the site)")
@@ -578,8 +584,13 @@ def main() -> int:
     for cat in sorted({i["category"] for i in out_items} - set(CATEGORY_ORDER)):
         categories.append({"name": cat, "count": sum(1 for i in out_items if i["category"] == cat)})
 
-    # opt-in: pull the artwork local so nothing is fetched from a CDN at runtime
-    local_images = cache_images(out_items, off) if args.with_images else 0
+    # Opt in once with --with-images; after that the folder's existence is the
+    # switch, so forgetting the flag cannot silently send the site back to the
+    # CDN while 14 MB of local copies sit unused.
+    want_images = (not args.no_images
+                   and (args.with_images or artwork.have_local_images()))
+    local_images = (cache_images(out_items, off, verify=args.refresh_images)
+                    if want_images else 0)
 
     payload = {
         "meta": {

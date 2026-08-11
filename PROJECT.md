@@ -181,7 +181,9 @@ or double-click `refresh-data.cmd`.
 | `--offline` | Rebuild from the local HTTP cache, no network |
 | `--source mirror` | Skip DE's drop table and use the community mirror |
 | `--verbose` | Print join diagnostics (unmatched names, etc.) |
-| `--with-images` | Download artwork into `assets/img/` (~14 MB, 277 files) and repoint every item at the local copy, so the app makes **no external requests at runtime**. Existing files are skipped, so re-runs only fetch new Primes. Gitignored — it is DE's artwork, not ours to redistribute. `bundle.py` rewrites these paths back to the CDN, since local files cannot travel inside a single `.html`. |
+| `--with-images` | Download artwork into `assets/img/` (~8 MB) and repoint every item at the local copy, so the app makes **no external requests at runtime**. Needed **once**: after the folder exists the build keeps using and updating it with no flag. Gitignored — DE's artwork, not ours to redistribute. `bundle.py` rewrites these paths back to the CDN, since local files cannot travel inside one `.html`. |
+| `--no-images` | Ignore `assets/img/` this run and point the site at the CDN. |
+| `--refresh-images` | Also re-check artwork already on disk against the CDN, by size. Adds about a minute, so it is not the default — DE almost never repaints an existing item. |
 
 ---
 

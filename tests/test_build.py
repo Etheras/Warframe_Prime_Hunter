@@ -243,6 +243,21 @@ def test_built_payload() -> None:
     check("payload: Aya rows are Aya only",
           [a for a in (aya or []) if "ayatan" in str(a.get("item", "")).lower()], [])
 
+    # the image cache is sticky: once the folder exists the payload must use it,
+    # or you end up with 8 MB on disk and a site still hotlinking the CDN
+    import artwork as art
+    if art.have_local_images():
+        local = [i for i in D["items"] if (i.get("image") or "").startswith("assets/img/")]
+        withimg = [i for i in D["items"] if i.get("image")]
+        check("payload: local artwork is actually used", len(local), len(withimg),
+              "assets/img/ exists, so every item should point at it")
+        # and nothing on disk should be unreferenced
+        used = {os.path.basename(i["image"]) for i in local}
+        ondisk = {f for f in os.listdir(art.IMG_DIR)
+                  if os.path.isfile(os.path.join(art.IMG_DIR, f))}
+        check("payload: no orphaned image files", sorted(ondisk - used), [],
+              "dropping a category once left 110 orphans and 5.7 MB behind")
+
     # ducats are a fixed game value, published per component - not a guess
     parts = [p for i in D["items"] for p in (i.get("parts") or [])]
     withd = [p for p in parts if p.get("ducats")]

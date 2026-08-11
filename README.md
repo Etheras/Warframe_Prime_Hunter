@@ -87,14 +87,24 @@ once and never touch the network again:
 python tools/build_data.py --with-images
 ```
 
-That adds about **14 MB** in `assets/img/` and repoints every card at the local
-copy — after it, the site makes no external requests at all. Already-downloaded
-pictures are skipped on later runs, so repeating it only fetches genuinely new
-Primes.
+That adds about **8 MB** in `assets/img/` and repoints every card at the local copy —
+after it, the site makes no external requests at all.
 
-The folder is gitignored, for the same reason the dataset is: the artwork belongs
-to Digital Extremes and is not ours to redistribute. Delete `assets/img/` to go
-back to the CDN.
+**You only need that flag once.** From then on the folder's existence is the switch:
+every later refresh keeps it current on its own, fetching pictures for new Primes and
+deleting ones for items that have left the catalogue. Two extras if you want them:
+
+```bash
+python tools/build_data.py --refresh-images
+```
+
+re-checks pictures already on disk against the CDN, which takes about an extra minute
+and is only worth it if Digital Extremes have repainted an existing item. And
+`--no-images` ignores the folder for one run and goes back to the CDN.
+
+The folder is gitignored, for the same reason the dataset is: the artwork belongs to
+Digital Extremes and is not ours to redistribute. Delete `assets/img/` to stop using
+local copies for good.
 
 ---
 
