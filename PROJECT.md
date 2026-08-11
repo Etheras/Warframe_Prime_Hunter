@@ -585,7 +585,7 @@ collection page writes back to the planner's store rather than keeping its own. 
 headline percentage is **per run**; the row names only the rotations the run
 actually reaches, and the round count is what it is divided by for the rate.
 
-**Aya is priced at what it buys, not guessed at.** Aya is a currency, not a
+**Aya is valued by what it buys, not guessed at.** Aya is a currency, not a
 reward, so it never reached the site before — DE lists it in the same drop rows as
 relics and the parser discarded it. It matters because Varzia sells relics for
 **1 Aya each** (`vaultTrader.inventory[].credits`), and Varzia stocks the current
@@ -597,6 +597,12 @@ it.
 banked, and Varzia's stock turns over every 28 days, so Aya held today buys from
 whatever the *next* rotation offers. Its value is therefore the best **vaulted**
 relic on your list, at its best refinement — not the best relic currently on sale.
+
+Its value is in the planner's own unit — expected wanted parts per opening, the
+number every other row is scored in — because it comes from the same
+`bestRefinement()` call used for every relic. **Ducats are not involved anywhere.**
+They are a separate, display-only fact on the collection page's part rows and feed no
+calculation; nothing in the planner reads them.
 
 It counts only for items that are **not farmable**. Almost any part turns up in some
 vaulted relic somewhere, so without that test a list of purely farmable Primes would

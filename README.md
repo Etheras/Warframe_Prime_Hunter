@@ -287,6 +287,10 @@ Each part shows what Baro Ki'Teer pays for a spare — `15d`, `65d` and so on. I
 fixed game value published per component, not a market price, so it is exact rather
 than an estimate. Useful for deciding which duplicates to keep.
 
+It is **information only**. Nothing in the planner reads it: no ranking, no scoring,
+no suggestion to sell anything. In particular it has nothing to do with how Aya is
+valued — Aya is measured by the relics it buys, never by ducats.
+
 ### Advanced options
 
 At the bottom of the sidebar:
