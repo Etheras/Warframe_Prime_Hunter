@@ -656,6 +656,101 @@ def test_launchers_are_runnable() -> None:
             check(f"{name}: no {bad.strip()}", bad in code, False, why)
 
 
+def test_runs_on_the_other_platform() -> None:
+    """
+    Everything here is developed on Windows and has to work on macOS and Linux,
+    where none of these failures can be seen while writing the code. They are
+    all silent locally and fatal elsewhere, which is the worst combination.
+    """
+    import glob
+
+    # 1. A launcher without its opposite number is a feature that only half the
+    #    users have. Both are meant to do exactly the same thing.
+    cmds = {os.path.splitext(os.path.basename(p))[0]
+            for p in glob.glob(os.path.join(ROOT, "*.cmd"))}
+    shs = {os.path.splitext(os.path.basename(p))[0]
+           for p in glob.glob(os.path.join(ROOT, "*.sh"))}
+    check("launchers: every .cmd has a .sh", sorted(cmds - shs), [])
+    check("launchers: every .sh has a .cmd", sorted(shs - cmds), [])
+
+    # 2. Case. NTFS does not care, ext4 does: a link written as Assets/App.js
+    #    works on the machine it was written on and 404s on the server. Every
+    #    local path the two pages reference must match the disk exactly.
+    for page in ("index.html", "plan.html"):
+        markup = read_text(os.path.join(ROOT, page))
+        refs = [m for m in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', markup)
+                if "${" not in m]
+        check_true(f"{page}: references something", len(refs) > 0)
+        for ref in refs:
+            target = os.path.join(ROOT, *ref.split("/"))
+            exists = os.path.exists(target)
+            # os.path.exists is case-insensitive on Windows, so ask the
+            # directory what it actually calls the file
+            cased = exists and os.path.basename(ref) in os.listdir(os.path.dirname(target))
+            check(f"{page}: {ref} exists, spelled that way", (exists, cased), (True, True),
+                  "a case mismatch is invisible on Windows and fatal on Linux")
+
+    # 3. Backslashes in a URL are not a path separator, they are a character.
+    for name in ("app.js", "plan.js", "rotation.js", "shared.js"):
+        code = read_text(os.path.join(ROOT, "assets", name))
+        check(f"{name}: no backslash paths in URLs",
+              bool(re.search(r'(?:src|href)\s*=\s*["\'][^"\']*\\\\', code)), False)
+
+    # 4. Python floor. README promises 3.8, and every annotation in the tools is
+    #    written in the 3.10 style, which only parses on 3.8 because of the
+    #    __future__ import. Losing that line is a syntax error for anyone on an
+    #    older interpreter and no error at all here.
+    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py")) +
+                       glob.glob(os.path.join(ROOT, "tests", "*.py"))):
+        src = read_text(path)
+        modern = re.search(r"->\s*[\w.\[\]]+\s*\|\s*None|:\s*(?:dict|list|set|tuple)\[", src)
+        if modern:
+            check_true(f"{os.path.basename(path)}: postponed annotations",
+                       "from __future__ import annotations" in src,
+                       "3.10-style hints need this line to parse on 3.8")
+
+    # 5. Constructs newer than the floor, which fail at runtime rather than at
+    #    import and so survive every check that only compiles the file.
+    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py"))):
+        src = re.sub(r'"""ory.*?"""', "", read_text(path), flags=re.S)
+        for bad, why in ((r"\.removeprefix\(", "str.removeprefix is 3.9+"),
+                         (r"\.removesuffix\(", "str.removesuffix is 3.9+"),
+                         (r"\bfunctools\.cache\b", "functools.cache is 3.9+"),
+                         (r"\bzoneinfo\b", "zoneinfo is 3.9+"),
+                         (r"^\s*match\s+.+:\s*$", "match statements are 3.10+")):
+            check(f"{os.path.basename(path)}: {why}",
+                  bool(re.search(bad, src, re.M)), False)
+
+    # fromisoformat only learned to read a trailing Z in 3.11, and the
+    # worldstate writes nothing else, so the Z has to be replaced by hand
+    build = read_text(os.path.join(ROOT, "tools", "build_data.py"))
+    for m in re.finditer(r"fromisoformat\((.{0,60})", build):
+        check_true("fromisoformat: the Z is replaced first", "replace(" in m.group(1),
+                   "a bare Z only parses on 3.11+")
+
+    # 6. Absolute paths from whichever machine last touched the file.
+    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py")) +
+                       glob.glob(os.path.join(ROOT, "*.sh")) +
+                       glob.glob(os.path.join(ROOT, "*.cmd"))):
+        src = read_text(path)
+        # tests/ is allowed one: it is where Node is looked for by force
+        found = re.findall(r"[\"'][A-Za-z]:[\\/]{1,2}Users[\\/]{1,2}", src)
+        check(f"{os.path.basename(path)}: no absolute local paths", found, [])
+
+    # 7. Artwork filenames come from DE's item data and are written to disk. A
+    #    colon or a question mark in one is legal on Linux and unopenable on
+    #    Windows, so the whole cache would fail there and nowhere else.
+    payload = os.path.join(ROOT, "data", "vorframe-data.json")
+    if os.path.exists(payload):
+        illegal = re.compile(r'[<>:"|?*\\]')
+        bad = []
+        for item in read_json(payload)["items"]:
+            name = os.path.basename(str(item.get("image") or ""))
+            if name and illegal.search(name):
+                bad.append(name)
+        check("artwork: every filename is legal on Windows", bad[:5], [])
+
+
 def test_markup_is_xml_well_formed() -> None:
     """
     The pages are served as HTML5 and always will be, but they are held to XML
@@ -870,6 +965,7 @@ def main() -> int:
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
+                         test_runs_on_the_other_platform,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_bundle_is_self_contained]),
