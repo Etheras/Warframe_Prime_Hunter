@@ -40,6 +40,10 @@
   const KEY_PLAN = S.KEYS.plan;
   const KEY_MATERIALS = S.KEYS.materials;
 
+  /* What a relic opening is worth, and how to read a backup - shared with the
+     collection view, and testable without a browser. See assets/model.js. */
+  const M = window.VorFrameModel;
+
   const DATA = window.VORFRAME_DATA;
 
   if (!DATA || !DATA.items) {
@@ -144,19 +148,8 @@
     return { want, needs, formaShort };
   }
 
-  const squadify = (p) => (opts.squad ? S.squadOdds(p) : p);
-
-  /* value of one opening of this relic, at a given refinement */
-  function relicValue(entries, refinement) {
-    let total = 0;
-    entries.forEach((e) => {
-      const pct = e.chances[refinement];
-      if (pct == null) return;
-      // a drop of qty is only worth what you still need of it
-      total += squadify(pct / 100) * Math.min(e.qty, e.stillNeed);
-    });
-    return total;
-  }
+  const relicValue = (entries, refinement) =>
+    M.relicValue(entries, refinement, opts.squad);
 
   /* Which refinement to take this relic to.
 
@@ -173,29 +166,8 @@
 
      Forma never sets the bottleneck — you are not blocked on Forma — but it
      still counts towards the tie-break and the node score. */
-  function bestRefinement(entries) {
-    let best = REFINEMENTS[0], bestCost = Infinity, bestTotal = -1, bestBlocker = null;
-    REFINEMENTS.forEach((f) => {
-      let worst = 0, total = 0, blocker = null;
-      entries.forEach((e) => {
-        const pct = e.chances[f];
-        if (pct == null) return;
-        const p = squadify(pct / 100);
-        total += p * Math.min(e.qty, e.stillNeed);
-        if (e.bonus) return;                       // a by-product, never the blocker
-        const openings = Math.ceil(e.stillNeed / (e.qty || 1));
-        const cost = p > 0 ? openings / p : Infinity;
-        if (cost > worst) { worst = cost; blocker = e; }
-      });
-      const better = worst < bestCost - 1e-9 ||
-        (Math.abs(worst - bestCost) < 1e-9 && total > bestTotal);
-      if (better) { best = f; bestCost = worst; bestTotal = total; bestBlocker = blocker; }
-    });
-    // the node ranking still means "chance a reward drop yields something wanted",
-    // measured at the refinement actually chosen above
-    return { refinement: best, value: relicValue(entries, best), openings: bestCost,
-             blocker: bestBlocker };
-  }
+  const bestRefinement = (entries) =>
+    M.bestRefinement(entries, { refinements: REFINEMENTS, squad: opts.squad });
 
   /* ── the plan ────────────────────────────────────────────────── */
 
@@ -487,13 +459,7 @@
     return `<abbr class="rot" data-tip="${esc(help)}">rot ${esc(rot)}</abbr>`;
   }
 
-  /* Rarity from the unrefined chance, the same rule the pipeline uses, so the
-     planner can colour-code rows exactly like the collection view. */
-  function rarityOf(chances) {
-    const i = chances && chances.Intact;
-    if (i == null) return "";
-    return i >= 20 ? "Common" : i >= 6 ? "Uncommon" : "Rare";
-  }
+  const rarityOf = M.rarityOf;
 
   /* ── rendering ───────────────────────────────────────────────── */
   const pct = (v) => (v * 100).toFixed(2).replace(/\.?0+$/, "") + "%";
@@ -786,18 +752,8 @@
      the collection page pick the new state up, and it keeps the careful
      per-part merging in app.js as the single implementation rather than
      copying it here. */
-  const BACKUP_KEYS = {
-    collected: "vorframe.collected.v1",
-    parts: "vorframe.parts.v1",
-    materials: "vorframe.materials.v1",
-    wishlist: KEY_WISH,
-    plan: KEY_PLAN,
-    filters: "vorframe.filters.v1",
-  };
-  const readKey = (k, fallback) => {
-    try { return JSON.parse(localStorage.getItem(k) || "null") ?? fallback; }
-    catch (e) { return fallback; }
-  };
+  const BACKUP_KEYS = S.KEYS;      // the same six names shared.js owns
+  const readKey = load;
 
   const dlg = $("#dataDlg");
   const dbtn = $("#dataBtn");
@@ -824,40 +780,24 @@
     });
     $("#importBtn").addEventListener("click", () => {
       try {
-        const raw = JSON.parse($("#dataArea").value);
-        const payload = Array.isArray(raw) ? { collected: raw } : raw;
-        if (!payload || typeof payload !== "object" || !Array.isArray(payload.collected)) {
-          throw new Error("this doesn't look like a VorFrame backup");
-        }
-        let skipped = 0;
-        const keep = (ids) => (ids || []).filter((id) => {
-          if (BY_ID.has(id)) return true;
-          skipped++; return false;
-        });
+        /* Validated by the same code the collection view uses. This page used
+           to check ids but not part names or counts, so the same file restored
+           differently depending on which page you were looking at. */
+        const backup = M.parseBackup($("#dataArea").value, ITEMS);
         const wrote = [];
         const put = (key, value) => {
           if (value == null) return;
-          try { localStorage.setItem(key, JSON.stringify(value)); wrote.push(key); }
-          catch (e) { /* non-fatal */ }
+          save(key, value); wrote.push(key);
         };
-        put(BACKUP_KEYS.collected, keep(payload.collected));
-        if (Array.isArray(payload.wishlist)) put(BACKUP_KEYS.wishlist, keep(payload.wishlist));
-        if (payload.parts && typeof payload.parts === "object") {
-          const parts = {};
-          Object.keys(payload.parts).forEach((id) => {
-            if (BY_ID.has(id)) parts[id] = payload.parts[id]; else skipped++;
-          });
-          put(BACKUP_KEYS.parts, parts);
+        put(BACKUP_KEYS.collected, backup.collected);
+        put(BACKUP_KEYS.parts, backup.parts);
+        put(BACKUP_KEYS.wishlist, backup.wishlist);
+        put(BACKUP_KEYS.materials, backup.materials);
+        put(BACKUP_KEYS.filters, backup.filters);
+        if (backup.plan) {
+          put(BACKUP_KEYS.plan, Object.assign(load(KEY_PLAN, {}), backup.plan));
         }
-        if (Array.isArray(payload.materials)) put(BACKUP_KEYS.materials, payload.materials);
-        if (payload.filters) put(BACKUP_KEYS.filters, payload.filters);
-        if (payload.plan && typeof payload.plan === "object") {
-          const cur = readKey(BACKUP_KEYS.plan, {}) || {};
-          ["squad", "event", "railjack", "runMode", "aya"].forEach((k) => {
-            if (payload.plan[k] !== undefined) cur[k] = payload.plan[k];
-          });
-          put(BACKUP_KEYS.plan, cur);
-        }
+        const skipped = backup.skipped;
         $("#dlgMsg").style.color = "";
         $("#dlgMsg").textContent =
           `Imported ${wrote.length} section${wrote.length === 1 ? "" : "s"}` +

@@ -615,7 +615,7 @@ npm install
 npx playwright install chromium
 ```
 
-That adds ten tests that open the collection and the planner in Chromium and
+That adds eleven tests that open the collection and the planner in Chromium and
 check what a person would: the grid renders without console errors, ticking a
 part survives a reload, tooltips appear, the backup dialog carries your
 collection, filters and materials stick, the two pages agree about the farm

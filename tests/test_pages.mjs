@@ -135,6 +135,39 @@ page_test("the backup dialog opens and carries the collection", async () => {
             "a backup that does not contain the collection is worse than none");
 });
 
+page_test("a backup exported from one page restores on the other", async () => {
+  // the round trip both pages validate through model.js. They used to have
+  // their own copies of that validation, and the planner's was weaker - so the
+  // same file restored differently depending on where you pasted it.
+  const { page } = await open("/index.html");
+  await page.locator("[data-id]").first().click();
+  await page.getByRole("button", { name: /mark as collected/i }).click();
+  await page.getByRole("button", { name: /add to farm list/i }).click();
+  await page.keyboard.press("Escape");
+  await page.locator("#dataBtn").click();
+  const backup = await page.locator("#dataArea").inputValue();
+  const expected = JSON.parse(backup);
+  assert.ok(expected.collected.length >= 1, "nothing was collected to export");
+
+  // a clean slate, then restore from the planner
+  const fresh = await (await browser.newContext()).newPage();
+  await fresh.goto(origin + "/plan.html", { waitUntil: "load" });
+  await fresh.locator("#dataBtn").click();
+  await fresh.locator("#dataArea").fill(backup);
+  await fresh.locator("#importBtn").click();
+  await fresh.waitForTimeout(1200);                 // it reloads on success
+
+  const restored = await fresh.evaluate(() => ({
+    collected: JSON.parse(localStorage.getItem("vorframe.collected.v1") || "[]"),
+    parts: JSON.parse(localStorage.getItem("vorframe.parts.v1") || "{}"),
+    wishlist: JSON.parse(localStorage.getItem("vorframe.wishlist.v1") || "[]"),
+  }));
+  assert.deepEqual(restored.collected, expected.collected);
+  assert.deepEqual(restored.wishlist, expected.wishlist);
+  assert.deepEqual(restored.parts, expected.parts,
+                   "per-part progress must survive, not just the ticks");
+});
+
 page_test("a filter setting survives a reload", async () => {
   const { page } = await open("/index.html");
   const box = page.locator("#f-vaulted");

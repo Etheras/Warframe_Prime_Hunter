@@ -16,6 +16,10 @@
   const KEY_WISH = S.KEYS.wishlist;
   const KEY_PLAN = S.KEYS.plan;
 
+  /* What a relic opening is worth, which bucket an item is in, and how to read
+     a backup - shared with the planner. See assets/model.js. */
+  const M = window.VorFrameModel;
+
   const DATA = window.VORFRAME_DATA;
 
   if (!DATA || !DATA.items) {
@@ -95,15 +99,7 @@
   /* ── availability bucket ──────────────────────────────────────
      Each item gets exactly one bucket so the sidebar toggles are
      unambiguous, but a card can still show several badges.        */
-  function statusOf(it) {
-    const f = it.flags;
-    if (f.founder) return "founder";        // never coming back
-    if (f.resurgence) return "resurgence";  // time-limited: takes priority
-    if (f.farmable) return "farmable";
-    if (f.baro) return "baro";              // Gotva is (S) on the wiki but really Baro
-    if (f.special) return "special";        // quest / event / special vendor
-    return "vaulted";
-  }
+  const statusOf = M.statusOf;
 
   ITEMS.forEach((it) => {
     it._status = statusOf(it);
@@ -509,19 +505,9 @@
         uncommon  11 → 13 → 17 → 20            (Radiant nearly doubles it)
         rare      2 → 4 → 6 → 10               (Radiant is 5x)                */
   /* Refinement costs Void Traces: Exceptional 25, Flawless 50, Radiant 100. */
-  const TRACE_COST = { Intact: 0, Exceptional: 25, Flawless: 50, Radiant: 100 };
+  const TRACE_COST = M.TRACE_COST;
 
-  /* Which end to take this relic to, for THIS part. The odds move monotonically
-     with refinement, so the answer is always one of the two ends — the middle
-     steps are only ever a cheaper compromise, never better. */
-  function refineAdvice(ch) {
-    if (!ch) return null;
-    const intact = ch.Intact, rad = ch.Radiant;
-    if (intact == null || rad == null || !intact) return null;
-    return rad <= intact
-      ? { cls: "intact", label: "Intact" }
-      : { cls: "radiant", label: "Radiant" };
-  }
+  const refineAdvice = M.refineAdvice;
 
   /* Every refinement for this reward, with what it costs to get there. */
   function rarityTip(rar, ch) {
@@ -1097,76 +1083,19 @@
   });
   $("#importBtn").addEventListener("click", () => {
     try {
-      const raw = JSON.parse($("#dataArea").value);
-
-      // A bare array is a backup from before parts existed: it means
-      // "these items are complete", so expand it the way migrate() does.
-      const legacy = Array.isArray(raw);
-      const payload = legacy ? { collected: raw } : raw;
-      if (!payload || typeof payload !== "object" || !Array.isArray(payload.collected)) {
-        throw new Error("this doesn't look like a VorFrame backup");
-      }
-
-      const byId = new Map(ITEMS.map((i) => [i.id, i]));
-      let skipped = 0;
-
-      const ids = payload.collected.filter((id) => {
-        if (byId.has(id)) return true;
-        skipped++; return false;
-      });
-
-      // parts, validated against the current catalogue
-      const nextParts = {};
-      const srcParts = (!legacy && payload.parts && typeof payload.parts === "object")
-        ? payload.parts : {};
-      Object.keys(srcParts).forEach((id) => {
-        const it = byId.get(id);
-        if (!it) { skipped++; return; }
-        const bag = {};
-        Object.keys(srcParts[id] || {}).forEach((name) => {
-          const p = it.parts.find((x) => x.name === name);
-          if (!p) { skipped++; return; }
-          const n = Math.max(0, Math.min(needOf(p), Number(srcParts[id][name]) || 0));
-          if (n > 0) bag[name] = n;
-        });
-        if (Object.keys(bag).length) nextParts[id] = bag;
-      });
-      // legacy backups carry no parts, so derive them from the ticked items
-      if (legacy) {
-        ids.forEach((id) => {
-          const it = byId.get(id);
-          if (!it.parts.length) return;
-          nextParts[id] = {};
-          it.parts.forEach((p) => (nextParts[id][p.name] = needOf(p)));
-        });
-      }
-
-      // farm list, validated against the catalogue like everything else
-      const nextWish = Array.isArray(payload.wishlist)
-        ? payload.wishlist.filter((id) => {
-            if (byId.has(id)) return true;
-            skipped++; return false;
-          })
-        : null;
-
-      const nextMaterials = Array.isArray(payload.materials)
-        ? payload.materials
-            .filter((m) => m && typeof m === "object")
-            .map((m) => ({
-              name: String(m.name == null ? "" : m.name).slice(0, 60),
-              have: Math.max(0, Number(m.have) || 0),
-              need: Math.max(0, Number(m.need) || 0),
-            }))
-        : null;
+      const backup = M.parseBackup($("#dataArea").value, ITEMS);
+      const { skipped, legacy } = backup;
+      const ids = backup.collected;
+      const nextParts = backup.parts;
+      const nextWish = backup.wishlist;
+      const nextMaterials = backup.materials;
 
       collected = new Set(ids);
       partsOwned = nextParts;
       if (nextWish) save(KEY_WISH, nextWish);
-      // options are plain settings; keep only keys we recognise
-      if (payload.plan && typeof payload.plan === "object") {
-        const cur = load(KEY_PLAN, {});
-        ["squad", "event", "railjack", "runMode", "formaHave", "formaNeed"]
-          .forEach((k) => { if (payload.plan[k] !== undefined) cur[k] = payload.plan[k]; });
+      // parseBackup has already dropped any option we do not recognise
+      if (backup.plan) {
+        const cur = Object.assign(load(KEY_PLAN, {}), backup.plan);
         save(KEY_PLAN, cur);
         if (typeof cur.squad === "boolean") {
           state.squad = cur.squad;
@@ -1177,9 +1106,7 @@
           const sel = $("#f-runmode"); if (sel) sel.value = cur.runMode;
         }
       }
-      if (payload.filters && typeof payload.filters === "object") {
-        save(KEY_FILTERS, payload.filters);
-      }
+      if (backup.filters) save(KEY_FILTERS, backup.filters);
       // an item with parts is collected iff they're all owned — re-derive it
       ITEMS.forEach((it) => syncCollected(it));
       if (nextMaterials) { materials = nextMaterials; renderMaterials(); }
@@ -1193,9 +1120,9 @@
         `Imported ${collected.size} collected, ${partCount} part-tracked` +
         (nextMaterials ? `, ${nextMaterials.length} material rows` : "") +
         (nextWish ? `, ${nextWish.length} on the farm list` : "") +
-        (payload.plan ? ", planner options" : "") +
+        (backup.plan ? ", planner options" : "") +
         (legacy ? " (old-format backup, parts filled in)" : "") +
-        (payload.filters ? " Filters restored — reload to see them." : "") +
+        (backup.filters ? " Filters restored — reload to see them." : "") +
         (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped.` : ".");
     } catch (err) {
       $("#dlgMsg").style.color = "var(--red)";

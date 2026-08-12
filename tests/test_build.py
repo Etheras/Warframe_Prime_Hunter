@@ -691,7 +691,7 @@ def test_runs_on_the_other_platform() -> None:
                   "a case mismatch is invisible on Windows and fatal on Linux")
 
     # 3. Backslashes in a URL are not a path separator, they are a character.
-    for name in ("app.js", "plan.js", "rotation.js", "shared.js"):
+    for name in ("app.js", "plan.js", "rotation.js", "shared.js", "model.js"):
         code = read_text(os.path.join(ROOT, "assets", name))
         check(f"{name}: no backslash paths in URLs",
               bool(re.search(r'(?:src|href)\s*=\s*["\'][^"\']*\\\\', code)), False)
@@ -787,7 +787,7 @@ def test_server_serves_only_the_site() -> None:
     import serve
 
     for path in ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
-                 "assets/rotation.js", "assets/shared.js",
+                 "assets/rotation.js", "assets/shared.js", "assets/model.js",
                  "assets/styles.css", "data/vorframe-data.js",
                  "assets/img/AshPrime.png"):
         check_true(f"serves {path}", serve.allowed(path))
@@ -833,7 +833,7 @@ def test_server_serves_only_the_site() -> None:
         markup = read_text(os.path.join(ROOT, name))
         check(f"{name}: no inline style attributes", 'style="' in markup, False)
     for name in ("assets/app.js", "assets/plan.js", "assets/rotation.js",
-                 "assets/shared.js"):
+                 "assets/shared.js", "assets/model.js"):
         code = read_text(os.path.join(ROOT, name))
         check(f"{name}: emits no inline style attributes", 'style="' in code, False)
         check(f"{name}: emits no inline event handlers",
@@ -891,7 +891,7 @@ def test_browser_assets() -> None:
         print(f"  skip browser tests (Node {raw or '?'} has no test runner; 18+ needed)")
         return
 
-    for name in ("shared.js", "rotation.js", "app.js", "plan.js"):
+    for name in ("shared.js", "rotation.js", "model.js", "app.js", "plan.js"):
         # a parse error in app.js or plan.js is otherwise silent until the page
         # is opened, since nothing else ever reads them
         r = subprocess.run([node, "--check", os.path.join(ROOT, "assets", name)],
@@ -904,6 +904,7 @@ def test_browser_assets() -> None:
     # need it. Its skips come back through TAP and are reported as skips here.
     r = subprocess.run([node, "--test", "--test-reporter=tap",
                         os.path.join("tests", "test_assets.mjs"),
+                        os.path.join("tests", "test_model.mjs"),
                         os.path.join("tests", "test_pages.mjs")],
                        capture_output=True, text=True, cwd=ROOT)
     seen = skipped = 0
@@ -960,6 +961,8 @@ def test_bundle_is_self_contained() -> None:
                "window.VorFrameRotation" in html)
     check_true("bundle: the shared store and chrome came across",
                "window.VorFrameShared" in html)
+    check_true("bundle: the shared data model came across",
+               "window.VorFrameModel" in html)
     check_true("bundle: the modules are inlined before the pages that read them",
                max(html.index("window.VorFrameRotation"), html.index("window.VorFrameShared"))
                < html.index("VorFrameShared;"))

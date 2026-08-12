@@ -136,7 +136,9 @@ Chromium through Playwright, which is the only way to cover `app.js` and
 `plan.js` without stubbing a browser badly. That one **is** an npm dependency,
 so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
 the same version, `node_modules/` is not, and the tests skip with a reason when
-it is missing. 253 checks without it, 263 with.
+it is missing. **278 checks without it, 289 with** — the browser layer is
+deliberately the smaller half, because a test that needs a browser is a test
+that will eventually be skipped.
 
 The line that must not move: **nothing the site ships may depend on any of
 this.** No bundler, no framework, no runtime package.
@@ -155,10 +157,12 @@ results are folded into the same output. `--online` adds a real clone-and-build 
 a temp directory, which is the only check covering the new-user path. Every test is
 there because of a bug that actually happened, and says which in its docstring.
 
-What the tests still do **not** cover is `app.js` and `plan.js`, which are DOM from
-top to bottom — checking those would need a real DOM implementation, which would
-mean a dependency. They are syntax-checked, and everything else about them is
-verified by opening the pages.
+What is left in `app.js` and `plan.js` is rendering and event wiring. The logic
+worth asserting was moved out of them — `assets/model.js` and
+`assets/rotation.js` — precisely so it could be tested without a browser, and
+that is where the zero-dependency tests point. The pages themselves are
+syntax-checked on every run, and covered properly only when Playwright is
+installed.
 
 Also verify in a browser
 and **say plainly what you actually checked**, rather than asserting it works:
@@ -300,7 +304,8 @@ VorFrame/
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
 │   ├── shared.js           ← the store, tooltip, staleness banner, backup file
-│   ├── rotation.js         ← the rotation model, read by both pages
+│   ├── rotation.js         ← what one run at a node is worth
+│   ├── model.js            ← relic value, refinement, item status, backups
 │   ├── app.js              ← filtering, collection state, detail drawer
 │   └── plan.js             ← wishlist, scoring model, ranked node plan
 ├── data/
@@ -310,7 +315,8 @@ VorFrame/
 │   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
 ├── tests/
 │   ├── test_build.py       ← the suite, and the one command to run
-│   ├── test_assets.mjs     ← the model, under Node; skipped without it
+│   ├── test_assets.mjs     ← rotation + store, under Node
+│   ├── test_model.mjs      ← relic value, refinement, backups
 │   └── test_pages.mjs      ← the real pages in Chromium; needs Playwright
 ├── tools/
 │   ├── build_data.py       ← orchestration, the item join, and emit

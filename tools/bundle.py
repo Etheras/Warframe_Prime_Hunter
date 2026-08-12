@@ -56,6 +56,7 @@ def main() -> int:
     # shared.js and rotation.js first: both pages read them at load
     shared_js = read("assets", "shared.js")
     rotation_js = read("assets", "rotation.js")
+    model_js = read("assets", "model.js")
     app_js = read("assets", "app.js")
     plan_js = read("assets", "plan.js")
     data = read("data", "vorframe-data.js")
@@ -137,6 +138,7 @@ def main() -> int:
         "<script>", guard(data), CLOSE_SCRIPT,
         "<script>", guard(shared_js), CLOSE_SCRIPT,
         "<script>", guard(rotation_js), CLOSE_SCRIPT,
+        "<script>", guard(model_js), CLOSE_SCRIPT,
         "<script>", guard(app_js), CLOSE_SCRIPT,
         "<script>", guard(plan_js), CLOSE_SCRIPT,
         switcher,
