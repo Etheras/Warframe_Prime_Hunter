@@ -291,17 +291,38 @@ def _instant(value) -> datetime | None:
 
 
 def _is_live(entry: dict, now: datetime) -> bool:
-    """
-    Is this the bounty set on the board right now?
-
-    Worth checking rather than assuming. Minutes before a changeover the
-    worldstate carries the *next* set as well, and counting both halves the
-    vote: read at 21:53 against a window ending 21:55, the standard bounties
-    came back 16 for C and 16 for A, and the vaults 6 for B and 6 for C. The
-    tie went to the wrong letter for the vaults - a whole window out.
-    """
     start, end = _instant(entry.get("activation")), _instant(entry.get("expiry"))
     return bool(end and end > now and (not start or start <= now))
+
+
+def _one_window(entries: list, now: datetime) -> list:
+    """
+    Narrow a worldstate reading to a single bounty window.
+
+    Two things make this necessary, and they pull in opposite directions.
+
+    Minutes before a changeover the worldstate carries the *next* set as well.
+    Counting both halves the vote: read at 21:53 against a window ending 21:55,
+    the standard bounties came back 16 for C and 16 for A, and the vaults 6 for
+    B and 6 for C. The tie went to the wrong letter for the vaults, a whole
+    window out. So a live window always wins.
+
+    But a cached reading has no live window at all - every entry expired while
+    it sat on disk - and that is the normal case for `--offline` and for a build
+    that kept going after the API was unreachable. Discarding it would throw
+    away a perfectly good anchor: the cycle is unbroken, so the most recently
+    finished window still names the letter correctly once the page walks it
+    forward. So fall back to the latest window we have rather than to nothing.
+    """
+    live = [e for e in entries if _is_live(e, now)]
+    if live:
+        return live
+    ends = [_instant(e.get("expiry")) for e in entries]
+    past = [t for t in ends if t and t <= now]
+    if not past:
+        return []
+    latest = max(past)
+    return [e for e in entries if _instant(e.get("expiry")) == latest]
 
 
 def derive_bounty_rotation(pools: dict, syndicate_missions: list,
@@ -319,15 +340,19 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
     reward it is currently offering. Ties abstain: several Cambion Drift tiers
     pay the same handful of resources in all three rotations and genuinely
     carry no information. In the reading above 20 jobs voted and none dissented.
+
+    All the voters come from one window - see `_one_window` - which may be the
+    live one or, on a cached reading, the last one there was. Either anchors the
+    sequence; the page walks it forward from `windowEnd`.
     """
     votes: dict[str, dict[str, int]] = {}
     ends: dict[str, list[str]] = {}
     now = now or datetime.now(timezone.utc)
+    offering = [e for e in syndicate_missions or []
+                if SYNDICATE_SECTION.get(e.get("syndicate")) and (e.get("jobs") or [])]
 
-    for entry in syndicate_missions or []:
-        sid = SYNDICATE_SECTION.get(entry.get("syndicate"))
-        if not sid or not _is_live(entry, now):
-            continue
+    for entry in _one_window(offering, now):
+        sid = SYNDICATE_SECTION[entry["syndicate"]]
         for job in entry.get("jobs") or []:
             live = set(job.get("rewardPool") or [])
             levels = job.get("enemyLevels") or []

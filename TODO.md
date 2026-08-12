@@ -77,18 +77,6 @@ the bounty appears in the planner without the checkbox. If it does not, capture 
 raw worldstate entry — that is the fixture this cannot be written against today.
 Plague Star matters most: it carries 26 relics, more than any other bounty.
 
-### The rotation model is written out twice
-
-`assets/app.js` and `assets/plan.js` each carry their own copy of the whole
-rotation model — `RESET_STOPS`, `ROT_PATTERN`, `scorePlan`, `runValue`, and now the
-bounty clock as well. They are kept in step by hand, which is exactly the setup
-where the two pages drift apart and rank the same node differently.
-
-Extracting an `assets/rotation.js` that both load is the fix. It is not free:
-`index.html` and `plan.html` both need the extra `<script>`, and `tools/bundle.py`
-inlines the scripts by name, so it needs the third. Worth doing before the next
-change to the model rather than after.
-
 ### Two bounty tiers publish only two rotations
 
 `Level 30 - 40 Cambion Drift Bounty` publishes rotations A and B, not A/B/C, and it

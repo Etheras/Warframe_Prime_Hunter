@@ -297,6 +297,19 @@ def test_derive_bounty_rotation() -> None:
     check("rotation: the next window does not vote", fams["standard"]["letter"], "C")
     check("rotation: and does not dilute the count", fams["standard"]["of"], 1)
 
+    # A cached reading has no live window at all - everything in it expired
+    # while it sat on disk, which is the normal case for --offline and for a
+    # build that carried on after the API was unreachable. The letter is still
+    # derivable: the cycle is unbroken, so the last window we have anchors it
+    # and the page walks it forward. Dropping it left the planner saying
+    # "rotation unknown" on every bounty after one offline rebuild.
+    stale = build_data.derive_bounty_rotation(
+        pools, live, _NOW + datetime.timedelta(days=2))
+    check("rotation: a cached window still anchors the sequence",
+          stale["standard"]["letter"], "C")
+    check("rotation: and keeps its own window end",
+          stale["standard"]["windowEnd"], "2026-08-11T21:55:23.341Z")
+
     # a pool that fits more than one rotation says nothing, and must not vote
     tie = _syndicate([{"type": "x", "enemyLevels": [5, 15], "rewardPool": []}])
     check("rotation: an empty pool abstains",
@@ -673,7 +686,7 @@ def test_server_serves_only_the_site() -> None:
     import serve
 
     for path in ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
-                 "assets/styles.css", "data/vorframe-data.js",
+                 "assets/rotation.js", "assets/styles.css", "data/vorframe-data.js",
                  "assets/img/AshPrime.png"):
         check_true(f"serves {path}", serve.allowed(path))
 
@@ -717,7 +730,7 @@ def test_server_serves_only_the_site() -> None:
     for name in ("index.html", "plan.html"):
         markup = read_text(os.path.join(ROOT, name))
         check(f"{name}: no inline style attributes", 'style="' in markup, False)
-    for name in ("assets/app.js", "assets/plan.js"):
+    for name in ("assets/app.js", "assets/plan.js", "assets/rotation.js"):
         code = read_text(os.path.join(ROOT, name))
         check(f"{name}: emits no inline style attributes", 'style="' in code, False)
         check(f"{name}: emits no inline event handlers",
@@ -748,8 +761,15 @@ def test_bundle_is_self_contained() -> None:
     check_true("bundle: carries the planner view", 'id="view-planner"' in html)
     check_true("bundle: planner search came across", 'id="addSearch"' in html)
     check("bundle: tabs switch instead of navigating", html.count('data-view="'), 2)
-    check_true("bundle: both scripts inlined",
+    check_true("bundle: both page scripts inlined",
                "vorframe.plan.v1" in html and "vorframe.collected.v1" in html)
+    # both pages read the rotation model from a third script. Leaving it out of
+    # the bundle is not a visible break until a bounty is ranked, so it is
+    # asserted here rather than trusted to the eye.
+    check_true("bundle: the shared rotation model came across",
+               "window.VorFrameRotation" in html)
+    check_true("bundle: the model is inlined before the pages that read it",
+               html.index("window.VorFrameRotation") < html.index("vorframe.collected.v1"))
 
 
 def main() -> int:

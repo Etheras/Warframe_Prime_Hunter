@@ -122,8 +122,9 @@ def freshness() -> dict:
     return body
 
 
-# Exactly what the site asks for, and nothing else. The pages request six files
-# plus artwork; serving the containing folder handed out a great deal more.
+# Exactly what the site asks for, and nothing else. The pages request seven
+# files plus artwork; serving the containing folder handed out a great deal
+# more.
 #
 # An allowlist rather than a blocklist, deliberately: a blocklist has to predict
 # what is worth hiding, and the thing that made this urgent -- a whole .git
@@ -131,14 +132,15 @@ def freshness() -> dict:
 # reconstructed -- was not on anyone's list of things to think about.
 ALLOWED_FILES = frozenset({
     "index.html", "plan.html",
-    "assets/styles.css", "assets/app.js", "assets/plan.js",
+    "assets/styles.css", "assets/rotation.js", "assets/app.js", "assets/plan.js",
     "data/vorframe-data.js",
 })
 ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 
-# No 'unsafe-inline' and no 'unsafe-eval': the app is two script files and one
-# stylesheet of its own. frame-ancestors 'none' stops the page being framed,
-# form-action 'none' because there is no form to submit anywhere.
+# No 'unsafe-inline' and no 'unsafe-eval': the app is three script files of its
+# own -- the shared rotation model, then whichever page you are on -- and one
+# stylesheet. frame-ancestors 'none' stops the page being framed, form-action
+# 'none' because there is no form to submit anywhere.
 #
 # img-src is decided from the dataset rather than fixed. When artwork has been
 # pulled local -- which refresh-data does by default -- no third party is
@@ -240,7 +242,7 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
         """
         Headers a browser will act on, which cost nothing to send.
 
-        The CSP is the substantive one: everything the app runs is its own two
+        The CSP is the substantive one: everything the app runs is its own
         script files, so 'self' is enough and there is no 'unsafe-inline'
         anywhere. That is only true because the two inline onerror attributes on
         artwork were replaced with a capture-phase listener - with those in place

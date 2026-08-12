@@ -10,7 +10,7 @@ both. Judge a change by whether it serves that shared dataset well.
 > VorFrame, and it is only worth that if it matches the code. **Section 2 sets out
 > how to work on this project — read it before changing anything.**
 
-**Last updated:** 2026-08-09
+**Last updated:** 2026-08-12
 
 ---
 
@@ -276,6 +276,7 @@ VorFrame/
 ├── refresh-data.cmd / .sh  ← the one way to look after the site
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
+│   ├── rotation.js         ← the rotation model, read by both pages
 │   ├── app.js              ← filtering, collection state, detail drawer
 │   └── plan.js             ← wishlist, scoring model, ranked node plan
 ├── data/
@@ -632,7 +633,8 @@ collection view answers the narrower per-part question and does not.
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
 that item's relics drop there*. It scores each node by what one round there is worth towards a part you
-still need — the same model `plan.js` uses, rotation weighting included, so the two pages cannot rank things
+still need — the same model `plan.js` uses, rotation weighting included — literally the same code,
+since both read it from `assets/rotation.js`, so the two pages cannot rank things
 differently. (It used to rank by how many relics happened to overlap, which made
 the order disagree with the per-part odds listed underneath.) It only counts
 relics holding a part you are still missing, so the advice moves as you tick
@@ -756,7 +758,7 @@ The rotation-A plan's tail is chosen per node rather than fixed: after the three
 rewards, round 4 onward is a free choice between defending 1–2 for B or 3–4 for C, so
 assuming B would strand a wanted C.
 
-Implementation: `plansFor(mission, squad)` in both `plan.js` and `app.js` looks the
+Implementation: `plansFor(mission, squad)` in `assets/rotation.js` looks the
 mission type up in `ROT_PATTERN` and falls back to AABC, so a mission type nobody has
 thought about degrades to the normal rule rather than to nothing. `assertRotationCoverage()`
 logs, once per load, how many mission types are in the data and exactly which ones

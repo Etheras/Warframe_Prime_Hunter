@@ -143,165 +143,17 @@
   const CATEGORIES = DATA.categories.map((c) => c.name);
 
   /* ── filter state ─────────────────────────────────────────── */
-  /* Identical to plan.js - see the long note there. A run collects every
-     rotation it passes through, so a node is valued whole: the rewards the
-     pattern yields, over the rounds it costs. */
-  const RUN_MODES = ["reset", "full", "aabcaa"];
-  const RESET_STOPS = [
-    { rounds: 2, counts: { A: 2 } },              // nothing wanted past rotation A
-    { rounds: 3, counts: { A: 2, B: 1 } },        // ... past B
-    { rounds: 4, counts: { A: 2, B: 1, C: 1 } },  // ... past C
-  ];
-  const RUN_PATTERNS = {
-    full:   { rounds: 4, counts: { A: 2, B: 1, C: 1 } },
-    aabcaa: { rounds: 6, counts: { A: 4, B: 1, C: 1 } },
-  };
-
-  /* rot holds value per reward drop of each rotation, plus `none` for sources
-     carrying no rotation at all.
-
-     For `reset` the stopping point is the LAST rotation holding something you
-     want - not whichever stop has the best rate. If you need a part from A and
-     another from C, leaving after round 2 never gets you the C part at all, so
-     a higher per-round rate there is measuring the wrong thing. Same reasoning
-     as refinement following the bottleneck instead of the likeliest reward. */
-  /* Rotation pattern, by mission type.
-
-     Every endless mission advances A -> A -> B -> C and repeats, with one
-     exception. Disruption does not use that cycle at all: it pays one reward
-     per round, and the tier depends on the round number *and* how many of the
-     four conduits you successfully defended that round.
-
-         round   1 defended   2   3   4 defended
-           1         A        A   A       B
-           2         A        A   B       B
-           3         A        B   B       C
-           4+        B        B   C       C
-
-     We assume all four are defended, which is what anyone deliberately farming
-     does. That pays B, B, then C from round three onward for as long as you
-     stay -- so rotation C is *unlocked* rather than periodic, and rotation A is
-     unreachable. Defending fewer is a deliberate min-max: it is the only way to
-     reach rotation A, and it can hold you on B indefinitely. The rotation label
-     is coloured differently on these nodes and explains this on hover. */
-  /* Every mission type advances A -> A -> B -> C and repeats. Disruption is the
-     sole exception and is listed explicitly; anything not named here gets AABC,
-     so a mission type we have never heard of degrades to the normal rule rather
-     than to nothing. `assertRotationCoverage()` logs what that covers. */
-  /* Once the three rotation A rewards are banked, round 4 onward is a free
-     choice: defend 1-2 conduits for B, or 3-4 for C. Take whichever is worth
-     more here rather than assuming B, which would strand a wanted C. */
-  const tailTier = (rot) => ((rot.C || 0) > (rot.B || 0) ? "C" : "B");
-
-  const AABC = { plan: (r) => "AABC"[(r - 1) % 4], cycle: 4, squadOnly: false,
-                 name: null };
-  const ROT_PATTERN = {
-    /* Defending all four conduits: B, B, then C for as long as you stay.
-       Needs no coordination - it is simply playing the mission well. */
-    Disruption: [
-      { plan: (r) => (r <= 2 ? "B" : "C"), cycle: 3, squadOnly: false,
-        name: "defending all four conduits" },
-      /* Rotation A exists only if you deliberately UNDER-defend: 3 conduits in
-         round 1, then 2, then 1, which is the only route to it and caps at
-         three. From round 4 the floor is B. Letting conduits die on purpose,
-         to a schedule, without failing the round outright, is not something a
-         random public squad will do - so this plan is offered only when the
-         4-squad option says you have an organised team. */
-      /* Rotation A is exhaustible: three rewards at most, rounds 1-3, and
-         flatly impossible from round 4. So this is not one option among
-         several - if anything you want sits on A, it is the only plan that can
-         ever get it, and it takes priority over any plan that banks more.
-         Same reasoning as refinement following the bottleneck rather than the
-         likeliest reward: you cannot optimise throughput on a resource that
-         runs out. */
-      { plan: (r, rot) => (r <= 3 ? "A" : tailTier(rot)), cycle: 4, squadOnly: true,
-        onlyChanceAt: "A",
-        name: "under-defending on purpose for rotation A (the only route to it)" },
-      /* Holding rotation B from the very first round: defend 4, then 3-4, then
-         2-3, then 1-2 forever. Only beats the plan above when rotation A is
-         worth less than B here - otherwise A,A,A,B,B,B... dominates it, since
-         both are B from round four on. Same coordination requirement. */
-      { plan: () => "B", cycle: 1, squadOnly: true,
-        name: "holding rotation B every round" },
-    ],
-  };
-  const plansFor = (mission, squad) =>
-    (ROT_PATTERN[mission] || [AABC]).filter((p) => !p.squadOnly || squad);
-
-  function scorePlan(rot, runMode, p) {
-    let n;
-    if (runMode === "full") n = 4;
-    else if (runMode === "aabcaa") n = 6;
-    else {
-      n = 0;                                    // reset: last round that pays
-      for (let r = 1; r <= p.cycle; r++) if ((rot[p.plan(r, rot)] || 0) > 0) n = r;
-    }
-    const counts = {};
-    for (let r = 1; r <= n; r++) {
-      const t = p.plan(r, rot);
-      counts[t] = (counts[t] || 0) + 1;
-    }
-    let total = 0;
-    Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
-    return { total, counts, rounds: n || null, plan: p };
-  }
-
-  /* A bounty is not costed in rounds. One run pays the stages of whichever
-     letter the clock has up, and no amount of staying reaches another - see
-     the bounty clock below. Kept in step with the planner's copy by hand: the
-     whole rotation model is duplicated across the two files, which is worth
-     fixing but not by leaving one of them wrong in the meantime. */
-  function bountyRun(rot, live) {
-    const pays = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0);
-    const flat = rot.none || 0;
-    const onTable = !live.published || live.published.indexOf(live.letter) >= 0;
-    const letter = live.letter && onTable ? live.letter : null;
-
-    if (letter) {
-      const v = rot[letter] || 0;
-      return {
-        total: v + flat, perRound: v + flat, rounds: null,
-        counts: pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null,
-        stranded: pays.filter((t) => t !== letter),
-        planName: null, nonStandard: false,
-        bounty: { letter, endsAt: live.endsAt },
-      };
-    }
-    const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
-    return {
-      total: mean + flat, perRound: mean + flat, rounds: null,
-      counts: null, stranded: null, planName: null, nonStandard: false,
-      bounty: { letter: null, endsAt: live.endsAt },
-    };
-  }
-
-  /* Where a mission type offers more than one way to play it, take whichever
-     banks more. Adding a plan can therefore only ever raise a node's score, so
-     ticking the 4-squad box never makes anything look worse. */
-  function runValue(rot, runMode, mission, squad, live) {
-    if (live) return bountyRun(rot, live);
-    const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let best = { total: 0, counts: null, rounds: null, plan: null };
-    if (hasRot) {
-      const avail = plansFor(mission, squad);
-      // a plan flagged onlyChanceAt owns the sole route to that rotation, so
-      // when something wanted sits there it is used outright, not compared
-      const forced = avail.find((p) => p.onlyChanceAt && (rot[p.onlyChanceAt] || 0) > 0);
-      (forced ? [forced] : avail).forEach((p) => {
-        const r = scorePlan(rot, runMode, p);
-        if (!best.plan || r.total > best.total + 1e-12) best = r;
-      });
-    }
-    const counts = best.counts;
-    const stranded = hasRot
-      ? ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !(counts && counts[t]))
-      : null;
-    return { total: best.total + (rot.none || 0),
-             perRound: best.total / (best.rounds || 1),
-             rounds: best.rounds, counts, stranded,
-             planName: best.plan ? best.plan.name : null,
-             nonStandard: !!ROT_PATTERN[mission] };
-  }
+  /* The rotation model - what one run at a node is actually worth - lives in
+     assets/rotation.js, so the collection view and the planner cannot disagree
+     about it. Aliased here so the call sites read as they always did. */
+  const ROT = window.VorFrameRotation;
+  const RUN_MODES = ROT.RUN_MODES;
+  const runValue = ROT.runValue;
+  const liveRotation = ROT.liveRotation;
+  const untilText = ROT.untilText;
+  const isRailjack = ROT.isRailjack;
+  const isEventNode = ROT.isEventNode;
+  const CYCLE_MINUTES = ROT.cycleMinutes;
 
   const rotSlot = (r) =>
     ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
@@ -746,68 +598,8 @@
       rows.join("\n") + (state.squad ? "\n\n4-squad odds" : "");
   }
 
-  /* Railjack/Proxima nodes are a different activity, so they are kept out of the
-     ranking — but never hidden, because five live relics have no other source
-     and they carry never-vaulted frames (Nyx, Valkyr). */
-  const RAILJACK_NODES = new Set([
-    "Bendar Cluster", "Iota Temple", "Korm's Belt", "Ogal Cluster", "Sover Strait",
-    "Arva Vector", "Brom Cluster", "Enkidu Ice Drifts", "Mammon's Prospect",
-    "Nu-Gua Mines", "Sovereign Grasp", "Fenton's Field", "Khufu Envoy",
-    "Obol Crossing", "Peregrine Axis", "Profit Margin", "Seven Sirens",
-    "Kasio's Rest", "Lupal Pass", "Mordo Cluster", "Nodo Gap", "Vand Cluster",
-    "Beacon Shield Ring", "Bifrost Echo", "Falling Glory", "Luckless Expanse",
-    "Orvin-Haarc", "Vesper Strait",
-  ]);
-  const isRailjack = (s) =>
-    RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
-
-  /* ── the bounty clock ────────────────────────────────────────────
-     One rotation letter is live for everyone, it changes every 150 minutes
-     A → B → C, and a bounty run pays the stages of whichever is up. The build
-     names the letter that was live when it ran by reading the worldstate; the
-     arithmetic here walks it forward so it stays right between refreshes.
-     The Isolation Vaults run a phase of their own, so each family is tracked
-     separately. Mirrors the planner's copy in assets/plan.js. */
-  const BOUNTY = (DATA.meta || {}).bounties || null;
-  const SEQ = (BOUNTY && BOUNTY.sequence) || "ABC";
-  const CYCLE_MS = ((BOUNTY && BOUNTY.cycleMinutes) || 150) * 60000;
-
-  function familyState(name) {
-    const fam = (BOUNTY && (BOUNTY.families || {})[name]) || null;
-    const end = fam && fam.windowEnd ? new Date(fam.windowEnd).getTime() : NaN;
-    const at = SEQ.indexOf(fam ? fam.letter : "");
-    if (!isFinite(end) || at < 0) return { letter: null, endsAt: null };
-    const now = Date.now();
-    const steps = now < end ? 0 : Math.floor((now - end) / CYCLE_MS) + 1;
-    return { letter: SEQ[(at + steps) % SEQ.length],
-             endsAt: end + steps * CYCLE_MS };
-  }
-
-  function liveRotation(node) {
-    const g = (BOUNTY && BOUNTY.groups && BOUNTY.groups[node]) || null;
-    if (!g) return { letter: null, endsAt: null, published: "" };
-    return Object.assign(familyState(g.family), { published: g.rotations || "" });
-  }
-
-  /* Bounties that only exist while an event is running - the two Ghoul tiers
-     and Plague Star. The build records the window rather than a yes/no, so a
-     week-old build still knows when a purge ends. */
-  const bountyEvent = (s) =>
-    (s.kind === "bounty" && BOUNTY && (BOUNTY.events || {})[s.node]) || null;
-  function eventRunning(e) {
-    if (!e || !e.expiry) return false;
-    const now = Date.now();
-    return new Date(e.expiry).getTime() > now &&
-      (!e.activation || new Date(e.activation).getTime() <= now);
-  }
-
-  /* Event nodes only exist while their event is running, and DE's drop table
-     never says which event that is — so they are left out of the ranking here
-     rather than sending you looking for a node that isn't on your star chart.
-     The limited-time bounties are the same problem with an answer: the
-     worldstate does say whether they are running. */
-  const isEventNode = (s) => /^Event:/i.test(s.planet || "") ||
-    !!(bountyEvent(s) && !eventRunning(bountyEvent(s)));
+  /* Railjack nodes, event nodes and the bounty clock all live in
+     assets/rotation.js - see the alias block near the top of this file. */
 
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is
      really "stay for the 4th reward". Spelled out on hover because the letters
@@ -827,7 +619,7 @@
      telling you the opposite. */
   const BOUNTY_CYCLE =
     "Bounties do not work that way: one rotation is live for everyone,\n" +
-    "it changes every 150 minutes (A → B → C → repeat), and a run pays\n" +
+    "it changes every " + CYCLE_MINUTES + " minutes (A → B → C → repeat), and a run pays\n" +
     "the stages of whichever is up. Staying longer cannot reach another.\n" +
     "The planner says which rotation is live and how long it has left.";
 
@@ -837,13 +629,6 @@
     const help = isBounty ? BOUNTY_CYCLE
       : (ROT_WHEN[key] ? ROT_WHEN[key] + "\n\n" : "") + ROT_CYCLE;
     return `<abbr class="rot" data-tip="${esc(help)}">${esc(prefix)}${esc(rot)}</abbr>`;
-  }
-
-  /* "42 min", "3h 12m" — how long the live rotation has left. */
-  function untilText(ms) {
-    const mins = Math.max(0, Math.round((ms - Date.now()) / 60000));
-    return mins < 60 ? mins + " min"
-      : Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
   }
 
   /* A bounty row names the letter that is live and how long it has left,
@@ -858,12 +643,8 @@
         (b.endsAt ? ", for another " + untilText(b.endsAt) : "") + ".");
       // what this node holds that the clock has not reached, and when it will -
       // the reason a bounty can be worth nothing now and worth running later
-      const at = SEQ.indexOf(b.letter);
       (s.stranded || []).forEach((t) => {
-        const to = SEQ.indexOf(t);
-        const when = at >= 0 && to >= 0 && b.endsAt
-          ? b.endsAt + (((to - at - 1) % SEQ.length + SEQ.length) % SEQ.length) * CYCLE_MS
-          : null;
+        const when = ROT.whenNext(b.letter, b.endsAt, t);
         lines.push("Rotation " + t + " holds something you want" +
           (when ? ", and is up in " + untilText(when) : "") + ".");
       });
