@@ -14,6 +14,7 @@
   const KEY_PARTS = S.KEYS.parts;
   const KEY_MATERIALS = S.KEYS.materials;
   const KEY_WISH = S.KEYS.wishlist;
+  const KEY_PLAN = S.KEYS.plan;
 
   const DATA = window.VORFRAME_DATA;
 
@@ -28,29 +29,18 @@
   const RELICS = DATA.relics || {};
 
   /* ── collection state ─────────────────────────────────────── */
-  let collected = new Set();
-  try {
-    const raw = localStorage.getItem(KEY_COLLECTED);
-    if (raw) collected = new Set(JSON.parse(raw));
-  } catch (e) { /* corrupt or unavailable storage — start empty */ }
+  // load/save come from shared.js, which swallows a corrupt or unavailable
+  // store: private mode keeps working in memory rather than throwing
+  let collected = new Set(load(KEY_COLLECTED, []));
 
-  const saveCollected = () => {
-    try { localStorage.setItem(KEY_COLLECTED, JSON.stringify(Array.from(collected))); }
-    catch (e) { /* private mode: keep working in memory */ }
-  };
+  const saveCollected = () => save(KEY_COLLECTED, Array.from(collected));
 
   /* ── part ownership ───────────────────────────────────────────
      { itemId: { partName: countOwned } }. Keys are the normalised
      part names the pipeline emits, so they survive a source switch. */
-  let partsOwned = {};
-  try {
-    partsOwned = JSON.parse(localStorage.getItem(KEY_PARTS) || "{}") || {};
-  } catch (e) { partsOwned = {}; }
+  let partsOwned = load(KEY_PARTS, {});
 
-  const savePartsOwned = () => {
-    try { localStorage.setItem(KEY_PARTS, JSON.stringify(partsOwned)); }
-    catch (e) { /* non-fatal */ }
-  };
+  const savePartsOwned = () => save(KEY_PARTS, partsOwned);
 
   const needOf = (p) => p.itemCount || 1;
   const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
@@ -95,12 +85,11 @@
   })();
 
   /* ── farm list, shared with plan.html ─────────────────────── */
-  let wishlist = [];
-  try { wishlist = JSON.parse(localStorage.getItem(KEY_WISH) || "[]") || []; } catch (e) {}
+  let wishlist = load(KEY_WISH, []);
   const onWishlist = (id) => wishlist.includes(id);
   function toggleWishlist(id) {
     wishlist = onWishlist(id) ? wishlist.filter((x) => x !== id) : wishlist.concat([id]);
-    try { localStorage.setItem(KEY_WISH, JSON.stringify(wishlist)); } catch (e) {}
+    save(KEY_WISH, wishlist);
   }
 
   /* ── availability bucket ──────────────────────────────────────
@@ -161,33 +150,29 @@
      exactly one copy rather than one per page. `squad` used to be kept here
      *and* in vorframe.filters.v1, which meant the pages could quietly disagree
      about whether you were farming solo. */
-  try {
-    const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
-    if (plan && RUN_MODES.includes(plan.runMode)) state.runMode = plan.runMode;
-    if (plan && typeof plan.squad === "boolean") state.squad = plan.squad;
-  } catch (e) { /* ignore malformed planner options */ }
+  const planOpts = load(KEY_PLAN, null);
+  if (planOpts && RUN_MODES.includes(planOpts.runMode)) state.runMode = planOpts.runMode;
+  if (planOpts && typeof planOpts.squad === "boolean") state.squad = planOpts.squad;
 
   /* One-time migration: adopt the old per-page value if the shared store has
      never been written, so nobody silently loses the setting. */
   function writeSharedOption(key, value) {
-    try {
-      const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
-      plan[key] = value;
-      localStorage.setItem("vorframe.plan.v1", JSON.stringify(plan));
-    } catch (e) { /* non-fatal */ }
+    const plan = load(KEY_PLAN, {});
+    plan[key] = value;
+    save(KEY_PLAN, plan);
   }
-  try {
-    const plan = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "null");
-    const legacy = JSON.parse(localStorage.getItem(KEY_FILTERS) || "null");
+  {
+    const plan = load(KEY_PLAN, null);
+    const legacy = load(KEY_FILTERS, null);
     if ((!plan || typeof plan.squad !== "boolean") &&
         legacy && typeof legacy.squad === "boolean") {
       state.squad = legacy.squad;
       writeSharedOption("squad", state.squad);
     }
-  } catch (e) { /* non-fatal */ }
+  }
 
-  try {
-    const saved = JSON.parse(localStorage.getItem(KEY_FILTERS) || "null");
+  {
+    const saved = load(KEY_FILTERS, null);
     if (saved) {
       Object.assign(state.avail, saved.avail || {});
       if (typeof saved.showCollected === "boolean") state.showCollected = saved.showCollected;
@@ -201,21 +186,17 @@
       if (typeof saved.hideOwnedParts === "boolean")
         state.hideOwnedParts = saved.hideOwnedParts;
     }
-  } catch (e) { /* ignore malformed saved filters */ }
+  }
 
-  const saveFilters = () => {
-    try {
-      localStorage.setItem(KEY_FILTERS, JSON.stringify({
-        avail: state.avail,
-        showCollected: state.showCollected,
-        showMissing: state.showMissing,
-        cats: Array.from(state.cats),
-        sort: state.sort,
-        hideVaultedRelics: state.hideVaultedRelics,
-        hideOwnedParts: state.hideOwnedParts,
-      }));
-    } catch (e) { /* non-fatal */ }
-  };
+  const saveFilters = () => save(KEY_FILTERS, {
+    avail: state.avail,
+    showCollected: state.showCollected,
+    showMissing: state.showMissing,
+    cats: Array.from(state.cats),
+    sort: state.sort,
+    hideVaultedRelics: state.hideVaultedRelics,
+    hideOwnedParts: state.hideOwnedParts,
+  });
 
   /* ── matching ─────────────────────────────────────────────── */
   function matches(it, skip) {
@@ -1092,11 +1073,8 @@
   $("#dataBtn").addEventListener("click", () => {
     // Everything the user took the trouble to set. A backup that restores your
     // collection but loses your farm list and options is not a backup.
-    let wishlist = [], planOpts = {};
-    try { wishlist = JSON.parse(localStorage.getItem(KEY_WISH) || "[]") || []; }
-    catch (e) { /* ignore */ }
-    try { planOpts = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {}; }
-    catch (e) { /* ignore */ }
+    const wishlist = load(KEY_WISH, []);
+    const planOpts = load(KEY_PLAN, {});
     $("#dataArea").value = JSON.stringify({
       vorframe: 3,
       exported: new Date().toISOString(),
@@ -1104,7 +1082,7 @@
       parts: partsOwned,
       materials: materials,
       wishlist: wishlist,
-      filters: JSON.parse(localStorage.getItem(KEY_FILTERS) || "null"),
+      filters: load(KEY_FILTERS, null),
       plan: planOpts,
     });
     $("#dlgMsg").style.color = "";
@@ -1183,30 +1161,24 @@
 
       collected = new Set(ids);
       partsOwned = nextParts;
-      if (nextWish) {
-        try { localStorage.setItem(KEY_WISH, JSON.stringify(nextWish)); }
-        catch (e) { /* non-fatal */ }
-      }
+      if (nextWish) save(KEY_WISH, nextWish);
       // options are plain settings; keep only keys we recognise
       if (payload.plan && typeof payload.plan === "object") {
-        try {
-          const cur = JSON.parse(localStorage.getItem("vorframe.plan.v1") || "{}") || {};
-          ["squad", "event", "railjack", "runMode", "formaHave", "formaNeed"]
-            .forEach((k) => { if (payload.plan[k] !== undefined) cur[k] = payload.plan[k]; });
-          localStorage.setItem("vorframe.plan.v1", JSON.stringify(cur));
-          if (typeof cur.squad === "boolean") {
-            state.squad = cur.squad;
-            const cb = $("#f-squad"); if (cb) cb.checked = cur.squad;
-          }
-          if (RUN_MODES.includes(cur.runMode)) {
-            state.runMode = cur.runMode;
-            const sel = $("#f-runmode"); if (sel) sel.value = cur.runMode;
-          }
-        } catch (e) { /* non-fatal */ }
+        const cur = load(KEY_PLAN, {});
+        ["squad", "event", "railjack", "runMode", "formaHave", "formaNeed"]
+          .forEach((k) => { if (payload.plan[k] !== undefined) cur[k] = payload.plan[k]; });
+        save(KEY_PLAN, cur);
+        if (typeof cur.squad === "boolean") {
+          state.squad = cur.squad;
+          const cb = $("#f-squad"); if (cb) cb.checked = cur.squad;
+        }
+        if (RUN_MODES.includes(cur.runMode)) {
+          state.runMode = cur.runMode;
+          const sel = $("#f-runmode"); if (sel) sel.value = cur.runMode;
+        }
       }
       if (payload.filters && typeof payload.filters === "object") {
-        try { localStorage.setItem(KEY_FILTERS, JSON.stringify(payload.filters)); }
-        catch (e) { /* non-fatal */ }
+        save(KEY_FILTERS, payload.filters);
       }
       // an item with parts is collected iff they're all owned — re-derive it
       ITEMS.forEach((it) => syncCollected(it));
@@ -1238,16 +1210,11 @@
     { name: "Orokin Catalyst", have: 0, need: 0 },
     { name: "Orokin Reactor", have: 0, need: 0 },
   ];
-  let materials;
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY_MATERIALS) || "null");
-    materials = Array.isArray(raw) ? raw : DEFAULT_MATERIALS.slice();
-  } catch (e) { materials = DEFAULT_MATERIALS.slice(); }
+  const savedMaterials = load(KEY_MATERIALS, null);
+  let materials = Array.isArray(savedMaterials)
+    ? savedMaterials : DEFAULT_MATERIALS.slice();
 
-  const saveMaterials = () => {
-    try { localStorage.setItem(KEY_MATERIALS, JSON.stringify(materials)); }
-    catch (e) { /* non-fatal */ }
-  };
+  const saveMaterials = () => save(KEY_MATERIALS, materials);
 
   /* Two modes: normally you only edit "have", because that's the number that
      changes as you play. The name and the target sit behind the edit toggle so

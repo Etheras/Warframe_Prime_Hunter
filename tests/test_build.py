@@ -898,16 +898,28 @@ def test_browser_assets() -> None:
                            capture_output=True, text=True)
         check(f"{name}: parses", r.returncode, 0, (r.stderr or "").strip()[:200])
 
+    # test_assets.mjs needs nothing but Node. test_pages.mjs drives a real
+    # browser through Playwright and skips itself when that is not installed,
+    # which is the normal case - it is a large download and VorFrame does not
+    # need it. Its skips come back through TAP and are reported as skips here.
     r = subprocess.run([node, "--test", "--test-reporter=tap",
-                        os.path.join("tests", "test_assets.mjs")],
+                        os.path.join("tests", "test_assets.mjs"),
+                        os.path.join("tests", "test_pages.mjs")],
                        capture_output=True, text=True, cwd=ROOT)
-    seen = 0
+    seen = skipped = 0
     for line in (r.stdout or "").splitlines():
         m = re.match(r"^(ok|not ok) \d+ - (.+?)\s*$", line)
         if not m:
             continue
         seen += 1
-        check("js: " + m.group(2), m.group(1), "ok")
+        name, status = m.group(2), m.group(1)
+        reason = re.search(r"#\s*SKIP\s*(.*)$", name)
+        if reason and status == "ok":
+            skipped += 1
+            if skipped == 1:      # one line, not one per test
+                print(f"  skip page tests ({reason.group(1).strip() or 'skipped'})")
+            continue
+        check("js: " + name, status, "ok")
     if not seen:
         check_true("browser tests ran", False, (r.stdout or r.stderr)[-400:])
 

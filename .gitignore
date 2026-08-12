@@ -23,6 +23,11 @@ dist/
 drafts/
 
 # python
+# Optional test-only dependencies. package.json and its lock file are tracked
+# so anyone who wants the browser tests gets the same Playwright; the packages
+# themselves are not, and nothing the site ships needs them.
+node_modules/
+
 __pycache__/
 *.pyc
 

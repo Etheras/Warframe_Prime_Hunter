@@ -126,11 +126,20 @@ so it opens straight from `file://`. **No bundler, no framework, no npm packages
 and adding one is not on the table.** Keep it that way: the thing has to survive
 being copied to a USB stick.
 
-Node was installed on this machine on 2026-08-12, and that changes exactly one
-thing — the browser tests in `tests/test_assets.mjs` can run. It is a **test
-runner and nothing else**: it uses `node:test`, `node:assert` and `node:vm` from
-the standard library, there is no `package.json` and no `node_modules`, and the
-suite skips itself where Node is absent. Nothing the site ships may depend on it.
+Node was installed on this machine on 2026-08-12, and it is a **test runner and
+nothing else**. `tests/test_assets.mjs` uses `node:test`, `node:assert` and
+`node:vm` from the standard library — no packages at all — and skips itself
+where Node is absent.
+
+`tests/test_pages.mjs` goes one step further and drives the real pages in
+Chromium through Playwright, which is the only way to cover `app.js` and
+`plan.js` without stubbing a browser badly. That one **is** an npm dependency,
+so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
+the same version, `node_modules/` is not, and the tests skip with a reason when
+it is missing. 253 checks without it, 263 with.
+
+The line that must not move: **nothing the site ships may depend on any of
+this.** No bundler, no framework, no runtime package.
 
 ### Verifying a change
 
@@ -301,7 +310,8 @@ VorFrame/
 │   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
 ├── tests/
 │   ├── test_build.py       ← the suite, and the one command to run
-│   └── test_assets.mjs     ← the browser half, under Node; skipped without it
+│   ├── test_assets.mjs     ← the model, under Node; skipped without it
+│   └── test_pages.mjs      ← the real pages in Chromium; needs Playwright
 ├── tools/
 │   ├── build_data.py       ← orchestration, the item join, and emit
 │   ├── sources.py          ← network, HTTP cache, warm/cold STALE/MISSING policy

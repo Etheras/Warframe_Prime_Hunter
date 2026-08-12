@@ -605,6 +605,32 @@ from [nodejs.org](https://nodejs.org/) if you want them.
 One wrinkle worth knowing: a terminal that was already open when you installed
 Node will not have it on `PATH`. Open a new one.
 
+### Testing the pages themselves — optional
+
+The tests above cover the model, not the pages. Driving the real pages needs a
+real browser, which is a large download, so it is opt-in:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+That adds ten tests that open the collection and the planner in Chromium and
+check what a person would: the grid renders without console errors, ticking a
+part survives a reload, tooltips appear, the backup dialog carries your
+collection, filters and materials stick, the two pages agree about the farm
+list, a bounty row names its rotation, and the layout does not scroll sideways
+on a phone.
+
+Without Playwright you get one line and everything else runs as normal:
+
+```
+  skip page tests (Playwright is not installed (npm install))
+```
+
+`package.json` exists only for this. **Nothing the site ships depends on it**,
+and `node_modules/` is not tracked.
+
 ---
 
 ## Want more detail?
