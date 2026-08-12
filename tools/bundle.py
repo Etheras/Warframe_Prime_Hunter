@@ -53,7 +53,8 @@ def main() -> int:
     html = read("index.html")
     plan = read("plan.html")
     css = read("assets", "styles.css")
-    # rotation.js first: both pages read the model from it at load
+    # shared.js and rotation.js first: both pages read them at load
+    shared_js = read("assets", "shared.js")
     rotation_js = read("assets", "rotation.js")
     app_js = read("assets", "app.js")
     plan_js = read("assets", "plan.js")
@@ -134,6 +135,7 @@ def main() -> int:
         body_after_header(plan),
         "</div>",
         "<script>", guard(data), CLOSE_SCRIPT,
+        "<script>", guard(shared_js), CLOSE_SCRIPT,
         "<script>", guard(rotation_js), CLOSE_SCRIPT,
         "<script>", guard(app_js), CLOSE_SCRIPT,
         "<script>", guard(plan_js), CLOSE_SCRIPT,

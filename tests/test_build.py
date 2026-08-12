@@ -686,7 +686,8 @@ def test_server_serves_only_the_site() -> None:
     import serve
 
     for path in ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
-                 "assets/rotation.js", "assets/styles.css", "data/vorframe-data.js",
+                 "assets/rotation.js", "assets/shared.js",
+                 "assets/styles.css", "data/vorframe-data.js",
                  "assets/img/AshPrime.png"):
         check_true(f"serves {path}", serve.allowed(path))
 
@@ -730,7 +731,8 @@ def test_server_serves_only_the_site() -> None:
     for name in ("index.html", "plan.html"):
         markup = read_text(os.path.join(ROOT, name))
         check(f"{name}: no inline style attributes", 'style="' in markup, False)
-    for name in ("assets/app.js", "assets/plan.js", "assets/rotation.js"):
+    for name in ("assets/app.js", "assets/plan.js", "assets/rotation.js",
+                 "assets/shared.js"):
         code = read_text(os.path.join(ROOT, name))
         check(f"{name}: emits no inline style attributes", 'style="' in code, False)
         check(f"{name}: emits no inline event handlers",
@@ -766,10 +768,16 @@ def test_bundle_is_self_contained() -> None:
     # both pages read the rotation model from a third script. Leaving it out of
     # the bundle is not a visible break until a bounty is ranked, so it is
     # asserted here rather than trusted to the eye.
+    # both pages read the rotation model and the store/chrome helpers from two
+    # shared scripts. Leaving either out of the bundle is not a visible break
+    # until something is ranked or saved, so it is asserted rather than eyed.
     check_true("bundle: the shared rotation model came across",
                "window.VorFrameRotation" in html)
-    check_true("bundle: the model is inlined before the pages that read it",
-               html.index("window.VorFrameRotation") < html.index("vorframe.collected.v1"))
+    check_true("bundle: the shared store and chrome came across",
+               "window.VorFrameShared" in html)
+    check_true("bundle: the modules are inlined before the pages that read them",
+               max(html.index("window.VorFrameRotation"), html.index("window.VorFrameShared"))
+               < html.index("VorFrameShared;"))
 
 
 def main() -> int:

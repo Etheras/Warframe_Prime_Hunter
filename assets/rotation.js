@@ -296,6 +296,32 @@
   const isEventNode = (s) => /^Event:/i.test(s.planet || "") ||
     !!(bountyEvent(s) && !eventRunning(bountyEvent(s)));
 
+  /* Guard against the mistake that started all of this: a mission type quietly
+     getting the wrong rotation. Everything not named in ROT_PATTERN is assumed
+     to run A->A->B->C, and the bug was invisible precisely because nothing ever
+     said what was being assumed. So say it, once per load, in the console.
+
+     Bounties are left out: they are not on the round cycle at all, and listing
+     them here as "assumed AABC" was itself an instance of the mistake. */
+  function assertCoverage() {
+    const seen = new Set();
+    Object.values(DATA.relics || {}).forEach((r) =>
+      (r.sources || []).forEach((s) => {
+        if (s.mode && s.kind !== "bounty") seen.add(s.mode);
+      }));
+    const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
+    const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
+    console.info("[VorFrame] rotation model: " + seen.size + " mission types in the data");
+    console.info("  non-standard : " + (odd.length ? odd.join(", ") : "(none)"));
+    console.info("  assumed AABC : " + aabc.join(", "));
+    Object.keys(ROT_PATTERN).forEach((m) => {
+      if (!seen.has(m)) {
+        console.warn("[VorFrame] ROT_PATTERN names '" + m + "' but no source uses it");
+      }
+    });
+  }
+  assertCoverage();
+
   window.VorFrameRotation = {
     RUN_MODES, ROT_PATTERN, runValue,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,

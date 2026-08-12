@@ -122,7 +122,7 @@ def freshness() -> dict:
     return body
 
 
-# Exactly what the site asks for, and nothing else. The pages request seven
+# Exactly what the site asks for, and nothing else. The pages request eight
 # files plus artwork; serving the containing folder handed out a great deal
 # more.
 #
@@ -132,13 +132,14 @@ def freshness() -> dict:
 # reconstructed -- was not on anyone's list of things to think about.
 ALLOWED_FILES = frozenset({
     "index.html", "plan.html",
-    "assets/styles.css", "assets/rotation.js", "assets/app.js", "assets/plan.js",
+    "assets/styles.css", "assets/shared.js", "assets/rotation.js",
+    "assets/app.js", "assets/plan.js",
     "data/vorframe-data.js",
 })
 ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 
-# No 'unsafe-inline' and no 'unsafe-eval': the app is three script files of its
-# own -- the shared rotation model, then whichever page you are on -- and one
+# No 'unsafe-inline' and no 'unsafe-eval': the app is four script files of its
+# own -- two shared modules, then whichever page you are on -- and one
 # stylesheet. frame-ancestors 'none' stops the page being framed, form-action
 # 'none' because there is no form to submit anywhere.
 #

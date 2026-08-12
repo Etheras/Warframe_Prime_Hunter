@@ -22,7 +22,6 @@
      about it. Aliased here so the call sites read the same as they always did. */
   const ROT = window.VorFrameRotation;
   const RUN_MODES = ROT.RUN_MODES;
-  const ROT_PATTERN = ROT.ROT_PATTERN;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -32,9 +31,16 @@
   const eventRunning = ROT.eventRunning;
   const CYCLE_MINUTES = ROT.cycleMinutes;
 
+  /* Storage, the escaper, the tooltip, the staleness banner and the backup
+     file are shared with the collection view - see assets/shared.js. */
+  const S = window.VorFrameShared;
+  const { esc, $, $$, load, save } = S;
+  const KEY_PARTS = S.KEYS.parts;
+  const KEY_WISH = S.KEYS.wishlist;
+  const KEY_PLAN = S.KEYS.plan;
+  const KEY_MATERIALS = S.KEYS.materials;
+
   const DATA = window.VORFRAME_DATA;
-  const $ = (s, r) => (r || document).querySelector(s);
-  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
   if (!DATA || !DATA.items) {
     document.body.innerHTML =
@@ -43,40 +49,12 @@
     return;
   }
 
-  /* Guard against the mistake that started this: a mission type quietly getting
-     the wrong rotation. Everything not named in ROT_PATTERN uses A->A->B->C, so
-     this lists what that assumption currently covers. Runs once, console only. */
-  function assertRotationCoverage() {
-    const seen = new Set();
-    Object.values(DATA.relics || {}).forEach((r) =>
-      // bounties are not on the round cycle at all - they run on the clock, so
-      // the AABC assumption never applies to them and listing them here as
-      // "assumed" was itself the mistake this check exists to catch
-      (r.sources || []).forEach((s) => {
-        if (s.mode && s.kind !== "bounty") seen.add(s.mode);
-      }));
-    const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
-    const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
-    console.info("[VorFrame] rotation model: " + seen.size + " mission types in the data");
-    console.info("  non-standard : " + (odd.length ? odd.join(", ") : "(none)"));
-    console.info("  assumed AABC : " + aabc.join(", "));
-    Object.keys(ROT_PATTERN).forEach((m) => {
-      if (!seen.has(m)) {
-        console.warn("[VorFrame] ROT_PATTERN names '" + m + "' but no source uses it");
-      }
-    });
-  }
 
   const ITEMS = DATA.items;
   const RELICS = DATA.relics || {};
   const BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
   const REFINEMENTS = (DATA.meta && DATA.meta.refinements) ||
     ["Intact", "Exceptional", "Flawless", "Radiant"];
-
-  const KEY_PARTS = "vorframe.parts.v1";
-  const KEY_WISH = "vorframe.wishlist.v1";
-  const KEY_PLAN = "vorframe.plan.v1";
-  const KEY_MATERIALS = "vorframe.materials.v1";
 
   /* Forma has one home: the materials list on the collection page, where it is
      row one. The planner used to keep its own copy in KEY_PLAN, so the same
@@ -104,15 +82,6 @@
       localStorage.setItem(KEY_MATERIALS, JSON.stringify(list));
     } catch (e) { /* non-fatal */ }
   }
-
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-  const load = (k, dflt) => {
-    try { const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? dflt : v; }
-    catch (e) { return dflt; }
-  };
-  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   /* ── state, shared with the collection page where it makes sense ── */
   let partsOwned = load(KEY_PARTS, {});
@@ -175,7 +144,7 @@
     return { want, needs, formaShort };
   }
 
-  const squadify = (p) => (opts.squad ? 1 - Math.pow(1 - p, 4) : p);
+  const squadify = (p) => (opts.squad ? S.squadOdds(p) : p);
 
   /* value of one opening of this relic, at a given refinement */
   function relicValue(entries, refinement) {
@@ -229,7 +198,6 @@
   }
 
   /* ── the plan ────────────────────────────────────────────────── */
-  assertRotationCoverage();
 
   function buildPlan() {
     const { want, needs, formaShort } = wantedIndex();
@@ -371,23 +339,6 @@
   /* ── tooltip, same as the collection page ─────────────────────
      Monospaced and whitespace-preserving, because native title= is
      proportional and turns aligned columns to mush. */
-  const tipEl = document.createElement("div");
-  tipEl.className = "tip"; tipEl.hidden = true;
-  document.body.appendChild(tipEl);
-  function showTip(el) {
-    tipEl.textContent = el.dataset.tip || "";
-    tipEl.hidden = false;
-    const r = el.getBoundingClientRect(), t = tipEl.getBoundingClientRect();
-    let top = r.bottom + 7;
-    if (top + t.height > window.innerHeight - 8) top = r.top - t.height - 7;
-    tipEl.style.left = Math.max(8, Math.min(r.left, window.innerWidth - t.width - 10)) + "px";
-    tipEl.style.top = Math.max(8, top) + "px";
-  }
-  document.addEventListener("mouseover", (e) => {
-    const el = e.target.closest("[data-tip]");
-    if (el) showTip(el); else if (!tipEl.hidden) tipEl.hidden = true;
-  });
-  window.addEventListener("scroll", () => { tipEl.hidden = true; }, true);
 
   /* Rotation rewards cycle A -> A -> B -> C and repeat, so "rotation C" really
      means "stay for the 4th reward". Spelled out because the letters mean
@@ -825,50 +776,6 @@
     if (e.key === KEY_WISH) { wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id)); render(); }
   });
 
-  /* A failed refresh used to be a line in the footer, which nobody scrolls to.
-     If the data is behind, say so above the fold and say what to do about it. */
-  function staleBanner() {
-    const m = DATA.meta || {};
-    /* The server checks upstream before serving this file and plants the
-       answer on it. Nothing is fetched from here - the page never talks to
-       Digital Extremes, and does not know the check happened. Absent on
-       file:// and on GitHub Pages, where no server ran. */
-    const up = window.VORFRAME_UPSTREAM;
-    const stale = (m.stale || []).length ? m.stale : null;
-    const degraded = (m.degraded || []).length ? m.degraded : null;
-    const built = m.generated ? new Date(m.generated) : null;
-    const days = built ? Math.floor((Date.now() - built.getTime()) / 86400000) : 0;
-    const moved = up && up.stale && (up.moved || []).length ? up.moved : null;
-    const old = !stale && !degraded && !moved && days >= 14;
-    if (!stale && !degraded && !moved && !old) return;
-
-    const el = document.createElement("div");
-    el.className = "databar " + (degraded ? "bad" : "warn");
-
-    /* Two audiences. Whoever runs the server can fix this and is told how, in
-       the only terms that matter to them - the file they double-click. Anyone
-       else is just reading someone else's copy: telling them to run a script
-       they do not have is noise, so they get the warning and nothing more.
-       Being on localhost is the closest thing to "this is your copy" that the
-       page can actually know. */
-    const yours = ["localhost", "127.0.0.1", "::1", ""].indexOf(location.hostname) >= 0;
-    const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
-
-    el.innerHTML = moved
-      ? "<b>Out of date.</b> Digital Extremes have published newer data than this." + fix
-      : degraded
-        ? "<b>Some data is missing.</b> This copy was built without " +
-          esc(degraded.join(", ")) + ", so items or drop locations may be absent." + fix
-        : stale
-          ? "<b>Showing older data.</b> The last update could not reach " +
-            esc(stale.join(", ")) + ", so an earlier copy is being shown" +
-            (days ? " (from " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
-            ". Vaulting and Resurgence may have moved on since." + fix
-          : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
-            "28 days, and drop tables change with each update." + fix;
-    const header = document.querySelector("header.topbar");
-    if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
-  }
 
   /* ── backup ───────────────────────────────────────────────────────────
      The same dialog the collection page carries, because a backup button that
@@ -964,57 +871,8 @@
     });
   }
 
-  /* Save to a file / restore from a file.
-
-     Copy-and-paste works and stays, but it assumes you know what to do with a
-     wall of JSON. These two do the same job for anyone who does not: one
-     downloads a dated .json, the other reads one back and runs the same import
-     the textarea does, so there is only one code path to be right. */
-  function backupFilename() {
-    const d = new Date();
-    const p = (n) => String(n).padStart(2, "0");
-    return `vorframe-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
-  }
-  const dl = document.getElementById("downloadBtn");
-  if (dl) {
-    dl.addEventListener("click", () => {
-      const blob = new Blob([document.getElementById("dataArea").value],
-                            { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = backupFilename();
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      const msg = document.getElementById("dlgMsg");
-      msg.style.color = "";
-      msg.textContent = "Saved as " + a.download + " — keep it somewhere safe.";
-    });
-  }
-  const up = document.getElementById("uploadBtn");
-  const upFile = document.getElementById("uploadFile");
-  if (up && upFile) {
-    up.addEventListener("click", () => upFile.click());
-    upFile.addEventListener("change", () => {
-      const file = upFile.files && upFile.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        document.getElementById("dataArea").value = String(reader.result || "");
-        document.getElementById("importBtn").click();   // one import, not two
-      };
-      reader.onerror = () => {
-        const msg = document.getElementById("dlgMsg");
-        msg.style.color = "var(--red)";
-        msg.textContent = "Could not read that file.";
-      };
-      reader.readAsText(file);
-      upFile.value = "";                                 // same file twice works
-    });
-  }
-
-  staleBanner();
+  S.wireFileBackup();
+  S.staleBanner();
   render();
 
   /* The bounty clock moves while the page is open: a countdown left alone goes

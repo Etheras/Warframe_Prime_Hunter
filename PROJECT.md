@@ -45,7 +45,8 @@ both. Judge a change by whether it serves that shared dataset well.
 | Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
 | Fold **Forma** into the ranking | Have/need field under Advanced options |
 
-Everything you enter lives in the browser's `localStorage`, across five keys:
+Everything you enter lives in the browser's `localStorage`, across six keys —
+named once, in `assets/shared.js`, because both pages read and write them:
 
 | Key | Holds | In Backup? |
 |---|---|---|
@@ -276,6 +277,7 @@ VorFrame/
 ├── refresh-data.cmd / .sh  ← the one way to look after the site
 ├── assets/
 │   ├── styles.css          ← all styling (dark Orokin theme)
+│   ├── shared.js           ← the store, tooltip, staleness banner, backup file
 │   ├── rotation.js         ← the rotation model, read by both pages
 │   ├── app.js              ← filtering, collection state, detail drawer
 │   └── plan.js             ← wishlist, scoring model, ranked node plan
