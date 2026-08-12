@@ -28,8 +28,10 @@ no account.
 - **A web browser**
 - Windows, macOS or Linux
 
-Nothing else. There are no dependencies to install: no Node, no npm, no `pip
-install`, no build step.
+Nothing else. There are no dependencies to install: no npm packages, no `pip
+install`, no build step. **Node.js is recommended but not required** — it runs
+the browser half of the test suite and nothing else, so you only want it if you
+are changing the code. See [Running the tests](#running-the-tests).
 
 Every task has a launcher for both platforms — `.cmd` to double-click on Windows,
 `.sh` to run on macOS and Linux — and they do exactly the same thing. The Python
@@ -575,14 +577,33 @@ fresh on every build, so nothing is redistributed from here.
 
 ## Running the tests
 
-If you change anything under `tools/`:
+If you change anything under `tools/` or `assets/`:
 
 ```bash
 python tests/test_build.py
 ```
 
-No network needed, about a second. Add `--online` to also clone the repo into a
-temporary folder and build it from scratch — the path a new user takes.
+No network needed, about a second. That one command runs everything, including
+the browser tests. Add `--online` to also clone the repo into a temporary folder
+and build it from scratch — the path a new user takes.
+
+**Node.js is recommended, not required.** The tests that cover the JavaScript —
+the rotation model, the bounty clock, the saved-progress keys — run under Node's
+own test runner. Without Node they are skipped and the rest still runs, which is
+why nothing here asks you to install it just to *use* VorFrame:
+
+```
+browser
+  skip browser tests (no Node found — the site does not need it)
+```
+
+If you have it, they simply appear in the same output as everything else. There
+is still no `package.json` and nothing to `npm install`: the tests use only
+Node's standard library, and **the site itself never needs Node at all.** Get it
+from [nodejs.org](https://nodejs.org/) if you want them.
+
+One wrinkle worth knowing: a terminal that was already open when you installed
+Node will not have it on `PATH`. Open a new one.
 
 ---
 

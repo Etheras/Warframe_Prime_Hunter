@@ -5,7 +5,7 @@ VorFrame's test suite. Standard library only, like everything else here.
     python tests/test_build.py            # everything that needs no network
     python tests/test_build.py --online   # adds the real clone-and-build test
 
-Two kinds of test live here.
+Three kinds of test live here.
 
 *Unit tests* exercise the parsers and the join against fixtures held in this
 file, so they run in about a second and need nothing external.
@@ -15,6 +15,12 @@ into a temporary directory and builds from scratch, because that is the path a
 new user takes and the one nothing else covers -- every other check runs against
 a working tree that already has a warm cache. It needs the network, so it only
 runs with --online.
+
+*Browser tests* cover the JavaScript, which is where the rotation model lives
+and which nothing checked until two of its bugs reached a browser. They are in
+tests/test_assets.mjs and run under Node's own test runner, folded into the
+output here so there is still one command to run. Node is optional -- VorFrame
+itself never needs it -- so they are skipped where it is not installed.
 
 Every test here exists because of a bug that actually happened. The comment on
 each says which.
@@ -739,6 +745,65 @@ def test_server_serves_only_the_site() -> None:
               bool(re.search(r'\son(?:error|click|load|change)="', code)), False)
 
 
+def find_node() -> str | None:
+    """
+    Node, if this machine has it.
+
+    Looked for rather than assumed. It is not required to run VorFrame - the
+    site is plain files and opens from file:// - so the browser tests are a
+    bonus that runs where Node happens to exist and is skipped where it does
+    not, the same bargain --online makes. The explicit paths are there because
+    a freshly installed Node is not on the PATH of a shell that was already
+    open, which is exactly when someone will try to run this.
+    """
+    found = shutil.which("node")
+    if found:
+        return found
+    for path in (r"C:\Program Files\nodejs\node.exe",
+                 r"C:\Program Files (x86)\nodejs\node.exe",
+                 os.path.expandvars(r"%LOCALAPPDATA%\Programs\nodejs\node.exe"),
+                 "/usr/local/bin/node", "/usr/bin/node", "/opt/homebrew/bin/node"):
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def test_browser_assets() -> None:
+    """
+    The pipeline was tested and the JavaScript was not, which is where the
+    rotation model actually lives. Two bugs got as far as a browser before
+    anyone noticed: a bounty rotation that stopped advancing once the anchor
+    window had expired, and a list cap left lifted after debugging.
+
+    Runs `tests/test_assets.mjs` under Node's own test runner. No packages: the
+    site must stay installable-by-copying, so nothing here may need npm.
+    """
+    node = find_node()
+    if not node:
+        print("  skip browser tests (no Node found — the site does not need it)")
+        return
+
+    for name in ("shared.js", "rotation.js", "app.js", "plan.js"):
+        # a parse error in app.js or plan.js is otherwise silent until the page
+        # is opened, since nothing else ever reads them
+        r = subprocess.run([node, "--check", os.path.join(ROOT, "assets", name)],
+                           capture_output=True, text=True)
+        check(f"{name}: parses", r.returncode, 0, (r.stderr or "").strip()[:200])
+
+    r = subprocess.run([node, "--test", "--test-reporter=tap",
+                        os.path.join("tests", "test_assets.mjs")],
+                       capture_output=True, text=True, cwd=ROOT)
+    seen = 0
+    for line in (r.stdout or "").splitlines():
+        m = re.match(r"^(ok|not ok) \d+ - (.+?)\s*$", line)
+        if not m:
+            continue
+        seen += 1
+        check("js: " + m.group(2), m.group(1), "ok")
+    if not seen:
+        check_true("browser tests ran", False, (r.stdout or r.stderr)[-400:])
+
+
 def test_bundle_is_self_contained() -> None:
     """
     The single-file build must reference nothing on disk, and must carry both
@@ -795,6 +860,7 @@ def main() -> int:
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_bundle_is_self_contained]),
+        ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]
     for title, tests in groups:

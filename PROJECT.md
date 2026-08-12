@@ -119,12 +119,18 @@ what — the diff already says what. **Always ask before `git push`, every singl
 time.** This is not a permission granted once; a commit is local and reversible,
 a push is outward-facing and is the owner's call.
 
-### No Node, no build step
+### No build step, and nothing to install
 
-This machine has Python 3.14, git and a browser. There is no npm, no bundler, no
-framework, and adding one is not on the table. The site is plain HTML, CSS and
-JavaScript with the data baked into a `.js` file so it opens straight from
-`file://`. Keep it that way.
+The site is plain HTML, CSS and JavaScript with the data baked into a `.js` file,
+so it opens straight from `file://`. **No bundler, no framework, no npm packages,
+and adding one is not on the table.** Keep it that way: the thing has to survive
+being copied to a USB stick.
+
+Node was installed on this machine on 2026-08-12, and that changes exactly one
+thing — the browser tests in `tests/test_assets.mjs` can run. It is a **test
+runner and nothing else**: it uses `node:test`, `node:assert` and `node:vm` from
+the standard library, there is no `package.json` and no `node_modules`, and the
+suite skips itself where Node is absent. Nothing the site ships may depend on it.
 
 ### Verifying a change
 
@@ -134,9 +140,16 @@ Run the tests before pushing anything that touches the pipeline:
 python tests/test_build.py
 ```
 
-They need no network and take about a second. `--online` adds a real clone-and-build
-into a temp directory, which is the only check covering the new-user path. Every test
-is there because of a bug that actually happened, and says which in its docstring.
+They need no network and take about a second, and that one command covers the
+JavaScript too: `tests/test_assets.mjs` runs under Node's test runner and its
+results are folded into the same output. `--online` adds a real clone-and-build into
+a temp directory, which is the only check covering the new-user path. Every test is
+there because of a bug that actually happened, and says which in its docstring.
+
+What the tests still do **not** cover is `app.js` and `plan.js`, which are DOM from
+top to bottom — checking those would need a real DOM implementation, which would
+mean a dependency. They are syntax-checked, and everything else about them is
+verified by opening the pages.
 
 Also verify in a browser
 and **say plainly what you actually checked**, rather than asserting it works:
@@ -287,7 +300,8 @@ VorFrame/
 ├── .github/workflows/
 │   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
 ├── tests/
-│   └── test_build.py       ← the suite; --online adds clone-and-build
+│   ├── test_build.py       ← the suite, and the one command to run
+│   └── test_assets.mjs     ← the browser half, under Node; skipped without it
 ├── tools/
 │   ├── build_data.py       ← orchestration, the item join, and emit
 │   ├── sources.py          ← network, HTTP cache, warm/cold STALE/MISSING policy
