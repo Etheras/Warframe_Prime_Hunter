@@ -88,18 +88,31 @@ STALE: list[str] = []
 MISSING: list[str] = []
 
 
-def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
+def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
+          optional: bool = False):
     """
     GET with a small on-disk cache so reruns and --offline are cheap.
 
     On failure: reuse the cached copy if there is one (recorded as STALE),
     otherwise record MISSING and either abort (critical) or return None.
+
+    `optional` marks a source the dataset is *better* for having rather than
+    incomplete without. A cold miss on one of those returns None and says so,
+    but is deliberately not recorded in MISSING, because MISSING aborts the
+    build - and refusing to publish a whole catalogue because an enrichment
+    source was briefly unreachable is the wrong trade.
+
+    That distinction was missing when the bounty rotation was added, and it
+    took CI down: api.warframestat.us did not answer the runner, both new keys
+    landed in MISSING, and a build that had every relic and every item in hand
+    aborted rather than publish without a countdown.
     """
     path = cache_path(key)
     if offline:
         if not os.path.exists(path):
-            MISSING.append(key)
-            if critical:
+            if not optional:
+                MISSING.append(key)
+            if critical and not optional:
                 raise SystemExit(f"--offline but nothing cached for {key}")
             return None
         with gzip.open(path, "rb") as fh:
@@ -133,6 +146,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
             return fh.read()
 
     # cold: nothing to fall back on
+    if optional:
+        log(f"~ {key}: unreachable and not cached - continuing without it")
+        return None
     MISSING.append(key)
     if critical:
         raise SystemExit(
@@ -143,13 +159,17 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True):
     return None
 
 
-def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True):
-    raw = fetch(url, key, offline, critical)
+def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
+               optional: bool = False):
+    raw = fetch(url, key, offline, critical, optional)
     if raw is None:
         return None
     try:
         return json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
+        if optional:
+            log(f"~ {key} returned unparseable data ({exc}) - continuing without it")
+            return None
         MISSING.append(key)
         if critical:
             raise SystemExit(f"{key} returned unparseable data: {exc}")

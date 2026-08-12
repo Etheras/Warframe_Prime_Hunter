@@ -522,10 +522,14 @@ def main() -> int:
         log("! vault trader unavailable - Resurgence flags will be empty")
         vault_trader = {}
 
+    # Optional on purpose: without these the planner says the bounty rotation is
+    # unknown and treats the limited-time bounties as not running, which is a
+    # smaller loss than refusing to publish a catalogue that is otherwise whole.
     log("api: bounties on offer + world events (live rotation, Ghoul, Plague Star)")
     syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
-                                    off, critical=False)
-    world_events = fetch_json(WORLD_EVENTS, "api_events", off, critical=False)
+                                    off, critical=False, optional=True)
+    world_events = fetch_json(WORLD_EVENTS, "api_events", off,
+                              critical=False, optional=True)
 
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash = acquire_export(off)

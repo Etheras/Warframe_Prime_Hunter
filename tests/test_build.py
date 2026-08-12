@@ -564,6 +564,50 @@ def test_clone_and_build(online: bool) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_an_optional_source_cannot_fail_the_build() -> None:
+    """
+    A cold miss on a source the dataset merely benefits from must not abort a
+    build that has the catalogue, the relics and the drop tables in hand.
+
+    This is the bug that took CI red. The bounty rotation added two worldstate
+    fetches; api.warframestat.us did not answer the runner, both landed in
+    MISSING, and MISSING aborts. A whole publish was refused because a
+    countdown was unavailable.
+
+    Checked against sources.fetch directly rather than by running a build,
+    because the interesting case is the one where the network is down - which a
+    test cannot arrange, but an unroutable host can.
+    """
+    before_missing = list(sources.MISSING)
+    unreachable = "https://vorframe.invalid./nothing"
+
+    got = sources.fetch(unreachable, "test_optional_source", optional=True)
+    check("optional source: a cold miss returns nothing", got, None)
+    check("optional source: and is not counted as missing",
+          [k for k in sources.MISSING if k not in before_missing], [],
+          "MISSING aborts the build, so an enrichment source must stay out of it")
+
+    # the same miss on a source the dataset genuinely needs is still fatal
+    try:
+        sources.fetch(unreachable, "test_required_source", critical=True)
+        check_true("required source: a cold miss still aborts", False)
+    except SystemExit:
+        check_true("required source: a cold miss still aborts", True)
+    finally:
+        sources.MISSING[:] = before_missing
+
+    # and the two that caused it are actually declared optional at the call
+    # site, not merely importable that way
+    build = read_text(os.path.join(ROOT, "tools", "build_data.py"))
+    not_optional = []
+    for key in ("SYNDICATE_MISSIONS", "WORLD_EVENTS"):
+        call = re.search(r"fetch_json\(\s*" + key + r"\b[^)]*\)", build, re.S)
+        if not call or "optional=True" not in call.group(0):
+            not_optional.append(key)
+    check("the worldstate fetches are declared optional", not_optional, [],
+          "without it an unreachable worldstate aborts the whole build")
+
+
 def test_no_writer_leaves_orphans() -> None:
     """
     Every writer must either overwrite a fixed name or prune what it no longer
@@ -684,7 +728,13 @@ def test_runs_on_the_other_platform() -> None:
 
     # 2. Case. NTFS does not care, ext4 does: a link written as Assets/App.js
     #    works on the machine it was written on and 404s on the server.
-    miscased, seen = [], 0
+    #
+    #    The dataset is generated and gitignored, so a fresh checkout has not
+    #    got one yet - which is exactly the state CI runs the tests in, and
+    #    this check duly failed there on its first run. Absence is only a
+    #    problem for files that are supposed to be committed.
+    GENERATED = {"data/vorframe-data.js"}
+    miscased, absent, seen = [], [], 0
     for page in ("index.html", "plan.html"):
         markup = read_text(os.path.join(ROOT, page))
         for ref in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', markup):
@@ -692,13 +742,18 @@ def test_runs_on_the_other_platform() -> None:
                 continue
             seen += 1
             target = os.path.join(ROOT, *ref.split("/"))
+            if not os.path.exists(target):
+                if ref not in GENERATED:
+                    absent.append(page + " -> " + ref)
+                continue
             # os.path.exists is case-insensitive on Windows, so ask the
             # directory what it actually calls the file
-            if not (os.path.exists(target) and
-                    os.path.basename(ref) in os.listdir(os.path.dirname(target))):
+            if os.path.basename(ref) not in os.listdir(os.path.dirname(target)):
                 miscased.append(page + " -> " + ref)
     check_true("pages: reference their assets at all", seen >= 8)
-    check("pages: every local reference exists, spelled that way", miscased, [],
+    check("pages: every committed reference is present", absent, [])
+    check("pages: every local reference is spelled the way the disk spells it",
+          miscased, [],
           "a case mismatch is invisible on Windows and fatal on Linux")
 
     # 3. Backslashes in a URL are not a path separator, they are a character.
@@ -990,6 +1045,7 @@ def main() -> int:
                       test_bounty_family_split, test_live_event_bounties]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
+                         test_an_optional_source_cannot_fail_the_build,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
                          test_runs_on_the_other_platform,
