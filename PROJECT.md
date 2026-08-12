@@ -136,7 +136,7 @@ Chromium through Playwright, which is the only way to cover `app.js` and
 `plan.js` without stubbing a browser badly. That one **is** an npm dependency,
 so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
 the same version, `node_modules/` is not, and the tests skip with a reason when
-it is missing. **278 checks without it, 289 with** — the browser layer is
+it is missing. **174 checks without it, 185 with** — the browser layer is
 deliberately the smaller half, because a test that needs a browser is a test
 that will eventually be skipped.
 
