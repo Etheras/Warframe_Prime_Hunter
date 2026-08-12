@@ -77,16 +77,45 @@ the bounty appears in the planner without the checkbox. If it does not, capture 
 raw worldstate entry — that is the fixture this cannot be written against today.
 Plague Star matters most: it carries 26 relics, more than any other bounty.
 
-### Two bounty tiers publish only two rotations
+### Read each bounty's rotation letter directly, instead of inheriting it
 
-`Level 30 - 40 Cambion Drift Bounty` publishes rotations A and B, not A/B/C, and it
-is not alone. When the board is on the letter such a bounty does not publish, there
-is no honest answer about what it pays: it is scored at the average of the letters
-it does have, and the row says so on hover.
+The letter is currently derived once per *family* — one for the standard bounties,
+one for the Isolation Vaults — and every bounty in that family is assumed to be on
+it, walking A→B→C. Most are. Three Cambion Drift tiers are not, because DE's table
+does not give them three rotations at all:
 
-Only Aya is affected today, on one node. Worth revisiting if DE's table starts
-disagreeing with the board more widely — the alternative reading is that those
-tiers run a two-letter cycle of their own, which nothing currently confirms.
+| Bounty | Rotations DE publishes |
+|---|---|
+| `Level 30 - 40 Cambion Drift Bounty` | A, B |
+| `Level 40 - 60 Cambion Drift Bounty` | A |
+| `Level 100 - 100 Cambion Drift Bounty` | A |
+
+The single-rotation ones are handled correctly — one table, nothing to wait for. The
+two-rotation one is not: when the board is on C, it is scored at the average of A and
+B, which is certainly wrong, because it is demonstrably offering one specific table.
+
+Three readings of the live worldstate, against what that tier was actually offering:
+
+| Bounty window ends | Board is on | That tier offered |
+|---|---|---|
+| 2026-08-11T21:55Z | C | its A table |
+| 2026-08-12T07:55Z | A | its A table |
+| 2026-08-12T10:25Z | B | its B table |
+
+Two readings fit all three: the tier falls back to A whenever the board is on C, or
+the tier runs its own two-letter cycle that happens to line up. They only diverge
+about eight hours after the last reading above, so neither is confirmed.
+
+**The fix does not need that question answered.** Every bounty tier appears in every
+window, so its letter can be read straight from the worldstate the same way the
+family's is — per group rather than per family — and the group's own published
+rotations become its sequence. `derive_bounty_rotation` already does the matching;
+it just aggregates the votes one level too high. Tiers whose rotations are
+indistinguishable (several pay the same handful of resources in all three) keep the
+family letter as a fallback.
+
+Only Aya is affected today, on one node, which is why this is written down rather
+than done.
 
 ### Serving to a network exposes the folder, read-only
 
@@ -254,6 +283,22 @@ misleading anyone reading it directly.
 
 Where the two disagree, the API's `vaulted` field wins. Worth spot-checking which is
 actually right before deciding whether this is a wiki problem or one of ours.
+
+### The wiki contradicts itself about Isolation Vault rotations
+
+[`Isolation Vault`](https://wiki.warframe.com/w/Isolation_Vault) says the vault drop
+tables *"rotate once every Fass/Vome cycle (2.5 hours or 150 minutes) in a ABCABC…
+pattern"*. [`Cambion Drift`](https://wiki.warframe.com/w/Cambion_Drift) describes the
+same tables as *"AAA AAA BBB CCC, repeating"* across a run's stages — a per-stage
+rule, not a clock.
+
+Our own readings of the live worldstate back the first one: all three vault chambers
+sat on the same letter at the same moment, matched DE's published pool for that
+letter exactly, and advanced together at the 150-minute boundary. Two builds either
+side of one changeover saw B → C across all six vault tiers.
+
+**No local workaround** — the app follows the clock, which is what the evidence
+supports. The second page is what needs correcting.
 
 ### Not wiki issues
 
