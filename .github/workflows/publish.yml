@@ -74,6 +74,11 @@ jobs:
 
       # Parsers and join first: if these are broken there is no point spending
       # a minute fetching from five upstreams to build a wrong dataset.
+      #
+      # This also runs the browser tests, because the runner image ships Node.
+      # Nothing here installs it: the site never needs Node, and if a future
+      # image drops it the group skips rather than failing. No npm packages are
+      # involved either - the browser tests use Node's standard library only.
       - name: Run the tests
         run: python tests/test_build.py
 

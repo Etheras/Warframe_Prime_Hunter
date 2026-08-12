@@ -783,6 +783,19 @@ def test_browser_assets() -> None:
         print("  skip browser tests (no Node found — the site does not need it)")
         return
 
+    # `--test-reporter` arrived in Node 18. An older one would fail on the flag
+    # rather than on anything real, and a CI run going red over the runner's
+    # Node version teaches everyone to ignore it.
+    try:
+        raw = subprocess.run([node, "--version"], capture_output=True, text=True,
+                             timeout=30).stdout.strip()
+        major = int(re.sub(r"^v", "", raw).split(".")[0])
+    except (OSError, ValueError, subprocess.SubprocessError):
+        major = 0
+    if major < 18:
+        print(f"  skip browser tests (Node {raw or '?'} has no test runner; 18+ needed)")
+        return
+
     for name in ("shared.js", "rotation.js", "app.js", "plan.js"):
         # a parse error in app.js or plan.js is otherwise silent until the page
         # is opened, since nothing else ever reads them
