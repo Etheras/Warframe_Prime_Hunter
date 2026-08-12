@@ -140,8 +140,17 @@ it is missing. **278 checks without it, 289 with** — the browser layer is
 deliberately the smaller half, because a test that needs a browser is a test
 that will eventually be skipped.
 
+The GitHub CLI is a third recommendation, and answers a different question
+from the tests: whether the *published* build agrees, on a clean Linux machine
+with no cache and none of your local state. `gh run list` and
+`gh run view --log-failed` are the two worth knowing. It earned its place -
+this suite passed locally while CI was red for two commits, because a source
+that is optional in spirit was fatal in code and only a cold runner hit it.
+`README.md` has the install and usage.
+
 The line that must not move: **nothing the site ships may depend on any of
-this.** No bundler, no framework, no runtime package.
+this.** No bundler, no framework, no runtime package. Node, Playwright and `gh`
+are all recommended, all optional, and each is skipped cleanly when absent.
 
 ### Verifying a change
 

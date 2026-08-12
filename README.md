@@ -29,9 +29,12 @@ no account.
 - Windows, macOS or Linux
 
 Nothing else. There are no dependencies to install: no npm packages, no `pip
-install`, no build step. **Node.js is recommended but not required** — it runs
-the browser half of the test suite and nothing else, so you only want it if you
-are changing the code. See [Running the tests](#running-the-tests).
+install`, no build step.
+
+If you are going to *work on* VorFrame rather than just use it, three more tools
+are worth having — **Node.js**, **Playwright** and the **GitHub CLI**. All three
+are recommended and **none is required**; the suite skips whatever is absent. See
+[Recommended tools](#recommended-tools--none-of-them-required).
 
 Every task has a launcher for both platforms — `.cmd` to double-click on Windows,
 `.sh` to run on macOS and Linux — and they do exactly the same thing. The Python
@@ -597,13 +600,12 @@ browser
   skip browser tests (no Node found — the site does not need it)
 ```
 
-If you have it, they simply appear in the same output as everything else. There
-is still no `package.json` and nothing to `npm install`: the tests use only
-Node's standard library, and **the site itself never needs Node at all.** Get it
-from [nodejs.org](https://nodejs.org/) if you want them.
+If you have it, they simply appear in the same output as everything else. The
+tests use only Node's standard library, so there is nothing to `npm install` for
+these, and **the site itself never needs Node at all.**
 
-One wrinkle worth knowing: a terminal that was already open when you installed
-Node will not have it on `PATH`. Open a new one.
+See [Recommended tools](#recommended-tools--none-of-them-required) below for how
+to install it.
 
 ### Testing the pages themselves — optional
 
@@ -630,6 +632,93 @@ Without Playwright you get one line and everything else runs as normal:
 
 `package.json` exists only for this. **Nothing the site ships depends on it**,
 and `node_modules/` is not tracked.
+
+---
+
+## Recommended tools — none of them required
+
+VorFrame needs **Python and a browser**, and nothing else. Everything below is
+for working *on* it rather than using it: each one adds a layer of checking or
+control, each is skipped cleanly when absent, and none of them is ever needed to
+run the site or refresh the data.
+
+| Tool | What it adds | Without it |
+|---|---|---|
+| **Node.js** | The tests covering the JavaScript — rotation model, bounty clock, storage keys, backup validation | Those tests skip; the Python suite still runs |
+| **Playwright** | Eleven tests that drive the real pages in Chromium | Those skip too, with a reason |
+| **GitHub CLI** (`gh`) | Watching CI, reading failures, and managing the repo from the terminal | Use the Actions tab in a browser instead |
+
+### Installing them
+
+**Windows**
+
+```bash
+winget install OpenJS.NodeJS.LTS
+winget install GitHub.cli
+```
+
+**macOS**
+
+```bash
+brew install node gh
+```
+
+**Linux (Debian/Ubuntu)**
+
+```bash
+sudo apt install nodejs npm
+sudo apt install gh
+```
+
+Then, from the repo root, for the page tests only:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
+> **A terminal that was already open when you installed something will not have
+> it on `PATH`.** Open a new one. This costs more time than it should — it looks
+> exactly like a failed install.
+
+### Using the GitHub CLI
+
+One-time sign-in, which is what lets it see a private repo:
+
+```bash
+gh auth login
+```
+
+Then, the three worth knowing. Did the last push pass?
+
+```bash
+gh run list --limit 5
+```
+
+Why did it fail — printing only the failing steps, rather than the whole log:
+
+```bash
+gh run view --log-failed
+```
+
+Watch the run triggered by a push as it happens:
+
+```bash
+gh run watch
+```
+
+**This is a control tool, not a test tool.** The suite tells you whether the code
+is right; `gh` tells you whether the *published* build agrees, on a clean Linux
+machine with no cache and none of your local state. Those are different
+questions, and this project has already been bitten by the difference: the tests
+passed locally while CI was red for two commits, because a source that is
+optional in spirit was fatal in code and only a cold runner ever hit it.
+
+To reproduce what CI does, without pushing:
+
+```bash
+python tests/test_build.py --online
+```
 
 ---
 
