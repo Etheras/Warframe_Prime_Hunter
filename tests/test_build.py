@@ -661,8 +661,18 @@ def test_runs_on_the_other_platform() -> None:
     Everything here is developed on Windows and has to work on macOS and Linux,
     where none of these failures can be seen while writing the code. They are
     all silent locally and fatal elsewhere, which is the worst combination.
+
+    Each check is one property asserted over every file it applies to, and names
+    every offender when it fails. Asserting per file and per pattern instead
+    turned eight properties into eighty-nine lines of "ok", which made the suite
+    look three times broader than it is and buried the interesting failures.
     """
     import glob
+
+    tools = sorted(glob.glob(os.path.join(ROOT, "tools", "*.py")))
+    pys = tools + sorted(glob.glob(os.path.join(ROOT, "tests", "*.py")))
+    launchers = sorted(glob.glob(os.path.join(ROOT, "*.sh")) +
+                       glob.glob(os.path.join(ROOT, "*.cmd")))
 
     # 1. A launcher without its opposite number is a feature that only half the
     #    users have. Both are meant to do exactly the same thing.
@@ -670,72 +680,69 @@ def test_runs_on_the_other_platform() -> None:
             for p in glob.glob(os.path.join(ROOT, "*.cmd"))}
     shs = {os.path.splitext(os.path.basename(p))[0]
            for p in glob.glob(os.path.join(ROOT, "*.sh"))}
-    check("launchers: every .cmd has a .sh", sorted(cmds - shs), [])
-    check("launchers: every .sh has a .cmd", sorted(shs - cmds), [])
+    check("launchers: every .cmd has a .sh, and back", sorted(cmds ^ shs), [])
 
     # 2. Case. NTFS does not care, ext4 does: a link written as Assets/App.js
-    #    works on the machine it was written on and 404s on the server. Every
-    #    local path the two pages reference must match the disk exactly.
+    #    works on the machine it was written on and 404s on the server.
+    miscased, seen = [], 0
     for page in ("index.html", "plan.html"):
         markup = read_text(os.path.join(ROOT, page))
-        refs = [m for m in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', markup)
-                if "${" not in m]
-        check_true(f"{page}: references something", len(refs) > 0)
-        for ref in refs:
+        for ref in re.findall(r'(?:src|href)="(?!data:|https?:|#)([^"]+)"', markup):
+            if "${" in ref:
+                continue
+            seen += 1
             target = os.path.join(ROOT, *ref.split("/"))
-            exists = os.path.exists(target)
             # os.path.exists is case-insensitive on Windows, so ask the
             # directory what it actually calls the file
-            cased = exists and os.path.basename(ref) in os.listdir(os.path.dirname(target))
-            check(f"{page}: {ref} exists, spelled that way", (exists, cased), (True, True),
-                  "a case mismatch is invisible on Windows and fatal on Linux")
+            if not (os.path.exists(target) and
+                    os.path.basename(ref) in os.listdir(os.path.dirname(target))):
+                miscased.append(page + " -> " + ref)
+    check_true("pages: reference their assets at all", seen >= 8)
+    check("pages: every local reference exists, spelled that way", miscased, [],
+          "a case mismatch is invisible on Windows and fatal on Linux")
 
     # 3. Backslashes in a URL are not a path separator, they are a character.
-    for name in ("app.js", "plan.js", "rotation.js", "shared.js", "model.js"):
-        code = read_text(os.path.join(ROOT, "assets", name))
-        check(f"{name}: no backslash paths in URLs",
-              bool(re.search(r'(?:src|href)\s*=\s*["\'][^"\']*\\\\', code)), False)
+    backslashed = [os.path.basename(p)
+                   for p in sorted(glob.glob(os.path.join(ROOT, "assets", "*.js")))
+                   if re.search(r'(?:src|href)\s*=\s*["\'][^"\']*\\\\', read_text(p))]
+    check("assets: no backslash paths in emitted URLs", backslashed, [])
 
     # 4. Python floor. README promises 3.8, and every annotation in the tools is
-    #    written in the 3.10 style, which only parses on 3.8 because of the
+    #    written in the 3.10 style, which only parses there because of the
     #    __future__ import. Losing that line is a syntax error for anyone on an
     #    older interpreter and no error at all here.
-    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py")) +
-                       glob.glob(os.path.join(ROOT, "tests", "*.py"))):
-        src = read_text(path)
-        modern = re.search(r"->\s*[\w.\[\]]+\s*\|\s*None|:\s*(?:dict|list|set|tuple)\[", src)
-        if modern:
-            check_true(f"{os.path.basename(path)}: postponed annotations",
-                       "from __future__ import annotations" in src,
-                       "3.10-style hints need this line to parse on 3.8")
+    modern = re.compile(r"->\s*[\w.\[\]]+\s*\|\s*None|:\s*(?:dict|list|set|tuple)\[")
+    check("python: 3.10-style hints keep their __future__ import",
+          [os.path.basename(p) for p in pys
+           if modern.search(read_text(p))
+           and "from __future__ import annotations" not in read_text(p)], [],
+          "without it they are a syntax error on the 3.8 the README promises")
 
     # 5. Constructs newer than the floor, which fail at runtime rather than at
     #    import and so survive every check that only compiles the file.
-    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py"))):
-        src = re.sub(r'"""ory.*?"""', "", read_text(path), flags=re.S)
-        for bad, why in ((r"\.removeprefix\(", "str.removeprefix is 3.9+"),
-                         (r"\.removesuffix\(", "str.removesuffix is 3.9+"),
-                         (r"\bfunctools\.cache\b", "functools.cache is 3.9+"),
-                         (r"\bzoneinfo\b", "zoneinfo is 3.9+"),
-                         (r"^\s*match\s+.+:\s*$", "match statements are 3.10+")):
-            check(f"{os.path.basename(path)}: {why}",
-                  bool(re.search(bad, src, re.M)), False)
+    TOO_NEW = ((r"\.removeprefix\(", "str.removeprefix is 3.9+"),
+               (r"\.removesuffix\(", "str.removesuffix is 3.9+"),
+               (r"\bfunctools\.cache\b", "functools.cache is 3.9+"),
+               (r"\bzoneinfo\b", "zoneinfo is 3.9+"),
+               (r"^\s*match\s+.+:\s*$", "match statements are 3.10+"))
+    check("python: nothing newer than the 3.8 floor",
+          [os.path.basename(p) + ": " + why
+           for p in tools for pattern, why in TOO_NEW
+           if re.search(pattern, read_text(p), re.M)], [])
 
     # fromisoformat only learned to read a trailing Z in 3.11, and the
     # worldstate writes nothing else, so the Z has to be replaced by hand
     build = read_text(os.path.join(ROOT, "tools", "build_data.py"))
-    for m in re.finditer(r"fromisoformat\((.{0,60})", build):
-        check_true("fromisoformat: the Z is replaced first", "replace(" in m.group(1),
-                   "a bare Z only parses on 3.11+")
+    check("python: fromisoformat never sees a bare Z",
+          [m.group(1) for m in re.finditer(r"fromisoformat\((.{0,60})", build)
+           if "replace(" not in m.group(1)], [],
+          "a bare Z only parses on 3.11+")
 
-    # 6. Absolute paths from whichever machine last touched the file.
-    for path in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py")) +
-                       glob.glob(os.path.join(ROOT, "*.sh")) +
-                       glob.glob(os.path.join(ROOT, "*.cmd"))):
-        src = read_text(path)
-        # tests/ is allowed one: it is where Node is looked for by force
-        found = re.findall(r"[\"'][A-Za-z]:[\\/]{1,2}Users[\\/]{1,2}", src)
-        check(f"{os.path.basename(path)}: no absolute local paths", found, [])
+    # 6. Absolute paths from whichever machine last touched the file. tests/ is
+    #    exempt: it is where Node is looked for by force.
+    check("scripts: no absolute local paths",
+          [os.path.basename(p) for p in tools + launchers
+           if re.search(r"[\"'][A-Za-z]:[\\/]{1,2}Users[\\/]{1,2}", read_text(p))], [])
 
     # 7. Artwork filenames come from DE's item data and are written to disk. A
     #    colon or a question mark in one is legal on Linux and unopenable on
@@ -743,12 +750,10 @@ def test_runs_on_the_other_platform() -> None:
     payload = os.path.join(ROOT, "data", "vorframe-data.json")
     if os.path.exists(payload):
         illegal = re.compile(r'[<>:"|?*\\]')
-        bad = []
-        for item in read_json(payload)["items"]:
-            name = os.path.basename(str(item.get("image") or ""))
-            if name and illegal.search(name):
-                bad.append(name)
-        check("artwork: every filename is legal on Windows", bad[:5], [])
+        check("artwork: every filename is legal on Windows",
+              [os.path.basename(str(i["image"])) for i in read_json(payload)["items"]
+               if i.get("image") and illegal.search(os.path.basename(str(i["image"])))][:5],
+              [])
 
 
 def test_markup_is_xml_well_formed() -> None:
@@ -786,17 +791,22 @@ def test_server_serves_only_the_site() -> None:
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import serve
 
-    for path in ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
-                 "assets/rotation.js", "assets/shared.js", "assets/model.js",
-                 "assets/styles.css", "data/vorframe-data.js",
-                 "assets/img/AshPrime.png"):
-        check_true(f"serves {path}", serve.allowed(path))
+    # Both directions in one assertion each, naming whatever went wrong: a
+    # per-path check told us nothing extra and turned two properties into
+    # twenty-one lines of output.
+    wanted = ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
+              "assets/rotation.js", "assets/shared.js", "assets/model.js",
+              "assets/styles.css", "data/vorframe-data.js",
+              "assets/img/AshPrime.png")
+    check("serves every file the pages ask for",
+          [p for p in wanted if not serve.allowed(p)], [])
 
-    for path in (".git/config", ".git/HEAD", ".git/objects/info/packs",
+    forbidden = (".git/config", ".git/HEAD", ".git/objects/info/packs",
                  ".cache/api_items.gz", ".cache/state.json", "tools/serve.py",
                  "tests/test_build.py", ".gitignore", "PROJECT.md",
-                 "dist/vorframe.html", "assets/img/sub/nested.png"):
-        check(f"refuses {path}", serve.allowed(path), False)
+                 "dist/vorframe.html", "assets/img/sub/nested.png")
+    check("serves nothing else", [p for p in forbidden if serve.allowed(p)], [],
+          "an allowlist that leaks is worse than none, because it is trusted")
 
     # Rate limiting that keeps nothing. The address is hashed with a salt made
     # at start-up and held in memory, so a bucket cannot be tied to a person,
@@ -828,16 +838,18 @@ def test_server_serves_only_the_site() -> None:
             check("CSP forbids the CDN when artwork is local",
                   "cdn.warframestat.us" in serve.build_csp(), False)
 
-    # inline handlers and style attributes are exactly what that policy blocks
-    for name in ("index.html", "plan.html"):
-        markup = read_text(os.path.join(ROOT, name))
-        check(f"{name}: no inline style attributes", 'style="' in markup, False)
-    for name in ("assets/app.js", "assets/plan.js", "assets/rotation.js",
-                 "assets/shared.js", "assets/model.js"):
-        code = read_text(os.path.join(ROOT, name))
-        check(f"{name}: emits no inline style attributes", 'style="' in code, False)
-        check(f"{name}: emits no inline event handlers",
-              bool(re.search(r'\son(?:error|click|load|change)="', code)), False)
+    # Inline handlers and style attributes are exactly what that policy blocks,
+    # so a single one anywhere makes the CSP unshippable. Two assertions over
+    # every file, naming the offenders.
+    import glob
+    pages = [os.path.join(ROOT, n) for n in ("index.html", "plan.html")]
+    scripts = sorted(glob.glob(os.path.join(ROOT, "assets", "*.js")))
+    check("markup and scripts carry no inline styles",
+          [os.path.basename(p) for p in pages + scripts if 'style="' in read_text(p)], [])
+    check("scripts emit no inline event handlers",
+          [os.path.basename(p) for p in scripts
+           if re.search(r'\son(?:error|click|load|change)="', read_text(p))], [],
+          "the two artwork onerror attributes are why this exists")
 
 
 def find_node() -> str | None:
