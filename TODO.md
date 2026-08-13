@@ -58,6 +58,61 @@ per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
 
+### Profit-Taker does not fit the model, so hide it for now
+
+`Level 40 - 60 PROFIT-TAKER - PHASE 1/2/3` and `Level 50 - 60 PHASE 4` are a
+multi-phase heist, not a bounty, and Phase 3 splits into a **first completion**
+(a guaranteed Gravimag, once ever) and **subsequent completions** (everything
+after, and the only half carrying relics). Nothing in the planner can express
+"once ever", and the four phases are not four independent things you choose
+between.
+
+**Decision: exclude the Profit-Taker nodes from the ranking** until the shape is
+worked out, rather than rank them wrongly. Six relic rows are affected. Revisit
+with the numbers in hand.
+
+### Rank the two loops apart, and never merge them again
+
+**Settled 2026-08-13.** Collecting relics and cracking relics are two different
+activities with two different bottlenecks, and a single score covering both
+answers neither. The owner's actual pattern makes the split concrete: relics get
+stacked on weekdays when there is no time, and cracked in bulk at the weekend.
+
+- **Where to go** ranks on **relics per run** — how fast a node fills the stack.
+  It knows nothing about what a relic is worth once opened.
+- **What to crack** ranks on **openings needed** for the scarcest thing still
+  wanted. It knows nothing about where the relic came from.
+
+The current score multiplies the two together, which is why "≈N runs to finish"
+could never be given an honest label.
+
+### Let the player weight each mission type by effort
+
+Ranking per *run* flatters anything long. Ranking per *minute* changes the order
+completely — with one player's estimates, Capture and Exterminate nodes moved up
+**over a hundred places**, and Spy fell by a factor of ten.
+
+That is too big to ignore and too personal to ship: the numbers depend on gear
+and progression, and so do the *ratios* between them. A strong player trivialises
+a Capture while a Spy vault still costs its fixed hacking time.
+
+**So the weights belong to the player.** Minutes per run, per mission type, under
+Advanced options, stored locally and **empty by default** — unset, the ranking
+stays per run exactly as it is now. Nothing ships a default anyone would have to
+argue with.
+
+### Railjack should say so, and its caches probably should not be ranked at all
+
+Two things, same 38 Proxima nodes:
+
+- `Skirmish` and `Caches` are **both Railjack** and the UI never says so. A node
+  called "Arva Vector" gives no hint that it needs a ship and a crew. Label it.
+- **Railjack caches are a poor recommendation on their own.** Three hidden caches
+  inside a boarded base, for the worst relics-per-run in the whole list — nobody
+  runs Railjack for them. Keeping them ranked at all is questionable; at minimum
+  they should not appear above ordinary star-chart nodes. Left in for now,
+  deliberately, until there is a rule rather than a hunch.
+
 ### The Ghoul and Plague Star detection has never seen a live event
 
 The bounty clock and the event gating both shipped on 2026-08-12
