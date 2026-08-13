@@ -583,6 +583,14 @@
         ? ` · <span class="rounds">${esc(untilText(b.endsAt))} left</span>` : "");
   }
 
+  /* What a node demands before you can play it — a ship, or other players.
+     Same wording as the planner, from the same place. */
+  function demandTags(n) {
+    return ROT.demandsOf(n).map((d) =>
+      '<span class="demand" data-tip="' + esc(d.tip) + '">' + esc(d.label) + "</span>"
+    ).join("");
+  }
+
   function rotListTag(rots, nonStandard) {
     if (!rots || !rots.length) return "";
     const lines = [];
@@ -703,7 +711,8 @@
           <div class="spot">
             <div class="spot-where">${esc(s.node)}
               <span class="spot-mode">(${esc(s.mode)})</span>${
-              s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""}</div>
+              s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""
+              }${demandTags(s)}</div>
             <div class="spot-meta">${
               s.kind === "bounty" ? bountyRotTag(s)
                 : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)

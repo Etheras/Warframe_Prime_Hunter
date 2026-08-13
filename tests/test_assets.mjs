@@ -251,6 +251,25 @@ test("a limited-time bounty counts as an event node only while it is not running
   assert.equal(after.isEventNode(star), true, "the operation ended, so it drops out");
 });
 
+test("a node says what it demands before you can play it", () => {
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const demands = (node, extra) =>
+    ROT.demandsOf(Object.assign({ node, planet: "Rotating / Event" }, extra))
+      .map((d) => d.label);
+  // Railjack needs a ship and its own star chart; Faceoff matches you against
+  // other players. Neither is a drawback in the ranking, but a node named
+  // "Arva Vector" gives no hint of either.
+  assert.deepEqual(plain(demands("Arva Vector")), ["Railjack"]);
+  assert.deepEqual(plain(demands("Faceoff: Single Squad")), ["PvPvE"]);
+  assert.deepEqual(plain(demands("Faceoff: Squad VS Squad (Steel Path)")), ["PvPvE"]);
+  assert.deepEqual(plain(demands("Ukko", { planet: "Void" })), [],
+                   "an ordinary node demands nothing and says nothing");
+  // the regex once contained a literal backspace instead of a word boundary,
+  // which matched nothing at all and failed silently
+  assert.equal(ROT.isPvPvE({ node: "Faceoff: Single Squad" }), true);
+  assert.equal(ROT.isPvPvE({ node: "Facsimile" }), false);
+});
+
 test("Event: nodes and Railjack are recognised however they are spelled", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
   assert.equal(ROT.isEventNode({ planet: "Event: Sedna", node: "Camenae" }), true);

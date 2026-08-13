@@ -388,6 +388,14 @@
     return `<abbr class="rot" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` + tail;
   }
 
+  /* What a node demands before you can play it — a ship, or other players.
+     Said on the row rather than left to be discovered in the mission. */
+  function demandTags(n) {
+    return ROT.demandsOf(n).map((d) =>
+      '<span class="demand" data-tip="' + esc(d.tip) + '">' + esc(d.label) + "</span>"
+    ).join("");
+  }
+
   function runTag(n) {
     if (n.bounty) return bountyTag(n);
     const pays = n.counts
@@ -558,7 +566,7 @@
         <div class="spot-where">${esc(n.node)}
           <span class="spot-mode">(${esc(n.mode)})</span>
           <span class="src-planet">— ${esc(n.planet)}</span>
-          ${n.railjack ? `<span class="tag">railjack</span>` : ""}
+          ${demandTags(n)}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
         <div class="spot-meta">${runTag(n)}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${

@@ -272,6 +272,35 @@
   const isRailjack = (s) =>
     RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
 
+  /* What a node asks of you before you can play it at all. Neither is a
+     drawback in the ranking - both are perfectly good farms - but a node named
+     "Arva Vector" gives no hint that it needs a ship and a crew, and one named
+     "Vehrvod District" none that you will be matched against other players.
+     Say so on the row rather than leaving it to be discovered in the mission. */
+  const DEMANDS = {
+    railjack: { label: "Railjack", tip: [
+      "Needs a Railjack, and a crew or an AI crew.",
+      "Its own star chart, reached from your Drydock.",
+    ].join("\n") },
+    pvpve: { label: "PvPvE", tip: [
+      "Faceoff is player versus player versus environment: you are",
+      "matched against another squad while both fight the map.",
+      "",
+      "Vehrvod District is squad versus squad; Lower Vehrvod is",
+      "against AI-controlled Tenno.",
+    ].join("\n") },
+  };
+  // DE files all four Faceoff tables under transientRewards, so the node
+  // name is the only signal: "Faceoff: Single Squad", "Faceoff: Squad VS
+  // Squad", each with a Steel Path variant.
+  const isPvPvE = (s) => /^Faceoff\b/i.test(s.node || "");
+  function demandsOf(s) {
+    const out = [];
+    if (isRailjack(s)) out.push(DEMANDS.railjack);
+    if (isPvPvE(s)) out.push(DEMANDS.pvpve);
+    return out;
+  }
+
   /* Bounties that only exist while an event is running: the two Ghoul tiers and
      Plague Star. The build records the window rather than a yes/no, so a
      week-old build still knows a purge ends tomorrow. */
@@ -343,6 +372,7 @@
     RUN_MODES, ROT_PATTERN, runValue,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
-    isRailjack, isEventNode, notADestination, bountyEvent, eventRunning,
+    isRailjack, isPvPvE, demandsOf, isEventNode, notADestination,
+    bountyEvent, eventRunning,
   };
 })();
