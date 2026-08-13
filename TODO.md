@@ -85,17 +85,20 @@ from the worldstate, and the Plague Star *bounty* is already gated on it.
 
 **Everything else in the same position, needing a verdict each:**
 
-| Source | Relics | What it is | Live? |
+| Source | Relics | What it is | Verdict |
 |---|---|---|---|
-| `Hemocyte` (enemy) | 11 | Plague Star final stage only | **no** — gate on Plague Star |
-| `Faceoff: …` ×4 | 22 each | unidentified — appears in DE's `transientRewards` | unknown |
-| `Void Storm (…)` ×6 | 7–8 each | Railjack Void Storms | probably permanent, unverified |
-| `Another Betrayer`, `Family Reunion`, `Hot Mess`, `Recover The Orokin Archive`, `Sunkiller`, `Table For Two`, `The Aftermath`, `Time's Up` | 22 each | DE's `keyRewards` — key-gated objectives, not missions of their own | unknown |
+| `Hemocyte` (enemy) | 11 | Plague Star final stage only | **exclude** unless Plague Star is live — gate on the window we already compute |
+| `Faceoff: …` ×4 | 22 each | **permanent.** Höllvania, Update 38.0 (2024-12-13). Nodes *Lower Vehrvod* (vs AI) and *Vehrvod District* (PvPvE) with Steel Path variants | **keep** — but it is PvPvE, worth flagging like Railjack |
+| `Another Betrayer`, `Family Reunion`, `Hot Mess`, `Recover The Orokin Archive`, `Sunkiller`, `Table For Two`, `The Aftermath`, `Time's Up` | 22 each | **quest missions.** All eight share one identical reward table, and "Sunkiller" is a New War track rather than a node — these are quest stages, not farmable nodes | **exclude** — one-time story content, cannot be ground |
+| `Void Storm (…)` ×6 | 7–8 each | Railjack Void Storms | **unverified.** Probably permanent; check before acting |
 
-None of those have been identified against the wiki yet, and the ones carrying
-22 live relics apiece are ranked today. **Identify each before shipping the
-accessibility rule**, because omitting a permanent source is as wrong as
-recommending a dead one.
+Checked against both wikis, because the two disagree in places and the older one
+is not always stale. Two corrections came out of it: a search confidently
+identified the eight quest missions as **Steel Path Incursions**, and the wiki
+disproves it — Incursions award *"5 Steel Essence (unaffected by any boosters)"*
+and no relics at all. Faceoff was assumed to be event content and is not.
+
+Only **Void Storms** remain unidentified.
 
 ### Our four invented "mission types" leak into the ranking
 
