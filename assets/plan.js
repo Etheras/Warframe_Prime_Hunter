@@ -29,6 +29,7 @@
   const isEvent = ROT.isEventNode;
   const bountyEvent = ROT.bountyEvent;
   const eventRunning = ROT.eventRunning;
+  const notADestination = ROT.notADestination;
   const CYCLE_MINUTES = ROT.cycleMinutes;
 
   /* Storage, the escaper, the tooltip, the staleness banner and the backup
@@ -192,6 +193,7 @@
     const nodes = new Map();
     relicPlan.forEach((rp, rname) => {
       (RELICS[rname].sources || []).forEach((s) => {
+        if (notADestination(s)) return;      // quest, or not modelled yet
         if (!opts.railjack && isRailjack(s)) return;
         if (!opts.event && isEvent(s)) return;
         const key = `${s.planet}|${s.node}|${s.mode}`;

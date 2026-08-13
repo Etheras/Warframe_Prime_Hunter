@@ -285,6 +285,20 @@
       (!e.activation || new Date(e.activation).getTime() <= now);
   }
 
+  /* The build tags anything that is not a place you can decide to go today.
+     `quest` is a one-time story mission, `unmodelled` is content whose shape the
+     model cannot yet express, and `event:X` rides X's live window. */
+  function eventWindow(name) {
+    const evs = (BOUNTY && BOUNTY.events) || {};
+    return Object.keys(evs).map((k) => evs[k]).find((e) => e.event === name) || null;
+  }
+
+  /* Never a destination, whatever the options say. A quest mission cannot be
+     ground and an unmodelled one would be ranked on a guess - neither becomes
+     reachable by ticking a box, so neither gets one. */
+  const notADestination = (s) =>
+    s.access === "quest" || s.access === "unmodelled";
+
   /* DE's drop table lists event nodes permanently but never says which event
      they belong to, and the node only exists in the game while that event is
      running. Recommending one you cannot reach is worse than leaving it out, so
@@ -292,9 +306,12 @@
 
      The limited-time bounties are the same problem with an answer: the
      worldstate does say whether they are running, so they are excluded only
-     while they are not. */
+     while they are not. An event *enemy* - the Hemocyte, which spawns only in
+     the final stage of Plague Star - rides exactly the same window. */
   const isEventNode = (s) => /^Event:/i.test(s.planet || "") ||
-    !!(bountyEvent(s) && !eventRunning(bountyEvent(s)));
+    !!(bountyEvent(s) && !eventRunning(bountyEvent(s))) ||
+    !!(String(s.access || "").indexOf("event:") === 0 &&
+       !eventRunning(eventWindow(String(s.access).slice(6))));
 
   /* Guard against the mistake that started all of this: a mission type quietly
      getting the wrong rotation. Everything not named in ROT_PATTERN is assumed
@@ -326,6 +343,6 @@
     RUN_MODES, ROT_PATTERN, runValue,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
-    isRailjack, isEventNode, bountyEvent, eventRunning,
+    isRailjack, isEventNode, notADestination, bountyEvent, eventRunning,
   };
 })();

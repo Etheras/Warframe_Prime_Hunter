@@ -90,7 +90,7 @@ from the worldstate, and the Plague Star *bounty* is already gated on it.
 | `Hemocyte` (enemy) | 11 | Plague Star final stage only | **exclude** unless Plague Star is live — gate on the window we already compute |
 | `Faceoff: …` ×4 | 22 each | **permanent.** Höllvania, Update 38.0 (2024-12-13). Nodes *Lower Vehrvod* (vs AI) and *Vehrvod District* (PvPvE) with Steel Path variants | **keep** — but it is PvPvE, worth flagging like Railjack |
 | `Another Betrayer`, `Family Reunion`, `Hot Mess`, `Recover The Orokin Archive`, `Sunkiller`, `Table For Two`, `The Aftermath`, `Time's Up` | 22 each | **quest missions.** All eight share one identical reward table, and "Sunkiller" is a New War track rather than a node — these are quest stages, not farmable nodes | **exclude** — one-time story content, cannot be ground |
-| `Void Storm (…)` ×6 | 7–8 each | Railjack Void Storms | **unverified.** Probably permanent; check before acting |
+| `Void Storm (…)` ×6 | 7–8 each | **permanent.** Roll through the Proxima like Void Fissures; *"upon mission completion, you'll be rewarded with your earned Relic reward"* | **keep** |
 
 Checked against both wikis, because the two disagree in places and the older one
 is not always stale. Two corrections came out of it: a search confidently
@@ -98,7 +98,10 @@ identified the eight quest missions as **Steel Path Incursions**, and the wiki
 disproves it — Incursions award *"5 Steel Essence (unaffected by any boosters)"*
 and no relics at all. Faceoff was assumed to be event content and is not.
 
-Only **Void Storms** remain unidentified.
+All four identified. **The exclusions are implemented** — the build tags every
+unreachable row with `access` (`quest`, `unmodelled`, `event:X`) and both pages
+filter on it, so what remains open here is only the *labelling*: Faceoff is
+PvPvE and Railjack needs a ship, and neither says so in the UI.
 
 ### Our four invented "mission types" leak into the ranking
 

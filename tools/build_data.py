@@ -268,6 +268,57 @@ CYCLE_MINUTES = 150       # one full day/night of the landscape
 SEQUENCE = "ABC"
 
 
+# --------------------------------------------------------------------------
+# what can actually be run
+# --------------------------------------------------------------------------
+#
+# The planner answers "where do I go next", so a source belongs in it only if
+# it can be entered today. Three kinds cannot, and each is tagged rather than
+# deleted - the collection view still wants to say where a relic comes from.
+#
+# Quest missions. All eight share one identical reward table, and "Sunkiller"
+# is a New War music track rather than a node: these are quest stages, played
+# once, and cannot be ground. Named explicitly because DE files them in
+# keyRewards alongside genuinely repeatable key-gated missions (Jordas Golem,
+# Mutalist Alad V, Orokin Derelict), which stay.
+QUEST_MISSIONS = frozenset({
+    "Another Betrayer", "Family Reunion", "Hot Mess", "Recover The Orokin Archive",
+    "Sunkiller", "Table For Two", "The Aftermath", "Time's Up",
+})
+
+# Enemies that only exist while an event runs. The Hemocyte appears solely in
+# the final stage of the Plague Star bounty - "a total of four spawning during
+# the final stage" - so it rides the window the bounty already rides.
+EVENT_ENEMIES = {"Hemocyte": "Plague Star"}
+
+
+def tag_access(relic_sources: dict, aya_sources: list) -> dict:
+    """Mark every row that is not a place you can decide to go, and say why."""
+    counts: dict[str, int] = {}
+
+    def tag(row: dict) -> None:
+        node = str(row.get("node") or "")
+        access = None
+        if row.get("kind") == "key" and node in QUEST_MISSIONS:
+            access = "quest"
+        elif node in EVENT_ENEMIES:
+            access = "event:" + EVENT_ENEMIES[node]
+        elif "PROFIT-TAKER" in node.upper():
+            # a multi-phase heist with a one-time first completion; the model
+            # has no way to express either, so it is hidden until it does
+            access = "unmodelled"
+        if access:
+            row["access"] = access
+            counts[access] = counts.get(access, 0) + 1
+
+    for rows in (relic_sources or {}).values():
+        for row in rows:
+            tag(row)
+    for row in aya_sources or []:
+        tag(row)
+    return counts
+
+
 def bounty_family(group: str) -> str:
     """
     Which clock a bounty's rotation letter runs on.
@@ -536,6 +587,12 @@ def main() -> int:
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)
+
+    # Tag what cannot be entered today, so the planner can leave it out while
+    # the collection view still says where a relic comes from.
+    access = tag_access(relic_sources, aya_sources)
+    if access:
+        log("access: " + ", ".join(f"{n} row(s) {k}" for k, n in sorted(access.items())))
 
     # ---- transform -------------------------------------------------------
     print("-" * 60)

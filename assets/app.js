@@ -413,7 +413,8 @@
     open.forEach((rname) => {
       if (!value.get(rname)) return;
       (RELICS[rname].sources || [])
-        .filter((s) => !isRailjack(s) && !isEventNode(s)).forEach((s) => {
+        .filter((s) => !ROT.notADestination(s) && !isRailjack(s) && !isEventNode(s))
+        .forEach((s) => {
         const key = `${s.planet} ${s.node} ${s.mode}`;
         let e = map.get(key);
         if (!e) {

@@ -587,6 +587,62 @@ def test_clone_and_build(online: bool) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_unreachable_sources_are_tagged() -> None:
+    """
+    The planner answers "where do I go next", so a source belongs in it only if
+    it can be entered today. A mockup ranked `Hemocyte` **first** - eleven live
+    relics, top of the list - and it appears only in the final stage of the
+    Plague Star bounty, an event last run years ago.
+
+    Three kinds cannot be entered, and each is tagged rather than deleted,
+    because the collection view still wants to say where a relic comes from.
+    """
+    rows = {
+        "Meso D8": [
+            {"kind": "key", "planet": "Keys & Special", "node": "Sunkiller",
+             "mode": "Key", "rotation": "C", "chance": 2.0},
+            {"kind": "key", "planet": "Keys & Special", "node": "Jordas Golem Assassinate",
+             "mode": "Key", "rotation": "C", "chance": 2.0},
+            {"kind": "enemy", "planet": "Enemy drops", "node": "Hemocyte",
+             "mode": "Enemy", "rotation": None, "chance": 12.9},
+            {"kind": "bounty", "planet": "Fortuna (Orb Vallis)",
+             "node": "Level 40 - 60 PROFIT-TAKER - PHASE 1", "mode": "Bounty",
+             "rotation": None, "chance": 12.5},
+            {"kind": "mission", "planet": "Void", "node": "Ukko",
+             "mode": "Capture", "rotation": None, "chance": 10.0},
+        ]
+    }
+    counts = build_data.tag_access(rows, [])
+    got = {r["node"]: r.get("access") for r in rows["Meso D8"]}
+    check("quest missions are tagged", got["Sunkiller"], "quest")
+    check("a repeatable key mission is not", got["Jordas Golem Assassinate"], None,
+          "Jordas needs a crafted key but can be run as often as you like")
+    check("an event-only enemy rides its event", got["Hemocyte"], "event:Plague Star")
+    check("Profit-Taker is tagged unmodelled",
+          got["Level 40 - 60 PROFIT-TAKER - PHASE 1"], "unmodelled")
+    check("an ordinary node is left alone", got["Ukko"], None)
+    check("and the build can report what it tagged", counts,
+          {"quest": 1, "event:Plague Star": 1, "unmodelled": 1})
+
+    # the same tagging reaches the Aya rows, which are scored the same way
+    aya = [{"kind": "enemy", "node": "Hemocyte", "mode": "Enemy", "chance": 1.0}]
+    build_data.tag_access({}, aya)
+    check("Aya rows are tagged too", aya[0].get("access"), "event:Plague Star")
+
+    # and it holds against the built payload rather than only a fixture
+    payload = os.path.join(ROOT, "data", "vorframe-data.json")
+    if os.path.exists(payload):
+        D = read_json(payload)
+        live = [s for r in D["relics"].values() for s in (r.get("sources") or [])
+                if not r.get("vaulted")]
+        check("no live quest mission is left untagged",
+              sorted({s["node"] for s in live
+                      if s["node"] in build_data.QUEST_MISSIONS and not s.get("access")}), [])
+        check("Hemocyte is tagged in the real data",
+              sorted({s.get("access") for s in live if s["node"] == "Hemocyte"}),
+              ["event:Plague Star"])
+
+
 def test_an_optional_source_cannot_fail_the_build() -> None:
     """
     A cold miss on a source the dataset merely benefits from must not abort a
@@ -1092,6 +1148,7 @@ def main() -> int:
                       test_bounty_family_split, test_live_event_bounties]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
+                         test_unreachable_sources_are_tagged,
                          test_an_optional_source_cannot_fail_the_build,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
