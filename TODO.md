@@ -58,6 +58,70 @@ per-round rate in each row's rotation tooltip is the workaround.
 
 ## Everything else
 
+### Only recommend what can actually be run today
+
+**The rule, set 2026-08-13.** A source belongs in the ranking only if it can be
+run *now*:
+
+- **Permanent content** — always shown.
+- **Recurring often enough to plan around** (roughly monthly or better, e.g.
+  Nightmare missions) — modelled, but **shown only while it is actually live**.
+- **Anything we cannot deterministically tell is live** — omitted. Not shown
+  greyed out, not shown with a caveat. Omitted.
+
+The planner exists to answer "where do I go next". A node you cannot enter is
+not a worse answer than the right one, it is not an answer.
+
+**The case that exposed it: `Hemocyte`.** It ranked *first* in a mockup at 0.74
+wanted relics per run, carrying 11 live relics. It is not a mission at all — it
+is an enemy, and the wiki is explicit: *"They only appear on the Advanced and The
+Steel Path variants of the Plague Star Bounty, with a total of four spawning
+during the final stage."* Plague Star is a **re-run event**, last seen years ago.
+So the top recommendation in the list was content nobody can reach.
+
+The fix is already half-built: `meta.bounties.events` detects a live Plague Star
+from the worldstate, and the Plague Star *bounty* is already gated on it.
+`Hemocyte` must be gated on the same window.
+
+**Everything else in the same position, needing a verdict each:**
+
+| Source | Relics | What it is | Live? |
+|---|---|---|---|
+| `Hemocyte` (enemy) | 11 | Plague Star final stage only | **no** — gate on Plague Star |
+| `Faceoff: …` ×4 | 22 each | unidentified — appears in DE's `transientRewards` | unknown |
+| `Void Storm (…)` ×6 | 7–8 each | Railjack Void Storms | probably permanent, unverified |
+| `Another Betrayer`, `Family Reunion`, `Hot Mess`, `Recover The Orokin Archive`, `Sunkiller`, `Table For Two`, `The Aftermath`, `Time's Up` | 22 each | DE's `keyRewards` — key-gated objectives, not missions of their own | unknown |
+
+None of those have been identified against the wiki yet, and the ones carrying
+22 live relics apiece are ranked today. **Identify each before shipping the
+accessibility rule**, because omitting a permanent source is as wrong as
+recommending a dead one.
+
+### Our four invented "mission types" leak into the ranking
+
+`Bounty`, `Key`, `Special` and `Enemy` are ours, not DE's — one bucket per
+droptable section (`official.py`). DE's own mission type is the parenthesised
+word in `Planet/Node (Type)`, and the wiki lists 35 of them; ours match 24.
+
+That matters because the planner presents all of them as places to go:
+
+- **`Enemy`** is not a destination. It is an enemy that drops relics wherever it
+  spawns — see the Hemocyte case above.
+- **`Key`** is not a mission type. It is an extra key-gated objective attached to
+  an existing mission, and nobody runs one exclusively for it.
+- **`Special`** is a bag holding Void Storms, Faceoff and Duviri tables together.
+- Three of DE's own labels are not wiki mission types either: `Caches` (a reward
+  stream *inside* a Railjack mission), `The Circuit` and `The Perita Rebellion`
+  (single activities whose "type" is their own name).
+
+Useful find while checking: the wiki splits missions into **Endless** (Defense,
+Survival, Interception, Excavation, Defection, Disruption, Alchemy, Infested
+Salvage, Legacyte Harvest, Void Cascade/Flood/Armageddon) and **Standard**
+(Assassination, Capture, Exterminate, Hijack, Mobile Defense, Rescue, Sabotage,
+**Spy**). That is exactly the round-based-or-not split the model has been
+reverse-engineering, from a source, and it independently confirms Spy is not
+endless.
+
 ### Profit-Taker does not fit the model, so hide it for now
 
 `Level 40 - 60 PROFIT-TAKER - PHASE 1/2/3` and `Level 50 - 60 PHASE 4` are a
