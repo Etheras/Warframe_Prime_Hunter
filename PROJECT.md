@@ -152,6 +152,38 @@ The line that must not move: **nothing the site ships may depend on any of
 this.** No bundler, no framework, no runtime package. Node, Playwright and `gh`
 are all recommended, all optional, and each is skipped cleanly when absent.
 
+### Showing a proposal before building it
+
+`temp_mockup.html` is a scratchpad at the repo root for **showing what a change
+would look like, against real data, before writing any of it.** It loads
+`data/vorframe-data.js` and `assets/styles.css` exactly as the real pages do, so
+a draft is made of live numbers in the app's own visual language rather than
+invented figures in a wireframe.
+
+Use it when a proposal is easier to react to than to read — a new column, a
+different ranking, a reworked row — and when the alternative is a wall of prose
+about a layout. Then delete the draft or overwrite it with the next one; it holds
+one idea at a time and no history.
+
+**If you are an AI assistant working on this project, this is the mechanism to
+reach for.** Write the mockup, serve it, and show it. Do not compute example
+numbers by hand in a side script and paste them into static HTML — wire the page
+to the real dataset so what the owner sees is what the data actually says.
+
+```bash
+python tools/serve.py          # then open /temp_mockup.html
+```
+
+Three rules, all enforced rather than remembered:
+
+- **Gitignored.** It never reaches GitHub, so a half-formed idea cannot be
+  published by accident.
+- **Localhost only.** `serve.py` refuses it to any non-loopback peer, checked by
+  address — `serve-lan` binds `0.0.0.0`, so being gitignored is not enough on its
+  own. A guest on your Wi-Fi gets a `403`, and the tests assert both directions.
+- **Not part of the site.** Nothing in `index.html`, `plan.html`, the bundle or
+  the published build references it. It is never a place to put real features.
+
 ### Verifying a change
 
 Run the tests before pushing anything that touches the pipeline:

@@ -633,6 +633,16 @@ Without Playwright you get one line and everything else runs as normal:
 `package.json` exists only for this. **Nothing the site ships depends on it**,
 and `node_modules/` is not tracked.
 
+### Sketching a change before building it
+
+`temp_mockup.html` at the repo root is a scratchpad for trying a layout against
+your real data — it loads the same dataset and stylesheet the app does. Open it
+at `/temp_mockup.html` while `serve.cmd` is running.
+
+It is **gitignored and served only to this machine**: `serve.py` refuses it to
+any other address, so sharing the LAN server never shares a half-finished idea.
+Delete it whenever; nothing depends on it.
+
 ---
 
 ## Recommended tools — none of them required

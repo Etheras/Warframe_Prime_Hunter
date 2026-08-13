@@ -863,6 +863,30 @@ def test_server_serves_only_the_site() -> None:
     check("serves nothing else", [p for p in forbidden if serve.allowed(p)], [],
           "an allowlist that leaks is worse than none, because it is trusted")
 
+    # temp_mockup.html is a local scratchpad for showing a proposed change
+    # against real data (PROJECT.md §2). It is unreviewed and is not part of the
+    # site, and serve-lan binds 0.0.0.0 - so it is local-only by peer address
+    # rather than by anyone remembering which launcher they used.
+    check("mockup: served to this machine",
+          [p for p in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+           if not serve.allowed("temp_mockup.html", p)], [])
+    check("mockup: refused to everyone else",
+          [p for p in ("192.168.1.169", "10.0.0.4", "203.0.113.9", "", None)
+           if serve.allowed("temp_mockup.html", p)], [],
+          "a LAN guest must never reach an unreviewed local page")
+    check("mockup: a real page is still served over the LAN",
+          serve.allowed("index.html", "192.168.1.169"), True,
+          "the local-only rule must not have narrowed the site itself")
+
+    # and it can never reach GitHub in the first place
+    ignored = subprocess.run(["git", "check-ignore", "temp_mockup.html"],
+                             cwd=ROOT, capture_output=True, text=True)
+    check("mockup: gitignored, so it cannot be published", ignored.returncode, 0,
+          "it holds whatever half-formed idea was last drafted")
+    workflow = read_text(os.path.join(ROOT, ".github", "workflows", "publish.yml"))
+    check("mockup: the published site never copies it",
+          "temp_mockup" in workflow, False)
+
     # Rate limiting that keeps nothing. The address is hashed with a salt made
     # at start-up and held in memory, so a bucket cannot be tied to a person,
     # correlated across restarts, or found on disk afterwards.

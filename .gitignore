@@ -23,6 +23,11 @@ dist/
 drafts/
 
 # python
+# Local mockups. temp_mockup.html is the scratchpad for showing a proposed
+# change against real data before building it — see PROJECT.md section 2. It is
+# never uploaded, and nothing in the site or the tests reads it.
+temp_mockup.html
+
 # Optional test-only dependencies. package.json and its lock file are tracked
 # so anyone who wants the browser tests gets the same Playwright; the packages
 # themselves are not, and nothing the site ships needs them.

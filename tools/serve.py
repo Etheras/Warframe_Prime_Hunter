@@ -169,7 +169,25 @@ def build_csp() -> str:
 CSP = build_csp()
 
 
-def allowed(rel: str) -> bool:
+# Served to this machine and to nothing else, whatever the server is bound to.
+#
+# temp_mockup.html is a scratchpad for showing a proposed change against real
+# data before building it (PROJECT.md §2). It is unreviewed, it is not part of
+# the site, and serve-lan binds 0.0.0.0 - so "it is gitignored" is not enough on
+# its own. Being local-only is enforced here, by the peer address, rather than
+# left to whoever remembers not to run the LAN launcher.
+LOCAL_ONLY_FILES = frozenset({"temp_mockup.html"})
+LOOPBACK = ("127.", "::1", "localhost", "::ffff:127.")
+
+
+def is_loopback(peer: str | None) -> bool:
+    p = str(peer or "")
+    return p == "::1" or any(p.startswith(pre) for pre in LOOPBACK)
+
+
+def allowed(rel: str, peer: str | None = None) -> bool:
+    if rel in LOCAL_ONLY_FILES:
+        return is_loopback(peer)
     if rel in ALLOWED_FILES:
         return True
     return any(rel.startswith(d) and "/" not in rel[len(d):] for d in ALLOWED_DIRS)
@@ -287,7 +305,7 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):                                    # noqa: N802
         if not allow_request(self.client_address[0]):
             return self._too_many()
-        if not allowed(self._relative()):
+        if not allowed(self._relative(), self.client_address[0]):
             return self._reject()
         super().do_HEAD()
 
@@ -298,7 +316,7 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
         if rel in ("", "."):
             rel = "index.html"
             self.path = "/index.html"
-        if not allowed(rel):
+        if not allowed(rel, self.client_address[0]):
             return self._reject()
 
         # The dataset is the one request worth checking before answering: asked
