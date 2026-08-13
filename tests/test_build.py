@@ -245,6 +245,15 @@ _BOUNTY_PAGE = """
 <tr><th>Stage 1</th></tr>
 <tr><td>Neo C7 Relic</td><td>Uncommon (18.45%)</td></tr>
 <h3 id="solarisRewards">Fortuna</h3>
+<table>
+<tr><th>Level 40 - 60 PROFIT-TAKER - PHASE 3</th></tr>
+<tr><th>First Completion</th></tr>
+<tr><th>Final Stage</th></tr>
+<tr><td>Gravimag</td><td>Very Common (100.00%)</td></tr>
+<tr><th>Subsequent Completions</th></tr>
+<tr><th>Final Stage</th></tr>
+<tr><td>Meso D8 Relic</td><td>Uncommon (15.00%)</td></tr>
+<h3 id="deimosRewards">Deimos</h3>
 """
 
 
@@ -266,6 +275,20 @@ def test_bounty_rotation_pools() -> None:
           sorted(pools["Level 15 - 25 Ghoul Bounty"]), ["A"])
     check("bounty levels parsed", official.group_levels("Level 15 - 25 Ghoul Bounty"),
           [15, 25])
+
+    # Profit-Taker Phase 3 nests one level deeper than the rest: its table splits
+    # into "First Completion" (a Gravimag, once ever) and "Subsequent
+    # Completions" (everything after, and the only half carrying relics). Both
+    # read as bounties in their own right, so the planner offered a node called
+    # "Subsequent Completions" - which is not a place you can go.
+    _, sources, _ = official.parse_droptables(_BOUNTY_PAGE)
+    bounty_nodes = {row["node"] for rows in sources.values() for row in rows
+                    if row["kind"] == "bounty"}
+    check("no bounty is named after one of its own sub-headings",
+          sorted(n for n in bounty_nodes
+                 if n in ("First Completion", "Subsequent Completions", "Final Stage")), [])
+    check("Profit-Taker relics land on the phase they belong to",
+          "Level 40 - 60 PROFIT-TAKER - PHASE 3" in bounty_nodes, True)
 
 
 # 21:00Z sits inside the window below, so the fixtures do not rot with the clock

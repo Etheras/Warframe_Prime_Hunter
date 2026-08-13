@@ -33,6 +33,10 @@ _RELIC_HDR = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\s*\
 _RELIC_ITEM = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\b", re.I)
 _NODE_HDR = re.compile(r"^(.+?)/(.+?)\s*\((.+?)\)$")
 _ROT_HDR = re.compile(r"^Rotation\s+(\w+)$", re.I)
+# Sub-headings *inside* a bounty: which stage, or which completion. Anything
+# matching this belongs to the bounty above it rather than starting a new one.
+_SUBHEAD = re.compile(r"^((final\s+)?stage\b|first completion$|subsequent completions$)",
+                      re.I)
 
 # section id -> (kind, label used as the "planet" column for non-mission rows)
 SECTIONS = {
@@ -236,7 +240,14 @@ def parse_droptables(page: str):
                 # "^Stage" missed "Final Stage", so it became a group of its own
                 # and 61 source rows were filed under a phantom node of that name,
                 # detached from the bounty they belong to.
-                if re.match(r"^(final\s+)?stage\b", head, re.I):
+                #
+                # Profit-Taker Phase 3 nests one level deeper, and broke the same
+                # way: its table is split into "First Completion" (a guaranteed
+                # Gravimag, once ever) and "Subsequent Completions" (everything
+                # after, and the only one carrying relics). Both were read as
+                # bounties in their own right, so the planner offered a node
+                # called "Subsequent Completions", which is not a place.
+                if _SUBHEAD.match(head):
                     stage = head
                     continue
                 group = head
@@ -308,7 +319,7 @@ def bounty_rotation_pools(page: str) -> dict[str, dict[str, dict[str, set[str]]]
                 if rot:
                     rotation = rot.group(1).upper()
                     continue
-                if re.match(r"^(final\s+)?stage\b", head, re.I):
+                if _SUBHEAD.match(head):
                     continue          # stages all sit inside one rotation
                 group = head
                 rotation = None
