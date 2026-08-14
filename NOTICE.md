@@ -4,6 +4,33 @@ VorFrame's own code is MIT licensed (see [LICENSE](LICENSE)). The data it
 displays comes from the sources below, each with its own terms. This file
 records what they are and what each one requires.
 
+## Authorship — written by a generative AI
+
+Effectively all of this project's code, tests and documentation was written by
+**Claude** (Anthropic), directed and reviewed by a human owner who made the
+design decisions. The [README](README.md) says so at the top, and says what the
+project does about it.
+
+Two things worth recording here rather than only there:
+
+- **It changes what the copyright is worth, possibly to nothing.** Several
+  jurisdictions grant protection only to works with sufficient *human*
+  authorship — the US Copyright Office has been explicit that purely
+  machine-generated material is not protectable, with protection extending only
+  to a human's own creative contributions such as selection, arrangement and
+  modification. How much of this codebase clears that bar is genuinely unsettled
+  and untested, so **the MIT grant may cover less than it appears to.** It is
+  offered in good faith and imposes no obligation the law does not support. If
+  you need certainty about reusing this, do not rely on the licence file alone.
+- **No model runs in the pipeline.** An AI wrote the parsers; none is invoked
+  when they run. Every value shown is derived deterministically from the sources
+  below, which is a deliberate rule of the project rather than an accident — see
+  [`PROJECT.md §2`](PROJECT.md).
+
+This is a description, not legal advice, and the same caveat applies as further
+down: anyone publishing an instance should satisfy themselves it fits their
+circumstances.
+
 > Summary of the practical constraints: **non-commercial only**, **no Warframe
 > or Digital Extremes logos**, and the site must be clear that it is unofficial.
 > All three are satisfied by the current build.

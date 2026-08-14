@@ -252,22 +252,25 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
      nowhere on the star chart: filtering Railjack out left that card with no farm
      section at all, saying nothing where it could say "here, bring a ship". */
   const { page, errors } = await open("/index.html");
+  /* Chosen by planet name, not by isRailjack. Picking the subject with the
+     function under test makes the case vacuous - break the classifier, find no
+     subject, return early, go green having checked nothing. */
   const only = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    const D = window.VORFRAME_DATA;
+    const proxima = (s) => /Proxima/i.test(s.planet || "");
     for (const it of D.items) {
       for (const p of it.parts || []) {
         for (const r of p.relics || []) {
           const rec = D.relics[r.relic];
           if (!rec || rec.vaulted || !(rec.sources || []).length) continue;
-          if (rec.sources.every((s) => R.isRailjack(s) || R.notADestination(s))) {
-            return { id: it.id, relic: r.relic };
-          }
+          if (rec.sources.every(proxima)) return { id: it.id, relic: r.relic };
         }
       }
     }
     return null;
   });
-  if (!only) return;   // no such item in this dataset; nothing to prove
+  assert.ok(only, "no live relic drops only on Proxima - if that is really true " +
+                  "now, delete this test rather than letting it pass empty");
 
   await page.locator(`[data-id="${only.id}"]`).click();
   const spots = page.locator(".drawer .spot");
@@ -280,6 +283,84 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   assert.deepEqual(errors, []);
 });
 
+page_test("Steel Path nodes stay off the list until you say you have it", async () => {
+  /* The Steel Path is a second star chart, unlocked once. Until then its nodes
+     are not on your chart at all, so recommending one is the same mistake as
+     recommending an event node that is not running. Costs nothing to leave off
+     today either: both Steel Path relic tables in the data are Faceoff, and each
+     is identical to its ordinary twin. */
+  const { page, errors } = await open("/plan.html");
+  /* Pick the subject by node NAME, never by calling isSteelPath. Choosing the
+     target with the function under test makes the whole case vacuous: break the
+     classifier and there is no target, the early return fires, and the test goes
+     green having checked nothing. That is not hypothetical - a one-character
+     mutation to the regex passed this test before it was written this way. */
+  const target = await page.evaluate(() => {
+    const D = window.VORFRAME_DATA;
+    const named = (s) => /\(Steel Path/i.test(s.node || "");
+    const it = D.items.find((i) => (i.relics || []).some((r) => {
+      const rec = D.relics[r];
+      return rec && !rec.vaulted && (rec.sources || []).some(named);
+    }));
+    if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ steelPath: false }));
+    return it ? it.id : null;
+  });
+  assert.ok(target,
+            "no live relic drops on a node named (Steel Path) - if DE really has " +
+            "removed them all, delete this test rather than letting it pass empty");
+  await page.reload({ waitUntil: "load" });
+
+  /* Count the whole ranking, not the visible eight. A Faceoff table is one
+     reward a run against 22 relics, so it sorts well below anything endless -
+     out of sight of the rows and of the "+N more" hover both. The summary
+     counts every place, so the arithmetic is what gets checked: switching this
+     on has to add exactly the Steel Path nodes and nothing else. */
+  const places = () => page.evaluate(() =>
+    Number((document.querySelector("#planSummary").textContent
+      .match(/(\d+) places?/) || [])[1] || 0));
+  const visible = () => page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll("#planNodes .spot-where"))
+      .map((e) => e.textContent.replace(/\s+/g, " ").trim());
+    const more = document.querySelector(".more-nodes");
+    return rows.join(" | ") + " | " + (more ? more.dataset.tip : "");
+  });
+
+  const expected = await page.evaluate((id) => {
+    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    const seen = new Set();
+    (D.items.find((i) => i.id === id).relics || []).forEach((r) => {
+      const rec = D.relics[r];
+      if (!rec || rec.vaulted) return;
+      (rec.sources || []).forEach((s) => {
+        // the planner tests these in order, so a node that is also Railjack or
+        // an event was already excluded by an earlier rule. Again by name, so
+        // the expected number is independent of the code being measured.
+        if (R.notADestination(s) || R.isRailjack(s) || R.isEventNode(s)) return;
+        if (/\(Steel Path/i.test(s.node || "")) {
+          seen.add(s.planet + "|" + s.node + "|" + s.mode);
+        }
+      });
+    });
+    return seen.size;
+  }, target);
+  assert.ok(expected > 0, "picked an item with no Steel Path route to test with");
+
+  const off = await places();
+  assert.ok(off > 0, "the ordinary twin still ranks, so the list is not empty");
+  assert.ok(!/Steel Path/i.test(await visible()),
+            "a Steel Path node ranked while the box was off");
+
+  await page.locator("label:has(#p-steel)").click();
+  assert.ok(await page.locator("#p-steel").isChecked());
+  assert.equal(await places(), off + expected,
+               `ticking it must add exactly the ${expected} Steel Path node(s)`);
+
+  await page.reload({ waitUntil: "load" });
+  assert.ok(await page.locator("#p-steel").isChecked(), "the answer has to survive a reload");
+  assert.deepEqual(errors, []);
+});
+
 page_test("an empty ranking names the switch that emptied it", async () => {
   /* The one place the planner can strand you. Nyx Prime's four parts all come
      from relics that exist only on Proxima, so with Railjack off the page finds
@@ -287,14 +368,24 @@ page_test("an empty ranking names the switch that emptied it", async () => {
      while the list directly beneath went on saying four relics are dropping and
      every part has one dropping for it. That reads as a fault, not a setting. */
   const { page, errors } = await open("/plan.html");
+  /* Named outright rather than found with isRailjack. Picking the subject with
+     the code under test makes the case vacuous - break the classifier, find no
+     subject, return early, go green having checked nothing.
+
+     Nyx Prime is the documented example (PROJECT.md §7): its relics live on
+     Proxima planets AND on Railjack nodes that sit on ordinary ones, like
+     Beacon Shield Ring on Venus, so no simple property of the data picks it out
+     without reimplementing the classifier. If DE ever gives it a star-chart
+     route this fails, which is the right way to find that out. */
   const stranded = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
-    const it = D.items.find((i) => R.railjackOnly(i, D.relics));
+    const D = window.VORFRAME_DATA;
+    const it = D.items.find((i) => i.name === "Nyx Prime");
     if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
     localStorage.setItem("vorframe.plan.v1", JSON.stringify({ railjack: false }));
     return it ? it.name : null;
   });
-  if (!stranded) return;   // nothing in this dataset is Railjack-only
+  assert.ok(stranded, "Nyx Prime is not in the dataset - pick another item that " +
+                      "can only be farmed on Railjack, do not delete the check");
   await page.reload({ waitUntil: "load" });
 
   const where = page.locator("#planNodes");

@@ -27,6 +27,7 @@
   const untilText = ROT.untilText;
   const isRailjack = ROT.isRailjack;
   const isEvent = ROT.isEventNode;
+  const isSteelPath = ROT.isSteelPath;
   const bountyEvent = ROT.bountyEvent;
   const eventRunning = ROT.eventRunning;
   const notADestination = ROT.notADestination;
@@ -92,8 +93,8 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
-      minutes: {} },
+    { squad: false, event: false, railjack: false, steelPath: false,
+      runMode: "reset", aya: true, minutes: {} },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
@@ -233,13 +234,14 @@
        than by the data. Counted so an empty ranking can name the switch that
        emptied it - see `noNodes`. */
     const nodes = new Map();
-    const blocked = { railjack: new Set(), event: new Set() };
+    const blocked = { railjack: new Set(), event: new Set(), steelPath: new Set() };
     relicPlan.forEach((rp, rname) => {
       (RELICS[rname].sources || []).forEach((s) => {
         if (notADestination(s)) return;      // quest, or not modelled yet
         const skip = `${s.planet}|${s.node}|${s.mode}`;
         if (!opts.railjack && isRailjack(s)) { blocked.railjack.add(skip); return; }
         if (!opts.event && isEvent(s)) { blocked.event.add(skip); return; }
+        if (!opts.steelPath && isSteelPath(s)) { blocked.steelPath.add(skip); return; }
         const key = `${s.planet}|${s.node}|${s.mode}`;
         let n = nodes.get(key);
         if (!n) {
@@ -373,7 +375,8 @@
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
-             blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
+             blocked: { railjack: blocked.railjack.size, event: blocked.event.size,
+                        steelPath: blocked.steelPath.size } };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -646,6 +649,9 @@
     }
     if (blocked.event) {
       off.push([blocked.event, "an event node", "Include event nodes"]);
+    }
+    if (blocked.steelPath) {
+      off.push([blocked.steelPath, "on the Steel Path", "Steel Path unlocked"]);
     }
     if (!off.length) {
       return `<p class="hint">The relics below do drop, but nowhere you can get to
@@ -928,7 +934,7 @@
     });
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
-   ["p-railjack", "railjack"]].forEach(([id, key]) => {
+   ["p-railjack", "railjack"], ["p-steel", "steelPath"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });

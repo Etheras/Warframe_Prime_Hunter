@@ -54,7 +54,7 @@ named once, in `assets/shared.js`, because both pages read and write them:
 | `vorframe.parts.v1` | per-part counts | yes |
 | `vorframe.materials.v1` | the manual materials checklist | yes |
 | `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
-| `vorframe.plan.v1` | planner options (squad, event, Railjack, run mode, effort minutes) | no |
+| `vorframe.plan.v1` | planner options (squad, event, Railjack, Steel Path, run mode, effort minutes) | no |
 | `vorframe.filters.v1` | collection filters, sort and view toggles | no |
 
 **Backup** exports the first three as one document and still accepts the old
@@ -223,6 +223,32 @@ Three layers hold the rule, because remembering it demonstrably did not work:
 
 Generated files are exempt and always were — `data/`, `.cache/` and `dist/` are
 written by the build and verified by it.
+
+### Never pick a test's subject with the code under test
+
+A browser test usually has to find something in the live dataset to act on — an
+item that can only be farmed on Railjack, a node behind the Steel Path. The
+obvious way to find it is to call the classifier that decides. **Do not.**
+
+Break that classifier and the search returns nothing, the `if (!found) return`
+guard fires, and the test reports success having checked nothing at all. It is
+not a hypothetical: a one-character mutation to the Steel Path regex left the
+unit tests red — five of them — and the browser test green.
+
+So select on something the code under test does not own:
+
+- a **property of the raw data**, like a node name matching `(Steel Path` or a
+  planet matching `Proxima`; or
+- a **named subject**, like Nyx Prime, where no simple property picks it out
+  without reimplementing the classifier.
+
+And replace the early return with an assertion. "There is nothing here to test"
+is a finding, not a pass — if it is ever genuinely true, someone should read the
+message and delete the test deliberately.
+
+Check both directions when you write one: mutate the classifier, confirm the test
+goes red, revert. A test that cannot fail is worse than no test, because it is
+counted.
 
 ### Verifying a change
 
@@ -1023,6 +1049,38 @@ reason `flags.farmable` is computed rather than parsed. That it agrees exactly
 with `permanent && vaulted` on today's data is corroboration, not the definition.
 
 Five relics carry all six: **Lith C7, Meso N11, Neo V9, Axi S8, Axi V10**.
+
+### The Steel Path is asked about, Mastery Rank is not
+
+Both are gates on entering a node; only one of them is a reason to hide it, and
+the difference is worth writing down because it looks arbitrary otherwise.
+
+**The Steel Path is a second star chart**, unlocked once by clearing the first.
+Until you have, its nodes are not on your chart at all — the same shape as an
+event that is not running, and the same answer: excluded by default, with a
+*Steel Path unlocked* checkbox in the planner sidebar beside *Include Railjack*.
+Recognised two ways in `ROT.isSteelPath`: DE names most of them `(Steel Path)`,
+and one Faceoff table `(Steel Path Winner)`; the level `100 - 100` bounty tier is
+not named but is gated all the same, on the wiki's authority — *"Requires Mastery
+Rank 10 and unlock The Steel Path"*.
+
+**Leaving it off costs nothing today.** The only Steel Path content carrying
+relics is the Faceoff pair, and each variant is identical to its ordinary twin:
+the same 22 relics at the same 8.33%. Ticking the box moves the ranking from 152
+places to 154 and adds no reward that was not already reachable. No 100–100 tier
+carries a relic at all, so that half of the rule is written for the day one does.
+
+**Mastery Rank gates nothing here, deliberately.** The worldstate publishes
+`minMR` per bounty tier and it matches the wiki exactly — MR1 at level 10–30
+through MR10 at 100–100 — so filtering by it would be easy and would be wrong.
+The wiki: *"These can still be played, when an eligible squad member selects
+one."* The rank stops you **selecting** a bounty, not running one, so hiding a
+tier from someone whose squadmate can start it would answer the wrong question.
+It belongs with the demand badges instead, which is what `TODO.md` records
+alongside the header field the owner has specified for it.
+
+That is the general rule these two cases establish: **a gate on *reaching* a node
+excludes it; a gate on *starting* it only annotates it.**
 
 ### An empty ranking has to say what emptied it
 

@@ -1,5 +1,39 @@
 # VorFrame
 
+> ### Written by a generative AI
+>
+> **Effectively all of this project — code, tests and documentation — was written
+> by [Claude](https://www.anthropic.com/claude) (Anthropic), working from a human
+> owner's direction, review and decisions.** It is not a human-authored codebase
+> that an assistant helped with; it is the other way round.
+>
+> Read it with that in mind. What follows is what the project actually does about
+> it, rather than a disclaimer that ends the sentence:
+>
+> - **Everything is checked by running it.** 218 automated tests, including
+>   browser tests against the real pages, and the reasoning behind each design
+>   decision is written down in [`PROJECT.md`](PROJECT.md) rather than left in a
+>   chat log. Where a rule exists, the incident that caused it is recorded.
+> - **No language model is in the data pipeline.** Nothing you see is generated,
+>   guessed or summarised at runtime. Every number comes from Digital Extremes'
+>   published drop tables and item manifest, parsed deterministically — see
+>   [`PROJECT.md §2`](PROJECT.md). An AI wrote the parser; it does not run inside
+>   it.
+> - **It has been wrong.** Real bugs shipped and were caught later: a regex that
+>   silently matched nothing, a badge that told six Primes they were "never
+>   vaulted" when they need a Railjack, a farm list that came back empty with no
+>   explanation. Each is written up in the git history and in
+>   [`TODO.md`](TODO.md). Assume more remain.
+> - **Nothing here is authoritative.** Cross-check anything that matters against
+>   the game or the [wiki](https://wiki.warframe.com/w/Prime) before spending
+>   hours or Void Traces on it. Known disagreements with the wiki are listed in
+>   [`TODO.md`](TODO.md) rather than quietly patched over.
+>
+> Licensing is unaffected: the code is MIT (see [LICENSE](LICENSE)), and the
+> game data belongs to Digital Extremes under the terms in
+> [`NOTICE.md`](NOTICE.md). **This is an unofficial fan project**, not affiliated
+> with or endorsed by Digital Extremes.
+
 Two local tools over one dataset:
 
 - a **collection tracker** for the WARFRAME Primes you own, down to individual parts, and

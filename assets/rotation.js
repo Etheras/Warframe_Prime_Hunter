@@ -346,15 +346,36 @@
       "Vehrvod District is squad versus squad; Lower Vehrvod is",
       "against AI-controlled Tenno.",
     ].join("\n") },
+    steel: { label: "Steel Path", tip: [
+      "On the Steel Path, which is a second star chart unlocked",
+      "by clearing the first one. Until then the node is not on",
+      "your chart at all.",
+    ].join("\n") },
   };
   // DE files all four Faceoff tables under transientRewards, so the node
   // name is the only signal: "Faceoff: Single Squad", "Faceoff: Squad VS
   // Squad", each with a Steel Path variant.
   const isPvPvE = (s) => /^Faceoff\b/i.test(s.node || "");
+
+  /* The Steel Path is a whole second star chart, unlocked once by clearing the
+     first one. A node behind it is not harder-but-reachable; it does not exist
+     on your chart until then, which is the same shape as an event node.
+
+     Two ways to be behind it. DE names most of them - "(Steel Path)", and
+     "(Steel Path Winner)" on one Faceoff table. The level 100-100 bounty tier
+     is not named but is gated all the same: the wiki's Bounty page gives it
+     "Requires Mastery Rank 10 and unlock The Steel Path". No 100-100 tier
+     carries a relic today, so that half of the rule is written for the day one
+     does rather than for anything currently on screen. */
+  const isSteelPath = (s) =>
+    /\(Steel Path\b[^)]*\)/i.test(s.node || "") ||
+    /^Level\s+100\s*-\s*100\b/i.test(s.node || "");
+
   function demandsOf(s) {
     const out = [];
     if (isRailjack(s)) out.push(DEMANDS.railjack);
     if (isPvPvE(s)) out.push(DEMANDS.pvpve);
+    if (isSteelPath(s)) out.push(DEMANDS.steel);
     return out;
   }
 
@@ -454,7 +475,8 @@
     RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
-    isRailjack, isPvPvE, demandsOf, railjackOnly, isEventNode, notADestination,
+    isRailjack, isPvPvE, isSteelPath, demandsOf, railjackOnly,
+    isEventNode, notADestination,
     bountyEvent, eventRunning,
   };
 })();

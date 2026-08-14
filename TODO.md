@@ -32,7 +32,7 @@ and silence is itself a choice. Nothing else in this file is blocked on anyone.
 | 6 | **How should the banner know who is reading it?** It currently guesses from the hostname and is wrong in both directions. | (a) let `serve.py` say so — the plumbing is already there, and this is the recommendation; (b) a `--guest` flag; (c) say nothing to anyone | keeps guessing |
 | 7 | **Close the two server holes?** Directory listing is on, and `.cache/` is served. Nothing served is sensitive, so this is a priority call rather than a security one. | (a) do both, a few lines; (b) leave it | stays open |
 | 8 | **What is the project called?** See *The name is not load-bearing yet* below. | any name; the audit says what would have to move | stays VorFrame |
-| 9 | **How should Railjack be presented?** Two parts: where the six locked Primes sit in the collection's availability buckets, and whether the planner should keep making you opt in to your only option. | **(a)** (i) badge only; (ii) a seventh bucket; (iii) a cross-cutting *Needs a Railjack* filter — recommended. **(b)** (i) leave it; (ii) auto-include when it is the only route — recommended; (iii) a three-state checkbox | badge only, and the opt-in stays |
+| 9 | **How should Railjack and its lookalikes be presented?** Three parts: where the six locked Primes sit in the collection's availability buckets; whether the planner should keep making you opt in to your only option; and whether Steel Path variants that are *exact duplicates* should both be ranked. | **(a)** (i) badge only; (ii) a seventh bucket; (iii) a cross-cutting *Needs a Railjack* filter — recommended. **(b)** (i) leave it; (ii) auto-include when it is the only route — recommended; (iii) a three-state checkbox. **(c)** (i) rank both twins; (ii) collapse identical twins — recommended; (iii) show the variant only when its table is better | badge only, the opt-in stays, and four identical Faceoff rows can fill half the list |
 | 10 | **Model pre-refined relic rewards?** Elite Sanctuary Onslaught, Void Storms and Profit-Taker hand you the relic **already Radiant** — 80 reward rows — and we discard that. Worth 100 Void Traces and, on a blocked rare, ~40 openings. | (a) keep discarding it; (b) keep the refinement and let those nodes score on it, which moves the ranking and breaks the one-refinement-per-relic assumption | keeps discarding it |
 
 **Yours to do elsewhere, not here:** four corrections belong on
@@ -338,6 +338,47 @@ because the display question is the same either way and the data can change.
 behind a current Railjack source is exactly the shape this project is happy with:
 the app is about what is farmable now, and it says what "now" costs you.
 
+### A Mastery Rank field in the header
+
+**Specified by the owner 2026-08-14, alongside the decision *not* to gate anything
+by rank.** Those two go together and the order matters: the field is for saying
+what a node asks of you, never for hiding it.
+
+The shape asked for:
+
+- **A Mastery Rank number the player fills in**, stored locally like everything
+  else, empty until they do.
+- **Sitting next to the site name and logo**, in the header — not in the planner
+  sidebar. It is an account fact, true on both pages, so it does not belong to
+  either one's options.
+- **A plain `−` / `+` pair** either side of the number. Ranks move one at a time
+  and rarely; a spinner or a free text box is more machinery than the job needs.
+  The materials rows in the collection view are the nearest existing pattern.
+
+Range: 0 to 30, then **Legendary ranks** above that, which the wiki writes `LR1`,
+`LR2` and so on with no published cap. Simplest honest handling is to keep one
+integer and render anything over 30 as `LR<n−30>`.
+
+**What it is for, given it gates nothing.** The worldstate publishes `minMR` per
+bounty tier and it matches the wiki exactly — MR1 at level 10–30 up to MR10 at
+100–100 (see *The worldstate publishes far more than the two fields we read*). So
+a node can say **"asks MR5"** the same way one says **"Railjack"** or
+**"PvPvE"** — a demand badge, shown when the player's rank is below it and silent
+when it is not.
+
+That restraint is deliberate and the wiki is the reason: *"These can still be
+played, when an eligible squad member selects one."* The rank stops you
+**selecting** a bounty, not running one. Hiding a tier from someone whose friend
+can start it would be exactly the wrong answer, so the field informs and never
+filters.
+
+**Still open:** whether an unfilled field should be treated as "rank unknown, say
+nothing" (safe, and the default everything else in this project takes) or should
+prompt once. And whether the same header slot should hold the other things the
+app would like to know about the player — Solaris United standing for
+Profit-Taker, and Steel Path, which now has its own checkbox in the planner
+sidebar and is arguably in the wrong place for the same reason this field is not.
+
 ### How Railjack should be presented — decision 9
 
 The badges landed on 2026-08-14 and they are the floor, not the answer: a node row
@@ -377,6 +418,25 @@ shape. Options:
 
 (ii) reads best and is the smallest change: the information to do it already
 exists, since `railjackOnly` answers exactly that question per item.
+
+**c. Steel Path variants are exact duplicates, and both are ranked.** Demonstrated
+2026-08-14 by weighting effort so Faceoff rose to the top: the list showed
+*Faceoff: Single Squad*, *Faceoff: Single Squad (Steel Path)*, *Faceoff: Squad VS
+Squad* and *Faceoff: Squad VS Squad (Steel Path)* — four rows, all at 4.7% per
+minute, filling half the visible eight. They are not merely similar; each Steel
+Path table is the same 22 relics at the same 8.33% as its ordinary twin.
+
+This is the same class of problem as the entry above and wants deciding with it:
+
+- (i) leave both ranked — honest, and wasteful of the eight slots that exist
+- (ii) **collapse identical twins into one row** with a note that a Steel Path
+  version exists and pays the same. Needs a rule for "identical", which here is
+  cheap: same relic set, same chances
+- (iii) show the Steel Path variant only when its table is actually *better*,
+  which today is never
+
+Worth noting the same shape may appear elsewhere as DE adds Steel Path variants
+of existing content, so a rule beats a special case for Faceoff.
 
 ### Railjack is the only activity that locks anyone in
 

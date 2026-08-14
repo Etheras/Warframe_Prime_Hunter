@@ -344,13 +344,37 @@ test("a node says what it demands before you can play it", () => {
   // "Arva Vector" gives no hint of either.
   assert.deepEqual(plain(demands("Arva Vector")), ["Railjack"]);
   assert.deepEqual(plain(demands("Faceoff: Single Squad")), ["PvPvE"]);
-  assert.deepEqual(plain(demands("Faceoff: Squad VS Squad (Steel Path)")), ["PvPvE"]);
   assert.deepEqual(plain(demands("Ukko", { planet: "Void" })), [],
                    "an ordinary node demands nothing and says nothing");
   // the regex once contained a literal backspace instead of a word boundary,
   // which matched nothing at all and failed silently
   assert.equal(ROT.isPvPvE({ node: "Faceoff: Single Squad" }), true);
   assert.equal(ROT.isPvPvE({ node: "Facsimile" }), false);
+
+  // a Steel Path node stacks its demand on top of whatever else it asks
+  assert.deepEqual(plain(demands("Faceoff: Squad VS Squad (Steel Path)")),
+                   ["PvPvE", "Steel Path"]);
+});
+
+test("the Steel Path is recognised by name, and by the tier the wiki gates", () => {
+  const ROT = loadRotation();
+  const sp = (node) => ROT.isSteelPath({ node });
+
+  assert.equal(sp("Faceoff: Single Squad (Steel Path)"), true);
+  assert.equal(sp("Faceoff: Squad VS Squad (Steel Path Winner)"), true,
+               "DE writes one of them with a trailing word inside the bracket");
+  /* Not named, but gated: the wiki's Bounty page gives the 100-100 tier
+     "Requires Mastery Rank 10 and unlock The Steel Path". No 100-100 tier
+     carries a relic today, so this is written for the day one does. */
+  assert.equal(sp("Level 100 - 100 Cetus Bounty"), true);
+  assert.equal(sp("Level 100-100 Orb Vallis Bounty"), true, "spacing varies");
+
+  assert.equal(sp("Faceoff: Single Squad"), false);
+  assert.equal(sp("Level 40 - 60 Cetus Bounty"), false);
+  assert.equal(sp("Steel Meridian Relay"), false,
+               "the words alone are not the marker - it is the bracket");
+  assert.equal(sp(""), false);
+  assert.equal(ROT.isSteelPath({}), false);
 });
 
 test("Event: nodes and Railjack are recognised however they are spelled", () => {
