@@ -795,12 +795,20 @@ def test_launchers_are_runnable() -> None:
     # Shell scripts are the exact mirror: a CRLF one dies on Linux with
     # "bad interpreter: /usr/bin/env bash^M", which names the file rather than
     # the problem and is a genuinely baffling first thing to hit.
-    for path in sorted(glob.glob(os.path.join(ROOT, "*.sh"))):
+    shells = (sorted(glob.glob(os.path.join(ROOT, "*.sh")))
+              + sorted(glob.glob(os.path.join(ROOT, "tools", "*.sh"))))
+    for path in shells:
         name = os.path.basename(path)
         raw = read_bytes(path)
         check(f"{name}: no CR anywhere", raw.count(b"\r"), 0,
               "a CRLF shell script will not run on macOS or Linux")
         check_true(f"{name}: has a shebang", raw.startswith(b"#!"))
+        # git tracks the execute bit, and a scheduler script that has to be
+        # invoked as `bash x.sh` is one nobody will invoke the documented way
+        mode = subprocess.run(["git", "ls-files", "-s", "--", path],
+                              cwd=ROOT, capture_output=True, text=True).stdout.split()
+        if mode:
+            check(f"{name}: committed executable", mode[0], "100755")
 
     # PowerShell must run under both Windows PowerShell 5.1 and pwsh 7+. These
     # are the constructs that quietly split them; each is a real trap rather
@@ -1197,6 +1205,40 @@ def test_server_serves_only_the_site() -> None:
           "the two artwork onerror attributes are why this exists")
 
 
+def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
+    """
+    Two schedulers, one job. They are separate files because Windows has Task
+    Scheduler and everything else has cron, and nothing but a check like this
+    stops one of them drifting - a default changed on the platform in front of
+    you and left alone on the other is not a visible mistake.
+
+    The interval is not free-floating either. The refresh exists to keep the
+    "this data is old" banner from ever firing, so it has to run several times
+    over inside that window; the owner's rule is that at least two runs may fail
+    before anyone is told anything is wrong.
+    """
+    ps = read_text(os.path.join(ROOT, "tools", "schedule.ps1"))
+    sh = read_text(os.path.join(ROOT, "tools", "schedule.sh"))
+    shared = read_text(os.path.join(ROOT, "assets", "shared.js"))
+
+    win = re.search(r"\$EveryHours\s*=\s*(\d+)", ps)
+    nix = re.search(r"(?m)^EVERY=(\d+)", sh)
+    check_true("schedule: the Windows default is findable", bool(win))
+    check_true("schedule: the cron default is findable", bool(nix))
+    hours = int(win.group(1))
+    check("schedule: both platforms refresh on the same clock",
+          int(nix.group(1)), hours,
+          "a default changed on one platform and not the other is invisible")
+
+    # the banner the whole thing exists to prevent, read from where it is set
+    days = re.search(r"days\s*>=\s*(\d+)", shared)
+    check_true("schedule: the banner's patience is findable", bool(days))
+    check_true("schedule: three refreshes fit inside the banner's patience, twice over",
+               hours * 3 <= int(days.group(1)) * 24,
+               f"refreshing every {hours}h against a banner at {days.group(1)} days "
+               f"leaves no room for a failed run")
+
+
 def test_a_refresh_clears_the_stale_banner() -> None:
     """
     Refreshing the data must retire the banner that told you to refresh it.
@@ -1413,6 +1455,7 @@ def main() -> int:
                          test_the_guard_refuses_shell_writes_to_source,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
+                         test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_bundle_is_self_contained]),
         ("browser", [test_browser_assets]),

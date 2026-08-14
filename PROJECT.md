@@ -328,15 +328,25 @@ regular row structure, so the whole refresh is deterministic parsing — there i
 model in the loop and no API key to hold. A scheduled task can maintain the site
 indefinitely on its own.
 
-### Install the daily task
+### Install the hourly task
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
 Registers a Windows Scheduled Task ("Warframe Prime Hunter data refresh") that runs
-`build_data.py --if-changed` daily at 18:30. Options: `-Time 07:30`, `-RunNow`,
-`-Remove`. *(Not installed automatically — run it yourself when you want it.)*
+`build_data.py --if-changed` **every hour**. Options: `-EveryHours 8`, `-Time 07:30`,
+`-RunNow`, `-Remove`. `tools/schedule.sh` installs the same job into cron on macOS
+and Linux, with the same defaults — a test compares the two, because a default
+changed on one platform and left alone on the other is not a visible mistake.
+
+**Why hourly.** Two reasons, and neither is "to be current for its own sake":
+
+- The **"this data is old" banner** is what the task exists to prevent, so it has to
+  run several times over inside that window. At 24 runs a day a long run of failures
+  is needed before anyone is told anything is wrong.
+- The **fissure strip** only shows fissures that have not expired, so it is exactly
+  as fresh as this task. Hourly it is nearly always right; daily it is always empty.
 
 ### Why `--if-changed` is cheap
 
@@ -347,17 +357,28 @@ It fetches a fingerprint before doing any real work:
 | DE Public Export index hash | ~500 bytes | New Primes, any game build |
 | `HEAD` on warframe.com/droptables | headers only | Vaultings, unvaultings, drop changes |
 | Varzia trader window | small JSON | Resurgence rotation flip (every 28 days) |
+| `/pc/fissures` | small JSON | where relics can be cracked in the next hour |
 
-Fingerprints live in `.cache/state.json`. On a quiet day the task exits in about a
-second having written nothing; a real change triggers the full rebuild.
+Fingerprints live in `.cache/state.json`. The first three decide whether anything is
+downloaded. The fissure list is fetched every run regardless and never enters the
+fingerprint, because it changes constantly — putting it in would mean a full download
+every hour to learn something a 10 KB document already said.
+
+So a quiet run costs four small requests and a rebuild **from the cache**, which
+takes 0.65 s. It used to exit having written nothing at all; it now rewrites the
+payload, because the fissures in it have moved even when nothing else has.
 
 ### Or let GitHub run it
 
 `.github/workflows/publish.yml` does the same job in CI on a daily cron, with no
 secrets (every source is public) and no `pip install` (stdlib only). It builds,
 asserts the result is sane — at least 250 items, 40 Warframes, 500 relics, and
-something farmable — then publishes to GitHub Pages. This supersedes the Scheduled
-Task.
+something farmable — then publishes to GitHub Pages.
+
+It supersedes the Scheduled Task for everything except the fissures, which it cannot
+help with: a site rebuilt once a day always finds them expired, so the published copy
+shows no strip at all. That is the honest answer for a daily build, and it is why the
+local hourly task is still worth running if the planner is what you use.
 
 **The dataset is never committed.** It is built in CI and handed to Pages as an
 artifact, so the repo stays source-only (21 files, ~259 KB) and DE's data is not
@@ -434,7 +455,8 @@ Warframe Prime Hunter/
 │   ├── official.py         ← parsers for DE's drop table + public export
 │   ├── bundle.py           ← inlines everything into dist/warframe-prime-hunter.html
 │   ├── serve.py            ← local server, picks a working port
-│   └── schedule.ps1        ← installs/removes the daily Scheduled Task
+│   ├── schedule.ps1        ← installs/removes the hourly Scheduled Task
+│   └── schedule.sh         ← the same job in cron, for macOS and Linux
 ├── dist/                   ← GENERATED — single-file build, gitignored
 └── .cache/                 ← GENERATED — HTTP cache + state.json, safe to delete
 ```

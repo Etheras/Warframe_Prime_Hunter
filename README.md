@@ -79,7 +79,7 @@ underneath is identical on all three; only the launchers and the scheduler diffe
 | Get or update the data | `refresh-data.cmd` | `./refresh-data.sh` |
 | Open the site | `serve.cmd` | `./serve.sh` |
 | Open it to your network | `serve-lan.cmd` | `./serve-lan.sh` |
-| Keep it updated daily | `tools\schedule.ps1` | `cron` — see below |
+| Keep it updated hourly | `tools\schedule.ps1` | `./tools/schedule.sh` |
 
 Check Python is available:
 
@@ -429,8 +429,15 @@ Right-click `tools\schedule.ps1` → **Run with PowerShell**, or run this in a t
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
-That sets up a Windows scheduled task that checks once a day at 18:30. On days when
-nothing has changed it finishes in about a second without touching anything.
+That sets up a Windows scheduled task that checks **every hour**. When nothing has
+changed it sends four small requests, rebuilds from what is already on disk in under
+a second, and touches nobody's servers — a full download only happens when Digital
+Extremes actually publish something.
+
+Hourly rather than daily because of the **fissures**: the planner shows where relics
+can be cracked right now, and only ever shows ones that have not expired yet. That
+list is exactly as fresh as this task. Run it hourly and it is nearly always right;
+run it daily and it is empty by the time you look.
 
 Only the scheduling is Windows-specific — the build itself runs anywhere.
 
@@ -441,17 +448,23 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:00
 ```
 
 ```bash
+powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryHours 8
+```
+
+```bash
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
 ```
 
 ### Automatically — macOS and Linux
 
-There is no helper script; use `cron`. Run `crontab -e` and add a daily 18:30 check,
-substituting the full path to your copy:
+Same job, installed into `cron`:
 
 ```bash
-30 18 * * * cd /path/to/Warframe Prime Hunter && python tools/build_data.py --if-changed
+./tools/schedule.sh
 ```
+
+It takes the same options — `--every 8`, `--at 07:30`, `--remove`, and `--show` to
+print the crontab line without installing it.
 
 No account, no API key, and no AI involved — it just reads the official data files
 and rebuilds the list.
@@ -548,7 +561,7 @@ it stores the login so you're never asked again.
 In the repo: **Settings → Pages → Source: GitHub Actions**.
 
 Then **Actions → Build and publish site → Run workflow**. A couple of minutes later
-your site is live at `https://YOURUSERNAME.github.io/Warframe Prime Hunter/`, with the standalone
+your site is live at `https://YOURUSERNAME.github.io/REPO-NAME/`, with the standalone
 single-file version at `/warframe-prime-hunter-standalone.html`.
 
 Pages needs a **public** repo on the free plan.
@@ -557,8 +570,12 @@ Pages needs a **public** repo on the free plan.
 
 `.github/workflows/publish.yml` rebuilds the data from DE every day at 18:40 UTC and
 republishes the site — so it stays up to date whether or not your PC is switched on,
-and the data still never enters the repository. Once that's running you don't need
-the Windows scheduled task any more.
+and the data still never enters the repository.
+
+One thing the published copy cannot do is show you tonight's fissures: they turn over
+every hour or two, so a site rebuilt once a day always finds them expired and shows
+nothing. That is why the local hourly task is still worth keeping if you use the
+planner to decide what to crack.
 
 > The workflow has **read-only** access to your code and uses no secrets or API
 > keys — every source it touches is public.
