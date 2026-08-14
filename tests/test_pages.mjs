@@ -494,7 +494,8 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   const before = await order();
   assert.ok(before.length > 1, "need a ranking before there is anything to re-rank");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /%\s*\nper run/, "with nothing set the rows are still ranked per run");
+               /%\s*\nper objective/,
+               "with nothing set, objective count is the default cost basis");
 
   // an endless mission made expensive per round has to fall behind a fast one
   await page.locator("#advanced > summary").click();
@@ -521,7 +522,28 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
 
   await page.locator("#advanced > summary").click();
   await page.locator("#effortClear").click();
-  assert.deepEqual(await order(), before, "clearing puts the per-run ranking back");
+  assert.deepEqual(await order(), before,
+                   "clearing puts the per-objective default back");
+  assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
+               /per objective/, "and says so again");
+
+  /* The default is a cost basis, not "no cost basis": a four-round Defense is
+     costed four times a single-objective Capture even with every box empty.
+     That is the whole of decision 3 - per run flattered anything long. */
+  const basis = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll("#planNodes .spot"));
+    return rows.map((s) => ({
+      alt: s.querySelector(".spot-alt").textContent.trim(),
+      head: s.querySelector(".spot-score b").textContent.trim(),
+    }));
+  });
+  const multi = basis.find((r) => /over \d+ (round|vault|cache|stage)s/.test(r.alt));
+  assert.ok(multi, `no multi-objective row on screen to check: ${JSON.stringify(basis)}`);
+  const perRun = Number(multi.alt.match(/^([\d.]+)%/)[1]);
+  const shown = Number(multi.head.replace("%", ""));
+  const objectives = Number(multi.alt.match(/over (\d+)/)[1]);
+  assert.ok(Math.abs(shown - perRun / objectives) < 0.02,
+            `${multi.head} should be ${perRun}% over ${objectives} objectives`);
   assert.deepEqual(errors, []);
 });
 

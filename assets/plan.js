@@ -101,8 +101,8 @@
 
   /* ── effort, supplied by the player and empty by default ──────────
      Minutes for one *objective* of each mission type. Nothing is filled in to
-     begin with, and while nothing is filled in none of this runs: the ranking
-     is per run, exactly as it was before this existed.
+     begin with, and nothing has to be: the list is costed by objective *count*
+     until someone says what an objective costs them in minutes.
 
      It exists because ranking per run flatters anything long. Against one
      player's own timings, costing per minute moved Capture and Exterminate
@@ -110,6 +110,11 @@
      big to ignore, and far too personal to ship a default for. A strong player
      trivialises a Capture while a Spy vault still costs its fixed hacking time,
      so even the ratios between the numbers are that player's own.
+
+     Objective count is the compromise that needs no answer: against those same
+     timings it is out by 2.4x where per-run is out by 9.6x, because a round, a
+     vault and a bounty stage all take roughly 2.5 to 6 minutes. Four times
+     closer to the truth for free, and nobody has to agree with a shipped number.
 
      A mission type left blank while others are filled in cannot be costed at
      zero, or it would sort straight to the top of a list it was never measured
@@ -368,8 +373,17 @@
       n.objectives = o.count; n.unit = o.unit;
       n.minutes = mins ? mins.per(n.mode) * o.count : null;
       n.minutesAssumed = !!mins && mins.assumed(n.mode);
-      // with no minutes anywhere, this is the score and the ranking is per run
-      n.rate = n.minutes ? n.score / n.minutes : n.score;
+      /* Costed per objective by default, per minute once anyone says what an
+         objective costs them.
+
+         Per *run* was the old default and it flatters anything long: a run is
+         whatever you decide to make it, so it is not a unit at all. Against one
+         player's own timings, costing per run is out by up to 9.6x across
+         mission types; per objective it is out by 2.4x, because a round, a
+         vault and a bounty stage all take somewhere around 2.5 to 6 minutes.
+         Four times closer to the truth, and it asks the player for nothing. */
+      n.cost = n.minutes || o.count;
+      n.rate = n.score / n.cost;
     });
 
     // Rate first, then a lower enemy level (faster clears). Rotation used to
@@ -564,30 +578,45 @@
      blocked on is not the same prize as a common; the count does not, and says
      only how fast the stack fills. A node can hand over more relics and still
      be worth less. */
+  /* "4 rounds", "3 vaults", "one run" - how a run's cost reads when nobody has
+     put a minute figure on it. */
+  const objectivesText = (n) =>
+    n.objectives === 1 && n.unit === "run"
+      ? "one run"
+      : n.objectives + " " + n.unit + (n.objectives === 1 ? "" : "s");
+
   function scoreBlock(n) {
     const perMin = n.minutes != null;
     const lines = [];
 
-    lines.push("Ranked on what one run here is worth towards your list" +
-               (perMin ? "," : "."));
-    if (perMin) lines.push("per minute of it.");
+    lines.push("Ranked on what one run here is worth towards your list,");
+    lines.push(perMin ? "per minute of it." : "per objective of it.");
     if (opts.squad) lines.push("Assumes a 4-squad cracking the same relic.");
     lines.push("");
 
-    if (perMin) {
-      lines.push("Whole run   " + pct(n.score) + "   over " + n2(n.minutes) + " min");
-      if (n.objectives > 1) {
-        lines.push("            " + n.objectives + " " + n.unit + "s at " +
-                   n2(n.minutes / n.objectives) + " min each");
-      }
-      if (n.minutesAssumed) {
-        lines.push("");
-        lines.push("You have set no minutes for " + n.mode + ", so it is costed at");
-        lines.push("the average of the types you did set. Fill it in to rank");
-        lines.push("this row on its own time rather than on everyone else's.");
-      }
-      lines.push("");
+    lines.push("Whole run   " + pct(n.score) +
+               (perMin ? "   over " + n2(n.minutes) + " min"
+                       : n.cost === 1 ? "   (one objective)"
+                                      : "   over " + objectivesText(n)));
+    if (perMin && n.objectives > 1) {
+      lines.push("            " + objectivesText(n) + " at " +
+                 n2(n.minutes / n.objectives) + " min each");
     }
+    if (perMin && n.minutesAssumed) {
+      lines.push("");
+      lines.push("You have set no minutes for " + n.mode + ", so it is costed at");
+      lines.push("the average of the types you did set. Fill it in to rank");
+      lines.push("this row on its own time rather than on everyone else's.");
+    }
+    if (!perMin) {
+      lines.push("");
+      lines.push("An objective is a round, a vault, a cache or a bounty stage -");
+      lines.push("whichever this mission counts in. It stands in for time, and");
+      lines.push("it is a fair stand-in: an objective takes 2.5 to 6 minutes");
+      lines.push("almost everywhere, while a run is whatever you decide to make");
+      lines.push("it. Put real minutes in under Effort to rank on those instead.");
+    }
+    lines.push("");
 
     lines.push("Relics      " + n2(n.perRun) + " you want, per run on average");
     lines.push("            " + pct(n.anyRun) + " of runs drop at least one");
@@ -598,16 +627,18 @@
 
     const counted = n2(n.perRun) + " relic" + (n2(n.perRun) === "1" ? "" : "s") +
                     " · " + pct(n.anyRun) + " of runs";
-    const cost = perMin
-      ? `<span class="spot-alt">${pct(n.score)} per run over ` +
-        (n.minutesAssumed
+    /* "over one run" after "per run" says the same thing twice, so a
+       single-objective mission just states the per-run figure and stops. */
+    const over = perMin
+      ? " over " + (n.minutesAssumed
           ? `<span class="est">${n2(n.minutes)} min</span>`
-          : `${n2(n.minutes)} min`) + "</span>"
-      : "";
+          : `${n2(n.minutes)} min`)
+      : n.cost === 1 ? "" : " over " + esc(objectivesText(n));
 
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
-      <b>${pct(n.rate)}</b>${perMin ? "per minute" : "per run"}
-      ${cost}<span class="spot-alt">${counted}</span></div>`;
+      <b>${pct(n.rate)}</b>${perMin ? "per minute" : "per objective"}
+      <span class="spot-alt">${pct(n.score)} per run${over}</span>
+      <span class="spot-alt">${counted}</span></div>`;
   }
 
   function renderWishlist() {
@@ -709,9 +740,9 @@
           ? `<b>${set.length} set.</b> Every other type is costed at their average, ` +
             `${n2(mean)} min — shown in amber on the row, so a borrowed number is ` +
             `never mistaken for one of yours.`
-          : `Nothing set, so the list is ranked <b>per run</b>, exactly as it is ` +
-            `without any of this. Fill in a single type and the whole list re-sorts ` +
-            `by time.`;
+          : `Nothing set, so every mission is costed by its <b>objective count</b> ` +
+            `— four rounds, three vaults, one run. That is the default and it works. ` +
+            `Fill in a single type and the whole list re-sorts on real minutes.`;
     }
     const clear = $("#effortClear");
     if (clear) clear.hidden = !set.length;
@@ -741,10 +772,12 @@
       `The percentage is what <b>one whole run</b> at that node is worth towards your ` +
       `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}` +
       (perMinute
-        ? `, divided by the minutes you said it costs — so the ranking is now per ` +
+        ? `, divided by the minutes you said it costs — so the ranking is per ` +
           `minute, and a long run has to earn its length.`
-        : ` — so a longer run can outrank a faster one on volume alone. Fill in ` +
-          `<b>Effort</b> in the sidebar to rank by time instead.`) +
+        : `, divided by the <b>objectives</b> it takes — a round, a vault, a cache ` +
+          `or a bounty stage. A run is whatever you decide to make it, so it is not ` +
+          `a unit; an objective is, and it takes 2.5–6 minutes almost everywhere. ` +
+          `Fill in <b>Effort</b> in the sidebar to rank on real minutes instead.`) +
       ` Beneath it, the same run counted rather than valued: how many relics you want ` +
       `it hands over on average, and how often it hands over any at all. The percentage ` +
       `weighs a rare you are blocked on above a common; the count does not. ` +
@@ -813,7 +846,7 @@
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
           `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${
-            pct(n.rate)}${n.minutes != null ? "/min" : ""}`
+            pct(n.rate)}${n.minutes != null ? "/min" : "/obj"}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
 

@@ -28,7 +28,7 @@ move its reasoning into `PROJECT.md`.
 | 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ✅ done |
 | 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
 | 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
-| 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ⬜ |
+| 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
 | 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save, which the owner rates a serious bottleneck; model the **endless-fissure bonus relic** (claim to verify first); and reduce — only slightly — the value of a relic handed over at a *higher* refinement than the plan wants. | ⬜ |
 | 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ⬜ |
 | 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ⬜ |
@@ -79,29 +79,25 @@ The wiki also names two more exceptions we do not currently see in relic sources
 several tiers inside a **single mission**. We cost a three-vault Spy run as three
 rounds of Defense.
 
-### 3. Mission length is still not modelled *by default* — decision 3
+### 3. Mission length **[answered 2026-08-14 — both halves]**
 
-Four rounds of Disruption score four times a bounty that may take just as long in real
-minutes, and single-reward missions sink however fast they are. This became
-load-bearing when node ranking moved to whole-run totals (`PROJECT.md §7`), so it is
-the weakest assumption left in the model.
+Four rounds of Disruption used to score four times a bounty that may take just as
+long in real minutes, and single-reward missions sank however fast they were. Both
+halves of the fix are now in:
 
-**Half-answered, 2026-08-14.** The player can now supply minutes per objective under
-*Effort — optional*, and the whole list re-ranks per minute — see `PROJECT.md §7`.
-That is the honest fix for anyone willing to type twenty numbers in.
+- **Real minutes**, per objective per mission type, under *Effort — optional*.
+- **Objective count as the default**, so the flaw above is gone before anyone
+  types anything. Measured against one player's own timings, costing per *run* is
+  out by up to 9.6× across mission types while costing per *objective* is out by
+  2.4× — an objective takes 2.5–6 minutes almost everywhere. Four times closer for
+  free, and an objective count is a fact about the mission rather than an estimate
+  of anybody's play, so there is no shipped number to argue with.
 
-What is still open is the **default**, which is deliberately per run and therefore
-still wrong in the way described above. Nothing ships a timing because the numbers,
-and the ratios between them, depend on gear and progression; the real data neither
-the wiki nor DE publishes is what would let a default be defended. Two things could
-narrow it without inventing anything:
-
-- **Objective count is a fair-ish middle.** Measured against one player's own
-  timings, costing per *run* is out by up to 9.6× across mission types while
-  costing per *objective* is out by 2.4×, because an objective takes 2.5–6 minutes
-  almost everywhere. Four times closer, and it asks the player for nothing — but it
-  is still a default someone could argue with, which is why it is not in.
-- The per-round rate in each row's rotation tooltip remains the cheap workaround.
+Both are documented in `PROJECT.md §7`. What remains is not a modelling gap but an
+ordinary unknown: **nine mission types are still assumed A→A→B→C** (entry 1 above)
+and **three of them are not round-based at all** (entry 2), so their objective
+counts are inherited rather than checked. Those two entries are the real remainder
+of this heading.
 
 ## Everything else
 

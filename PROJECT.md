@@ -1120,9 +1120,22 @@ ship a default for. A strong player trivialises a Capture while a Spy vault stil
 costs its fixed hacking time, so even the *ratios* between the numbers belong to
 whoever is playing.
 
-So the planner asks, under *Effort — optional* in the sidebar, and asks for nothing
-until then: **with no minutes set anywhere, the ranking is per run, byte for byte
-what it was before this existed.**
+So the planner asks, under *Effort — optional* in the sidebar, and needs no answer:
+**with no minutes set anywhere, every run is costed by its objective count.**
+
+That default changed on 2026-08-14. It used to be per *run*, which is not a unit at
+all — a run is whatever you decide to make it, and the option directly above lets you
+decide differently. Against one player's own timings, costing per run is out by up to
+**9.6×** across mission types; costing per objective is out by **2.4×**, because a
+round, a vault and a bounty stage all take somewhere around 2.5 to 6 minutes. Four
+times closer to the truth, for free, and nobody has to agree with a number we shipped
+— an objective count is a fact about the mission, not an estimate of anybody's play.
+
+The effect is large and is the whole point. On a two-Prime list the old top rows were
+Mithra and Mot at 63.85% a run; the new ones are Stribog (Sabotage) and Tiwaz (Mobile
+Defense) at 16.1% an objective, with Mithra third at 15.96% — because Mithra's 63.85%
+took four rounds and Stribog's 16.1% took one mission. Capture and Exterminate nodes
+rise for the same reason.
 
 Three decisions inside it are worth keeping:
 
@@ -1137,9 +1150,11 @@ Three decisions inside it are worth keeping:
   which would sort it straight to the top of a list it was never measured against.
   The borrowed number is drawn in `--odd` amber on the row so it is a guess you can
   see rather than one you cannot.
-- **The big number follows the ranking.** Give any minutes and every row's headline
-  becomes value per *minute* and says so, because the largest number in a row must
-  always be the one the list is sorted by (`STYLE.md §5`).
+- **The big number follows the ranking.** The headline reads *per objective* by
+  default and *per minute* the moment any minutes are given, because the largest
+  number in a row must always be the one the list is sorted by (`STYLE.md §5`).
+  The faint line beneath keeps the per-run figure and what it was divided by, so
+  nothing is lost by the change of basis.
 
 Only mission types the current plan actually ranks get a box — 27 of the 31 in the
 data, for a two-Prime list — and they stay in alphabetical order rather than moving
