@@ -387,6 +387,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* A number you did not supply, standing in for one you have not set yet. Same
    brightness as the line it sits on; only the hue changes — see STYLE.md §1. */
 .est{color:var(--odd);cursor:help}
+/* A relic handed over already refined, at a refinement this plan actually
+   wanted: a straight gain, so it borrows the refinement palette rather than the
+   amber that means "read the tooltip, this one is odd". Where the refinement
+   overshoots what was wanted it uses .est instead, because then it IS odd. */
+.pre{color:var(--violet);cursor:help}
 
 /* parts */
 .part{margin-bottom:12px;border:1px solid var(--line-soft);border-radius:9px;overflow:hidden}

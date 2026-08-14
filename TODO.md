@@ -29,7 +29,7 @@ move its reasoning into `PROJECT.md`.
 | 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
 | 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
-| 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save, which the owner rates a serious bottleneck; model the **endless-fissure bonus relic** (claim to verify first); and reduce — only slightly — the value of a relic handed over at a *higher* refinement than the plan wants. | ⬜ |
+| 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save; model the **endless-fissure bonus relic**; and reduce the value of a relic handed over at a *higher* refinement than the plan wants. | 🟡 **refinement done.** Traces are counted and shown, not scored — they need a player fact, like Mastery Rank. The fissure bonus is verified and deferred to decision 1, where it belongs: it is a reward for *cracking*, and no run mode here is long enough to reach it |
 | 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ⬜ |
 | 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ⬜ |
 | 9 | **(a)(ii) a seventh availability bucket**, and **(b)(ii) auto-include Railjack when it is the only route.** Owner wants to review all of #9 — **mock it up first.** | ⬜ mockup |
@@ -219,7 +219,72 @@ under `Bounty`, and bounties are the one thing on a clock.
 4. Effort: one objective per run. Phase 2 has a stated 4–5 minute timer, which is
    the only published duration of the four.
 
-### Some nodes hand you the relic already refined, and we discard that — decision 10
+### Void Traces are counted but not scored — the rest of decision 10
+
+The refinement itself is modelled (entry below). Two pieces of decision 10 are
+deliberately **not** scored, and this records why and what would settle each.
+
+**1. The 100 Void Traces.** Confirmed against
+[the wiki](https://wiki.warframe.com/w/Void_Relic): refining costs **25 / 50 /
+100** traces for Exceptional / Flawless / Radiant, less whatever the relic has
+already had spent on it. A node handing over a Radiant relic is therefore worth
+up to 100 traces on top of the relic, and the owner is right that this is not
+nothing — traces come in at 6–30 a fissure run.
+
+It is shown on the row and left out of the score, because **what 100 traces are
+worth depends on how many you have**, and that is a fact about the player this
+app cannot see. Same call as Mastery Rank: a player fact we do not know
+annotates rather than moves the ranking.
+
+**The exchange rate that would settle it, if a trace count is ever collected.**
+Traces buy refinement, so their value is the refinement uplift they buy on the
+relic you would have spent them on next:
+
+```
+value of 100 traces  ≈  best over relics r in the plan of
+                        ( value(r, Radiant) − value(r, r.chosenRefinement) )
+```
+
+That is derived from the player's own plan rather than invented, and it goes to
+zero exactly when it should — when nothing in the plan wants refining. It needs
+one number from the player: **are you trace-limited?** Which is the same header
+slot the Mastery Rank field wants (see *A Mastery Rank field in the header*).
+
+**2. The endless-fissure bonus relic.** The owner's recollection checks out, and
+more precisely than stated. From
+[Void Fissure](https://wiki.warframe.com/w/Void_Fissure):
+
+| Stay | You are given |
+|---|---|
+| 5 rotations | one random **Exceptional** relic of the mission's tier |
+| 10 rotations | one random **Flawless** relic |
+| every 5th after 15 | one random **Radiant** relic |
+
+A rotation is 5 waves of Defense, 5 minutes of Survival, 1 Interception round or
+200 Cryotic of Excavation.
+
+**Three things stop it being modelled here, and none of them is difficulty:**
+
+- **It is a reward for cracking, not for collecting.** You are in a fissure
+  because you are opening relics. The bonus lands in the *other* loop, which is
+  exactly what decision 1 is about to separate — so it belongs to that work, not
+  to this entry, and building it before the split would put it in the wrong
+  column.
+- **No run this planner models is long enough.** The run modes stop at 4
+  rotations (`reset`, `full`) or 6 (`aabcaa`). Only `aabcaa` reaches the first
+  bonus at all, and only just. That is a real finding about the run modes rather
+  than a reason to skip: a fourth mode, "stay for the bonus", would be the
+  honest way to offer it.
+- **The relic is random of the tier**, so its value is the *average* over the
+  live relics of that tier the plan wants — computable, but a different quantity
+  from everything else on the row, which is about a specific relic at a specific
+  node.
+
+**Do it with decision 1**, on the cracking side, where it answers a question that
+side actually asks: *given you are cracking these relics, is it worth staying to
+rotation 5?*
+
+### Some nodes hand you the relic already refined **[done 2026-08-14]** — decision 10
 
 Found 2026-08-14 while checking the Profit-Taker tables, and it is worth more
 than the thing that led to it.
@@ -249,10 +314,16 @@ It also lands on the entry above: `bestRefinement` picks one refinement per reli
 because *"you can't hold the same relic two ways"* — which stops being true when
 one node gives you a Radiant copy and another an Intact one.
 
-**What it needs:** keep the refinement on the source in `sources.py`, then let
-`relicValue` use it where present instead of assuming the chosen refinement. The
-parse is a one-line change; the model change needs thought, and the ranking will
-move.
+**Built 2026-08-14.** `official.py` keeps the refinement where DE names one — 80
+rows, all Radiant, across 11 nodes and nowhere else — and the planner values
+those sources at the refinement they actually hand over rather than at the one
+`bestRefinement` would have chosen.
+
+It cuts both ways, which is the part worth remembering: a Radiant copy is a gain
+when the plan wanted Radiant and a **loss** when the plan wanted the common,
+because Radiant trades commons for rares (25.33% → 16.67%). Elite Sanctuary
+Onslaught reads `pre-refined` in amber for exactly that reason on a list blocked
+on a common. The trace saving is shown and not scored — see the entry above.
 
 ### Rank the two loops apart, and never merge them again — decision 1
 

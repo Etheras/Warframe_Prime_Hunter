@@ -891,6 +891,66 @@ def test_runs_on_the_other_platform() -> None:
               [])
 
 
+def test_a_pre_refined_relic_reward_keeps_its_refinement() -> None:
+    """
+    DE names a refinement on a relic *reward* row only when the relic arrives
+    already refined -- "Lith Q3 Relic (Radiant)" against the usual "Lith Q3
+    Relic". Eighty rows do, every one Radiant, across eleven nodes: Elite
+    Sanctuary Onslaught, the six Void Storms and the four Profit-Taker phases.
+
+    It used to be parsed off and dropped, which made those nodes look like they
+    handed over an ordinary Intact relic. Refining one costs 100 Void Traces and
+    moves a blocked rare from ~50 expected openings to ~10, so the difference is
+    not cosmetic in either direction: it is a gain when the plan wanted Radiant
+    and a loss when the plan wanted the common.
+
+    The relic *contents* tables name a refinement on every row and always did --
+    that is what a relic holds at each quality, a different question -- so this
+    checks the reward rows only.
+    """
+    page = """
+<h3 id="missionRewards">Missions</h3>
+<table>
+<tr><th>Sanctuary/Elite Sanctuary Onslaught (Sanctuary Onslaught)</th></tr>
+<tr><th>Rotation A</th></tr>
+<tr><td>Lith Q3 Relic (Radiant)</td><td>Rare (7.04%)</td></tr>
+<tr><td>Meso D8 Relic</td><td>Rare (7.04%)</td></tr>
+<tr><th>Earth/Cambria (Defense)</th></tr>
+<tr><th>Rotation A</th></tr>
+<tr><td>Lith Q3 Relic</td><td>Uncommon (11.06%)</td></tr>
+</table>
+"""
+    _, sources, _ = official.parse_droptables(page)
+    rows = {(r["node"], r.get("refinement")) for rows_ in sources.values() for r in rows_}
+
+    check("a pre-refined reward keeps the refinement DE named",
+          ("Elite Sanctuary Onslaught", "Radiant") in rows, True,
+          "100 Void Traces of refinement given away unrecorded")
+    check("an ordinary reward names no refinement",
+          ("Cambria", None) in rows, True,
+          "a field carried on every row to say the usual thing is noise")
+    check("the relic is still the same relic",
+          sorted(sources), ["Lith Q3", "Meso D8"],
+          "the refinement must not leak into the relic's name")
+
+    # ...and against the real table, if this checkout has been built. Eleven
+    # nodes, eighty rows, every one Radiant. A new one appearing is worth
+    # knowing about rather than absorbing silently.
+    built = os.path.join(ROOT, "data", "vorframe-data.json")
+    if os.path.exists(built):
+        with open(built, encoding="utf-8") as fh:
+            payload = json.load(fh)
+        live = [s for rec in payload["relics"].values()
+                for s in rec.get("sources") or [] if s.get("refinement")]
+        check("every pre-refined reward in the real table is Radiant",
+              sorted({s["refinement"] for s in live}), ["Radiant"])
+        odd = sorted({s["node"] for s in live
+                      if not ("Onslaught" in s["node"] or "Void Storm" in s["node"]
+                              or "PROFIT-TAKER" in s["node"])})
+        check("only Onslaught, Void Storms and Profit-Taker pre-refine", odd, [],
+              "a new node hands out refined relics - worth pricing deliberately")
+
+
 def test_no_source_file_carries_a_control_byte() -> None:
     """
     A regex reached the browser as `/^Faceoff\\x08/i` — a shell heredoc turned
@@ -1230,6 +1290,7 @@ def main() -> int:
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
                          test_runs_on_the_other_platform,
+                         test_a_pre_refined_relic_reward_keeps_its_refinement,
                          test_no_source_file_carries_a_control_byte,
                          test_the_guard_refuses_shell_writes_to_source,
                          test_markup_is_xml_well_formed,

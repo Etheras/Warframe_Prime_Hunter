@@ -30,7 +30,16 @@ _ROW = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S | re.I)
 _CELL = re.compile(r"<(th|td)\b[^>]*>(.*?)</\1>", re.S | re.I)
 _TAGS = re.compile(r"<[^>]+>")
 _RELIC_HDR = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\s*\((\w+)\)$", re.I)
-_RELIC_ITEM = re.compile(r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\b", re.I)
+# A relic *reward* row names a refinement only when the relic arrives already
+# refined - "Lith Q3 Relic (Radiant)" rather than the usual "Lith Q3 Relic".
+# Eighty rows across the table do, every one of them Radiant: Elite Sanctuary
+# Onslaught, the six Void Storms, and the four Profit-Taker phases. Refining a
+# relic yourself costs 100 Void Traces and moves a blocked rare from roughly 50
+# expected openings to 10, so which of the two you are being handed is not a
+# detail. It used to be parsed off and thrown away.
+_RELIC_ITEM = re.compile(
+    r"^(Lith|Meso|Neo|Axi|Requiem|Omnia)\s+(\w+)\s+Relic\b"
+    r"(?:\s*\((Intact|Exceptional|Flawless|Radiant)\))?", re.I)
 _NODE_HDR = re.compile(r"^(.+?)/(.+?)\s*\((.+?)\)$")
 _ROT_HDR = re.compile(r"^Rotation\s+(\w+)$", re.I)
 # Sub-headings *inside* a bounty: which stage, or which completion. Anything
@@ -165,6 +174,11 @@ def parse_droptables(page: str):
         if not m:
             return
         key = f"{m.group(1).title()} {m.group(2).upper()}"
+        # Only where DE names one. Absent means "the ordinary Intact relic",
+        # which is the overwhelming majority, and a field carried on every row
+        # to say the usual thing would be noise in the payload.
+        if m.group(3):
+            entry = dict(entry, refinement=m.group(3).title())
         relic_sources.setdefault(key, []).append(entry)
 
     # ---- relic contents -------------------------------------------------

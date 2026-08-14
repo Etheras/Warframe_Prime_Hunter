@@ -214,6 +214,47 @@
   const bestRefinement = (entries) =>
     M.bestRefinement(entries, { refinements: REFINEMENTS, squad: opts.squad });
 
+  /* ── a relic handed over already refined ──────────────────────────
+     Eleven nodes do it, all Radiant: Elite Sanctuary Onslaught, the six Void
+     Storms, and the four Profit-Taker phases (`PROJECT.md §7`). DE names the
+     refinement on those reward rows and on no others.
+
+     It cuts both ways, which is why it cannot just be treated as a bonus.
+
+     `bestRefinement` picks a refinement per relic on the assumption that the
+     choice is yours - you spend the Void Traces and you spend them on whatever
+     clears your scarcest wanted reward fastest. A node that hands the relic
+     over Radiant has taken that choice away, so the only honest value is the
+     value AT THE REFINEMENT YOU WERE GIVEN:
+
+       * wanted Radiant anyway -> full value, and 100 Void Traces you keep
+       * wanted Intact, given Radiant -> the common you were after has gone from
+         25.33% to 16.67%, so this copy is worth less to this plan than one you
+         picked up on the star chart. Not worthless, and worth more outside the
+         plan - but the plan is what is being ranked.
+
+     Traces are counted but not scored. 100 traces is real - it is the whole
+     cost of a Radiant, and the owner rates it a serious bottleneck - but what
+     it is worth depends on how many you have, which is a fact about the player
+     that this app does not know. Same call as Mastery Rank: a player fact we
+     cannot see annotates the row rather than moving it. See TODO.md for the
+     exchange rate that would settle it. */
+  const TRACE_COST = { Intact: 0, Exceptional: 25, Flawless: 50, Radiant: 100 };
+
+  function sourceValue(s, rp) {
+    const given = s.refinement;
+    if (!given || !rp.byRefinement || rp.byRefinement[given] == null) {
+      return { value: rp.value, pre: false, traces: 0 };
+    }
+    return {
+      value: rp.byRefinement[given],
+      pre: true,
+      // what you would have paid to get this relic to the state it arrives in,
+      // net of what the plan was going to spend on it anyway
+      traces: Math.max(0, (TRACE_COST[given] || 0) - (TRACE_COST[rp.refinement] || 0)),
+    };
+  }
+
   /* ── the plan ────────────────────────────────────────────────── */
 
   function buildPlan() {
@@ -228,8 +269,17 @@
       if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value, openings, blocker } = bestRefinement(entries);
       if (value <= 0) return;
+      /* What this relic is worth at every refinement, not just the chosen one.
+         The choice assumes you decide - you buy the refinement with 100 Void
+         Traces and you buy the one that suits your bottleneck. Eleven nodes
+         take that choice away by handing the relic over already Radiant, and
+         then the only honest value is the value at the refinement you were
+         actually given. See `sourceValue`. */
+      const byRefinement = {};
+      REFINEMENTS.forEach((f) => { byRefinement[f] = relicValue(entries, f); });
+
       relicPlan.set(rname, {
-        refinement, value, openings, blocker, entries,
+        refinement, value, openings, blocker, entries, byRefinement,
         wants: Array.from(new Set(entries.map((e) => e.label))).sort(),
       });
     });
@@ -270,7 +320,13 @@
           nodes.set(key, n);
         }
         const slot = { A: "A", B: "B", C: "C" }[String(s.rotation || "").toUpperCase()] || "none";
-        n.rot[slot] += ((s.chance || 0) / 100) * rp.value;
+        const worth = sourceValue(s, rp);
+        if (worth.pre) {
+          n.preRefined = true;
+          n.tracesSaved = Math.max(n.tracesSaved || 0, worth.traces);
+          n.overshot = n.overshot || worth.value < rp.value - 1e-12;
+        }
+        n.rot[slot] += ((s.chance || 0) / 100) * worth.value;
         n.cnt[slot] += (s.chance || 0) / 100;
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev.chance) {
@@ -825,6 +881,24 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}${
+          n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
+            "Hands its relics over already Radiant." + "\n\n" +
+            (n.tracesSaved
+              ? "That is " + n.tracesSaved + " Void Traces you do not spend, on top of\n" +
+                "whatever the relic itself is worth.\n\n"
+              : "") +
+            (n.overshot
+              ? "But this plan wanted less refinement than that. Radiant\n" +
+                "trades commons away for rares - 25.33% down to 16.67% -\n" +
+                "and what you are blocked on here is a common, so a copy\n" +
+                "from this node is worth less to you than one off the star\n" +
+                "chart. Scored at what it is actually worth, not at what a\n" +
+                "relic of this name would be worth if the choice were yours."
+              : "This plan wanted Radiant anyway, so that is the whole\n" +
+                "refinement cost avoided and nothing given up for it.") + "\n\n" +
+            "The traces are counted, not scored: what 100 of them are worth\n" +
+            "depends on how many you have, which this app cannot see.")
+          }">${n.overshot ? "pre-refined" : "radiant"}</span>` : ""}${
           n.halved ? ` · <span class="est" data-tip="${esc(
             "Scored at half, deliberately." + "\n\n" +
             "Three hidden caches inside a boarded Railjack base is the" + "\n" +
