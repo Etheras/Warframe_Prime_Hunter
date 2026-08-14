@@ -16,27 +16,13 @@ raised again from scratch. Everything else is genuinely outstanding.
 
 ---
 
-## Decided — the batch being built now
+## The ten decisions of 2026-08-14 are all shipped
 
-**All ten answered by the owner on 2026-08-14.** This table is the plan of record.
-Work through it in the order below, committing each step on its own, so an
-interruption costs one step rather than the batch. Delete a row when it ships and
-move its reasoning into `PROJECT.md`.
-
-| # | Decision | Status |
-|---|---|---|
-| 7 | **Already done** — `serve.py` has served from a strict allowlist for some time; `.cache/`, `tools/`, `.git/` and directory listings all 404 already. The entry was stale, not open. Verified by calling `allowed()` directly. | ✅ nothing to do |
-| 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ✅ done |
-| 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ✅ done |
-| 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
-| 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
-| 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save; model the **endless-fissure bonus relic**; and reduce the value of a relic handed over at a *higher* refinement than the plan wants. | 🟡 **refinement done.** Traces are counted and shown, not scored — they need a player fact, like Mastery Rank. The fissure bonus is verified and deferred to decision 1, where it belongs: it is a reward for *cracking*, and no run mode here is long enough to reach it |
-| 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ✅ **done.** Profit-Taker's four phases are in, badged *Old Mate*, off the bounty clock. Swept every bounty, key, enemy and transient source for others: the only one is **Hemocyte**, which is already event-gated and now badged as an enemy rather than a place — see *Plague Star and Profit-Taker are the same shape* |
-| 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ✅ done |
-| 9a | ✅ **done.** (ii) a seventh availability bucket, decided after seeing the mockup. Rename *Farmable now* → **`Farmable`** while doing it, and make sure the new bucket reads as clearly distinct from the **Include Railjack** checkbox, which is a different thing and exists on both pages. | ✅ done |
-| 9b | ✅ **done.** Keep today's behaviour — the empty ranking that names the switch. Simplify the wording, and put the *"you must tick Include Railjack to farm this frame's relics"* line in a colour that **pops out**. Auto-include is *not* wanted. | ✅ done |
-| 9c | **Consolidate**, with the suggested node named in fine print by the existing tie-breaks — Aya, then lowest level — and the same in the collection view. | ✅ done |
-| 5 | ✅ **done.** (b) raise the whole meta line to `--txt-dim`. Chosen over (c) to avoid a one-off rule for the rotation label: *"I don't want too many things to have unique CSS unless needed."* | ✅ done |
+The table that stood here is gone, per this file's own rule: a row is deleted
+when it ships, and its reasoning moves to `PROJECT.md`. Ten answered, ten built.
+**One is only partly done** and keeps an entry of its own below — decision 10's
+**Void Traces**, which are counted and shown but not scored, because scoring
+them needs a fact only the player can supply.
 
 **Yours to do elsewhere, not here:** four corrections belong on
 [`wiki.warframe.com/w/Prime`](https://wiki.warframe.com/w/Prime) rather than in this
@@ -343,27 +329,26 @@ five, overtaking the single-objective missions.
 Railjack is excluded: its fissures are Void Storms, which are their own nodes
 with their own tables and no rotations to stay for.
 
-**The app does not know which nodes are fissures, and deliberately does not
-try.** The owner asked how this is calculated; the honest answer is that it is
-not. A fissure is an overlay that moves every hour or two, and this dataset is
-refreshed daily — so a fetched list (`/pc/fissures` exists) would be stale
-within hours and wrong more often than right. **A confidently wrong fissure map
-is worse than an honest assumption**, because the whole point of the ranking is
-to be trusted without checking.
+**The app now knows which nodes are fissures — and the bonus still does not use
+it.** When this was written the answer to *"how is that calculated"* was "it is
+not", because a fissure moves every hour or two against a dataset refreshed
+daily. Both halves of that changed on 2026-08-14: the build fetches
+`/pc/fissures` and the scheduler runs hourly, so the ranked rows carry a live
+**fissure badge** (see `PROJECT.md` — *The fissure marks the ranking*).
 
-So the bonus is added to every endless node **equally**, the row says *"+relic
-if fissure"* in amber, and the tooltip leads with the assumption rather than
-burying it. That is safe precisely because it is node-independent: a constant
-added to every endless node cannot reorder them against each other, so the only
-comparison it affects is *endless versus short* — and that one holds whatever
-the fissure map happens to look like.
+**The scoring is deliberately unchanged.** The bonus is still added to every
+endless node **equally**, and the row still says *"+relic if fissure"*. Feeding
+the live list into the score is the obvious next move and is the wrong one: it
+would reorder the ranking every hour on a fact that has expired by the time
+anyone acts on it, and a list that changes under you is one you stop trusting.
+The constant is safe precisely because it is node-independent — it cannot
+reorder endless nodes against each other, so the only comparison it moves is
+*endless versus short*, which holds whatever the fissure map looks like.
 
-**What would change this:** if the app ever refreshed often enough to hold a
-live fissure list — a running `serve.py` could poll it the way it already polls
-upstream freshness — then the bonus could be conditioned per node and the mode
-could name which nodes are fissures right now. That is a real feature, and it is
-the same shape as the freshness check that already exists. Not worth it on a
-daily build.
+**What is genuinely still open here:** the row now carries two related things —
+a badge saying *this is a fissure for 40 more minutes* and a marker saying
+*+relic if fissure*. A reader can join those, but the page does not. Worth
+revisiting once the entry below lands, since both are about the cracking side.
 
 **What is still deferred to decision 1:** the bonus is a reward for *cracking*
 relics, and it currently sits on the collecting side because that is where the
