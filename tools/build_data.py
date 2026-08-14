@@ -539,7 +539,6 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
 # letting it into the score would reshuffle the list hourly for a reason that
 # has expired by the time anyone reads it.
 FISSURE_TIERS = ("Lith", "Meso", "Neo", "Axi", "Omnia")
-OMNIA_OPENS = ("Lith", "Meso", "Neo", "Axi")
 
 
 def build_fissures(raw, now: datetime) -> list:
