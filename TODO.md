@@ -27,7 +27,7 @@ move its reasoning into `PROJECT.md`.
 | 7 | **Already done** — `serve.py` has served from a strict allowlist for some time; `.cache/`, `tools/`, `.git/` and directory listings all 404 already. The entry was stale, not open. Verified by calling `allowed()` directly. | ✅ nothing to do |
 | 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ✅ done |
 | 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
-| 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ⬜ |
+| 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ⬜ |
 | 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save, which the owner rates a serious bottleneck; model the **endless-fissure bonus relic** (claim to verify first); and reduce — only slightly — the value of a relic handed over at a *higher* refinement than the plan wants. | ⬜ |
 | 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ⬜ |
@@ -283,7 +283,28 @@ that corner was "% on top, like they used to". Splitting the ranking means the b
 number on the left column becomes a relic *count*, not a percentage, and that is
 the decision still to make.
 
-### Railjack caches probably should not be ranked at all — decision 4
+### Railjack caches are halved **[done 2026-08-14]**
+
+**Option (c), a flat 50%.** One named constant, `CACHE_PENALTY` in
+`rotation.js`, applied by the planner and nowhere else. The row says **halved**
+in amber with the reasoning on hover, because a score moved by a judgement and
+not saying so is the thing this project keeps refusing to do.
+
+**The relic count on the same row is untouched**, deliberately: what a run hands
+you is a fact, the penalty is only what we think it is worth going for, and a
+fact bent to suit an opinion would be a lie. A Veil Proxima cache now reads
+`3.65% per run` beside `0.32 relics · 28.93% of runs` — the second pair is what
+DE's numbers say and does not move.
+
+It is the **only** judgement of its kind in the model; everything else is
+arithmetic on published numbers. That is why it is one constant in one place
+rather than a fudge spread through the scoring.
+
+Kept below for the argument it settles, and because the second half of the
+original entry — whether they should be ranked *at all* — was answered with
+"yes, but lower" rather than "no".
+
+### The original entry, for the reasoning
 
 Of the two things once listed here against the same 38 Proxima nodes, the labelling
 half shipped on 2026-08-14: `Skirmish` and `Caches` now both carry a **Railjack**

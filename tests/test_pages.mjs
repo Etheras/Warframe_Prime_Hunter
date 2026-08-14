@@ -389,6 +389,50 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("a Railjack cache is scored at half, and the row says so", async () => {
+  /* The only deliberate thumb on the scale in the model, so it has to be both
+     applied and visible. The count on the same row must NOT move: what a run
+     hands you is a fact, the penalty is only what we think it is worth going
+     for, and a fact bent to suit an opinion would be a lie. */
+  const { page, errors } = await open("/plan.html");
+  /* Nyx Prime, whose every live route is a Railjack cache, so every ranked row
+     is one and none of this depends on where a halved node happens to sort. */
+  const only = await page.evaluate(() => {
+    const D = window.VORFRAME_DATA;
+    const it = D.items.find((i) => i.name === "Nyx Prime");
+    if (!it) return null;
+    localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ railjack: true }));
+    // by mode, never by calling isRailjackCache
+    return (it.relics || []).every((r) => {
+      const rec = D.relics[r];
+      return !rec || rec.vaulted ||
+        (rec.sources || []).every((s) => s.mode === "Caches");
+    });
+  });
+  assert.ok(only, "Nyx Prime is no longer caches-only - pick another subject " +
+                  "rather than letting this check drift into meaninglessness");
+  await page.reload({ waitUntil: "load" });
+
+  const row = page.locator("#planNodes .spot").filter({ hasText: "(Caches)" }).first();
+  assert.ok(await row.count() > 0, "a Caches node has to be rankable with Railjack on");
+  assert.match(await row.locator(".spot-meta").innerText(), /halved/,
+               "a score moved by a judgement has to say so on the row");
+
+  const halved = await page.evaluate(() => {
+    const R = window.VorFrameRotation;
+    const rot = { A: 0.4, B: 0, C: 0, none: 0 };
+    const cnt = { A: 0.4, B: 0, C: 0, none: 0 };
+    const r = R.runValue(rot, "reset", "Caches", false, null, cnt);
+    return { total: r.total, count: r.count, penalty: R.cachePenalty };
+  });
+  assert.equal(halved.penalty, 0.5);
+  assert.ok(Math.abs(halved.count - halved.total) < 1e-12,
+            "runValue itself must stay unpenalised - the planner applies it, " +
+            "so the collection view and the counts are not quietly moved too");
+  assert.deepEqual(errors, []);
+});
+
 page_test("an empty ranking names the switch that emptied it", async () => {
   /* The one place the planner can strand you. Nyx Prime's four parts all come
      from relics that exist only on Proxima, so with Railjack off the page finds

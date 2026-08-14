@@ -356,6 +356,21 @@ test("a node says what it demands before you can play it", () => {
                    ["PvPvE", "Steel Path"]);
 });
 
+test("a Railjack cache is halved, and nothing else in the model is", () => {
+  const ROT = loadRotation();
+  const cache = (extra) => ROT.isRailjackCache(Object.assign(
+    { mode: "Caches", node: "Arva Vector", planet: "Neptune" }, extra));
+
+  assert.equal(ROT.cachePenalty, 0.5, "the one judgement in the model, named once");
+  assert.equal(cache(), true, "a named Railjack node counts even on an ordinary planet");
+  assert.equal(cache({ node: "Flexa", planet: "Veil Proxima" }), true);
+  assert.equal(cache({ mode: "Skirmish" }), false,
+               "a Skirmish is what people actually run Railjack for");
+  assert.equal(cache({ node: "Ukko", planet: "Void" }), false,
+               "a Caches mode somewhere else would not have earned this");
+  assert.equal(ROT.isRailjackCache({}), false);
+});
+
 test("the Steel Path is recognised by name, and by the tier the wiki gates", () => {
   const ROT = loadRotation();
   const sp = (node) => ROT.isSteelPath({ node });

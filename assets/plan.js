@@ -350,7 +350,13 @@
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
       const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live, n.cnt);
-      n.score = r.total; n.perRound = r.perRound;
+      /* The one deliberate thumb on the scale in the whole model - see
+         rotation.js. Applied to the score, never to the count below it: what a
+         run hands you is a fact, this is only what we think it is worth going
+         for. */
+      n.halved = ROT.isRailjackCache(n);
+      n.score = r.total * (n.halved ? 1 - ROT.cachePenalty : 1);
+      n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
       n.planName = r.planName; n.bounty = r.bounty;
@@ -786,6 +792,17 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}${
+          n.halved ? ` · <span class="est" data-tip="${esc(
+            "Scored at half, deliberately." + "\n\n" +
+            "Three hidden caches inside a boarded Railjack base is the" + "\n" +
+            "worst relics-per-run in the list, and nobody runs Railjack" + "\n" +
+            "for them - you run a Skirmish and open what you pass. Left" + "\n" +
+            "unweighted they sort in among ordinary star-chart nodes," + "\n" +
+            "which is not where they belong." + "\n\n" +
+            "A flat 50%: a judgement, not a measurement, and the only" + "\n" +
+            "one in the model. The relic count on this row is untouched" + "\n" +
+            "- what the run drops is a fact.")
+          }">halved</span>` : ""}${
           n.aya ? ` · <span class="aya" data-tip="${esc(
             "Also drops Aya at " + pct(n.aya / 100) + " per reward." + "\n\n" +
             "One Aya buys one relic of your choosing at Varzia. Counted at " +

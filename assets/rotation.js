@@ -329,6 +329,29 @@
   const isRailjack = (s) =>
     RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
 
+  /* ── the one deliberate thumb on the scale ────────────────────────
+     A Railjack `Caches` run is three hidden caches inside a boarded base, and
+     it is the worst relics-per-run in the whole list. Nobody runs Railjack for
+     them - you run a Skirmish and open what you pass. Ranking them beside
+     ordinary star-chart nodes puts them somewhere they do not belong, which the
+     owner put more bluntly: "caches on a Railjack is insanely out-of-order and
+     out-of-place".
+
+     So they are halved. This is a judgement, not a measurement, and it is the
+     only one of its kind in the model - everything else here is arithmetic on
+     DE's published numbers. It is written as one named constant in one place so
+     it can be argued with, and the row says out loud that it has been applied.
+
+     What it does NOT touch is the relic count and drop chance on the same row.
+     What a run hands you is a fact; this is only what we think it is worth
+     going for, and a fact that moved to suit an opinion would be a lie.
+
+     All 38 live Caches nodes are Railjack today, so the mode alone would do -
+     the Railjack test is kept anyway, because a Caches mode somewhere else
+     would not have earned this. */
+  const CACHE_PENALTY = 0.5;
+  const isRailjackCache = (s) => s.mode === "Caches" && isRailjack(s);
+
   /* What a node asks of you before you can play it at all. Neither is a
      drawback in the ranking - both are perfectly good farms - but a node named
      "Arva Vector" gives no hint that it needs a ship and a crew, and one named
@@ -476,6 +499,7 @@
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     isRailjack, isPvPvE, isSteelPath, demandsOf, railjackOnly,
+    isRailjackCache, cachePenalty: CACHE_PENALTY,
     isEventNode, notADestination,
     bountyEvent, eventRunning,
   };
