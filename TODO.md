@@ -622,12 +622,24 @@ shape. Options:
 (ii) reads best and is the smallest change: the information to do it already
 exists, since `railjackOnly` answers exactly that question per item.
 
-**c. Steel Path variants are exact duplicates, and both are ranked.** Demonstrated
-2026-08-14 by weighting effort so Faceoff rose to the top: the list showed
-*Faceoff: Single Squad*, *Faceoff: Single Squad (Steel Path)*, *Faceoff: Squad VS
-Squad* and *Faceoff: Squad VS Squad (Steel Path)* — four rows, all at 4.7% per
-minute, filling half the visible eight. They are not merely similar; each Steel
-Path table is the same 22 relics at the same 8.33% as its ordinary twin.
+**c. Identical duplicate nodes — and this is far bigger than it was written up as.**
+
+The entry started as "the four Faceoff rows are duplicates". Comparing every
+live relic, rotation and chance across every node in the dataset — done while
+building the mockup — finds **36 groups of byte-identical nodes covering 167 of
+them**, the largest group being 16. Faceoff is one group out of 36, and not the
+worst. Examples: `Cambria / Hapke / Grildrig / Vesper / Arval / Suisei /
+Shklovsky / Unda` are one choice; so are `Mithra / Mot`, and `Oxomoco / Ukko`.
+
+That changes what this sub-decision is. Collapsing identical twins is not a
+tidy-up of one awkward pair; it is **the single biggest change available to what
+the list looks like** — the visible eight would become eight genuinely different
+choices rather than, at worst, two.
+
+**What it costs**, and this is the part to weigh: identical *relic tables* does
+not mean identical *nodes*. They differ in enemy level, which is the ranking's
+tie-break, and they may differ in vaulted relics, which the collection view still
+shows. A collapsed row has to pick a level or show a range.
 
 That duplication is also **why the Steel Path has no checkbox** — an option that
 moves two identical rows is not worth asking about, so the badge carries it
@@ -950,14 +962,34 @@ something they do not have. Worth fixing properly all the same.
 
 Option 1 is the real fix; the plumbing for it is already there.
 
-### The rotation label sits at 3.48:1 contrast — decision 5
+### The meta line sits at 1.97:1, not 3.48:1 — decision 5
 
-Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
-`--txt-faint`, which is below AA (4.5:1) and well below the 7:1 `STYLE.md §3`
-requires. It is deliberately dimmed as secondary information, so raising it changes
-the visual hierarchy on both pages — worth doing, but it is a design decision rather
-than a straight fix. The amber non-standard label deliberately matches this same brightness, so it
-shares the problem by design (`STYLE.md §1`).
+**Corrected 2026-08-14, and it is twice as bad as this entry has claimed since
+2026-08-10.** The original measurement took `--txt-faint` as `#667080` and
+ignored the alpha. The token is `#66708090` — the same colour at 56% — so what
+reaches the eye is a blend with the panel behind it:
+
+| | On `--panel` | |
+|---|---|---|
+| `#667080`, alpha ignored | **3.48:1** | what this entry said |
+| `#66708090`, as shipped | **1.97:1** | what it actually is |
+| `--txt-dim` `#96a1b3` | 6.68:1 | option (b) |
+| `--odd` amber `#684321` | 2.00:1 | tracks the line, so shares the problem |
+
+Confirmed against a rendered `.spot-meta` with `getComputedStyle`, not read off
+the stylesheet — which is what `STYLE.md §3` says to do, and the reason the first
+measurement went wrong. **That rule now has a second half: measure the element,
+not the token, because a token can carry an alpha.**
+
+The design argument is unchanged: the line is deliberately dimmed as secondary
+information, so raising it changes the hierarchy on both pages. But 1.97:1 is a
+weaker position to defend than 3.48:1 was.
+
+**Mocked up in `temp_mockup.html`** — the same real row rendered three ways, with
+every ratio measured live. Options as before: (a) leave it, (b) raise the whole
+line to `--txt-dim`, (c) raise only the rotation label, which is the one part of
+the line that is a control rather than context — but the amber has to move with
+it or stop matching (`STYLE.md §1`).
 
 ## Settled — answered, kept so the answer is not lost
 

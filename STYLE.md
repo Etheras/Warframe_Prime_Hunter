@@ -96,6 +96,13 @@ not against the page. Measure it rather than eyeballing:
 const cs = getComputedStyle(el); [cs.color, cs.backgroundColor]
 ```
 
+**Measure the element, never the token** — a token can carry an alpha, and then
+the colour that reaches the eye is a blend with whatever is behind it. This is
+not hypothetical: `--txt-faint` is `#66708090`, and reading it as `#667080` put
+the meta line's contrast in `TODO.md` at **3.48:1** for four days when the real
+figure is **1.97:1**. The line above returns `rgba(...)` with the alpha included,
+which is exactly why it is the instruction rather than "look up the hex".
+
 The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 
 ---
