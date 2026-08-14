@@ -948,6 +948,7 @@ for a release and nobody is harmed; these cannot.
 | `tools/schedule.ps1` | `$TaskName`, and `$LegacyTaskName` for the one already registered | two tasks refresh the same folder, or `-Remove` stops finding the old one. **Set `$LegacyTaskName` to the outgoing name** — that is the whole mechanism |
 | `tools/bundle.py` | `OUT_FILE` → `dist/warframe-prime-hunter.html` | this is the file people are told to download; the workflow copies it by name |
 | `.github/workflows/publish.yml` | the same filename, and the `-A` user agent | the publish step fails, or publishes nothing under the old link |
+| `.github/workflows/publish.yml` | the **cache key prefix** — and leave the old one in `restore-keys` | a stored cache keeps the key it was written with, so renaming the prefix orphans every one of them. CI then starts cold on every run and stays green only until an upstream refuses a datacenter IP with no cached copy left. **This is what happened on 2026-08-14**: 31 caches, all named for the old prefix, unreachable from one line's change |
 | `tools/sources.py` | `UA = "WarframePrimeHunter/1.0"` | nothing breaks; it is a courtesy to the APIs and should stay honest |
 | `package.json` | `name` | npm refuses some names — lowercase, no spaces |
 | `LICENSE`, `NOTICE.md` | the copyright line and the fan-project disclaimer | these are the legal text, so they should name whatever the thing is actually called |

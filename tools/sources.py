@@ -60,6 +60,15 @@ IMG_CDN = "https://cdn.warframestat.us/img/"
 OFFICIAL_DROPTABLES = "https://www.warframe.com/droptables"
 EXPORT_INDEX = "https://origin.warframe.com/PublicExport/index_en.txt.lzma"
 EXPORT_MANIFEST = "https://content.warframe.com/PublicExport/Manifest/{file}"
+# The same index, published on the host the manifests already come from. Digital
+# Extremes answer a GitHub runner with 403 from origin.warframe.com and 200 from
+# content.warframe.com - measured, and curl gets the same pair, so it is a
+# datacenter block rather than anything about the request. One blocked host is
+# not a reason for a cold build to have nothing at all.
+EXPORT_INDEX_HOSTS = (
+    EXPORT_INDEX,
+    "https://content.warframe.com/PublicExport/index_en.txt.lzma",
+)
 # the export files worth reading: everything that can carry a Prime
 EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
                  "ExportSentinels_en.json", "ExportRegions_en.json"]
@@ -111,6 +120,11 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     took CI down: api.warframestat.us did not answer the runner, both new keys
     landed in MISSING, and a build that had every relic and every item in hand
     aborted rather than publish without a countdown.
+
+    `url` may be several, for a document published on more than one host. They
+    are tried in order on every attempt, and the cache is only consulted once
+    all of them have failed - so a host that starts refusing us is routed around
+    rather than papered over with a copy from yesterday.
     """
     path = cache_path(key)
     if offline:
@@ -123,25 +137,28 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
+    urls = [url] if isinstance(url, str) else list(url)
     last_err = None
     for attempt in range(3):
-        try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": UA,
-                "Accept-Encoding": "gzip",
-            })
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                raw = resp.read()
-                if resp.headers.get("Content-Encoding") == "gzip":
-                    raw = gzip.decompress(raw)
-            os.makedirs(CACHE_DIR, exist_ok=True)
-            with gzip.open(path, "wb") as fh:
-                fh.write(raw)
-            return raw
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-            last_err = exc
-            if attempt < 2:
-                time.sleep(1.5 * (attempt + 1))
+        for one in urls:
+            try:
+                req = urllib.request.Request(one, headers={
+                    "User-Agent": UA,
+                    "Accept-Encoding": "gzip",
+                })
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    raw = resp.read()
+                    if resp.headers.get("Content-Encoding") == "gzip":
+                        raw = gzip.decompress(raw)
+                os.makedirs(CACHE_DIR, exist_ok=True)
+                with gzip.open(path, "wb") as fh:
+                    fh.write(raw)
+                return raw
+            except (urllib.error.URLError, urllib.error.HTTPError,
+                    TimeoutError, OSError) as exc:
+                last_err = exc
+        if attempt < 2:
+            time.sleep(1.5 * (attempt + 1))
 
     # warm: a previous copy exists, so this is only an alert
     if os.path.exists(path):
@@ -215,7 +232,7 @@ def upstream_signature(offline: bool = False) -> dict:
     sig: dict = {}
     try:
         sig["exportIndex"] = hashlib.sha256(
-            fetch(EXPORT_INDEX, "export_index", offline)).hexdigest()[:16]
+            fetch(EXPORT_INDEX_HOSTS, "export_index", offline)).hexdigest()[:16]
     except Exception:
         pass
 

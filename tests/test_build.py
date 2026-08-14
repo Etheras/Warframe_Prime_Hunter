@@ -573,6 +573,75 @@ def test_offline_build() -> None:
           "two builds from the same cache must agree")
 
 
+def test_a_blocked_host_is_routed_around() -> None:
+    """
+    Digital Extremes publish the export index on two hosts, and answer a GitHub
+    runner with 403 from one of them and 200 from the other. Measured, and curl
+    gets the same pair, so it is a datacenter block rather than anything about
+    the request.
+
+    A second host must be *tried*, not merely fallen back to: reaching for the
+    cache first would keep serving a copy from yesterday while a host that works
+    sits unasked, which is how this stayed invisible until the cache went.
+
+    file:// throughout - the question is whether the loop moves on, and that
+    does not need anybody's server to answer it.
+    """
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-hosts-")
+    url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
+    good = os.path.join(tmp, "index.bin")
+    with open(good, "wb") as fh:
+        fh.write(b"the real document")
+    dead, alive = url(os.path.join(tmp, "nothing-here.bin")), url(good)
+
+    real_cache = sources.CACHE_DIR
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        check("fetch: the second host answers when the first refuses",
+              sources.fetch((dead, alive), "probe_a"), b"the real document")
+        check("fetch: routing around a blocked host is not a stale read",
+              (sources.STALE, sources.MISSING), ([], []),
+              "it is a working answer from a working host, not yesterday's copy")
+        check("fetch: one host is still just a string",
+              sources.fetch(alive, "probe_b"), b"the real document")
+
+        # and the cold policy is untouched: every host failing is still fatal
+        try:
+            sources.fetch((dead, dead), "probe_c")
+            check_true("fetch: all hosts down is fatal on a cold build", False)
+        except SystemExit:
+            check_true("fetch: all hosts down is fatal on a cold build", True)
+    finally:
+        sources.CACHE_DIR = real_cache
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_an_unreadable_export_index_degrades_instead_of_crashing() -> None:
+    """
+    `acquire_export` has always had a hand-written giving-up path, and that path
+    returned two values where the caller unpacks three. So the one moment it was
+    written for - the export being unreadable - would have raised a ValueError
+    from the assignment rather than degrading, and the build would have died
+    with a message about tuple sizes instead of about Digital Extremes.
+
+    Never fired, because DE's index has never been reachable-but-corrupt. This
+    is what it does now.
+    """
+    real = build_data.fetch
+    try:
+        build_data.fetch = lambda *a, **k: b"not an lzma stream at all"
+        got = build_data.acquire_export(False)
+        check("export: gives up with the three values the caller unpacks", len(got), 3)
+        primes, levels, digest = got                     # the line that used to raise
+        check("export: and they are empty rather than wrong",
+              (primes, levels, digest), ([], {}, None))
+    finally:
+        build_data.fetch = real
+
+
 def test_cold_failure_is_fatal() -> None:
     """
     The warm/cold policy: a refresh that fails with nothing cached is critical,
@@ -1467,7 +1536,10 @@ def main() -> int:
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
         ("built payload", [test_built_payload]),
-        ("integration", [test_offline_build, test_cold_failure_is_fatal,
+        ("integration", [test_offline_build,
+                         test_a_blocked_host_is_routed_around,
+                         test_an_unreadable_export_index_degrades_instead_of_crashing,
+                         test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
                          test_an_optional_source_cannot_fail_the_build,
                          test_no_writer_leaves_orphans,

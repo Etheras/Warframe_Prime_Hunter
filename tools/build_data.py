@@ -52,7 +52,8 @@ import official                                           # noqa: E402
 import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
-                     DROP_FILES, EXPORT_MANIFEST, EXPORT_WANTED, FISSURES, IMG_CDN,
+                     DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_WANTED,
+                     FISSURES, IMG_CDN,
                      ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE,
                      SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
@@ -110,11 +111,15 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
 def acquire_export(offline: bool):
     """DE's official item manifest -> (list of Prime items, index hash)."""
     try:
-        blob = fetch(EXPORT_INDEX, "export_index", offline)
+        blob = fetch(EXPORT_INDEX_HOSTS, "export_index", offline)
         index = official.decode_index(blob)
-    except Exception as exc:
+    except Exception as exc:                              # noqa: BLE001
+        # Three values, because that is what the caller unpacks. This returned
+        # two for as long as it has existed - the one path that gives up would
+        # have raised a ValueError from the assignment instead of degrading,
+        # which is precisely the moment you least want a second failure.
         log(f"! public export index unavailable ({exc})")
-        return [], None
+        return [], {}, None
 
     exports = {}
     for want in EXPORT_WANTED:

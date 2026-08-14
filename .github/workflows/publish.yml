@@ -46,6 +46,14 @@ jobs:
       # has succeeded, a later run whose source is blocked reuses that copy and
       # reports it as stale, instead of failing outright. The very first run is
       # necessarily cold, so a failure there is a real error and should stop.
+      #
+      # The legacy prefix is load-bearing, exactly like $LegacyTaskName in
+      # tools/schedule.ps1. A cache already stored keeps the key it was written
+      # with, so renaming the prefix orphaned all 31 of them at a stroke: every
+      # run afterwards started cold, and stayed green only until DE's 403 on
+      # origin.warframe.com had no cached copy left to fall back on. Drop this
+      # line once a run has saved under the new prefix and the old ones have
+      # aged out.
       - name: Restore source cache
         uses: actions/cache@v6
         with:
@@ -53,6 +61,7 @@ jobs:
           key: prime-sources-${{ github.run_id }}
           restore-keys: |
             prime-sources-
+            vorframe-sources-
 
       # Which sources answer a datacenter IP is not always the same as which
       # answer a home connection, so record it before the build runs.
