@@ -917,30 +917,68 @@ fails if any one of the six keys is dropped.
 keys, globals, filenames and URLs should not carry the product name. Prose can
 say it as often as it likes — prose is free to change.
 
-**Audited 2026-08-14.** The name appears in 30 tracked files. Almost all of it is
-prose — comments, headings, `--help` text, the browser title — which is a
-find-and-replace and nothing more. Four uses are **not** prose, and those are the
-ones that cost something:
+**The backup format is already safe, and better than it looks.** The export
+writes `format: 3` and `parseBackup` never reads even that — it accepts anything
+carrying a `collected` array and reads the rest by section name. So a renamed
+app restores a file exported by any earlier name, with no migration at all.
 
-| Where | What | Cost of changing it |
+---
+
+#### How to do it again — the runbook
+
+Verified against the 2026-08-14 rename, which took two passes because the first
+one missed seven files. Steps 2 and 3 are what the first pass skipped.
+
+**1. Find every mention, and do not trust your memory of where they are.**
+
+```bash
+git grep -il "warframe prime hunter\|WarframePrimeHunter\|warframe-prime-hunter"
+```
+
+Currently 33 files. Almost all of it is prose — comments, headings, `--help`
+text, the `<title>` — and prose is a find-and-replace. **Files you never open
+are where a rename dies:** last time it was `tools/schedule.ps1`, whose task
+name is not prose at all.
+
+**2. Change the six things that are not prose.** Everything else can be wrong
+for a release and nobody is harmed; these cannot.
+
+| Where | What | If you get it wrong |
 |---|---|---|
-| `assets/shared.js` | six `localStorage` keys, `vorframe.collected.v1` and friends | **loses every user's data unless migrated.** One read-old-write-new pass on first load, then the old keys can be dropped a release later |
-| `tools/build_data.py` → `data/vorframe-data.js` | the global `window.VORFRAME_DATA`, plus `VORFRAME_UPSTREAM` from `serve.py` | mechanical: one writer, one reader per page, all in this repo |
-| `tools/bundle.py` | output filename `dist/vorframe.html` | mechanical, but it is the thing people are told to download |
-| `tools/sources.py` | HTTP `User-Agent: VorFrame/1.0` | mechanical, and worth updating out of politeness to the APIs |
+| `tools/schedule.ps1` | `$TaskName`, and `$LegacyTaskName` for the one already registered | two tasks refresh the same folder, or `-Remove` stops finding the old one. **Set `$LegacyTaskName` to the outgoing name** — that is the whole mechanism |
+| `tools/bundle.py` | `OUT_FILE` → `dist/warframe-prime-hunter.html` | this is the file people are told to download; the workflow copies it by name |
+| `.github/workflows/publish.yml` | the same filename, and the `-A` user agent | the publish step fails, or publishes nothing under the old link |
+| `tools/sources.py` | `UA = "WarframePrimeHunter/1.0"` | nothing breaks; it is a courtesy to the APIs and should stay honest |
+| `package.json` | `name` | npm refuses some names — lowercase, no spaces |
+| `LICENSE`, `NOTICE.md` | the copyright line and the fan-project disclaimer | these are the legal text, so they should name whatever the thing is actually called |
 
-Plus the file names `data/vorframe-data.{js,json}`, which are referenced by both
-pages, `.gitignore`, `serve.py`, the bundler and the GitHub workflow.
+**3. Leave the load-bearing names alone.** These were deliberately made
+name-free in 2026-08 and must stay that way — this is the reason the next rename
+is cheap:
 
-**The rule until then:** do not add a *fifth*. New storage keys, new globals, new
-filenames and new URLs should not carry the name. Prose can say VorFrame as much
-as it likes — prose is free to change.
+- `localStorage` keys `wfprimes.*` — behind them is a hand-ticked collection
+  that exists nowhere else. Renaming these needs a copy-not-move migration
+  (`LEGACY_PREFIX` in `shared.js` is the pattern, and it has its own test).
+- `window.WFPRIME_DATA`, `window.WFPRIME_UPSTREAM`, `WFPrimeShared` /
+  `WFPrimeRotation` / `WFPrimeModel`
+- `data/prime-data.{js,json}`
+- the `format: 3` key in a backup
+- the cron marker in `tools/schedule.sh`, which names the script's path for
+  exactly this reason
 
-**The backup format is already safe, and better than it looks.** The export writes
-`vorframe: 3`, but `parseBackup` never reads it — it accepts anything carrying a
-`collected` array and reads the rest by section name. So a renamed app restores an
-old file with no migration at all. The only branded thing in that path is the
-error message *"this doesn't look like a VorFrame backup"*, which is prose.
+**4. Re-run the search from step 1.** It should return only files you meant to
+leave. This is the step that was skipped last time.
+
+**5. `python tests/test_build.py`.** The suite reads several of these by name —
+the storage keys, the bundle filename, the two page titles — so a half-done
+rename shows up as failures rather than as a surprise months later.
+
+**6. The GitHub repository is a separate decision, and the answer so far is
+no.** Renaming it breaks every clone, bookmark and link, changes the Pages URL,
+and buys nothing the code cares about — nothing depends on the folder or remote
+name. `README.md` says so where somebody cloning would otherwise be confused.
+If you do rename it, GitHub redirects the old URL, but `git remote set-url` is
+still needed in every existing clone.
 
 ### Serving to a network exposes the folder, read-only **[done — the entry was stale]**
 
