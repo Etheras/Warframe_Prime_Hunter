@@ -960,11 +960,48 @@ the storage keys, the bundle filename, the two page titles — so a half-done
 rename shows up as failures rather than as a surprise months later.
 
 **6. The GitHub repository is a separate decision, and the answer so far is
-no.** Renaming it breaks every clone, bookmark and link, changes the Pages URL,
-and buys nothing the code cares about — nothing depends on the folder or remote
-name. `README.md` says so where somebody cloning would otherwise be confused.
-If you do rename it, GitHub redirects the old URL, but `git remote set-url` is
-still needed in every existing clone.
+no.** Nothing in the code depends on the remote or folder name, so renaming it
+buys nothing technical, and it costs one thing that does not come back — see the
+Pages note below. `README.md` says the repo is still `VorFrame` where somebody
+cloning would otherwise be confused.
+
+#### If you do rename the repository
+
+Four things move, and only four. Audited 2026-08-14 with
+`git grep -in vorframe` — everything else the search finds is a **deliberate
+legacy fallback** that must stay spelled the old way.
+
+1. **On GitHub:** repo → **Settings** → **General** → rename → **Rename**.
+   Nothing else on that page needs touching.
+2. **Every existing clone**, including this one:
+
+   ```bash
+   git remote set-url origin https://github.com/Etheras/NEW-NAME.git
+   ```
+
+   GitHub redirects the old repository URL indefinitely, so a clone that never
+   does this keeps working — but the redirect is a courtesy, not a contract, and
+   `git remote -v` will go on lying about where the code lives.
+3. **`README.md`** — the `git clone` line and the `cd` after it, plus the note
+   explaining that the repo name and the app name differ. That note is the only
+   reason to rename at all, so it goes when the mismatch does.
+4. **The local folder** is optional and independent. Nothing reads it.
+
+**The one real cost: the Pages URL changes** from
+`https://etheras.github.io/OLD/` to `/NEW/`, and unlike the repository URL
+**that one is not redirected** — the old address 404s. Any bookmark on a phone
+breaks silently, which for a site whose whole point is being open next to the
+game is the expensive part. Rename when you are ready to re-bookmark, not on a
+whim.
+
+**Leave these alone — they are the mechanism, not the mess:**
+
+| Where | Why it keeps the old spelling |
+|---|---|
+| `assets/shared.js` — `LEGACY_PREFIX = "vorframe."` | reads the pre-rename store so a hand-ticked collection survives. It is a migration; renaming it defeats it |
+| `.github/workflows/publish.yml` — `vorframe-sources-` in `restore-keys` | reaches caches saved under the old prefix. Drop only once none are left |
+| `tools/schedule.ps1` — `$LegacyTaskName` | finds a task already registered under the old name, so `-Remove` works and re-registering does not leave two |
+| `tests/test_assets.mjs` — the planted `vorframe.*` keys | the fixture *is* the old world; a migration test cannot use the new names |
 
 ### Serving to a network exposes the folder, read-only **[done — the entry was stale]**
 
