@@ -820,6 +820,11 @@ abbr.rot-odd:hover{color:#c07a3c;text-decoration-color:#c07a3c}
 .demand{font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;
   color:var(--blue);border:1px solid #2c4a63;border-radius:3px;
   padding:1px 5px;margin-left:6px;vertical-align:1px;cursor:help}
+/* "+7 same" — how many other nodes are this exact bet. Quieter than a demand
+   badge and not a box: it is a count, not a requirement, and the row it sits on
+   is already the answer. */
+.same{font-size:10px;color:var(--txt-dim);margin-left:7px;cursor:help;
+  border-bottom:1px dotted var(--line)}
 
 /* "farming for" control on a card */
 .card-farm{

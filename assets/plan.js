@@ -545,7 +545,38 @@
       return (a.node || "").localeCompare(b.node || "");
     });
 
-    return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
+    /* Fold nodes that are the same bet into one row. DE writes one relic table
+       per tier and rotation shape, so eight low-level Lith Defense nodes are a
+       single choice listed eight times - and the visible eight rows could all
+       be that one choice. See `ROT.signature` for what counts as the same.
+
+       Folded after the sort, not before, so the survivor keeps the position the
+       group had already earned - every member scores identically, so the group
+       has one rank and there is nothing to choose between them on. Which node
+       to *name* is a separate question, and `ROT.pickNode` answers it with the
+       ranking's own tie-breaks so the fine print agrees with what the list
+       would have said anyway. */
+    const order = [];
+    const groups = new Map();
+    ranked.forEach((n) => {
+      const key = ROT.signature(n);
+      if (groups.has(key)) { groups.get(key).push(n); return; }
+      groups.set(key, [n]);
+      order.push(key);
+    });
+    /* The picked node *becomes* the row rather than being named beside it, so
+       everything else on the row - level, planet, demand badges - is that
+       node's too. Naming one node and showing another's level was the obvious
+       way to build this and would have been quietly wrong. */
+    const folded = order.map((key) => {
+      const group = groups.get(key);
+      const pick = group.length > 1 ? ROT.pickNode(group) : group[0];
+      pick.sameAs = group.length > 1 ? group : null;
+      return pick;
+    });
+
+    return { relicPlan, ranked: folded, places: ranked.length,
+             needs, formaShort, ayaValue, ayaRelic,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
              blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
@@ -849,7 +880,7 @@
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-            ayaRotationLive, ayaMissing, perMinute, blocked } = buildPlan();
+            ayaRotationLive, ayaMissing, perMinute, blocked, places } = buildPlan();
     renderEffort(ranked);
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
@@ -864,7 +895,10 @@
     $("#planSummary").innerHTML =
       `<b>${needs.length}</b> thing${needs.length === 1 ? "" : "s"} still needed · ` +
       `<b>${openRelics}</b> relic${openRelics === 1 ? "" : "s"} can supply them · ` +
-      `<b>${ranked.length}</b> place${ranked.length === 1 ? "" : "s"} to run`;
+      `<b>${places}</b> place${places === 1 ? "" : "s"} to run` +
+      (places > ranked.length
+        ? ` · <b>${ranked.length}</b> genuinely different`
+        : "");
 
     $("#planScoreNote").innerHTML =
       `<b>These are two lists, not one.</b> <i>Where to go</i> ranks on how many ` +
@@ -922,7 +956,14 @@
       return `<div class="spot">
         <div class="spot-where">${esc(n.node)}
           <span class="spot-mode${n.nonStandard ? " odd" : ""}">(${esc(n.mode)})</span>
-          <span class="src-planet">— ${esc(n.planet)}</span>
+          <span class="src-planet">— ${esc(n.planet)}</span>${
+          n.sameAs ? `<span class="same" data-tip="${esc(
+            n.sameAs.length + " nodes are this same bet — same relics, same rates.\n" +
+            "Shown: " + n.node +
+            (n.aya ? ", which also drops Aya." : ", the lowest level of them.") + "\n\n" +
+            n.sameAs.map((x) => "  " + x.node + " (" + x.planet + ")" +
+              (x.lvl ? "  lvl " + x.lvl[0] + "–" + x.lvl[1] : "")).join("\n"))
+          }">+${n.sameAs.length - 1} same</span>` : ""}
           ${demandTags(n)}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
         <div class="spot-meta">${runTag(n)}${

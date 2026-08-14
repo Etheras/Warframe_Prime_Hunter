@@ -995,6 +995,38 @@ state or a warning.
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
 
+### Nodes that are the same bet are one row
+
+**Digital Extremes do not write a relic table per node.** They write one per
+tier and rotation shape and hang it on every node that fits — so eight low-level
+Lith Defense nodes are a single choice listed eight times, and a list that shows
+the best eight places could spend all eight rows on it.
+
+Nodes fold together when **the relic table and the mission type both match**.
+Both halves matter:
+
+- The table is taken from what the planner *scored* — relic, chance and rotation
+  — not from the raw drop rows. Two nodes are the same bet when what you would
+  get for going there is the same, which is a statement about this plan.
+- Identical tables across **different** modes are common (Survival and Excavation
+  share several). Those are the same reward from a different activity, which is
+  a choice worth keeping rather than a duplicate worth hiding. Thirteen of the
+  thirty-six duplicate groups in the data span modes, and none of them folds.
+
+**The surviving row is the node you would rather run**, not whichever sorted
+first: `pickNode` uses the ranking's own tie-breaks in the same order — Aya, then
+lowest enemy level, then name so it never wobbles. And it *becomes* the row
+rather than being named beside it, so the level, planet and demand badges shown
+are that node's too. Naming one node and showing another's level was the obvious
+way to build this and would have been quietly wrong.
+
+The count of what was folded is on the row (`+8 same`) with the full list on
+hover, and the summary keeps both numbers: *233 places to run · 114 genuinely
+different*. Nothing is hidden — a fold is not a filter.
+
+Both pages do it, through the same two functions, so they cannot disagree about
+what counts as a duplicate or which of a group to name.
+
 ### Two lists, two questions, never one score
 
 **Split on 2026-08-14.** Collecting relics and cracking them are different

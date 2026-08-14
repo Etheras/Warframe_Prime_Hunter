@@ -373,19 +373,28 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
     });
   });
 
-  const steel = page.locator("#planNodes .spot").filter({ hasText: "(Steel Path)" });
-  assert.ok(await steel.count() > 0,
-            "a Steel Path node has to be rankable - it is not filtered out");
+  /* Not filtered out - folded. A Steel Path Faceoff table is the same 22 relics
+     at the same rates as its ordinary twin, which is exactly what makes two
+     nodes one bet, so the pair collapses to a single row and the variant lives
+     in that row's "+N same" list. Filtering and folding look alike from outside
+     and are not: nothing was hidden, and the row that survived is the one you
+     would rather run. */
+  const faceoff = page.locator("#planNodes .spot").filter({ hasText: "Faceoff" });
+  assert.ok(await faceoff.count() > 0, "Faceoff has to be on screen to test this");
+  assert.equal(await page.locator("#planNodes .spot")
+                         .filter({ hasText: "(Steel Path)" }).count(), 0,
+               "a Steel Path twin should be folded into its ordinary version, " +
+               "not shown as a second row for the same bet");
+
+  const same = faceoff.first().locator(".same");
+  assert.ok(await same.count() > 0, "the folded row has to say how many it stands for");
+  assert.match(await same.first().evaluate((e) => e.dataset.tip), /Steel Path/,
+               "and name the twin it folded, or the information is simply gone");
+
   // innerText, not textContent: the badge is uppercased in CSS
-  const labels = await steel.first().locator(".demand").allInnerTexts();
-  assert.ok(labels.includes("STEEL PATH"),
-            `the row must say what it needs, got ${JSON.stringify(labels)}`);
+  const labels = await faceoff.first().locator(".demand").allInnerTexts();
   assert.ok(labels.includes("PVPVE"),
-            "and Faceoff's own demand stacks with it rather than replacing it");
-  assert.match(await steel.first().locator(".demand")
-                          .filter({ hasText: "STEEL PATH" }).first()
-                          .evaluate((e) => e.closest("[data-tip]").dataset.tip),
-               /second star chart/i, "the badge has to carry its explanation");
+            `the surviving row keeps its own demands, got ${JSON.stringify(labels)}`);
   assert.deepEqual(errors, []);
 });
 

@@ -494,7 +494,7 @@
       e.planName = r.planName; e.bounty = r.bounty;
     });
 
-    return Array.from(map.values())
+    const ranked = Array.from(map.values())
       .map((e) => ({
         ...e,
         count: e.relics.size,
@@ -521,8 +521,26 @@
         const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
         if (al !== bl) return al - bl;
         return (a.node || "").localeCompare(b.node || "");
-      })
-      .slice(0, 8);
+      });
+
+    /* Fold nodes that are the same bet, exactly as the planner does and through
+       the same two functions, so the two pages cannot disagree about what
+       counts as a duplicate or which of a group to name. Eight rows for one
+       choice wastes a list that only shows eight. */
+    const order = [];
+    const groups = new Map();
+    ranked.forEach((e) => {
+      const key = ROT.signature(e);
+      if (groups.has(key)) { groups.get(key).push(e); return; }
+      groups.set(key, [e]);
+      order.push(key);
+    });
+    return order.map((key) => {
+      const group = groups.get(key);
+      const pick = group.length > 1 ? ROT.pickNode(group) : group[0];
+      pick.sameAs = group.length > 1 ? group : null;
+      return pick;
+    }).slice(0, 8);
   }
 
   /* ── drawer ───────────────────────────────────────────────── */
@@ -754,7 +772,14 @@
             <div class="spot-where">${esc(s.node)}
               <span class="spot-mode${s.nonStandard ? " odd" : ""}">(${esc(s.mode)})</span>${
               s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""
-              }${demandTags(s)}</div>
+              }${demandTags(s)}${
+              s.sameAs ? `<span class="same" data-tip="${esc(
+                s.sameAs.length + " nodes are this same bet — same relics, same rates.\n" +
+                "Shown: " + s.node +
+                (s.aya ? ", which also drops Aya." : ", the lowest level of them.") + "\n\n" +
+                s.sameAs.map((x) => "  " + x.node + " (" + x.planet + ")" +
+                  (x.lvl ? "  lvl " + x.lvl[0] + "–" + x.lvl[1] : "")).join("\n"))
+              }">+${s.sameAs.length - 1} same</span>` : ""}</div>
             <div class="spot-meta">${
               s.kind === "bounty" ? bountyRotTag(s)
                 : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)

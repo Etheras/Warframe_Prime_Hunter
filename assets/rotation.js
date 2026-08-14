@@ -324,6 +324,39 @@
     return { count: 1, unit: "run" };
   }
 
+  /* ── nodes that are the same choice ───────────────────────────────
+     Digital Extremes do not write a relic table per node. They write one per
+     tier and rotation shape and hang it on every node that fits, so eight
+     low-level Lith Defense nodes are one bet listed eight times - and a list
+     showing the best eight places can spend all eight rows on a single choice.
+
+     Two nodes fold together only when the relic table AND the mission type
+     match. Identical tables across *different* modes happen a lot (Survival and
+     Excavation share several) and those are the same reward from a different
+     activity, which is a choice worth keeping rather than a duplicate worth
+     hiding.
+
+     `signature` is deliberately built from what the planner scored, not from
+     the raw drop table: two nodes are the same choice when what you would get
+     for going there is the same, which is a statement about this plan. */
+  function signature(n) {
+    return n.mode + "|" + Array.from(n.relics.entries())
+      .map(([name, v]) => name + ":" + v.chance + "@" + (v.rotation || "-"))
+      .sort().join(",");
+  }
+
+  /* Which of a group of identical nodes to actually name. The same tie-breaks
+     the ranking already uses, in the same order, so the pick agrees with what
+     the list would have done if these had stayed separate rows: Aya first,
+     then the lowest enemy level, then the name so it never wobbles. */
+  function pickNode(group) {
+    return group.slice().sort((a, b) =>
+      (b.aya || 0) - (a.aya || 0) ||
+      (a.lvl ? a.lvl[0] : Infinity) - (b.lvl ? b.lvl[0] : Infinity) ||
+      (a.node || "").localeCompare(b.node || "")
+    )[0];
+  }
+
   /* ── which sources count at all ───────────────────────────────────
      Railjack nodes need a crewed ship and a different star chart, so they are
      opt-in; they are never hidden from the collection view, since some live
@@ -551,6 +584,7 @@
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
+    signature, pickNode,
     isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
     isRailjackCache, cachePenalty: CACHE_PENALTY,
     isEventNode, notADestination,

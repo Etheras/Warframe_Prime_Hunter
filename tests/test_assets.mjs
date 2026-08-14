@@ -452,6 +452,48 @@ test("the Profit-Taker heist asks for standing, and says so", () => {
                /Rank 5/, "the tip has to name the rank, not just imply a gate");
 });
 
+test("two nodes are the same bet only when the table AND the mode match", () => {
+  const ROT = loadRotation();
+  const node = (over) => Object.assign({
+    node: "Cambria", planet: "Earth", mode: "Defense", lvl: [2, 5], aya: 0,
+    relics: new Map([["Lith A1", { chance: 11.06, rotation: "A" }],
+                     ["Meso B2", { chance: 25.33, rotation: "C" }]]),
+  }, over);
+
+  const base = ROT.signature(node());
+  assert.equal(ROT.signature(node({ node: "Hapke", planet: "Phobos", lvl: [3, 7] })),
+               base, "same table, same mode, different rock - one bet");
+
+  /* Identical tables across different modes are common: Survival and Excavation
+     share several. Those are the same reward from a different activity, which
+     is a choice worth keeping rather than a duplicate worth hiding. */
+  assert.notEqual(ROT.signature(node({ mode: "Excavation" })), base,
+                  "same table, different activity - not the same bet");
+  assert.notEqual(ROT.signature(node({
+    relics: new Map([["Lith A1", { chance: 11.06, rotation: "A" }]]) })), base,
+    "a different table is a different bet even at the same node type");
+  assert.notEqual(ROT.signature(node({
+    relics: new Map([["Lith A1", { chance: 2.5, rotation: "A" }],
+                     ["Meso B2", { chance: 25.33, rotation: "C" }]]) })), base,
+    "same relics at different rates is a different bet");
+});
+
+test("the node named for a group is the one the tie-breaks would have picked", () => {
+  const ROT = loadRotation();
+  const n = (node, lvl, aya) => ({ node, planet: "X", lvl, aya: aya || 0 });
+
+  /* The ranking breaks ties on Aya then lowest level, so the fold has to pick
+     the same way - otherwise the fine print recommends a node the list itself
+     would have put second. */
+  assert.equal(ROT.pickNode([n("Casta", [12, 17]), n("Lith", [2, 5]),
+                             n("Spear", [8, 12])]).node, "Lith",
+               "lowest enemy level wins when nothing else separates them");
+  assert.equal(ROT.pickNode([n("Lith", [2, 5]), n("Casta", [12, 17], 4.17)]).node,
+               "Casta", "Aya outranks a lower level, exactly as the sort does");
+  assert.equal(ROT.pickNode([n("Zeta", null), n("Alpha", null)]).node, "Alpha",
+               "with nothing to separate them, the name - so it never wobbles");
+});
+
 test("a Railjack cache is halved, and nothing else in the model is", () => {
   const ROT = loadRotation();
   const cache = (extra) => ROT.isRailjackCache(Object.assign(
