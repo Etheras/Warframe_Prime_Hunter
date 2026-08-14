@@ -1,4 +1,4 @@
-# VorFrame — visual style
+# Warframe Prime Hunter — visual style
 
 The rules a new page follows so it looks like it belongs. **Read this before
 adding any UI**, and update it whenever a genuinely new pattern is introduced —

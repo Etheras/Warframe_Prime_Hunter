@@ -1,6 +1,6 @@
 # Third-party sources and attribution
 
-VorFrame's own code is MIT licensed (see [LICENSE](LICENSE)). The data it
+Warframe Prime Hunter's own code is MIT licensed (see [LICENSE](LICENSE)). The data it
 displays comes from the sources below, each with its own terms. This file
 records what they are and what each one requires.
 
@@ -40,7 +40,7 @@ circumstances.
 ## Digital Extremes Ltd. — WARFRAME
 
 WARFRAME, all game data, item names, artwork, and related trademarks are the
-property of **Digital Extremes Ltd.** VorFrame reads two publicly published
+property of **Digital Extremes Ltd.** Warframe Prime Hunter reads two publicly published
 endpoints:
 
 - <https://www.warframe.com/droptables> — the official drop tables
@@ -54,7 +54,7 @@ which permits non-commercial fan works using Warframe assets. Relevant terms:
 - *"Do not use Warframe or Digital Extremes logos without express written
   consent from Digital Extremes."*
 
-VorFrame accordingly: charges nothing, sells nothing, carries no advertising,
+Warframe Prime Hunter accordingly: charges nothing, sells nothing, carries no advertising,
 uses no DE or Warframe logo or wordmark as branding, and states on every page
 that it is unofficial.
 
@@ -107,7 +107,7 @@ The Prime catalogue's categories and availability markers are parsed from
 <https://wiki.warframe.com/w/Prime>.
 
 Wiki text is licensed **[CC BY-SA](https://creativecommons.org/licenses/by-sa/3.0/)**
-(Creative Commons Attribution–ShareAlike). VorFrame extracts factual values —
+(Creative Commons Attribution–ShareAlike). Warframe Prime Hunter extracts factual values —
 item names, their category, and vault-status markers — rather than reproducing
 wiki prose, and attributes the wiki in the site footer and here. Any wiki text
 reproduced verbatim in a derivative work must remain under CC BY-SA.
@@ -115,7 +115,7 @@ reproduced verbatim in a derivative work must remain under CC BY-SA.
 ## Warframe Community Developers (WFCD)
 
 - **[warframe-drop-data](https://github.com/WFCD/warframe-drop-data)** — MIT
-  licensed. A mirror of DE's official drop tables, used as VorFrame's automatic
+  licensed. A mirror of DE's official drop tables, used as Warframe Prime Hunter's automatic
   fallback when warframe.com is unreachable.
 - **[warframe-status](https://github.com/WFCD/warframe-status)** —
   Apache-2.0 licensed. Powers `api.warframestat.us`, used for item metadata,
@@ -129,8 +129,8 @@ copyright notices are preserved by this file.
 
 ---
 
-## What VorFrame does not redistribute
+## What Warframe Prime Hunter does not redistribute
 
-The generated dataset (`data/vorframe-data.js`) is deliberately **not committed**
+The generated dataset (`data/prime-data.js`) is deliberately **not committed**
 to this repository. Every clone and every CI build downloads it fresh from the
 sources above, so DE's data is never republished from here.

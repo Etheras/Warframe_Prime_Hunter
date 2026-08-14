@@ -6,7 +6,7 @@ The result has the stylesheet, both scripts and the dataset inlined, so it is a
 single file you can copy to a USB stick, email to yourself, or drop on any
 machine with a browser. No Python, no server, no internet needed to open it.
 
-    python tools/bundle.py            -> dist/vorframe.html
+    python tools/bundle.py            -> dist/warframe-prime-hunter.html
 
 It carries **both** views. They are two views of one dataset, so shipping only
 the collection made the standalone build a lesser thing than the served site.
@@ -29,7 +29,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "dist")
-OUT_FILE = os.path.join(OUT_DIR, "vorframe.html")
+OUT_FILE = os.path.join(OUT_DIR, "warframe-prime-hunter.html")
 
 CLOSE_SCRIPT = "</" + "script>"
 ESCAPED_CLOSE = "<" + chr(92) + "/" + "script>"
@@ -59,7 +59,7 @@ def main() -> int:
     model_js = read("assets", "model.js")
     app_js = read("assets", "app.js")
     plan_js = read("assets", "plan.js")
-    data = read("data", "vorframe-data.js")
+    data = read("data", "prime-data.js")
 
     def guard(text: str) -> str:
         # a literal </script> inside inlined JS would close the tag early

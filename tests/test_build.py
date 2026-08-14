@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VorFrame's test suite. Standard library only, like everything else here.
+Prime Hunter's test suite. Standard library only, like everything else here.
 
     python tests/test_build.py            # everything that needs no network
     python tests/test_build.py --online   # adds the real clone-and-build test
@@ -19,7 +19,7 @@ runs with --online.
 *Browser tests* cover the JavaScript, which is where the rotation model lives
 and which nothing checked until two of its bugs reached a browser. They are in
 tests/test_assets.mjs and run under Node's own test runner, folded into the
-output here so there is still one command to run. Node is optional -- VorFrame
+output here so there is still one command to run. Node is optional -- Prime Hunter
 itself never needs it -- so they are skipped where it is not installed.
 
 Every test here exists because of a bug that actually happened. The comment on
@@ -416,7 +416,7 @@ def test_live_event_bounties() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_built_payload() -> None:
-    path = os.path.join(ROOT, "data", "vorframe-data.json")
+    path = os.path.join(ROOT, "data", "prime-data.json")
     if not os.path.exists(path):
         print("  skip built payload (run tools/build_data.py first)")
         return
@@ -515,10 +515,10 @@ def test_offline_build() -> None:
                        cwd=ROOT, capture_output=True, text=True)
     check("offline build: exits 0", r.returncode, 0, r.stderr[-400:])
 
-    first = read_json(os.path.join(ROOT, "data", "vorframe-data.json"))
+    first = read_json(os.path.join(ROOT, "data", "prime-data.json"))
     subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
                    cwd=ROOT, capture_output=True, text=True)
-    second = read_json(os.path.join(ROOT, "data", "vorframe-data.json"))
+    second = read_json(os.path.join(ROOT, "data", "prime-data.json"))
     for d in (first, second):
         d["meta"].pop("generated", None)
     check("offline build: deterministic", first == second,  True,
@@ -531,7 +531,7 @@ def test_cold_failure_is_fatal() -> None:
     because the alternative is silently publishing a site with most of the game
     missing. It must exit non-zero unless --allow-degraded is passed.
     """
-    tmp = tempfile.mkdtemp(prefix="vorframe-cold-")
+    tmp = tempfile.mkdtemp(prefix="primehunter-cold-")
     try:
         for d in ("tools", "data"):
             os.makedirs(os.path.join(tmp, d), exist_ok=True)
@@ -545,7 +545,7 @@ def test_cold_failure_is_fatal() -> None:
                            cwd=tmp, capture_output=True, text=True, env=env, timeout=180)
         check_true("cold build: refuses to write a thin site", r.returncode != 0,
                    "a cold failure must not silently produce a partial dataset")
-        wrote = os.path.exists(os.path.join(tmp, "data", "vorframe-data.js"))
+        wrote = os.path.exists(os.path.join(tmp, "data", "prime-data.js"))
         check("cold build: writes no data file", wrote, False)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -560,7 +560,7 @@ def test_clone_and_build(online: bool) -> None:
     if not online:
         print("  skip clone-and-build (needs --online)")
         return
-    tmp = tempfile.mkdtemp(prefix="vorframe-clone-")
+    tmp = tempfile.mkdtemp(prefix="primehunter-clone-")
     try:
         r = subprocess.run(["git", "clone", "--depth", "1", ROOT, tmp],
                            capture_output=True, text=True, timeout=300)
@@ -568,7 +568,7 @@ def test_clone_and_build(online: bool) -> None:
 
         # a fresh clone must not carry the dataset -- it is gitignored on purpose
         check("clone: ships no dataset",
-              os.path.exists(os.path.join(tmp, "data", "vorframe-data.js")), False,
+              os.path.exists(os.path.join(tmp, "data", "prime-data.js")), False,
               "DE's data is rebuilt on demand, never committed")
         check("clone: ships no artwork",
               os.path.isdir(os.path.join(tmp, "assets", "img")), False)
@@ -577,7 +577,7 @@ def test_clone_and_build(online: bool) -> None:
                            cwd=tmp, capture_output=True, text=True, timeout=900)
         check("clone: build succeeds", r.returncode, 0, r.stdout[-600:] + r.stderr[-600:])
 
-        built = os.path.join(tmp, "data", "vorframe-data.json")
+        built = os.path.join(tmp, "data", "prime-data.json")
         check_true("clone: dataset written", os.path.exists(built))
         if os.path.exists(built):
             D = read_json(built)
@@ -638,7 +638,7 @@ def test_unreachable_sources_are_tagged() -> None:
     check("Aya rows are tagged too", aya[0].get("access"), "event:Plague Star")
 
     # and it holds against the built payload rather than only a fixture
-    payload = os.path.join(ROOT, "data", "vorframe-data.json")
+    payload = os.path.join(ROOT, "data", "prime-data.json")
     if os.path.exists(payload):
         D = read_json(payload)
         live = [s for r in D["relics"].values() for s in (r.get("sources") or [])
@@ -666,7 +666,7 @@ def test_an_optional_source_cannot_fail_the_build() -> None:
     test cannot arrange, but an unroutable host can.
     """
     before_missing = list(sources.MISSING)
-    unreachable = "https://vorframe.invalid./nothing"
+    unreachable = "https://primehunter.invalid./nothing"
 
     got = sources.fetch(unreachable, "test_optional_source", optional=True)
     check("optional source: a cold miss returns nothing", got, None)
@@ -702,7 +702,7 @@ def test_no_writer_leaves_orphans() -> None:
     left the catalogue, and nothing noticed.
     """
     import artwork as art
-    D_path = os.path.join(ROOT, "data", "vorframe-data.json")
+    D_path = os.path.join(ROOT, "data", "prime-data.json")
     if not os.path.exists(D_path):
         print("  skip orphan check (no dataset)")
         return
@@ -820,7 +820,7 @@ def test_runs_on_the_other_platform() -> None:
     #    got one yet - which is exactly the state CI runs the tests in, and
     #    this check duly failed there on its first run. Absence is only a
     #    problem for files that are supposed to be committed.
-    GENERATED = {"data/vorframe-data.js"}
+    GENERATED = {"data/prime-data.js"}
     miscased, absent, seen = [], [], 0
     for page in ("index.html", "plan.html"):
         markup = read_text(os.path.join(ROOT, page))
@@ -889,7 +889,7 @@ def test_runs_on_the_other_platform() -> None:
     # 7. Artwork filenames come from DE's item data and are written to disk. A
     #    colon or a question mark in one is legal on Linux and unopenable on
     #    Windows, so the whole cache would fail there and nowhere else.
-    payload = os.path.join(ROOT, "data", "vorframe-data.json")
+    payload = os.path.join(ROOT, "data", "prime-data.json")
     if os.path.exists(payload):
         illegal = re.compile(r'[<>:"|?*\\]')
         check("artwork: every filename is legal on Windows",
@@ -943,7 +943,7 @@ def test_a_pre_refined_relic_reward_keeps_its_refinement() -> None:
     # ...and against the real table, if this checkout has been built. Eleven
     # nodes, eighty rows, every one Radiant. A new one appearing is worth
     # knowing about rather than absorbing silently.
-    built = os.path.join(ROOT, "data", "vorframe-data.json")
+    built = os.path.join(ROOT, "data", "prime-data.json")
     if os.path.exists(built):
         with open(built, encoding="utf-8") as fh:
             payload = json.load(fh)
@@ -1062,7 +1062,7 @@ def test_server_serves_only_the_site() -> None:
     # twenty-one lines of output.
     wanted = ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
               "assets/rotation.js", "assets/shared.js", "assets/model.js",
-              "assets/styles.css", "data/vorframe-data.js",
+              "assets/styles.css", "data/prime-data.js",
               "assets/img/AshPrime.png")
     check("serves every file the pages ask for",
           [p for p in wanted if not serve.allowed(p)], [])
@@ -1070,7 +1070,7 @@ def test_server_serves_only_the_site() -> None:
     forbidden = (".git/config", ".git/HEAD", ".git/objects/info/packs",
                  ".cache/api_items.gz", ".cache/state.json", "tools/serve.py",
                  "tests/test_build.py", ".gitignore", "PROJECT.md",
-                 "dist/vorframe.html", "assets/img/sub/nested.png")
+                 "dist/warframe-prime-hunter.html", "assets/img/sub/nested.png")
     check("serves nothing else", [p for p in forbidden if serve.allowed(p)], [],
           "an allowlist that leaks is worse than none, because it is trusted")
 
@@ -1135,7 +1135,7 @@ def test_server_serves_only_the_site() -> None:
     # visitor's address cannot reach a third party even by accident.
     import artwork as art
     if art.have_local_images():
-        payload = read_text(os.path.join(ROOT, "data", "vorframe-data.js"))
+        payload = read_text(os.path.join(ROOT, "data", "prime-data.js"))
         if "cdn.warframestat.us" not in payload:
             check("CSP forbids the CDN when artwork is local",
                   "cdn.warframestat.us" in serve.build_csp(), False)
@@ -1158,7 +1158,7 @@ def find_node() -> str | None:
     """
     Node, if this machine has it.
 
-    Looked for rather than assumed. It is not required to run VorFrame - the
+    Looked for rather than assumed. It is not required to run Prime Hunter - the
     site is plain files and opens from file:// - so the browser tests are a
     bonus that runs where Node happens to exist and is skipped where it does
     not, the same bargain --online makes. The explicit paths are there because
@@ -1214,7 +1214,7 @@ def test_browser_assets() -> None:
 
     # test_assets.mjs needs nothing but Node. test_pages.mjs drives a real
     # browser through Playwright and skips itself when that is not installed,
-    # which is the normal case - it is a large download and VorFrame does not
+    # which is the normal case - it is a large download and Prime Hunter does not
     # need it. Its skips come back through TAP and are reported as skips here.
     r = subprocess.run([node, "--test", "--test-reporter=tap",
                         os.path.join("tests", "test_assets.mjs"),
@@ -1250,7 +1250,7 @@ def test_bundle_is_self_contained() -> None:
     r = subprocess.run([sys.executable, "tools/bundle.py"],
                        cwd=ROOT, capture_output=True, text=True)
     check("bundle: exits 0", r.returncode, 0, r.stderr[-300:])
-    out = os.path.join(ROOT, "dist", "vorframe.html")
+    out = os.path.join(ROOT, "dist", "warframe-prime-hunter.html")
     if not os.path.exists(out):
         check_true("bundle: file written", False)
         return
@@ -1264,7 +1264,7 @@ def test_bundle_is_self_contained() -> None:
     check_true("bundle: planner search came across", 'id="addSearch"' in html)
     check("bundle: tabs switch instead of navigating", html.count('data-view="'), 2)
     check_true("bundle: both page scripts inlined",
-               "vorframe.plan.v1" in html and "vorframe.collected.v1" in html)
+               "wfprimes.plan.v1" in html and "wfprimes.collected.v1" in html)
     # both pages read the rotation model from a third script. Leaving it out of
     # the bundle is not a visible break until a bounty is ranked, so it is
     # asserted here rather than trusted to the eye.
@@ -1272,14 +1272,14 @@ def test_bundle_is_self_contained() -> None:
     # shared scripts. Leaving either out of the bundle is not a visible break
     # until something is ranked or saved, so it is asserted rather than eyed.
     check_true("bundle: the shared rotation model came across",
-               "window.VorFrameRotation" in html)
+               "window.WFPrimeRotation" in html)
     check_true("bundle: the shared store and chrome came across",
-               "window.VorFrameShared" in html)
+               "window.WFPrimeShared" in html)
     check_true("bundle: the shared data model came across",
-               "window.VorFrameModel" in html)
+               "window.WFPrimeModel" in html)
     check_true("bundle: the modules are inlined before the pages that read them",
-               max(html.index("window.VorFrameRotation"), html.index("window.VorFrameShared"))
-               < html.index("VorFrameShared;"))
+               max(html.index("window.WFPrimeRotation"), html.index("window.WFPrimeShared"))
+               < html.index("WFPrimeShared;"))
 
 
 def main() -> int:

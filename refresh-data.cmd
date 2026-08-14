@@ -1,5 +1,5 @@
 @echo off
-REM Refresh everything VorFrame needs. This is the normal way to run it -
+REM Refresh everything Warframe Prime Hunter needs. This is the normal way to run it -
 REM double-click and wait.
 REM
 REM It does the lot, first run and every run after:

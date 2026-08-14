@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Serve VorFrame to your whole network, not just this machine. The macOS and
+# Serve Warframe Prime Hunter to your whole network, not just this machine. The macOS and
 # Linux twin of serve-lan.cmd.
 #
 # serve.sh binds to localhost, so only this computer can open the site. This one
@@ -36,7 +36,7 @@ else
 fi
 
 echo
-echo "  Serving VorFrame to the local network."
+echo "  Serving Warframe Prime Hunter to the local network."
 echo "  Anyone here can open it and gets their own tracker; yours is untouched."
 echo "  This folder is readable, so keep private files out of it."
 echo "  Press Ctrl+C to stop."

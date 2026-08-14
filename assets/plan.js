@@ -1,4 +1,4 @@
-/* VorFrame — farm planner
+/* Warframe Prime Hunter — farm planner
    Given a list of Primes you want, works out where to go next.
 
    The model, in one line:
@@ -20,7 +20,7 @@
   /* The rotation model - what one run at a node is actually worth - lives in
      assets/rotation.js, so this page and the collection view cannot disagree
      about it. Aliased here so the call sites read the same as they always did. */
-  const ROT = window.VorFrameRotation;
+  const ROT = window.WFPrimeRotation;
   const RUN_MODES = ROT.RUN_MODES;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
@@ -34,7 +34,7 @@
 
   /* Storage, the escaper, the tooltip, the staleness banner and the backup
      file are shared with the collection view - see assets/shared.js. */
-  const S = window.VorFrameShared;
+  const S = window.WFPrimeShared;
   const { esc, $, $$, load, save } = S;
   const KEY_PARTS = S.KEYS.parts;
   const KEY_WISH = S.KEYS.wishlist;
@@ -43,9 +43,9 @@
 
   /* What a relic opening is worth, and how to read a backup - shared with the
      collection view, and testable without a browser. See assets/model.js. */
-  const M = window.VorFrameModel;
+  const M = window.WFPrimeModel;
 
-  const DATA = window.VORFRAME_DATA;
+  const DATA = window.WFPRIME_DATA;
 
   if (!DATA || !DATA.items) {
     document.body.innerHTML =
@@ -1175,9 +1175,13 @@
         // an item whose parts are all owned counts as collected, same as the
         // collection page — keep the two in step
         const done = it.parts.every((q) => (partsOwned[id] || {})[q.name] >= needOf(q));
-        const coll = new Set(load("vorframe.collected.v1", []));
+        /* Through the shared constant, not a literal. This was spelled out by
+           hand in two places here, which the rename found: the store moved and
+           these two would have gone on reading and writing a key nothing else
+           touched, losing ticks silently rather than failing. */
+        const coll = new Set(load(S.KEYS.collected, []));
         if (done) coll.add(id); else coll.delete(id);
-        save("vorframe.collected.v1", Array.from(coll));
+        save(S.KEYS.collected, Array.from(coll));
         render();
       }
       return;
@@ -1294,7 +1298,7 @@
   if (dlg && dbtn) {
     dbtn.addEventListener("click", () => {
       $("#dataArea").value = JSON.stringify({
-        vorframe: 3,
+        format: 3,          // see app.js - deliberately not the app's name
         exported: new Date().toISOString(),
         collected: readKey(BACKUP_KEYS.collected, []),
         parts: readKey(BACKUP_KEYS.parts, {}),

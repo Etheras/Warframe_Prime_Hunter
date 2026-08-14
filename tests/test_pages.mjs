@@ -1,4 +1,4 @@
-/* VorFrame's page tests — the ones that need a real browser.
+/* Prime Hunter's page tests — the ones that need a real browser.
  *
  *     node --test tests/test_pages.mjs
  *     python tests/test_build.py         # runs these too, if Playwright is here
@@ -8,7 +8,7 @@
  * FileReader, Blob and focus handling. Stubbing that is writing a browser
  * badly, so these drive a real one instead.
  *
- * **Entirely optional.** Playwright is a large download and VorFrame needs
+ * **Entirely optional.** Playwright is a large download and Prime Hunter needs
  * nothing at all to run, so if it is not installed every test here skips and
  * the rest of the suite is unaffected:
  *
@@ -37,7 +37,7 @@ try {
 } catch {
   /* not installed - every test below skips */
 }
-const built = fs.existsSync(path.join(ROOT, "data", "vorframe-data.js"));
+const built = fs.existsSync(path.join(ROOT, "data", "prime-data.js"));
 const why = !chromium ? "Playwright is not installed (npm install)"
   : !built ? "no dataset yet (run tools/build_data.py)" : null;
 
@@ -106,11 +106,11 @@ page_test("ticking a part is saved, and survives a reload", async () => {
   await page.locator("[data-id]").first().click();               // open the drawer
   await page.getByRole("button", { name: /add to farm list/i }).click();
 
-  const saved = await page.evaluate(() => localStorage.getItem("vorframe.wishlist.v1"));
+  const saved = await page.evaluate(() => localStorage.getItem("wfprimes.wishlist.v1"));
   assert.match(saved, /\[".+"\]/, "the farm list must reach localStorage");
 
   await page.reload({ waitUntil: "load" });
-  const after = await page.evaluate(() => localStorage.getItem("vorframe.wishlist.v1"));
+  const after = await page.evaluate(() => localStorage.getItem("wfprimes.wishlist.v1"));
   assert.equal(after, saved, "and must still be there on the way back in");
 });
 
@@ -158,9 +158,9 @@ page_test("a backup exported from one page restores on the other", async () => {
   await fresh.waitForTimeout(1200);                 // it reloads on success
 
   const restored = await fresh.evaluate(() => ({
-    collected: JSON.parse(localStorage.getItem("vorframe.collected.v1") || "[]"),
-    parts: JSON.parse(localStorage.getItem("vorframe.parts.v1") || "{}"),
-    wishlist: JSON.parse(localStorage.getItem("vorframe.wishlist.v1") || "[]"),
+    collected: JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]"),
+    parts: JSON.parse(localStorage.getItem("wfprimes.parts.v1") || "{}"),
+    wishlist: JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]"),
   }));
   assert.deepEqual(restored.collected, expected.collected);
   assert.deepEqual(restored.wishlist, expected.wishlist);
@@ -197,7 +197,7 @@ page_test("the materials checklist keeps what you type in it", async () => {
 page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   const { page, errors } = await open("/plan.html");
   await page.evaluate(() => {
-    localStorage.setItem("vorframe.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
   });
   await page.reload({ waitUntil: "load" });
 
@@ -217,7 +217,7 @@ page_test("the never-vaulted badge splits, because it means two things", async (
      someone with no Railjack is the failure being pinned here. */
   const { page } = await open("/index.html");
   const split = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    const D = window.WFPRIME_DATA, R = window.WFPrimeRotation;
     const marked = D.items.filter((i) => (i.flags || {}).permanent);
     const rj = marked.filter((i) => R.railjackOnly(i, D.relics)).map((i) => i.name);
     return { marked: marked.length, rj: rj.sort() };
@@ -228,7 +228,7 @@ page_test("the never-vaulted badge splits, because it means two things", async (
 
   const shows = async (name, badge) => {
     const it = await page.evaluate((n) =>
-      (window.VORFRAME_DATA.items.find((i) => i.name === n) || {}).id, name);
+      (window.WFPRIME_DATA.items.find((i) => i.name === n) || {}).id, name);
     await page.locator(`[data-id="${it}"]`).click();
     const text = await page.locator(".d-badges").innerText();
     await page.locator(".drawer-close").click();
@@ -238,7 +238,7 @@ page_test("the never-vaulted badge splits, because it means two things", async (
             `${split.rj[0]} can only be farmed with a ship and the card must say so`);
 
   const plain = await page.evaluate((rj) => {
-    const D = window.VORFRAME_DATA;
+    const D = window.WFPRIME_DATA;
     return (D.items.find((i) => (i.flags || {}).permanent && !rj.includes(i.name)) || {}).name;
   }, split.rj);
   assert.ok(await shows(plain, "NEVER VAULTED"),
@@ -256,7 +256,7 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
      function under test makes the case vacuous - break the classifier, find no
      subject, return early, go green having checked nothing. */
   const only = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA;
+    const D = window.WFPRIME_DATA;
     const proxima = (s) => /Proxima/i.test(s.planet || "");
     for (const it of D.items) {
       for (const p of it.parts || []) {
@@ -293,7 +293,7 @@ page_test("the server decides who is told how to fix stale data", async () => {
      Injected before the page scripts run, which is where serve.py puts it. */
   const banner = async (upstream) => {
     const page = await browser.newPage();
-    await page.addInitScript((u) => { window.VORFRAME_UPSTREAM = u; }, upstream);
+    await page.addInitScript((u) => { window.WFPRIME_UPSTREAM = u; }, upstream);
     await page.goto(origin + "/index.html", { waitUntil: "load" });
     const el = page.locator(".databar");
     const text = await el.count() ? await el.first().innerText() : "";
@@ -335,14 +335,14 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
      green having checked nothing. That is not hypothetical - a one-character
      mutation to the regex passed this test before it was written this way. */
   const target = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA;
+    const D = window.WFPRIME_DATA;
     const named = (s) => /\(Steel Path/i.test(s.node || "");
     const it = D.items.find((i) => (i.relics || []).some((r) => {
       const rec = D.relics[r];
       return rec && !rec.vaulted && (rec.sources || []).some(named);
     }));
-    if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.removeItem("vorframe.plan.v1");
+    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.removeItem("wfprimes.plan.v1");
     return it ? it.id : null;
   });
   assert.ok(target,
@@ -398,11 +398,11 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
   /* Nyx Prime, whose every live route is a Railjack cache, so every ranked row
      is one and none of this depends on where a halved node happens to sort. */
   const only = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA;
+    const D = window.WFPRIME_DATA;
     const it = D.items.find((i) => i.name === "Nyx Prime");
     if (!it) return null;
-    localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ railjack: true }));
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
     // by mode, never by calling isRailjackCache
     return (it.relics || []).every((r) => {
       const rec = D.relics[r];
@@ -420,7 +420,7 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
                "a score moved by a judgement has to say so on the row");
 
   const halved = await page.evaluate(() => {
-    const R = window.VorFrameRotation;
+    const R = window.WFPrimeRotation;
     const rot = { A: 0.4, B: 0, C: 0, none: 0 };
     const cnt = { A: 0.4, B: 0, C: 0, none: 0 };
     const r = R.runValue(rot, "reset", "Caches", false, null, cnt);
@@ -450,10 +450,10 @@ page_test("an empty ranking names the switch that emptied it", async () => {
      without reimplementing the classifier. If DE ever gives it a star-chart
      route this fails, which is the right way to find that out. */
   const stranded = await page.evaluate(() => {
-    const D = window.VORFRAME_DATA;
+    const D = window.WFPRIME_DATA;
     const it = D.items.find((i) => i.name === "Nyx Prime");
-    if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ railjack: false }));
+    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: false }));
     return it ? it.name : null;
   });
   assert.ok(stranded, "Nyx Prime is not in the dataset - pick another item that " +
@@ -486,7 +486,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
      would look like it worked. */
   const { page, errors } = await open("/plan.html");
   await page.evaluate(() => {
-    localStorage.setItem("vorframe.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
   });
   await page.reload({ waitUntil: "load" });
 
@@ -554,7 +554,7 @@ page_test("the two pages agree about what is on the farm list", async () => {
   await page.locator("[data-id]").first().click();
   await page.getByRole("button", { name: /add to farm list/i }).click();
   const id = JSON.parse(await page.evaluate(
-    () => localStorage.getItem("vorframe.wishlist.v1")))[0];
+    () => localStorage.getItem("wfprimes.wishlist.v1")))[0];
 
   await page.goto(origin + "/plan.html", { waitUntil: "load" });
   const list = await page.locator("#wishlist").innerText();
@@ -565,8 +565,8 @@ page_test("the two pages agree about what is on the farm list", async () => {
 page_test("a bounty row names the live rotation and how long it has left", async () => {
   const { page } = await open("/plan.html");
   const bounty = await page.evaluate(() => {
-    const R = window.VorFrameRotation;
-    const groups = Object.keys((window.VORFRAME_DATA.meta.bounties || {}).groups || {});
+    const R = window.WFPrimeRotation;
+    const groups = Object.keys((window.WFPRIME_DATA.meta.bounties || {}).groups || {});
     if (!groups.length) return null;
     const live = R.liveRotation(groups[0]);
     return { letter: live.letter, endsAt: live.endsAt, text: R.untilText(live.endsAt) };

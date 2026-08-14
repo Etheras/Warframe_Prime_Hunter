@@ -1,4 +1,4 @@
-/* VorFrame — what both pages need that is not the rotation model.
+/* Warframe Prime Hunter — what both pages need that is not the rotation model.
 
    The collection view and the planner are two equal tools over one dataset, so
    a fair amount of them is the same code: they escape the same way, read and
@@ -9,11 +9,11 @@
    The rotation model lives next door in assets/rotation.js. This is everything
    else: storage, and the bits of chrome that are the same on both pages.
 
-   Loaded before app.js and plan.js, after data/vorframe-data.js.            */
+   Loaded before app.js and plan.js, after data/prime-data.js.               */
 (function () {
   "use strict";
 
-  const DATA = window.VORFRAME_DATA || {};
+  const DATA = window.WFPRIME_DATA || {};
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -25,15 +25,39 @@
      Six keys, named once. Both pages read and write the same three of them -
      parts, materials and the farm list - so a typo in one file would silently
      read an empty store rather than fail, and you would lose progress without
-     ever seeing an error. `PROJECT.md §1` says which survive a backup. */
+     ever seeing an error. `PROJECT.md §1` says which survive a backup.
+
+     The prefix says what the data IS, not what the app is called. That is
+     deliberate and it is the lesson of the rename that produced it: these keys
+     were `vorframe.*`, and the only expensive part of dropping that name was
+     that a hundred and sixty-seven ticked boxes lived behind it. The game will
+     still be Warframe and these will still be Primes whatever this project ends
+     up being called, so the next rename costs nothing. */
   const KEYS = {
-    collected: "vorframe.collected.v1",
-    parts:     "vorframe.parts.v1",
-    materials: "vorframe.materials.v1",
-    wishlist:  "vorframe.wishlist.v1",
-    plan:      "vorframe.plan.v1",
-    filters:   "vorframe.filters.v1",
+    collected: "wfprimes.collected.v1",
+    parts:     "wfprimes.parts.v1",
+    materials: "wfprimes.materials.v1",
+    wishlist:  "wfprimes.wishlist.v1",
+    plan:      "wfprimes.plan.v1",
+    filters:   "wfprimes.filters.v1",
   };
+
+  /* Anything saved under the old name, moved across once and left where it was.
+     Copy rather than move: if this build turns out to be broken, the old app
+     still finds its data, and a migration you cannot walk back from is a poor
+     trade for tidiness. Runs before anything reads the store. */
+  const LEGACY_PREFIX = "vorframe.";
+  (function migrate() {
+    try {
+      Object.keys(KEYS).forEach((name) => {
+        const now = KEYS[name];
+        if (localStorage.getItem(now) != null) return;      // already here
+        const then = LEGACY_PREFIX + now.slice(now.indexOf(".") + 1);
+        const old = localStorage.getItem(then);
+        if (old != null) localStorage.setItem(now, old);
+      });
+    } catch (e) { /* private mode, quota, or no storage at all */ }
+  })();
 
   const load = (k, dflt) => {
     try {
@@ -82,7 +106,7 @@
        answer on it. Nothing is fetched from here - the page never talks to
        Digital Extremes, and does not know the check happened. Absent on
        file:// and on GitHub Pages, where no server ran. */
-    const up = window.VORFRAME_UPSTREAM;
+    const up = window.WFPRIME_UPSTREAM;
     const stale = (m.stale || []).length ? m.stale : null;
     const degraded = (m.degraded || []).length ? m.degraded : null;
     const built = m.generated ? new Date(m.generated) : null;
@@ -139,7 +163,7 @@
   function backupFilename() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, "0");
-    return `vorframe-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+    return `prime-hunter-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
   }
 
   function wireFileBackup() {
@@ -191,7 +215,7 @@
      decides every number on both pages. Takes a probability. */
   const squadOdds = (p) => 1 - Math.pow(1 - p, 4);
 
-  window.VorFrameShared = {
+  window.WFPrimeShared = {
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
   };
 })();

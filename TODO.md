@@ -1,6 +1,7 @@
 # TODO
 
-Everything still outstanding in VorFrame. **Only unfinished work belongs here** —
+Everything still outstanding in Warframe Prime Hunter. **Only unfinished work
+belongs here** —
 when something ships, delete its entry rather than ticking it, and record *why* it
 was done that way in `PROJECT.md` if the reasoning matters. Settled design
 decisions are not TODOs and live in `PROJECT.md §7`.
@@ -26,14 +27,16 @@ move its reasoning into `PROJECT.md`.
 |---|---|---|
 | 7 | **Already done** — `serve.py` has served from a strict allowlist for some time; `.cache/`, `tools/`, `.git/` and directory listings all 404 already. The entry was stale, not open. Verified by calling `allowed()` directly. | ✅ nothing to do |
 | 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ✅ done |
-| 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
+| 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ✅ done |
 | 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
 | 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save; model the **endless-fissure bonus relic**; and reduce the value of a relic handed over at a *higher* refinement than the plan wants. | 🟡 **refinement done.** Traces are counted and shown, not scored — they need a player fact, like Mastery Rank. The fissure bonus is verified and deferred to decision 1, where it belongs: it is a reward for *cracking*, and no run mode here is long enough to reach it |
 | 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ✅ **done.** Profit-Taker's four phases are in, badged *Old Mate*, off the bounty clock. Swept every bounty, key, enemy and transient source for others: the only one is **Hemocyte**, which is already event-gated and now badged as an enemy rather than a place — see *Plague Star and Profit-Taker are the same shape* |
 | 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ✅ done |
-| 9 | **(a)(ii) a seventh availability bucket**, and **(b)(ii) auto-include Railjack when it is the only route.** Owner wants to review all of #9 — **mock it up first.** | ⬜ mockup |
-| 5 | **Cannot be answered on paper** — it is a visual change and needs seeing. **Mock it up.** | ⬜ mockup |
+| 9a | **(ii) a seventh availability bucket**, decided after seeing the mockup. Rename *Farmable now* → **`Farmable`** while doing it, and make sure the new bucket reads as clearly distinct from the **Include Railjack** checkbox, which is a different thing and exists on both pages. | ⬜ **build next** |
+| 9b | **Keep today's behaviour** — the empty ranking that names the switch. Simplify the wording, and put the *"you must tick Include Railjack to farm this frame's relics"* line in a colour that **pops out**. Auto-include is *not* wanted. | ⬜ **build next** |
+| 9c | **Still not agreed** — the owner's question is answered under *Identical duplicate nodes* below, which has been rewritten to say plainly what is being compared. | ⬜ needs a call |
+| 5 | **(b) raise the whole meta line to `--txt-dim`.** Chosen over (c) to avoid a one-off rule for the rotation label: *"I don't want too many things to have unique CSS unless needed."* | ⬜ **build next** |
 
 **Yours to do elsewhere, not here:** four corrections belong on
 [`wiki.warframe.com/w/Prime`](https://wiki.warframe.com/w/Prime) rather than in this
@@ -622,24 +625,58 @@ shape. Options:
 (ii) reads best and is the smallest change: the information to do it already
 exists, since `railjackOnly` answers exactly that question per item.
 
-**c. Identical duplicate nodes — and this is far bigger than it was written up as.**
+**c. Nodes that are the same choice — decision 9c, still open.**
 
-The entry started as "the four Faceoff rows are duplicates". Comparing every
-live relic, rotation and chance across every node in the dataset — done while
-building the mockup — finds **36 groups of byte-identical nodes covering 167 of
-them**, the largest group being 16. Faceoff is one group out of 36, and not the
-worst. Examples: `Cambria / Hapke / Grildrig / Vesper / Arval / Suisei /
-Shklovsky / Unda` are one choice; so are `Mithra / Mot`, and `Oxomoco / Ukko`.
+**What is being compared, since the first write-up never said.** Not Steel Path
+against non-Steel Path. **Every node against every other node**, on one question:
+*do these two drop exactly the same live relics, in the same rotations, at the
+same chances?* Where the answer is yes, running either one is the identical bet,
+and the planner currently lists them as separate places to go.
 
-That changes what this sub-decision is. Collapsing identical twins is not a
-tidy-up of one awkward pair; it is **the single biggest change available to what
-the list looks like** — the visible eight would become eight genuinely different
-choices rather than, at worst, two.
+It happens constantly, because **DE does not write a relic table per node**. It
+writes one per *tier and rotation shape*, and then hangs it on every node that
+fits. So every low-level Lith Defense node in the game shares one table.
 
-**What it costs**, and this is the part to weigh: identical *relic tables* does
-not mean identical *nodes*. They differ in enemy level, which is the ranking's
-tie-break, and they may differ in vaulted relics, which the collection view still
-shows. A collapsed row has to pick a level or show a range.
+Concretely, from the live data — 36 such groups, covering 172 nodes:
+
+```
+Cambria (Earth) · Hapke (Phobos) · Grildrig (Phobos) · Vesper (Venus)
+Arval (Mars) · Suisei (Mercury) · Shklovsky (Mars) · Unda (Venus)
+        ── one table, eight rows in the list, one actual choice
+
+Mithra (Void, Interception) · Mot (Void, Survival)
+Oxomoco (Void, Exterminate) · Ukko (Void, Capture)
+Faceoff ×2 · their two Steel Path variants
+```
+
+The Faceoff four — the only case the original entry described — are one group out
+of thirty-six, and not the worst. The largest is sixteen nodes.
+
+**So the question is:** when eight nodes are the same bet, should *Where to go*
+show eight rows or one? Today it shows eight, and they can fill the visible list
+with a single choice repeated.
+
+**Two reasons it is not simply "collapse them", both real:**
+
+1. **Identical relic tables are not identical nodes.** They differ in **enemy
+   level** — Lith (Earth) is 2–5, Casta (Ceres) is 12–17 — and level is the
+   ranking's own tie-break. A collapsed row has to pick one to show, or show a
+   range and lose the tie-break.
+2. **13 of the 36 groups span more than one mission type.** Survival and
+   Excavation share tables; so do Interception and Capture. Those are the same
+   *reward* but not the same *activity*, and a player may strongly prefer one.
+   Collapsing them hides a choice rather than a duplicate.
+
+**Which suggests a narrower rule than the original (ii):** collapse only where
+the table **and** the mission type match, show the lowest-level member as the
+row, and put the rest on hover — the pattern this project already uses for long
+lists (`STYLE.md §5`). That keeps the tie-break meaningful, never merges a
+Survival into an Excavation, and still turns the worst groups from sixteen rows
+into one.
+
+The options as originally put: (i) rank every twin, (ii) collapse identical
+twins, (iii) show a variant only when its table is better — which today is never,
+since every duplicate is exactly equal.
 
 That duplication is also **why the Steel Path has no checkbox** — an option that
 moves two identical rows is not worth asking about, so the badge carries it
@@ -841,12 +878,44 @@ real observations and would be the check on any implementation.
 Tiers whose rotations are indistinguishable (several pay the same handful of
 resources in all three) keep the family letter as a fallback.
 
-### Renaming, and where the name lives — decision 8
+### Renaming, and where the name lives **[done 2026-08-14]** — decision 8
 
-**Decided: `Warframe Prime Hunter`.** The owner expects to change it again, so
-the point of this entry is no longer "should we" but **"make the next one
-cheap"** — the map below is the deliverable, and it should be kept accurate as
-the project grows rather than re-derived each time.
+**Renamed to `Warframe Prime Hunter`.** The owner expects to change it again, so
+the deliverable was never the rename itself but **making the next one cheap.**
+That is now mostly done by removing the name from the places that hurt:
+
+| Was | Is now | Why |
+|---|---|---|
+| `vorframe.*` storage keys | `wfprimes.*` | keyed to **what the data is**, not what the app is called. The game will still be Warframe and these will still be Primes whatever we end up called, so this never has to move again |
+| `window.VORFRAME_DATA` | `window.WFPRIME_DATA` | same reasoning |
+| `VorFrameShared/Rotation/Model` | `WFPrimeShared/…` | same |
+| `data/vorframe-data.js` | `data/prime-data.js` | same |
+| `"vorframe": 3` in a backup | `"format": 3` | a file format carrying a brand needs rewriting every time the brand does. `parseBackup` never read it anyway |
+| `dist/vorframe.html` | `dist/warframe-prime-hunter.html` | **this one keeps the name on purpose** — it is what people download |
+| `User-Agent: VorFrame/1.0` | `WarframePrimeHunter/1.0` | ditto, out of politeness to the APIs |
+
+**The `localStorage` migration is the only part that could have lost anything**,
+so it is the only part with a test of its own: everything under the old prefix
+is **copied** to the new one on first load, and the originals are left where
+they are. Copy rather than move, because a build that turns out to be broken
+must not have taken the only copy of a hand-ticked collection with it. Verified
+in a real browser against a planted old store, and pinned by a unit test that
+fails if any one of the six keys is dropped.
+
+**Two things found while doing it**, both worth more than the rename:
+
+- `plan.js` spelled `"vorframe.collected.v1"` out by hand in two places instead
+  of using `S.KEYS.collected`. The store would have moved and those two would
+  have gone on reading and writing a key nothing else touched — losing ticks
+  silently rather than failing. Now uses the shared constant.
+- **The repository is still called `VorFrame` and stays that way.** Renaming a
+  git remote breaks every clone, bookmark and link for a cosmetic gain, and
+  nothing in the code depends on the folder's name. README says so where someone
+  cloning would be confused by it.
+
+**The rule that remains:** do not add a *fifth* load-bearing use. New storage
+keys, globals, filenames and URLs should not carry the product name. Prose can
+say it as often as it likes — prose is free to change.
 
 **Audited 2026-08-14.** The name appears in 30 tracked files. Almost all of it is
 prose — comments, headings, `--help` text, the browser title — which is a

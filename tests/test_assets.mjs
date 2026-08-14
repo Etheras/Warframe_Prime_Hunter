@@ -1,4 +1,4 @@
-/* VorFrame's browser-side tests.
+/* Warframe Prime Hunter's browser-side tests.
  *
  *     node --test tests/
  *     python tests/test_build.py        # runs these too, if node is installed
@@ -31,7 +31,7 @@ const source = (name) => fs.readFileSync(path.join(ROOT, "assets", name), "utf8"
 /* A window with just enough in it. `now` freezes the clock: the bounty clock
    is arithmetic on Date.now(), and a test that depended on the real one would
    pass or fail according to the time of day. */
-function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z") } = {}) {
+function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z"), seed = null } = {}) {
   const FixedDate = class extends Date {
     static now() { return now; }
   };
@@ -39,9 +39,11 @@ function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z") } = {}) {
     style: {}, classList: { add() {}, toggle() {} }, dataset: {},
     appendChild() {}, addEventListener() {}, hidden: false, className: "",
   });
-  const store = new Map();
+  // `seed` puts something in the store *before* the module runs, which is the
+  // only way to test a migration that happens on load
+  const store = new Map(Object.entries(seed || {}));
   const ctx = {
-    window: { VORFRAME_DATA: data, addEventListener() {} },
+    window: { WFPRIME_DATA: data, addEventListener() {} },
     document: {
       createElement: el, body: el(), addEventListener() {},
       querySelector: () => null,
@@ -67,13 +69,53 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
 const loadRotation = (opts) => {
   const ctx = sandbox(opts);
   vm.runInContext(source("rotation.js"), ctx);
-  return ctx.window.VorFrameRotation;
+  return ctx.window.WFPrimeRotation;
 };
 const loadShared = (opts) => {
   const ctx = sandbox(opts);
   vm.runInContext(source("shared.js"), ctx);
-  return { S: ctx.window.VorFrameShared, ctx };
+  return { S: ctx.window.WFPrimeShared, ctx };
 };
+
+test("a store saved under the old name is carried across, not stranded", () => {
+  /* The project was renamed from VorFrame on 2026-08-14 and the six storage
+     keys moved with it. Everything else in that rename was cosmetic; this was
+     not. Behind those keys is a hand-ticked collection that cannot be recovered
+     from anywhere - not from the game, not from DE, not from a rebuild - so a
+     migration that half works loses the only thing here that is genuinely the
+     player's. */
+  const legacy = {
+    "vorframe.collected.v1": JSON.stringify(["warframe-nyx-prime"]),
+    "vorframe.parts.v1": JSON.stringify({ "warframe-gyre-prime": { Chassis: 1 } }),
+    "vorframe.materials.v1": JSON.stringify([{ name: "Forma", have: 3, need: 9 }]),
+    "vorframe.wishlist.v1": JSON.stringify(["warframe-caliban-prime"]),
+    "vorframe.plan.v1": JSON.stringify({ squad: true, minutes: { Defense: 2.5 } }),
+    "vorframe.filters.v1": JSON.stringify({ sort: "name" }),
+  };
+  const { S, ctx } = loadShared({ seed: legacy });
+
+  Object.keys(S.KEYS).forEach((name) => {
+    const key = S.KEYS[name];
+    assert.match(key, /^wfprimes\./, `${name} still carries the old prefix`);
+    assert.deepEqual(plain(S.load(key, null)),
+                     JSON.parse(legacy["vorframe." + name + ".v1"]),
+                     `${name} did not survive the rename`);
+  });
+
+  // copied, not moved: a build that turns out to be broken must not have taken
+  // the only copy of the data with it
+  assert.equal(ctx.localStorage.getItem("vorframe.collected.v1"),
+               legacy["vorframe.collected.v1"],
+               "the old key was destroyed - there is no way back from that");
+
+  // and anything already saved under the new name wins over the old
+  const both = Object.assign({}, legacy,
+    { "wfprimes.collected.v1": JSON.stringify(["warframe-mag-prime"]) });
+  const fresh = loadShared({ seed: both });
+  assert.deepEqual(plain(fresh.S.load(fresh.S.KEYS.collected, null)),
+                   ["warframe-mag-prime"],
+                   "a stale legacy key overwrote current data");
+});
 
 /* One standard bounty on all three rotations, one publishing only two, one with
    a single table, and a vault family a step out of phase - which is what the
@@ -460,12 +502,12 @@ test("Event: nodes and Railjack are recognised however they are spelled", () => 
 test("the six storage keys are the ones the pages have always used", () => {
   const { S } = loadShared();
   assert.deepEqual(plain(S.KEYS), {
-    collected: "vorframe.collected.v1",
-    parts: "vorframe.parts.v1",
-    materials: "vorframe.materials.v1",
-    wishlist: "vorframe.wishlist.v1",
-    plan: "vorframe.plan.v1",
-    filters: "vorframe.filters.v1",
+    collected: "wfprimes.collected.v1",
+    parts: "wfprimes.parts.v1",
+    materials: "wfprimes.materials.v1",
+    wishlist: "wfprimes.wishlist.v1",
+    plan: "wfprimes.plan.v1",
+    filters: "wfprimes.filters.v1",
   }, "renaming one of these silently orphans saved progress");
 });
 
@@ -473,7 +515,7 @@ test("load falls back rather than throwing on a corrupt store", () => {
   const { S, ctx } = loadShared();
   S.save(S.KEYS.parts, { "warframe-xaku-prime": { Chassis: 1 } });
   assert.deepEqual(plain(S.load(S.KEYS.parts, {})), { "warframe-xaku-prime": { Chassis: 1 } });
-  assert.deepEqual(S.load("vorframe.nothing.here", "fallback"), "fallback");
+  assert.deepEqual(S.load("wfprimes.nothing.here", "fallback"), "fallback");
   ctx.localStorage.setItem(S.KEYS.parts, "{not json");
   assert.deepEqual(plain(S.load(S.KEYS.parts, {})), {}, "a corrupt store must not white-screen the page");
 });

@@ -1,4 +1,4 @@
-/* VorFrame — the data model, with no DOM in it.
+/* Warframe Prime Hunter — the data model, with no DOM in it.
 
    What a relic opening is worth, which refinement to take it to, what state an
    item is in, and how to read a backup file. None of it touches the page, and
@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  const S = window.VorFrameShared;
+  const S = window.WFPrimeShared;
   const REFINEMENTS = ["Intact", "Exceptional", "Flawless", "Radiant"];
 
   /* How many of a part one item needs. Ivara Prime wants two of some, and a
@@ -154,7 +154,7 @@
     const legacy = Array.isArray(raw);
     const payload = legacy ? { collected: raw } : raw;
     if (!payload || typeof payload !== "object" || !Array.isArray(payload.collected)) {
-      throw new Error("this doesn't look like a VorFrame backup");
+      throw new Error("this doesn't look like a Prime Hunter backup");
     }
 
     const byId = new Map((items || []).map((i) => [i.id, i]));
@@ -219,7 +219,7 @@
     return { legacy, skipped, collected, parts, wishlist, materials, plan, filters };
   }
 
-  window.VorFrameModel = {
+  window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
     needOf, rarityOf, refineAdvice, statusOf,
     relicValue, bestRefinement, parseBackup,

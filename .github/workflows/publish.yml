@@ -50,9 +50,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .cache
-          key: vorframe-sources-${{ github.run_id }}
+          key: prime-sources-${{ github.run_id }}
           restore-keys: |
-            vorframe-sources-
+            prime-sources-
 
       # Which sources answer a datacenter IP is not always the same as which
       # answer a home connection, so record it before the build runs.
@@ -68,7 +68,7 @@ jobs:
             # 302. urllib follows redirects, so without -L this probe reports a
             # "failure" the build never actually sees.
             code=$(curl -sL -o /dev/null -w '%{http_code}' -m 30 \
-                   -A 'VorFrame/1.0 (personal Prime collection tracker)' "$url" || echo "000")
+                   -A 'WarframePrimeHunter/1.0 (personal Prime collection tracker)' "$url" || echo "000")
             printf '  %-6s %s\n' "$code" "$url"
           done
 
@@ -89,7 +89,7 @@ jobs:
         run: |
           python - <<'PY'
           import json, sys
-          d = json.load(open("data/vorframe-data.json", encoding="utf-8"))
+          d = json.load(open("data/prime-data.json", encoding="utf-8"))
           items, relics, meta = d["items"], d["relics"], d["meta"]
           wf = [i for i in items if i["category"] == "Warframe"]
           art = [i for i in items if i.get("image")]
@@ -115,10 +115,10 @@ jobs:
           cp index.html plan.html _site/
           cp -r assets _site/
           mkdir -p _site/data
-          cp data/vorframe-data.js _site/data/
+          cp data/prime-data.js _site/data/
           # also offer the single-file build as a download
           python tools/bundle.py
-          cp dist/vorframe.html _site/vorframe-standalone.html
+          cp dist/warframe-prime-hunter.html _site/warframe-prime-hunter-standalone.html
           echo "Published $(date -u +%Y-%m-%dT%H:%MZ)" > _site/BUILD.txt
 
       - uses: actions/upload-pages-artifact@v5

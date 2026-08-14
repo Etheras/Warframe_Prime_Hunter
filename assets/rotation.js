@@ -1,4 +1,4 @@
-/* VorFrame — the rotation model, shared by both pages.
+/* Warframe Prime Hunter — the rotation model, shared by both pages.
 
    What a node is worth depends on what one run there actually hands you, and
    that is not the same question everywhere:
@@ -11,13 +11,13 @@
    drifted - the collection view told you to stay for the 4th reward at a
    bounty, where there is no 4th reward - so the model now lives here and both
    pages read it. Nothing in this file touches the DOM or the store; it is
-   arithmetic over `window.VORFRAME_DATA` and the clock.
+   arithmetic over `window.WFPRIME_DATA` and the clock.
 
-   Loaded before app.js and plan.js, after data/vorframe-data.js.            */
+   Loaded before app.js and plan.js, after data/prime-data.js.            */
 (function () {
   "use strict";
 
-  const DATA = window.VORFRAME_DATA || {};
+  const DATA = window.WFPRIME_DATA || {};
 
   /* ── rounds: the ordinary mission cycle ───────────────────────────
      Rewards cycle A -> A -> B -> C, one per round: rounds 1-2 pay A, 3 pays B,
@@ -535,18 +535,18 @@
       }));
     const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
     const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
-    console.info("[VorFrame] rotation model: " + seen.size + " mission types in the data");
+    console.info("[prime-hunter] rotation model: " + seen.size + " mission types in the data");
     console.info("  non-standard : " + (odd.length ? odd.join(", ") : "(none)"));
     console.info("  assumed AABC : " + aabc.join(", "));
     Object.keys(ROT_PATTERN).forEach((m) => {
       if (!seen.has(m)) {
-        console.warn("[VorFrame] ROT_PATTERN names '" + m + "' but no source uses it");
+        console.warn("[prime-hunter] ROT_PATTERN names '" + m + "' but no source uses it");
       }
     });
   }
   assertCoverage();
 
-  window.VorFrameRotation = {
+  window.WFPrimeRotation = {
     RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,

@@ -2,8 +2,8 @@
 # It is downloaded and rebuilt on demand by tools/build_data.py — locally for
 # you, and in CI for the published site. Keeping it out means this repo stays
 # source-only and every build pulls fresh data straight from DE.
-data/vorframe-data.js
-data/vorframe-data.json
+data/prime-data.js
+data/prime-data.json
 
 # item artwork pulled by --with-images. Same reasoning: it is DE's artwork,
 # served via cdn.warframestat.us, and not ours to redistribute.

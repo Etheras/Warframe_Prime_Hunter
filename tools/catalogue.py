@@ -212,7 +212,7 @@ CATEGORY_ORDER = [
     "Archwing",
 ]
 
-# VorFrame is about relics. These categories contain no item that any relic can
+# This project is about relics. These categories contain no item that any relic can
 # ever drop - verified by exact match against every relic reward, 0 of 148 - so
 # they are dropped from the catalogue entirely rather than shown as permanently
 # "vaulted", which was true but useless.

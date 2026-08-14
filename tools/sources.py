@@ -34,7 +34,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
 CACHE_DIR = os.path.join(ROOT, ".cache")
 
-UA = "VorFrame/1.0 (personal Prime collection tracker; contact: local user)"
+UA = "WarframePrimeHunter/1.0 (personal Prime collection tracker; contact: local user)"
 
 WIKI_RAW = "https://wiki.warframe.com/index.php?title={title}&action=raw"
 DROPS = "https://drops.warframestat.us/data/{name}"

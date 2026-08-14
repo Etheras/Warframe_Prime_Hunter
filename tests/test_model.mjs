@@ -1,4 +1,4 @@
-/* VorFrame's model tests — no browser, no packages.
+/* Warframe Prime Hunter's model tests — no browser, no packages.
  *
  *     node --test tests/test_model.mjs
  *     python tests/test_build.py        # runs these too
@@ -35,7 +35,7 @@ function load() {
                       appendChild() {}, addEventListener() {}, hidden: false, className: "" });
   const store = new Map();
   const ctx = {
-    window: { VORFRAME_DATA: {}, addEventListener() {} },
+    window: { WFPRIME_DATA: {}, addEventListener() {} },
     document: { createElement: el, body: el(), addEventListener() {},
                 querySelector: () => null },
     localStorage: {
@@ -51,7 +51,7 @@ function load() {
   vm.createContext(ctx);
   vm.runInContext(source("shared.js"), ctx);
   vm.runInContext(source("model.js"), ctx);
-  return ctx.window.VorFrameModel;
+  return ctx.window.WFPrimeModel;
 }
 
 /* Cross-realm objects have this context's prototypes, so compare structure. */
@@ -174,7 +174,7 @@ const CATALOGUE = [
 test("a backup restores what it should and counts what it could not", () => {
   const M = load();
   const out = M.parseBackup(JSON.stringify({
-    vorframe: 3,
+    format: 3,
     collected: ["warframe-xaku-prime", "warframe-gone-prime"],
     parts: {
       "warframe-xaku-prime": { Chassis: 1, Systems: 2, Wings: 1 },
@@ -267,7 +267,7 @@ test("something that is not a backup is refused, and says so", () => {
   for (const bad of ['{"hello":"world"}', "null", '"a string"', "42",
                      '{"collected":"not an array"}']) {
     assert.throws(() => M.parseBackup(bad, CATALOGUE),
-                  /doesn't look like a VorFrame backup/, `accepted ${bad}`);
+                  /doesn't look like a Prime Hunter backup/, `accepted ${bad}`);
   }
   assert.throws(() => M.parseBackup("{not json", CATALOGUE), SyntaxError);
 });

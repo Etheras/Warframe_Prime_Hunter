@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start VorFrame and open it in your browser. The macOS and Linux twin of
+# Start Warframe Prime Hunter and open it in your browser. The macOS and Linux twin of
 # serve.cmd.
 #
 # Serving the folder, rather than opening index.html directly, is what lets the

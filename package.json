@@ -1,7 +1,7 @@
 {
-  "name": "vorframe-tests",
+  "name": "warframe-prime-hunter-tests",
   "private": true,
-  "description": "Test-only. VorFrame itself needs no Node and no packages - it is static files that open from file://. This exists so the optional browser tests in tests/test_pages.mjs can find Playwright; see PROJECT.md section 2. Nothing the site ships depends on any of it.",
+  "description": "Test-only. Warframe Prime Hunter itself needs no Node and no packages - it is static files that open from file://. This exists so the optional browser tests in tests/test_pages.mjs can find Playwright; see PROJECT.md section 2. Nothing the site ships depends on any of it.",
   "scripts": {
     "test": "node --test tests/test_assets.mjs tests/test_pages.mjs"
   },

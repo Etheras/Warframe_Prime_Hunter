@@ -1,4 +1,4 @@
-# VorFrame
+# Warframe Prime Hunter
 
 > ### Written by a generative AI
 >
@@ -10,7 +10,7 @@
 > Read it with that in mind. What follows is what the project actually does about
 > it, rather than a disclaimer that ends the sentence:
 >
-> - **Everything is checked by running it.** 218 automated tests, including
+> - **Everything is checked by running it.** 233 automated tests, including
 >   browser tests against the real pages, and the reasoning behind each design
 >   decision is written down in [`PROJECT.md`](PROJECT.md) rather than left in a
 >   chat log. Where a rule exists, the incident that caused it is recorded.
@@ -65,7 +65,7 @@ no account.
 Nothing else. There are no dependencies to install: no npm packages, no `pip
 install`, no build step.
 
-If you are going to *work on* VorFrame rather than just use it, three more tools
+If you are going to *work on* Warframe Prime Hunter rather than just use it, three more tools
 are worth having — **Node.js**, **Playwright** and the **GitHub CLI**. All three
 are recommended and **none is required**; the suite skips whatever is absent. See
 [Recommended tools](#recommended-tools--none-of-them-required).
@@ -107,6 +107,11 @@ cd VorFrame
 ```
 
 No release download is published — the repository *is* the app.
+
+> **The repository is still called `VorFrame`.** The app was renamed to Warframe
+> Prime Hunter on 2026-08-14; the git remote was deliberately left alone, because
+> renaming it breaks every existing clone, bookmark and link for a cosmetic gain.
+> Nothing in the code depends on the folder's name.
 
 ---
 
@@ -179,7 +184,7 @@ not on the server, so a visitor gets their own empty tracker and cannot see or c
 yours. Nothing about your progress is ever sent to the server, and the server accepts
 no writes at all — it answers `GET` and nothing else.
 
-What sharing the address *does* expose is read access to the VorFrame folder, `.cache`
+What sharing the address *does* expose is read access to the Warframe Prime Hunter folder, `.cache`
 included, and directory listings of it. That is all public game data, so the practical
 advice is simply: keep private files out of the folder. The local-only server
 walks up from port 8777 to find a free one; the network one keeps 8777 fixed, so a
@@ -445,7 +450,7 @@ There is no helper script; use `cron`. Run `crontab -e` and add a daily 18:30 ch
 substituting the full path to your copy:
 
 ```bash
-30 18 * * * cd /path/to/VorFrame && python tools/build_data.py --if-changed
+30 18 * * * cd /path/to/Warframe Prime Hunter && python tools/build_data.py --if-changed
 ```
 
 No account, no API key, and no AI involved — it just reads the official data files
@@ -465,7 +470,7 @@ and rebuilds the list.
 python tools/bundle.py
 ```
 
-Creates `dist/vorframe.html` — the entire site squeezed into a single 1.6 MB file
+Creates `dist/warframe-prime-hunter.html` — the entire site squeezed into a single 1.6 MB file
 with the styling, code and data all inside it. Copy it to a USB stick, email it to
 yourself, or open it on a machine with no Python at all. Just double-click it.
 
@@ -492,7 +497,7 @@ already includes the credential manager that handles the login.
 Only **21 source files, about 259 KB**. Specifically:
 
 - ✅ The code — `index.html`, `plan.html`, `assets/`, `tools/`, the helper scripts and the docs
-- ❌ **Not** Digital Extremes' game data (`data/vorframe-data.js` / `.json`)
+- ❌ **Not** Digital Extremes' game data (`data/prime-data.js` / `.json`)
 - ❌ **Not** the download cache (`.cache/`) or the single-file build (`dist/`)
 - ❌ **Not** your editor or tool settings (`.claude/`, `.vscode/`)
 - ❌ **Not** your collection — that lives only in your browser
@@ -517,18 +522,18 @@ git config --global user.email "YOURUSERNAME@users.noreply.github.com"
 **2. Make the first commit** — everything is already staged:
 
 ```bash
-git commit -m "VorFrame: Prime collection and relic farming tracker"
+git commit -m "Warframe Prime Hunter: Prime collection and relic farming tracker"
 ```
 
 **3. Create an empty repo on the website:** <https://github.com/new>
 
-Name it `VorFrame`. **Don't** tick "Add a README", ".gitignore" or a licence — the
+Name it `Warframe Prime Hunter`. **Don't** tick "Add a README", ".gitignore" or a licence — the
 repo must start empty or the first push will be rejected.
 
 **4. Connect and push** (replace `YOURUSERNAME`):
 
 ```bash
-git remote add origin https://github.com/YOURUSERNAME/VorFrame.git
+git remote add origin https://github.com/YOURUSERNAME/warframe-prime-hunter.git
 ```
 
 ```bash
@@ -543,8 +548,8 @@ it stores the login so you're never asked again.
 In the repo: **Settings → Pages → Source: GitHub Actions**.
 
 Then **Actions → Build and publish site → Run workflow**. A couple of minutes later
-your site is live at `https://YOURUSERNAME.github.io/VorFrame/`, with the standalone
-single-file version at `/vorframe-standalone.html`.
+your site is live at `https://YOURUSERNAME.github.io/Warframe Prime Hunter/`, with the standalone
+single-file version at `/warframe-prime-hunter-standalone.html`.
 
 Pages needs a **public** repo on the free plan.
 
@@ -588,7 +593,7 @@ instead of serving the folder. Restore from a **Backup** copy if you have one.
 
 ## Licence and attribution
 
-VorFrame's own code — the build pipeline, the site, the docs — is **[MIT
+Warframe Prime Hunter's own code — the build pipeline, the site, the docs — is **[MIT
 licensed](LICENSE)**. Do what you like with it.
 
 The game data is a different matter. WARFRAME, its item names, artwork and
@@ -600,14 +605,14 @@ fan works. That policy sets three practical limits:
 - **No Warframe or Digital Extremes logos** without their written consent
 - Be clear it's **unofficial**
 
-VorFrame satisfies all three, and the site footer says so on every page.
+Warframe Prime Hunter satisfies all three, and the site footer says so on every page.
 
 Data sources and their licences (catalogue from the WARFRAME Wiki under CC BY-SA,
 item and worldstate data from WFCD under MIT and Apache-2.0) are listed in
 [NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
 fresh on every build, so nothing is redistributed from here.
 
-> VorFrame is an unofficial fan project. It is not affiliated with, endorsed,
+> Warframe Prime Hunter is an unofficial fan project. It is not affiliated with, endorsed,
 > sponsored, or approved by Digital Extremes Ltd.
 
 ---
@@ -627,7 +632,7 @@ and build it from scratch — the path a new user takes.
 **Node.js is recommended, not required.** The tests that cover the JavaScript —
 the rotation model, the bounty clock, the saved-progress keys — run under Node's
 own test runner. Without Node they are skipped and the rest still runs, which is
-why nothing here asks you to install it just to *use* VorFrame:
+why nothing here asks you to install it just to *use* Warframe Prime Hunter:
 
 ```
 browser
@@ -681,7 +686,7 @@ Delete it whenever; nothing depends on it.
 
 ## Recommended tools — none of them required
 
-VorFrame needs **Python and a browser**, and nothing else. Everything below is
+Warframe Prime Hunter needs **Python and a browser**, and nothing else. Everything below is
 for working *on* it rather than using it: each one adds a layer of checking or
 control, each is skipped cleanly when absent, and none of them is ever needed to
 run the site or refresh the data.

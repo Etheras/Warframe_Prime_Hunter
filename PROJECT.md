@@ -1,4 +1,4 @@
-# VorFrame — project overview
+# Warframe Prime Hunter — project overview
 
 A local, offline-capable web app presenting **two equal tools over one dataset**: a
 **collection tracker** (`index.html`) for what you own, and a **farm planner**
@@ -7,7 +7,7 @@ of the data and one set of saved progress, so a part ticked in either is ticked 
 both. Judge a change by whether it serves that shared dataset well.
 
 > **This file must be kept current.** It is the one document to read to understand
-> VorFrame, and it is only worth that if it matches the code. **Section 2 sets out
+> Warframe Prime Hunter, and it is only worth that if it matches the code. **Section 2 sets out
 > how to work on this project — read it before changing anything.**
 
 **Last updated:** 2026-08-12
@@ -50,12 +50,12 @@ named once, in `assets/shared.js`, because both pages read and write them:
 
 | Key | Holds | In Backup? |
 |---|---|---|
-| `vorframe.collected.v1` | whole items ticked | yes |
-| `vorframe.parts.v1` | per-part counts | yes |
-| `vorframe.materials.v1` | the manual materials checklist | yes |
-| `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
-| `vorframe.plan.v1` | planner options (squad, event, Railjack, run mode, effort minutes) | no |
-| `vorframe.filters.v1` | collection filters, sort and view toggles | no |
+| `wfprimes.collected.v1` | whole items ticked | yes |
+| `wfprimes.parts.v1` | per-part counts | yes |
+| `wfprimes.materials.v1` | the manual materials checklist | yes |
+| `wfprimes.wishlist.v1` | the farm list, shared with the planner | no |
+| `wfprimes.plan.v1` | planner options (squad, event, Railjack, run mode, effort minutes) | no |
+| `wfprimes.filters.v1` | collection filters, sort and view toggles | no |
 
 **Backup** exports the first three as one document and still accepts the old
 bare-array format by expanding each ticked item into fully-owned parts. Imports
@@ -156,7 +156,7 @@ are all recommended, all optional, and each is skipped cleanly when absent.
 
 `temp_mockup.html` is a scratchpad at the repo root for **showing what a change
 would look like, against real data, before writing any of it.** It loads
-`data/vorframe-data.js` and `assets/styles.css` exactly as the real pages do, so
+`data/prime-data.js` and `assets/styles.css` exactly as the real pages do, so
 a draft is made of live numbers in the app's own visual language rather than
 invented figures in a wireframe.
 
@@ -334,7 +334,7 @@ indefinitely on its own.
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
-Registers a Windows Scheduled Task ("VorFrame data refresh") that runs
+Registers a Windows Scheduled Task ("Warframe Prime Hunter data refresh") that runs
 `build_data.py --if-changed` daily at 18:30. Options: `-Time 07:30`, `-RunNow`,
 `-Remove`. *(Not installed automatically — run it yourself when you want it.)*
 
@@ -364,7 +364,7 @@ artifact, so the repo stays source-only (21 files, ~259 KB) and DE's data is not
 redistributed — each build pulls it fresh. The workflow holds `contents: read`, so
 it cannot modify the repository at all.
 
-That is also why `data/vorframe-data.js` is gitignored: a clone has no data until
+That is also why `data/prime-data.js` is gitignored: a clone has no data until
 `build_data.py` runs, which the README makes the first step.
 
 ### Packaging
@@ -380,7 +380,7 @@ What is provided instead:
 | Want | Use |
 |---|---|
 | Run it locally | `serve.cmd` |
-| One file to carry around | `tools/bundle.py` → `dist/vorframe.html` (1.6 MB, fully inlined) |
+| One file to carry around | `tools/bundle.py` → `dist/warframe-prime-hunter.html` (1.6 MB, fully inlined) |
 | Reach it from a phone | GitHub Pages + the refresh workflow |
 
 ### What deliberately isn't used
@@ -395,7 +395,7 @@ feeds above at the same time or sooner, so nothing is lost by skipping them.
 ## 5. Layout
 
 ```
-VorFrame/
+Warframe Prime Hunter/
 ├── README.md               ← plain-language guide: install, use, update
 ├── PROJECT.md              ← this file (how it's built)
 ├── TODO.md                 ← outstanding work only; decisions live here in §7
@@ -416,8 +416,8 @@ VorFrame/
 │   ├── app.js              ← filtering, collection state, detail drawer
 │   └── plan.js             ← wishlist, scoring model, ranked node plan
 ├── data/
-│   ├── vorframe-data.js    ← GENERATED — window.VORFRAME_DATA = {...}
-│   └── vorframe-data.json  ← GENERATED — same payload as plain JSON
+│   ├── prime-data.js    ← GENERATED — window.WFPRIME_DATA = {...}
+│   └── prime-data.json  ← GENERATED — same payload as plain JSON
 ├── .github/workflows/
 │   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
 ├── tests/
@@ -432,7 +432,7 @@ VorFrame/
 │   ├── relics.py           ← drop tables -> relic contents and relic sources
 │   ├── artwork.py          ← optional local image copies (--with-images)
 │   ├── official.py         ← parsers for DE's drop table + public export
-│   ├── bundle.py           ← inlines everything into dist/vorframe.html
+│   ├── bundle.py           ← inlines everything into dist/warframe-prime-hunter.html
 │   ├── serve.py            ← local server, picks a working port
 │   └── schedule.ps1        ← installs/removes the daily Scheduled Task
 ├── dist/                   ← GENERATED — single-file build, gitignored
@@ -526,7 +526,7 @@ avoids public exposure altogether.
 
 ### Two stores, and who owns each
 
-VorFrame keeps state in two places and they never mix:
+Warframe Prime Hunter keeps state in two places and they never mix:
 
 | Store | Holds | Written by | Lost if deleted |
 |---|---|---|---|
@@ -548,8 +548,8 @@ when they earn their keep.
 ### Staleness is checked by the server, not the page
 
 `serve.py` verifies upstream **before handing over the dataset**. The browser asks for
-`data/vorframe-data.js` as it always does; the server checks whether DE has moved on
-since the build, appends `window.VORFRAME_UPSTREAM = {...}` to the file it returns,
+`data/prime-data.js` as it always does; the server checks whether DE has moved on
+since the build, appends `window.WFPRIME_UPSTREAM = {...}` to the file it returns,
 and the banner reads that. The page never talks to Digital Extremes and does not know
 the check happened.
 
@@ -617,7 +617,7 @@ Verified across four states: warm-with-blocked-source (315 items + alert), cold
 
 ## 7. Data model
 
-`window.VORFRAME_DATA` holds:
+`window.WFPRIME_DATA` holds:
 
 ```js
 {
@@ -932,7 +932,7 @@ that trade understood. The per-round rate is still computed and shown in the
 rotation tooltip, so the pathology is visible rather than hidden; if a node with a
 much better rate is sitting below a longer one, the tooltip says so.
 
-The setting lives in `vorframe.plan.v1` and **both pages read that one copy**, since
+The setting lives in `wfprimes.plan.v1` and **both pages read that one copy**, since
 both rank nodes with it and this document guarantees they cannot disagree. The
 collection page writes back to the planner's store rather than keeping its own. The
 headline percentage is **per run**; the row names only the rotations the run

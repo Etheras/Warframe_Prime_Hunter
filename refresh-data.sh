@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refresh everything VorFrame needs. The macOS and Linux twin of
+# Refresh everything Warframe Prime Hunter needs. The macOS and Linux twin of
 # refresh-data.cmd - same behaviour, same options.
 #
 # It does the lot, first run and every run after:

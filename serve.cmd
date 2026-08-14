@@ -1,5 +1,5 @@
 @echo off
-REM Start VorFrame and open it in your browser.
+REM Start Warframe Prime Hunter and open it in your browser.
 REM Serving the folder (rather than opening index.html directly) is what lets the
 REM browser reliably save your collection between visits.
 REM The port is chosen automatically - Windows reserves port ranges dynamically,

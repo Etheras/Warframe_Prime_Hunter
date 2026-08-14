@@ -9,7 +9,7 @@ with a small state machine so a scheduled task can refresh the site unattended.
 Two sources:
 
   * https://www.warframe.com/droptables
-      The authoritative drop table. Every mirror (including the one VorFrame
+      The authoritative drop table. Every mirror (including the one Prime Hunter
       falls back to) is generated from this page, so it is always first to
       change when something is vaulted or unvaulted.
 
@@ -426,7 +426,7 @@ def collect_prime_items(exports: dict[str, dict]) -> list[dict]:
     Every Prime in DE's official item data, as
     [{name, category, uniqueName, productCategory}].
 
-    This is what lets VorFrame list a Prime that shipped today, before the
+    This is what lets Prime Hunter list a Prime that shipped today, before the
     wiki page has been edited.
     """
     found: dict[str, dict] = {}

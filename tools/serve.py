@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Serve VorFrame and open it in the default browser.
+Serve Warframe Prime Hunter and open it in the default browser.
 
     python tools/serve.py                    # this machine only
     python tools/serve.py --host 0.0.0.0     # anyone on your network
@@ -134,7 +134,7 @@ ALLOWED_FILES = frozenset({
     "index.html", "plan.html",
     "assets/styles.css", "assets/shared.js", "assets/rotation.js", "assets/model.js",
     "assets/app.js", "assets/plan.js",
-    "data/vorframe-data.js",
+    "data/prime-data.js",
 })
 ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 
@@ -151,7 +151,7 @@ ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 def build_csp() -> str:
     img = "'self' data:"
     try:
-        with open(os.path.join(ROOT, "data", "vorframe-data.js"), encoding="utf-8") as fh:
+        with open(os.path.join(ROOT, "data", "prime-data.js"), encoding="utf-8") as fh:
             if "cdn.warframestat.us" in fh.read():
                 img += " https://cdn.warframestat.us"
     except OSError:
@@ -243,7 +243,7 @@ def allow_request(addr: str) -> bool:
     return True
 
 
-class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
+class SiteHandler(http.server.SimpleHTTPRequestHandler):
     """
     Serves the site and refuses everything else.
 
@@ -321,8 +321,8 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
 
         # The dataset is the one request worth checking before answering: asked
         # for once per page load, and the thing that would be stale.
-        if rel == "data/vorframe-data.js":
-            path = os.path.join(ROOT, "data", "vorframe-data.js")
+        if rel == "data/prime-data.js":
+            path = os.path.join(ROOT, "data", "prime-data.js")
             if os.path.exists(path):
                 with open(path, "rb") as fh:
                     blob = fh.read()
@@ -333,7 +333,7 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
                 # with, which says nothing about who is at the other end.
                 payload = dict(freshness(),
                                owner=is_loopback(self.client_address[0]))
-                tail = "\nwindow.VORFRAME_UPSTREAM = " + json.dumps(payload) + ";\n"
+                tail = "\nwindow.WFPRIME_UPSTREAM = " + json.dumps(payload) + ";\n"
                 blob += tail.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/javascript")
@@ -348,7 +348,7 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Serve VorFrame locally.")
+    ap = argparse.ArgumentParser(description="Serve Warframe Prime Hunter locally.")
     ap.add_argument("--host", default="127.0.0.1",
                     help="interface to bind (default 127.0.0.1; use 0.0.0.0 for "
                          "the whole local network)")
@@ -358,7 +358,7 @@ def main() -> int:
                     help="do not open a browser window")
     args = ap.parse_args()
 
-    if not os.path.exists(os.path.join(ROOT, "data", "vorframe-data.js")):
+    if not os.path.exists(os.path.join(ROOT, "data", "prime-data.js")):
         print("No data yet. Run refresh-data.cmd first (about a minute).")
         return 1
 
@@ -378,7 +378,7 @@ def main() -> int:
     else:
         port = pick_port(host)
     url = f"http://localhost:{port}"
-    handler = functools.partial(VorFrameHandler, directory=ROOT)
+    handler = functools.partial(SiteHandler, directory=ROOT)
 
     # Threaded, because the single-threaded server could be taken down by one
     # client opening a socket and never finishing its request - measured: a
@@ -397,7 +397,7 @@ def main() -> int:
 
     # flush explicitly: stdout is block-buffered when the console window is not
     # a terminal, which would leave the launcher window blank until it closed
-    lines = ["", f"  VorFrame is running at  {url}"]
+    lines = ["", f"  Warframe Prime Hunter is running at  {url}"]
     if lan:
         addr = lan_address()
         if addr:

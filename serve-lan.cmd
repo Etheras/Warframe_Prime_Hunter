@@ -1,5 +1,5 @@
 @echo off
-REM Serve VorFrame to your whole network, not just this machine.
+REM Serve Warframe Prime Hunter to your whole network, not just this machine.
 REM
 REM serve.cmd binds to localhost, so only this PC can open the site. This one
 REM binds to every interface, so a phone or tablet on the same Wi-Fi can reach
@@ -21,7 +21,7 @@ REM Close this window to stop the server.
 
 cd /d "%~dp0"
 echo.
-echo   Serving VorFrame to the local network.
+echo   Serving Warframe Prime Hunter to the local network.
 echo   Anyone here can open it and gets their own tracker; yours is untouched.
 echo   This folder is readable, so keep private files out of it.
 echo   Close this window to stop.
