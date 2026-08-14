@@ -33,6 +33,10 @@ temp_mockup.html
 # themselves are not, and nothing the site ships needs them.
 node_modules/
 
+# Playwright's scratch directory. Created by every browser-test run and left
+# empty when they all pass, so it is noise in `git status` rather than a result.
+test-results/
+
 __pycache__/
 *.pyc
 

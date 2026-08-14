@@ -144,6 +144,64 @@ test("Disruption does not use the AABC cycle, and rotation A needs a squad", () 
   assert.match(squad.planName, /under-defending/);
 });
 
+// ── the same run, counted rather than valued ───────────────────────────────
+
+test("the count and the probability come from the rounds the value chose", () => {
+  const ROT = loadRotation();
+  // worth: a rot A relic is the valuable one; chance: rot C drops far more often.
+  // The run has to be the SAME run for both, or the row shows a percentage and a
+  // count that cannot both be true.
+  const worth = { A: 1, B: 0, C: 0.2, none: 0 };
+  const chance = { A: 0.1, B: 0.5, C: 0.5, none: 0 };
+  const r = ROT.runValue(worth, "reset", "Defense", false, null, chance);
+
+  assert.deepEqual(plain(r.counts), { A: 2, B: 1, C: 1 },
+                   "reset runs to C, because a C relic is wanted");
+  // 2 x 0.1 + 1 x 0.5 + 1 x 0.5 - rotation B counts even though it is worth
+  // nothing, because the run passes through it and you keep what it hands you
+  assert.ok(Math.abs(r.count - 1.2) < 1e-12, "expected wanted relics, got " + r.count);
+  // 1 - (0.9^2 x 0.5 x 0.5)
+  assert.ok(Math.abs(r.any - 0.7975) < 1e-12, "P(at least one), got " + r.any);
+});
+
+test("counting is skipped entirely when nothing asks for it", () => {
+  const ROT = loadRotation();
+  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "reset", "Defense", false, null);
+  assert.equal(r.count, undefined, "no alt map, no count - not a silent zero");
+  assert.equal(r.any, undefined);
+});
+
+test("a chance over 100% across one table is held at certainty", () => {
+  const ROT = loadRotation();
+  // several wanted relics in one table can sum past 1; one roll cannot pay twice
+  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "reset", "Defense", false, null,
+                         { A: 1.4, B: 0, C: 0, none: 0 });
+  assert.equal(r.count, 2, "two rolls at certainty, never 2.8");
+  assert.equal(r.any, 1);
+});
+
+test("a flat node counts its single roll, and no rounds", () => {
+  const ROT = loadRotation();
+  const r = ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 }, "reset", "Capture", false, null,
+                         { A: 0, B: 0, C: 0, none: 0.25 });
+  assert.equal(r.count, 0.25);
+  assert.equal(r.any, 0.25);
+});
+
+test("a run is costed in objectives, and each type has its own word for one", () => {
+  const ROT = loadRotation();
+  const o = (n) => plain(ROT.objectivesOf(n));
+  assert.deepEqual(o({ mode: "Defense", rounds: 4 }), { count: 4, unit: "round" });
+  assert.deepEqual(o({ mode: "Spy", rounds: 3 }), { count: 3, unit: "vault" },
+                   "a Spy rotation IS the vault count, so the rounds are the objectives");
+  assert.deepEqual(o({ mode: "Caches", rounds: 2 }), { count: 2, unit: "cache" });
+  assert.deepEqual(o({ mode: "Capture", rounds: null }), { count: 1, unit: "run" },
+                   "nothing to count inside a single-reward mission");
+  assert.deepEqual(o({ mode: "Bounty", rounds: null, bounty: { letter: "A" } }),
+                   { count: 4, unit: "stage" },
+                   "a bounty is not on the round cycle, so it is costed in stages");
+});
+
 // ── the bounty clock ───────────────────────────────────────────────────────
 
 test("the live letter is the one the build read, until its window ends", () => {

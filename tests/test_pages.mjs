@@ -208,6 +208,87 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("a card whose relic drops only on Railjack still says where", async () => {
+  /* The collection view answers "where does this item's relic drop", not "where
+     should I go next", so it must not hide a node for being awkward. Nyx Prime's
+     only unvaulted relic is Neo V9, which exists on eight Proxima nodes and
+     nowhere on the star chart: filtering Railjack out left that card with no farm
+     section at all, saying nothing where it could say "here, bring a ship". */
+  const { page, errors } = await open("/index.html");
+  const only = await page.evaluate(() => {
+    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    for (const it of D.items) {
+      for (const p of it.parts || []) {
+        for (const r of p.relics || []) {
+          const rec = D.relics[r.relic];
+          if (!rec || rec.vaulted || !(rec.sources || []).length) continue;
+          if (rec.sources.every((s) => R.isRailjack(s) || R.notADestination(s))) {
+            return { id: it.id, relic: r.relic };
+          }
+        }
+      }
+    }
+    return null;
+  });
+  if (!only) return;   // no such item in this dataset; nothing to prove
+
+  await page.locator(`[data-id="${only.id}"]`).click();
+  const spots = page.locator(".drawer .spot");
+  assert.ok(await spots.count() > 0,
+            `${only.id} can only be farmed on Railjack, and the card offered nowhere`);
+  // innerText, not textContent: the badge is uppercased in CSS, and what the
+  // reader sees is the thing worth pinning
+  assert.match(await spots.first().locator(".demand").innerText(), /^RAILJACK$/,
+               "a node that needs a ship has to say so, since it is the only option");
+  assert.deepEqual(errors, []);
+});
+
+page_test("minutes per objective re-sort the list, and are remembered", async () => {
+  /* The whole point of this option is that it changes the answer: ranking per
+     run flatters anything long, and one player's timings moved Capture nodes up
+     over a hundred places. A control that stores a number without moving a row
+     would look like it worked. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    localStorage.setItem("vorframe.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const order = () => page.locator("#planNodes .spot-where").allInnerTexts();
+  const before = await order();
+  assert.ok(before.length > 1, "need a ranking before there is anything to re-rank");
+  assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
+               /%\s*\nper run/, "with nothing set the rows are still ranked per run");
+
+  // an endless mission made expensive per round has to fall behind a fast one
+  await page.locator("#advanced > summary").click();
+  const rows = page.locator(".effort-row input");
+  assert.ok(await rows.count() > 0, "every mission type in the plan gets a box");
+  const set = async (mode, mins) => {
+    const box = page.locator(`.effort-row input[data-mode="${mode}"]`);
+    if (await box.count()) { await box.fill(String(mins)); await box.blur(); }
+    return box.count();
+  };
+  await set("Survival", 12);
+  await set("Capture", 2);
+
+  assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
+               /%\s*\nper minute/, "the rows say what they are now ranked on");
+  assert.notDeepEqual(await order(), before,
+                      "costing a long mission twelve minutes a round changed nothing");
+  assert.ok(await page.locator("#planNodes .est").count() > 0,
+            "a type with no minutes of its own is costed at the average, and says so");
+
+  await page.reload({ waitUntil: "load" });
+  assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
+               /per minute/, "the weights did not survive a reload");
+
+  await page.locator("#advanced > summary").click();
+  await page.locator("#effortClear").click();
+  assert.deepEqual(await order(), before, "clearing puts the per-run ranking back");
+  assert.deepEqual(errors, []);
+});
+
 page_test("the two pages agree about what is on the farm list", async () => {
   const { page } = await open("/index.html");
   await page.locator("[data-id]").first().click();

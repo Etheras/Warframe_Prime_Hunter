@@ -121,6 +121,31 @@
     return { total, counts, rounds: n || null, plan: p };
   }
 
+  /* ── the same run, counted rather than valued ─────────────────────
+     `rot` says what each rotation is *worth*; the optional `alt` map says the
+     plain chance that one reward roll there is a relic you want. Both describe
+     the same run, so the count and the probability are taken from the rounds
+     the value model actually settled on - working them out separately would let
+     the two disagree about how long the run is, and the row would then show a
+     percentage and a count that cannot both be true.
+
+     A reward roll yields exactly one item, so the relics in a table are
+     mutually exclusive and their chances add: the expected count is a plain
+     sum. The probability of coming away with something is the complement of
+     missing every roll.
+
+     `draws` is how many rolls each rotation gets over the run. */
+  function tally(draws, alt) {
+    if (!alt) return {};
+    let count = 0, miss = 1;
+    Object.keys(draws).forEach((t) => {
+      const p = Math.min(1, Math.max(0, alt[t] || 0));
+      count += draws[t] * p;
+      miss *= Math.pow(1 - p, draws[t]);
+    });
+    return { count, any: 1 - miss };
+  }
+
   /* ── the bounty clock ─────────────────────────────────────────────
      A bounty's rotation letter is the time of day, not how long you stay. One
      letter is live for everyone at once, it changes when the bounty board
@@ -198,7 +223,7 @@
      third - every letter it does publish is as likely as any other, so the run
      is valued at their mean and labelled unknown. Counting all of them, which
      is what the round model did, is the one answer that is certainly wrong. */
-  function bountyRun(rot, live) {
+  function bountyRun(rot, live, alt) {
     const pays = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0);
     const flat = rot.none || 0;
     const onTable = !live.published || live.published.indexOf(live.letter) >= 0;
@@ -206,23 +231,31 @@
 
     if (letter) {
       const v = rot[letter] || 0;
-      return {
+      const counts = pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null;
+      return Object.assign({
         total: v + flat, perRound: v + flat, rounds: null,
-        counts: pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null,
+        counts,
         stranded: pays.filter((t) => t !== letter),
         planName: null, nonStandard: false,
         bounty: { letter, endsAt: live.endsAt, published: live.published,
                   offTable: false, unknown: false },
-      };
+      }, tally(Object.assign({ none: 1 }, counts), alt));
     }
     const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
-    return {
+    /* Nothing is known about which letter is up, so the count and the
+       probability follow the value: one roll at the average of the letters this
+       bounty does publish. */
+    const altMean = alt && Object.assign({}, alt, {
+      mean: pays.length
+        ? pays.reduce((s, t) => s + Math.min(1, alt[t] || 0), 0) / pays.length : 0,
+    });
+    return Object.assign({
       total: mean + flat, perRound: mean + flat, rounds: null,
       counts: null, stranded: null, planName: null, nonStandard: false,
       bounty: { letter: null, endsAt: live.endsAt, published: live.published,
                 offTable: !!live.letter, unknown: pays.length > 1,
                 live: live.letter },
-    };
+    }, tally({ none: 1, mean: pays.length ? 1 : 0 }, altMean));
   }
 
   /* ── what one run is worth ────────────────────────────────────────
@@ -231,8 +264,8 @@
      it, take whichever banks more: adding a plan can therefore only ever raise
      a node's score, so ticking the 4-squad box never makes anything look
      worse. */
-  function runValue(rot, runMode, mission, squad, live) {
-    if (live) return bountyRun(rot, live);
+  function runValue(rot, runMode, mission, squad, live, alt) {
+    if (live) return bountyRun(rot, live, alt);
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
     let best = { total: 0, counts: null, rounds: null, plan: null };
     if (hasRot) {
@@ -249,11 +282,35 @@
     const stranded = hasRot
       ? ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0 && !(counts && counts[t]))
       : null;
-    return { total: best.total + (rot.none || 0),
-             perRound: best.total / (best.rounds || 1),
-             rounds: best.rounds, counts, stranded,
-             planName: best.plan ? best.plan.name : null,
-             nonStandard: !!ROT_PATTERN[mission] };
+    return Object.assign({
+      total: best.total + (rot.none || 0),
+      perRound: best.total / (best.rounds || 1),
+      rounds: best.rounds, counts, stranded,
+      planName: best.plan ? best.plan.name : null,
+      nonStandard: !!ROT_PATTERN[mission],
+    }, tally(Object.assign({ none: 1 }, counts), alt));
+  }
+
+  /* ── what a run costs, before anyone puts a number on it ──────────
+     Effort is asked for per *objective*, never per run. A run is not a fixed
+     size - how far you take an endless mission is your own choice, and the
+     "How far you run" option above changes it - while a Defense round, a Spy
+     vault and a bounty stage each stay the same thing however long you stay.
+     So the unit the player is asked about is the one that holds still.
+
+     Spy and Caches need no special case: their rotation *is* the count of
+     vaults opened or caches found, so the rounds the model already picked are
+     the objectives. Only the word for them differs.
+
+     Bounties are not on the round cycle at all, so the model has no round count
+     for them - every bounty in the game runs a fixed set of stages, and four is
+     the common shape. */
+  const BOUNTY_STAGES = 4;
+  const OBJECTIVE_UNIT = { Spy: "vault", Caches: "cache" };
+  function objectivesOf(n) {
+    if (n.bounty) return { count: BOUNTY_STAGES, unit: "stage" };
+    if (n.rounds) return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
+    return { count: 1, unit: "run" };
   }
 
   /* ── which sources count at all ───────────────────────────────────
@@ -369,7 +426,7 @@
   assertCoverage();
 
   window.VorFrameRotation = {
-    RUN_MODES, ROT_PATTERN, runValue,
+    RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     isRailjack, isPvPvE, demandsOf, isEventNode, notADestination,

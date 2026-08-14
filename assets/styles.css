@@ -376,8 +376,14 @@ button,input,select,textarea{font:inherit;color:inherit}
   grid-column:2/3;grid-row:1/3;align-self:center;text-align:right;
   font-size:11.5px;color:var(--txt-faint);font-variant-numeric:tabular-nums;line-height:1.25;
 }
-.spot-score b{display:block;font-size:17px;color:var(--gold);font-weight:700}
 .spot-score b{display:block;font-size:16px;color:var(--gold);font-weight:700}
+/* Everything derived from the ranked number goes underneath it, smaller — the
+   big one is always the number the list is sorted by, so the order of the rows
+   is never a mystery. */
+.spot-alt{display:block;font-size:10.5px;color:var(--txt-faint);white-space:nowrap}
+/* A number you did not supply, standing in for one you have not set yet. Same
+   brightness as the line it sits on; only the hue changes — see STYLE.md §1. */
+.est{color:var(--odd);cursor:help}
 
 /* parts */
 .part{margin-bottom:12px;border:1px solid var(--line-soft);border-radius:9px;overflow:hidden}
@@ -410,6 +416,28 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 #advanced summary:hover{color:var(--gold)}
 #advanced[open] summary{margin-bottom:8px}
+
+/* effort weights — minutes per objective, one mission type per row.
+   Full-width rows rather than a grid of boxes: the 290px planner sidebar wraps
+   a grid raggedly and it reads as broken form controls (STYLE.md §5). */
+.effort{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.effort-row{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}
+.effort-row .em-name{
+  flex:1;min-width:0;color:var(--txt-dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.effort-row input{
+  flex:0 0 auto;width:48px;padding:2px 6px;text-align:right;
+  background:#0d1118;border:1px solid var(--line);border-radius:5px;
+  color:var(--txt);font:inherit;font-size:12px;
+  font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield;
+}
+.effort-row input::-webkit-outer-spin-button,
+.effort-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.effort-row input:focus{border-color:var(--gold-dim);outline:none}
+.effort-row.set input{border-color:var(--gold-dim);color:var(--gold)}
+.effort-row .em-unit{flex:0 0 auto;width:76px;font-size:10.5px;color:var(--txt-faint)}
+
 .mat-actions{display:flex;gap:8px;align-items:center}
 .mat-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}
 

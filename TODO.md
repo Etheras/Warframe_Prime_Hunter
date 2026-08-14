@@ -47,14 +47,29 @@ The wiki also names two more exceptions we do not currently see in relic sources
 several tiers inside a **single mission**. We cost a three-vault Spy run as three
 rounds of Defense.
 
-### 3. Mission length is not modelled, and the ranking leans on it
+### 3. Mission length is still not modelled *by default*
 
 Four rounds of Disruption score four times a bounty that may take just as long in real
 minutes, and single-reward missions sink however fast they are. This became
 load-bearing when node ranking moved to whole-run totals (`PROJECT.md §7`), so it is
-now the weakest assumption in the model. The honest fix is timing real missions and
-scoring per minute, which needs data neither the wiki nor DE publishes. Until then the
-per-round rate in each row's rotation tooltip is the workaround.
+the weakest assumption left in the model.
+
+**Half-answered, 2026-08-14.** The player can now supply minutes per objective under
+*Effort — optional*, and the whole list re-ranks per minute — see `PROJECT.md §7`.
+That is the honest fix for anyone willing to type twenty numbers in.
+
+What is still open is the **default**, which is deliberately per run and therefore
+still wrong in the way described above. Nothing ships a timing because the numbers,
+and the ratios between them, depend on gear and progression; the real data neither
+the wiki nor DE publishes is what would let a default be defended. Two things could
+narrow it without inventing anything:
+
+- **Objective count is a fair-ish middle.** Measured against one player's own
+  timings, costing per *run* is out by up to 9.6× across mission types while
+  costing per *objective* is out by 2.4×, because an objective takes 2.5–6 minutes
+  almost everywhere. Four times closer, and it asks the player for nothing — but it
+  is still a default someone could argue with, which is why it is not in.
+- The per-round rate in each row's rotation tooltip remains the cheap workaround.
 
 ## Everything else
 
@@ -98,10 +113,12 @@ identified the eight quest missions as **Steel Path Incursions**, and the wiki
 disproves it — Incursions award *"5 Steel Essence (unaffected by any boosters)"*
 and no relics at all. Faceoff was assumed to be event content and is not.
 
-All four identified. **The exclusions are implemented** — the build tags every
-unreachable row with `access` (`quest`, `unmodelled`, `event:X`) and both pages
-filter on it, so what remains open here is only the *labelling*: Faceoff is
-PvPvE and Railjack needs a ship, and neither says so in the UI.
+All four identified, and **this entry is now closed**. The exclusions are
+implemented — the build tags every unreachable row with `access` (`quest`,
+`unmodelled`, `event:X`) and both pages filter on it — and the labelling landed on
+2026-08-14: a `.demand` badge says **PvPvE** on Faceoff and **Railjack** on the
+Proxima nodes, on both pages, from one definition in `rotation.js`. Kept here only
+because the reasoning above is the record of how each of the four was decided.
 
 ### Our four invented "mission types" leak into the ranking
 
@@ -156,32 +173,31 @@ stacked on weekdays when there is no time, and cracked in bulk at the weekend.
 The current score multiplies the two together, which is why "≈N runs to finish"
 could never be given an honest label.
 
-### Let the player weight each mission type by effort
+**Half the ingredient landed on 2026-08-14** and the rest did not, deliberately.
+Every node row now derives *relics per run* and *what share of runs drop one*
+alongside the combined score, taken from the same run the score is built from
+(`PROJECT.md §7`) — so the number "Where to go" would need to rank on already
+exists and is on screen. What has **not** changed is which of them orders the list:
+the ranked number is still the combined score, because the owner's instruction for
+that corner was "% on top, like they used to". Splitting the ranking means the big
+number on the left column becomes a relic *count*, not a percentage, and that is
+the decision still to make.
 
-Ranking per *run* flatters anything long. Ranking per *minute* changes the order
-completely — with one player's estimates, Capture and Exterminate nodes moved up
-**over a hundred places**, and Spy fell by a factor of ten.
+### Railjack caches probably should not be ranked at all
 
-That is too big to ignore and too personal to ship: the numbers depend on gear
-and progression, and so do the *ratios* between them. A strong player trivialises
-a Capture while a Spy vault still costs its fixed hacking time.
+Of the two things once listed here against the same 38 Proxima nodes, the labelling
+half shipped on 2026-08-14: `Skirmish` and `Caches` now both carry a **Railjack**
+badge, and Faceoff a **PvPvE** one, from a single definition in `rotation.js`.
 
-**So the weights belong to the player.** Minutes per run, per mission type, under
-Advanced options, stored locally and **empty by default** — unset, the ranking
-stays per run exactly as it is now. Nothing ships a default anyone would have to
-argue with.
+What is left is the ranking. **Railjack caches are a poor recommendation on their
+own:** three hidden caches inside a boarded base, for the worst relics-per-run in
+the whole list — nobody runs Railjack for them. Keeping them ranked at all is
+questionable; at minimum they should not appear above ordinary star-chart nodes.
+Left in for now, deliberately, until there is a rule rather than a hunch.
 
-### Railjack should say so, and its caches probably should not be ranked at all
-
-Two things, same 38 Proxima nodes:
-
-- `Skirmish` and `Caches` are **both Railjack** and the UI never says so. A node
-  called "Arva Vector" gives no hint that it needs a ship and a crew. Label it.
-- **Railjack caches are a poor recommendation on their own.** Three hidden caches
-  inside a boarded base, for the worst relics-per-run in the whole list — nobody
-  runs Railjack for them. Keeping them ranked at all is questionable; at minimum
-  they should not appear above ordinary star-chart nodes. Left in for now,
-  deliberately, until there is a rule rather than a hunch.
+Note that the effort weights now give a *mechanism* for this without a special
+case — a Railjack cache run costed honestly in minutes sinks on its own — but
+only for a player who fills the box in, so it is not an answer to the default.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 

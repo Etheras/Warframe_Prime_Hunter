@@ -54,7 +54,7 @@ named once, in `assets/shared.js`, because both pages read and write them:
 | `vorframe.parts.v1` | per-part counts | yes |
 | `vorframe.materials.v1` | the manual materials checklist | yes |
 | `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
-| `vorframe.plan.v1` | planner options (squad, event, Railjack, Forma) | no |
+| `vorframe.plan.v1` | planner options (squad, event, Railjack, run mode, effort minutes) | no |
 | `vorframe.filters.v1` | collection filters, sort and view toggles | no |
 
 **Backup** exports the first three as one document and still accepts the old
@@ -755,9 +755,21 @@ things off: Caliban Prime opens on
 Terrorem (5 of 7 relics), but once his Blueprint and Chassis are ticked it re-ranks
 to Zabala (2 of 2).
 
-Railjack/Proxima nodes are excluded from that ranking — a different activity — but
-never hidden, because five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10)
-have no other source and carry never-vaulted frames like Nyx and Valkyr.
+Railjack/Proxima nodes are excluded from the **planner**, behind an *Include
+Railjack* checkbox — it answers "where should I go next", and Railjack is a
+different activity with its own star chart and its own setup. The **collection
+view keeps them**, because it answers a different question: "where does this
+item's relic drop". Five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10)
+have no other source at all, and they carry never-vaulted frames like Nyx and
+Valkyr.
+
+That distinction was written down here long before the code did it. Until
+2026-08-14 `bestSpots` filtered Railjack out of the collection view as well, so
+Nyx Prime's card — whose only unvaulted relic is Neo V9, on eight Proxima nodes
+and nowhere else — showed **no farm section at all**. The page said nothing where
+it could have said "here, and you will need a ship". It says exactly that now, on
+each row, through the `Railjack` demand badge; a page test pins it by searching
+the dataset for any item in that position rather than naming Nyx.
 
 **Void Fissures need no special handling.** DE publishes no fissure reward table —
 a fissure is an overlay on an ordinary node, so the mission still pays out that
@@ -957,6 +969,65 @@ state or a warning.
 **Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
+
+### The same run, counted as well as valued
+
+A node row carries two numbers about one run, and they answer different questions.
+The **percentage** weighs every relic by what opening it is worth, so a rare you are
+blocked on outranks a common you would pick up anyway. The **count** — how many
+wanted relics the run hands over on average, and how often it hands over any at all
+— knows nothing about that, and says only how fast the stack fills.
+
+They disagree often enough to be worth both. Against a two-Prime list, Mithra
+(Interception) is worth 63.85% a run while dropping 0.83 wanted relics; Taranis
+(Defense) drops 1.47 and is worth 51.25%. More relics, less progress, because what
+Taranis hands you is the easy part.
+
+Both come out of `runValue`, which now takes an optional parallel map of plain drop
+chances alongside the value map and returns `count` and `any` for it. **They are
+deliberately not computed separately.** The value model chooses how long the run is —
+`reset` stops at the last rotation holding something wanted, and Disruption picks
+between three ways of playing it — so a count worked out on its own would silently
+describe a different run, and the row would show a percentage and a count that cannot
+both be true. Passing no map returns no count at all, rather than a zero that reads
+like an answer.
+
+Aya and Forma are in the percentage and out of the count. Neither is a relic, and the
+count claims to be relics.
+
+### Effort is the player's to give, and blank until they do
+
+Ranking per run flatters anything long. Against one player's own timings, ranking per
+minute moved Capture and Exterminate nodes up **over a hundred places** and dropped
+Spy by a factor of ten — far too large to leave unmodelled, and far too personal to
+ship a default for. A strong player trivialises a Capture while a Spy vault still
+costs its fixed hacking time, so even the *ratios* between the numbers belong to
+whoever is playing.
+
+So the planner asks, under *Effort — optional* in the sidebar, and asks for nothing
+until then: **with no minutes set anywhere, the ranking is per run, byte for byte
+what it was before this existed.**
+
+Three decisions inside it are worth keeping:
+
+- **The unit is one objective, never one run.** A Defense round, a Spy vault, a
+  bounty stage. How far you take an endless mission is your own choice, and the *How
+  far you run* option directly above changes it — a question whose unit moves cannot
+  be answered once. Spy and Caches need no special case: their rotation *is* the
+  count of vaults opened or caches found, so the rounds the model already picked are
+  the objectives, and only the word for them differs. Bounties are not on the round
+  cycle at all and are costed at four stages.
+- **A blank type is costed at the average of the ones you filled in**, not at zero,
+  which would sort it straight to the top of a list it was never measured against.
+  The borrowed number is drawn in `--odd` amber on the row so it is a guess you can
+  see rather than one you cannot.
+- **The big number follows the ranking.** Give any minutes and every row's headline
+  becomes value per *minute* and says so, because the largest number in a row must
+  always be the one the list is sorted by (`STYLE.md §5`).
+
+Only mission types the current plan actually ranks get a box — 27 of the 31 in the
+data, for a two-Prime list — and they stay in alphabetical order rather than moving
+to match the ranking they alter.
 
 ### The three sources, and what we change about them
 

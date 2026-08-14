@@ -17,16 +17,32 @@ Two independent things need colour, and they must never use the same channel:
 |---|---|---|
 | **Row background** | the **action** — what refinement to take this relic to | Intact green · Exceptional teal · Flawless blue · Radiant violet |
 | **Chip / label** | the **rarity** of a specific reward | Common bronze `#c67836` · Uncommon silver `#ced6e2` · Rare gold `#ffce40` |
+| **Badge beside a node name** | what the node **demands of you** before you can play it | `--blue`, outlined, uppercase |
 
 Rarity uses the game's own bronze/silver/gold language, so it reads without a
 legend. Never tint a background by rarity *and* put rarity chips on it — that
 was the first attempt and the chips vanished into the gradient.
+
+The third channel is `.demand`, currently `Railjack` and `PvPvE`. It states a
+**requirement, not a verdict**: both are perfectly good farms and neither is
+penalised in the ranking, so it must never borrow the amber or red that mean
+"something here is wrong". A node called "Arva Vector" gives no hint that it needs
+a ship and a crew, and one called "Vehrvod District" none that you will be matched
+against another squad — finding that out inside the mission is the wrong moment.
+Every badge carries a tooltip naming the demand; without one it is just a word in
+a box.
 
 **A rule that does not apply everywhere gets `--odd` amber** (`#684321`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and
 not a rarity. Anything given this colour must carry a tooltip explaining the
 difference, or the colour is just noise.
+
+The same amber marks **a number the app supplied because you did not** (`.est`): the
+assumed minutes on a planner row, where a mission type carries no effort weight of
+its own and is costed at the average of the ones that do. Same meaning — this one is
+not like its neighbours — and the same obligation to explain itself. A borrowed
+number that looks identical to one you typed is precisely what it prevents.
 
 It sits at the **same brightness as the meta line it lives on** — hue carries the
 signal, not luminance. A first attempt used a bright `#e8944a` at 7.27:1, which read
@@ -116,6 +132,14 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   is arbitrary: two equally-scarce parts had one ringed purely because it came
   first in the list. Sorting has no such failure mode, needs no legend, and
   survives ties. Wanted parts sort rarest first, gold to bronze, left to right.
+- **The biggest number in a row is the one the row is sorted by.** Everything
+  derived from it goes underneath it in the same corner, smaller and dimmer
+  (`.spot-alt`). A mockup promoted an average relic count over the ranked
+  percentage and the list immediately looked unordered — two numbers of equal
+  weight give the reader no way to tell which one produced the order they are
+  looking at. It follows that when the ranking changes what it measures, the big
+  number changes with it and its label says so: "per run" becomes "per minute"
+  the moment effort weights are given.
 - **Pad a block on both sides.** A line with padding on the bottom and none on
   the top reads as misaligned even when the spacing above comes from a
   neighbour's margin.
@@ -135,6 +159,15 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   `::-webkit-*-spin-button` reset). They are visually noisy at this size.
 - Default-off options that need explaining live under **Advanced options** with
   the reasoning in a tooltip, not in surrounding prose.
+- **Ask in the unit that holds still.** Effort is collected per *objective* — a
+  Defense round, a Spy vault, a bounty stage — never per run, because how far you
+  take an endless mission is your own choice and the option directly above it
+  changes that. A question whose unit moves cannot be answered once.
+- **Only offer a control for something in front of you.** The effort panel lists
+  the mission types the current plan actually ranks, not all 31 in the data.
+  Those rows stay alphabetical rather than following the ranking they alter: a
+  form whose fields rearrange themselves while you are typing into one is
+  unusable, however informative the new order would be.
 
 ---
 
@@ -158,7 +191,11 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 - Both pages share `assets/styles.css`. Page-specific rules are scoped by a body
   or container class, and **appended rules win by cascade order** — check for an
   existing rule for the same selector before adding one, since a stale duplicate
-  at the end of the file silently overrode a new rule and cost real time.
+  at the end of the file silently overrode a new rule and cost real time. It has
+  since happened again, and not at the end of the file: `.spot-score b` was
+  declared at 17px and again at 16px on the very next line, so the first was dead
+  from the moment it was written and nobody noticed for weeks. Grep the selector.
+  Do not scroll to where you believe it lives.
 
 ---
 

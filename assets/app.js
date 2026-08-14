@@ -121,7 +121,6 @@
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
-  const isRailjack = ROT.isRailjack;
   const isEventNode = ROT.isEventNode;
   const CYCLE_MINUTES = ROT.cycleMinutes;
 
@@ -409,11 +408,18 @@
     const value = new Map();
     open.forEach((r) => value.set(r, relicValueFor(it, r)));
 
+    /* Railjack nodes are kept here, unlike in the planner. This view answers
+       "where does this item's relic drop", not "where should I go next", and
+       some live relics drop nowhere else: Nyx Prime's only unvaulted relic is
+       Neo V9, which exists on four Proxima nodes and nowhere on the star chart.
+       Filtering them out left that card with no farm section at all - the page
+       said nothing where it could have said "here, and you will need a ship".
+       Now it says exactly that, on the row, via the Railjack badge. */
     const map = new Map();
     open.forEach((rname) => {
       if (!value.get(rname)) return;
       (RELICS[rname].sources || [])
-        .filter((s) => !ROT.notADestination(s) && !isRailjack(s) && !isEventNode(s))
+        .filter((s) => !ROT.notADestination(s) && !isEventNode(s))
         .forEach((s) => {
         const key = `${s.planet} ${s.node} ${s.mode}`;
         let e = map.get(key);
@@ -522,7 +528,7 @@
       rows.join("\n") + (state.squad ? "\n\n4-squad odds" : "");
   }
 
-  /* Railjack nodes, event nodes and the bounty clock all live in
+  /* Event nodes, what a node demands of you, and the bounty clock all live in
      assets/rotation.js - see the alias block near the top of this file. */
 
   /* Rotation rewards cycle A → A → B → C and then repeat, so "rotation C" is

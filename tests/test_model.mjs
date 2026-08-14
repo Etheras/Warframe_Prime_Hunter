@@ -218,11 +218,24 @@ test("only the planner options we recognise come back", () => {
   const out = M.parseBackup(JSON.stringify({
     collected: [],
     plan: { squad: true, aya: false, formaNeed: 3, runMode: "aabcaa",
+            minutes: { Defense: 2, Spy: 4.5 },
             somethingElse: "ignored", __proto__: "nope" },
   }), CATALOGUE);
   assert.deepEqual(plain(out.plan),
-                   { squad: true, runMode: "aabcaa", aya: false, formaNeed: 3 },
+                   { squad: true, runMode: "aabcaa", aya: false, formaNeed: 3,
+                     minutes: { Defense: 2, Spy: 4.5 } },
                    "both pages' options survive, and nothing else does");
+});
+
+test("the effort weights are carried by a backup, since they are typed by hand", () => {
+  /* Twenty numbers a player measured themselves are the most expensive thing in
+     the store to lose and the only thing here that cannot be recovered from the
+     game. Dropping them silently is the failure worth guarding against - the
+     dialog promises "planner options" and this is one. */
+  const M = load();
+  const out = M.parseBackup({ collected: [], plan: { minutes: { Survival: 12 } } },
+                            CATALOGUE);
+  assert.deepEqual(plain(out.plan), { minutes: { Survival: 12 } });
 });
 
 test("materials are cleaned up rather than trusted", () => {

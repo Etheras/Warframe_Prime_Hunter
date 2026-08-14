@@ -85,6 +85,16 @@
       <span class="box"></span>
       <span class="lbl" data-tip="Railjack is a different activity with its own setup, so it is left out of the ranking by default. Five live relics drop only there, though.">Include Railjack</span>
     </label>
+
+    <details id="advanced" class="gap-lg">
+      <summary data-tip="Ranking per run flatters anything long. Against one player's own timings, ranking per minute moved Capture and Exterminate nodes up over a hundred places and dropped Spy by a factor of ten.&#10;&#10;That is too big to ignore and too personal to ship: the numbers depend on your gear and your progression, and so do the ratios between them. So they are yours to give, and blank until you do.">Effort — optional</summary>
+      <p class="hint">Minutes for <strong>one objective</strong> — a round, a vault, a bounty
+        stage — not one whole run. How far you take an endless mission is your own
+        choice, so an objective is the only unit that holds still.</p>
+      <div id="effortRows" class="effort"></div>
+      <p class="hint" id="effortState"></p>
+      <button class="mini" id="effortClear" hidden="hidden">clear all</button>
+    </details>
   </aside>
 
   <!-- ─────────── the plan ─────────── -->
@@ -92,7 +102,7 @@
     <div id="planEmpty" class="empty">
       <p>Nothing on your list yet.</p>
       <p class="hint hint-narrow">
-        Search above to add a Prime, or open="open" the collection and use
+        Search above to add a Prime, or open the collection and use
         <b>Add to farm list</b>. Parts you already own are excluded automatically.
       </p>
     </div>

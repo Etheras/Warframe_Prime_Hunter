@@ -92,11 +92,50 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, runMode: "reset", aya: true },
+    { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
+      minutes: {} },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
   const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
+
+  /* ── effort, supplied by the player and empty by default ──────────
+     Minutes for one *objective* of each mission type. Nothing is filled in to
+     begin with, and while nothing is filled in none of this runs: the ranking
+     is per run, exactly as it was before this existed.
+
+     It exists because ranking per run flatters anything long. Against one
+     player's own timings, costing per minute moved Capture and Exterminate
+     nodes up over a hundred places and dropped Spy by a factor of ten - far too
+     big to ignore, and far too personal to ship a default for. A strong player
+     trivialises a Capture while a Spy vault still costs its fixed hacking time,
+     so even the ratios between the numbers are that player's own.
+
+     A mission type left blank while others are filled in cannot be costed at
+     zero, or it would sort straight to the top of a list it was never measured
+     against. It is costed at the average of the ones you did fill in, and the
+     row says so - a guess you can see beats a guess you cannot. */
+  opts.minutes = (function (raw) {
+    const clean = {};
+    const src = raw && typeof raw === "object" ? raw : {};
+    Object.keys(src).forEach((mode) => {
+      const v = Number(src[mode]);
+      if (isFinite(v) && v > 0) clean[mode] = v;
+    });
+    return clean;
+  })(opts.minutes);
+
+  const minutesSet = () => Object.keys(opts.minutes);
+
+  function effort() {
+    const set = minutesSet();
+    if (!set.length) return null;
+    const mean = set.reduce((s, m) => s + opts.minutes[m], 0) / set.length;
+    return {
+      per: (mode) => opts.minutes[mode] || mean,
+      assumed: (mode) => !opts.minutes[mode],
+    };
+  }
 
   /* Railjack, event nodes and the bounty clock all live in
      assets/rotation.js - see the alias block at the top of this file. */
@@ -203,11 +242,19 @@
                 kind: s.kind, lvl: s.lvl || null, event: isEvent(s),
                 eventBounty: bountyEvent(s),
                 railjack: isRailjack(s), score: 0,
-                rot: { A: 0, B: 0, C: 0, none: 0 }, relics: new Map() };
+                rot: { A: 0, B: 0, C: 0, none: 0 },
+                /* The same rolls counted rather than valued: the plain chance a
+                   reward here is a relic on the list, before anything is said
+                   about what opening it would be worth. Kept alongside rather
+                   than divided back out of the score, because the score has
+                   Forma and Aya folded into it and neither is a relic. */
+                cnt: { A: 0, B: 0, C: 0, none: 0 },
+                relics: new Map() };
           nodes.set(key, n);
         }
         const slot = { A: "A", B: "B", C: "C" }[String(s.rotation || "").toUpperCase()] || "none";
         n.rot[slot] += ((s.chance || 0) / 100) * rp.value;
+        n.cnt[slot] += (s.chance || 0) / 100;
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev.chance) {
           n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
@@ -287,27 +334,40 @@
     }
 
     // value each node as a whole run, which is what you actually commit to
+    const mins = effort();
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
-      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live);
+      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live, n.cnt);
       n.score = r.total; n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
       n.planName = r.planName; n.bounty = r.bounty;
+      // the same run counted: how many wanted relics it drops on average, and
+      // how often it drops any at all
+      n.perRun = r.count || 0; n.anyRun = r.any || 0;
+
+      const o = ROT.objectivesOf(n);
+      n.objectives = o.count; n.unit = o.unit;
+      n.minutes = mins ? mins.per(n.mode) * o.count : null;
+      n.minutesAssumed = !!mins && mins.assumed(n.mode);
+      // with no minutes anywhere, this is the score and the ranking is per run
+      n.rate = n.minutes ? n.score / n.minutes : n.score;
     });
 
-    // Score first, then a lower enemy level (faster clears). Rotation used to
+    // Rate first, then a lower enemy level (faster clears). Rotation used to
     // be a tie-break here; it is priced into the score now, so tie-breaking on
-    // it as well would count it twice. Mission length stays unmodelled.
+    // it as well would count it twice. Rate is the score per run until minutes
+    // are given, at which point it is the score per minute - so the list is
+    // always ordered by the number the row shows largest.
     const ranked = Array.from(nodes.values()).sort((a, b) => {
-      if (Math.abs(b.score - a.score) > 1e-9) return b.score - a.score;
+      if (Math.abs(b.rate - a.rate) > 1e-12) return b.rate - a.rate;
       const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
       if (al !== bl) return al - bl;
       return (a.node || "").localeCompare(b.node || "");
     });
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-             ayaRotationLive, ayaMissing };
+             ayaRotationLive, ayaMissing, perMinute: !!mins };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -473,6 +533,63 @@
 
   /* ── rendering ───────────────────────────────────────────────── */
   const pct = (v) => (v * 100).toFixed(2).replace(/\.?0+$/, "") + "%";
+  const n2 = (v) => v.toFixed(2).replace(/\.?0+$/, "");
+
+  /* The corner of a row carries the number the list is ranked on, largest, and
+     everything derived from it underneath in the faint line - never the other
+     way round. Two numbers of equal weight in one corner give the reader no
+     clue which of them put the rows in this order.
+
+     Both belong there, because they answer different questions. The percentage
+     weighs a relic by what opening it is worth, so it knows a rare you are
+     blocked on is not the same prize as a common; the count does not, and says
+     only how fast the stack fills. A node can hand over more relics and still
+     be worth less. */
+  function scoreBlock(n) {
+    const perMin = n.minutes != null;
+    const lines = [];
+
+    lines.push("Ranked on what one run here is worth towards your list" +
+               (perMin ? "," : "."));
+    if (perMin) lines.push("per minute of it.");
+    if (opts.squad) lines.push("Assumes a 4-squad cracking the same relic.");
+    lines.push("");
+
+    if (perMin) {
+      lines.push("Whole run   " + pct(n.score) + "   over " + n2(n.minutes) + " min");
+      if (n.objectives > 1) {
+        lines.push("            " + n.objectives + " " + n.unit + "s at " +
+                   n2(n.minutes / n.objectives) + " min each");
+      }
+      if (n.minutesAssumed) {
+        lines.push("");
+        lines.push("You have set no minutes for " + n.mode + ", so it is costed at");
+        lines.push("the average of the types you did set. Fill it in to rank");
+        lines.push("this row on its own time rather than on everyone else's.");
+      }
+      lines.push("");
+    }
+
+    lines.push("Relics      " + n2(n.perRun) + " you want, per run on average");
+    lines.push("            " + pct(n.anyRun) + " of runs drop at least one");
+    lines.push("");
+    lines.push("The percentage weighs each relic by what opening it is worth,");
+    lines.push("so a rare you are blocked on outweighs a common. The count");
+    lines.push("does not - it says only how fast the stack fills.");
+
+    const counted = n2(n.perRun) + " relic" + (n2(n.perRun) === "1" ? "" : "s") +
+                    " · " + pct(n.anyRun) + " of runs";
+    const cost = perMin
+      ? `<span class="spot-alt">${pct(n.score)} per run over ` +
+        (n.minutesAssumed
+          ? `<span class="est">${n2(n.minutes)} min</span>`
+          : `${n2(n.minutes)} min`) + "</span>"
+      : "";
+
+    return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
+      <b>${pct(n.rate)}</b>${perMin ? "per minute" : "per run"}
+      ${cost}<span class="spot-alt">${counted}</span></div>`;
+  }
 
   function renderWishlist() {
     const el = $("#wishlist");
@@ -507,10 +624,55 @@
     }).join("");
   }
 
+  /* ── the effort boxes ─────────────────────────────────────────────
+     One row per mission type the plan actually ranks, and no others - every
+     type in the data would ask for numbers about places this list is not
+     sending you. The rows stay in alphabetical order rather than moving to
+     match the ranking: they are a form being filled in, and a form whose fields
+     rearrange themselves as you type is unusable.
+
+     The unit is named on every row, because "8" means very different things
+     against a Defense round and against a whole Capture. */
+  function renderEffort(ranked) {
+    const box = $("#effortRows");
+    if (!box) return;
+    const unit = new Map();
+    ranked.forEach((n) => { if (!unit.has(n.mode)) unit.set(n.mode, n.unit); });
+    const modes = Array.from(unit.keys()).sort();
+
+    box.innerHTML = modes.length
+      ? modes.map((m) => `<label class="effort-row${opts.minutes[m] ? " set" : ""}">
+          <span class="em-name">${esc(m)}</span>
+          <input type="number" min="0" step="0.5" placeholder="—" inputmode="decimal"
+                 value="${opts.minutes[m] || ""}" data-mode="${esc(m)}"
+                 aria-label="minutes per ${esc(unit.get(m))} of ${esc(m)}" />
+          <span class="em-unit">min / ${esc(unit.get(m))}</span>
+        </label>`).join("")
+      : `<p class="hint">Nothing on your list yet, so there is nothing to weigh.</p>`;
+
+    const set = minutesSet();
+    const mean = set.length
+      ? set.reduce((s, m) => s + opts.minutes[m], 0) / set.length : 0;
+    const note = $("#effortState");
+    if (note) {
+      note.innerHTML = !modes.length ? ""
+        : set.length
+          ? `<b>${set.length} set.</b> Every other type is costed at their average, ` +
+            `${n2(mean)} min — shown in amber on the row, so a borrowed number is ` +
+            `never mistaken for one of yours.`
+          : `Nothing set, so the list is ranked <b>per run</b>, exactly as it is ` +
+            `without any of this. Fill in a single type and the whole list re-sorts ` +
+            `by time.`;
+    }
+    const clear = $("#effortClear");
+    if (clear) clear.hidden = !set.length;
+  }
+
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-            ayaRotationLive, ayaMissing } = buildPlan();
+            ayaRotationLive, ayaMissing, perMinute } = buildPlan();
+    renderEffort(ranked);
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
     $("#formaShort").classList.toggle("on", formaShort > 0);
@@ -528,9 +690,16 @@
 
     $("#planScoreNote").innerHTML =
       `The percentage is what <b>one whole run</b> at that node is worth towards your ` +
-      `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""} — so a ` +
-      `longer run can outrank a faster one on volume alone. Hover the rotations for the ` +
-      `per-round rate. ` +
+      `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}` +
+      (perMinute
+        ? `, divided by the minutes you said it costs — so the ranking is now per ` +
+          `minute, and a long run has to earn its length.`
+        : ` — so a longer run can outrank a faster one on volume alone. Fill in ` +
+          `<b>Effort</b> in the sidebar to rank by time instead.`) +
+      ` Beneath it, the same run counted rather than valued: how many relics you want ` +
+      `it hands over on average, and how often it hands over any at all. The percentage ` +
+      `weighs a rare you are blocked on above a common; the count does not. ` +
+      `Hover the rotations for the per-round rate. ` +
       `Rotation is priced in: the published chance assumes that rotation has come ` +
       `up, so it is not comparable across rotations on its own. ${RUN_BLURB[opts.runMode] || RUN_BLURB.reset} ` +
       `Relics are listed best-first within each node. ` +
@@ -578,11 +747,12 @@
             "One Aya buys one relic of your choosing at Varzia. Counted at " +
             pct(ayaValue) + " here, the value of the best relic it could buy you.")
           }">aya</span>` : ""}</div>
-        <div class="spot-score"><b>${pct(n.score)}</b>per run</div>
+        ${scoreBlock(n)}
       </div>`;
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
-          `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${pct(n.score)}`
+          `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${
+            pct(n.rate)}${n.minutes != null ? "/min" : ""}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
 
@@ -726,6 +896,36 @@
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
   });
+  /* The rows are rewritten on every render, so the handler lives on the box
+     that survives rather than on the inputs that do not. `change` rather than
+     `input`: re-ranking the whole list on every keystroke would move the answer
+     around underneath someone still typing the question. */
+  {
+    const box = $("#effortRows");
+    if (box) {
+      box.addEventListener("change", (e) => {
+        const el = e.target.closest("input[data-mode]");
+        if (!el) return;
+        const mode = el.dataset.mode;
+        const v = Number(el.value);
+        if (isFinite(v) && v > 0) opts.minutes[mode] = v;
+        else delete opts.minutes[mode];
+        save(KEY_PLAN, opts);
+        render();
+        // the input that had focus was just replaced; put the caret back
+        $$("#effortRows input").forEach((x) => {
+          if (x.dataset.mode === mode) { x.focus(); x.select(); }
+        });
+      });
+    }
+    const clear = $("#effortClear");
+    if (clear) {
+      clear.addEventListener("click", () => {
+        opts.minutes = {}; save(KEY_PLAN, opts); render();
+      });
+    }
+  }
+
   /* One-time migration from the planner's old private copy. */
   if (!readForma() && ((opts.formaHave || 0) || (opts.formaNeed || 0))) {
     writeForma(Math.max(0, Number(opts.formaHave) || 0),
