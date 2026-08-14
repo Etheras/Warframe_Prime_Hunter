@@ -332,8 +332,17 @@
       const byRefinement = {};
       REFINEMENTS.forEach((f) => { byRefinement[f] = relicValue(entries, f); });
 
+      /* How many things on your list this one relic clears. `openings` is set by
+         the *scarcest* of them, so a relic holding three wanted parts reports a
+         bigger number than one holding a single easy part - and on its own that
+         reads backwards when you are cracking a stack. Meso Y2 clears three
+         parts in 10 openings; Axi P10 clears one in 5. Per part cleared that is
+         3.3 against 5.0, and Meso Y2 is the better relic to spend a stack on. */
+      const clears = new Set(entries.filter((e) => !e.bonus).map((e) => e.label)).size;
+
       relicPlan.set(rname, {
-        refinement, value, openings, blocker, entries, byRefinement,
+        refinement, value, openings, blocker, entries, byRefinement, clears,
+        perPart: clears > 0 ? openings / clears : Infinity,
         wants: Array.from(new Set(entries.map((e) => e.label))).sort(),
       });
     });
@@ -642,56 +651,24 @@
       : [];
     if (!pays.length && !n.rounds && !(n.stranded || []).length) return "no rotation";
 
+    /* Short on purpose. This used to carry the whole Disruption tier table and
+       the rotation cycle - twenty-five lines of rules nobody reads on a hover,
+       and rules are the same for every row anyway. They live under *How this
+       works* at the foot of the page now (`STYLE.md §5`), and what is left here
+       is only what is true of THIS node. */
     const lines = [];
-    if (n.nonStandard) {
-      lines.push("DISRUPTION pays one reward per round, and the tier depends on");
-      lines.push("the round AND how many of the four conduits you defended.");
-      lines.push("");
-      lines.push("Defending all four:");
-      lines.push("  round   1  2  3  4  5  6+");
-      lines.push("  tier    B  B  C  C  C  C");
-      lines.push("");
-      lines.push("So rotation C is unlocked, not periodic - once you reach round");
-      lines.push("three every further round is another C.");
-      lines.push("");
-      lines.push("Defending fewer is a deliberate min-max:");
-      lines.push("  rotation A  only rounds 1-3, and only by defending 3/2/1");
-      lines.push("  rotation B  every round, defending 4 / 3-4 / 2-3 / 1-2");
-      lines.push("  rotation C  round 3 onward, defending 3-4");
-      lines.push("Losing all four in a round fails the mission.");
-      lines.push("");
-    }
-    if (n.planName) {
-      lines.push("Plan: " + n.planName + ".");
-      lines.push("");
-    }
     if (n.rounds) {
-      lines.push("Costed over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") +
-        (opts.runMode === "full" ? "."
-         : opts.runMode === "reset" ? ", the last one you want anything from."
-         : ", then restart."));
-      lines.push("");
-      lines.push("You collect, and we count:");
-      Object.keys(n.counts).forEach((r) => {
-        const v = n.rot[r] || 0;
-        lines.push("  rot " + r + " x" + n.counts[r] +
-          (v > 0 ? "   worth " + pct(v) : "   nothing you want"));
-      });
-      if ((n.rot.none || 0) > 0) lines.push("  no rotation   worth " + pct(n.rot.none));
-      lines.push("");
-      lines.push("Whole run  " + pct(n.score) + "   <- ranked on this");
-      lines.push("Per round  " + pct(n.perRound) + "   (" + n.rounds + " rounds)");
-      lines.push("");
+      lines.push(Object.keys(n.counts)
+        .map((r) => "rot " + r + " ×" + n.counts[r]).join(", ") +
+        " over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") + ".");
     }
+    if (n.planName) lines.push("Playing it by " + n.planName + ".");
     (n.stranded || []).forEach((t) => {
-      lines.push("rot " + t + " holds something you want (" + pct(n.rot[t]) +
-        ") but this run never reaches it.");
-      if (n.nonStandard && t === "A" && !opts.squad) {
-        lines.push("Rotation A here needs a squad under-defending to a schedule -");
-        lines.push("tick '4-squad, same relic' to let the planner consider it.");
-      }
+      lines.push("rot " + t + " has " + pct(n.rot[t]) + " you want, out of reach here.");
     });
-    if (!n.nonStandard) lines.push(ROT_CYCLE);
+    if (n.nonStandard && (n.stranded || []).indexOf("A") >= 0 && !opts.squad) {
+      lines.push("Tick 4-squad to let it try for rotation A.");
+    }
 
     const label = pays.length ? "rot " + pays.join("+")
       : (n.stranded || []).length ? "rot " + n.stranded.join("+") + " only"
@@ -735,66 +712,29 @@
       ? "one run"
       : n.objectives + " " + n.unit + (n.objectives === 1 ? "" : "s");
 
+  /* Two numbers on the row and three lines on the hover.
+
+     It carried four stacked figures and a fifteen-line tooltip, which is more
+     than anyone reads standing in front of eight of them. Everything cut from
+     here is either still on the row somewhere else - the round count is on the
+     meta line, the halving has its own marker - or is a rule that is the same
+     for every row and belongs under *How this works*. What is left is what
+     differs between one node and the next. */
   function scoreBlock(n) {
     const perMin = n.minutes != null;
-    const unit = perMin ? "minute" : "objective";
-    const lines = [];
+    const cost = perMin ? n2(n.minutes) + " min" : objectivesText(n);
 
-    lines.push("Ranked on how many relics you want this run hands over,");
-    lines.push("per " + unit + " of it. Nothing on this side knows what a relic");
-    lines.push("is worth once opened - that is the list on the right.");
-    if (opts.squad) lines.push("Assumes a 4-squad cracking the same relic.");
-    lines.push("");
-
-    lines.push("Relics      " + n2(n.perRun) + " you want, per run on average");
-    lines.push("            " + pct(n.anyRun) + " of runs drop at least one");
-    if (n.halved) {
-      lines.push("");
-      lines.push("The ranked figure is halved - see the note on the row. The");
-      lines.push("count above is not: what a run drops is a fact.");
-    }
-    lines.push("");
-
-    lines.push("Whole run   " + pct(n.score) + "   towards your list" +
-               (perMin ? "\n            over " + n2(n.minutes) + " min"
-                       : n.cost === 1 ? "\n            (one objective)"
-                                      : "\n            over " + objectivesText(n)));
-    if (perMin && n.objectives > 1) {
-      lines.push("            " + objectivesText(n) + " at " +
-                 n2(n.minutes / n.objectives) + " min each");
-    }
-    if (perMin && n.minutesAssumed) {
-      lines.push("");
-      lines.push("You have set no minutes for " + n.mode + ", so it is costed at");
-      lines.push("the average of the types you did set. Fill it in to rank");
-      lines.push("this row on its own time rather than on everyone else's.");
-    }
-    if (!perMin) {
-      lines.push("");
-      lines.push("An objective is a round, a vault, a cache or a bounty stage -");
-      lines.push("whichever this mission counts in. It stands in for time, and");
-      lines.push("it is a fair stand-in: an objective takes 2.5 to 6 minutes");
-      lines.push("almost everywhere, while a run is whatever you decide to make");
-      lines.push("it. Put real minutes in under Effort to rank on those instead.");
-    }
-    lines.push("");
-    lines.push("Two different questions, and they disagree often. The count");
-    lines.push("says how fast the stack fills. The percentage weighs each relic");
-    lines.push("by what opening it is worth, so a rare you are blocked on beats");
-    lines.push("a common - a node can hand over more relics and be worth less.");
-
-    /* "over one run" after "per run" says the same thing twice, so a
-       single-objective mission just states the per-run figure and stops. */
-    const over = perMin
-      ? " over " + (n.minutesAssumed
-          ? `<span class="est">${n2(n.minutes)} min</span>`
-          : `${n2(n.minutes)} min`)
-      : n.cost === 1 ? "" : " over " + esc(objectivesText(n));
+    const lines = [
+      n2(n.perRun) + " wanted relics a run, over " + cost + ".",
+      pct(n.anyRun) + " of runs drop at least one.",
+      "Worth " + pct(n.score) + " towards your list once opened.",
+    ];
+    if (n.halved) lines.push("Ranked figure halved — see the row.");
+    if (perMin && n.minutesAssumed) lines.push("Minutes assumed from the ones you set.");
 
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
-      <b>${n2(n.rate)}</b>relics per ${unit}
-      <span class="spot-alt">${n2(n.perRun)} per run${over}</span>
-      <span class="spot-alt">${pct(n.score)} worth · ${pct(n.anyRun)} of runs</span></div>`;
+      <b>${n2(n.rate)}</b>relics / ${perMin ? "min" : "objective"}
+      <span class="spot-alt">${n2(n.perRun)} a run</span></div>`;
   }
 
   function renderWishlist() {
@@ -979,7 +919,7 @@
       const more = ranked.length > SHOW;
       return `<div class="spot">
         <div class="spot-where">${esc(n.node)}
-          <span class="spot-mode">(${esc(n.mode)})</span>
+          <span class="spot-mode${n.nonStandard ? " odd" : ""}">(${esc(n.mode)})</span>
           <span class="src-planet">— ${esc(n.planet)}</span>
           ${demandTags(n)}
           ${n.event ? `<span class="tag">event</span>` : ""}</div>
@@ -988,56 +928,34 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}${
+          /* One line each. These markers exist to say a short thing - the
+             reasoning behind each lives under *How this works*, where it can be
+             read once instead of hovered eight times. */
           n.bonus ? ` · <span class="est" data-tip="${esc(
-            "IF you run this as a Void Fissure. Nothing here knows whether" + "\n" +
-            "it is one." + "\n\n" +
-            "Which nodes carry a fissure changes every hour or two, and this" + "\n" +
-            "data is refreshed daily, so a list of them would be wrong more" + "\n" +
-            "often than right - worse than no list. What is counted is the" + "\n" +
-            "depth bonus a fissure pays for staying: five rotations gives one" + "\n" +
-            "free relic, random, of the tier being run." + "\n\n" +
-            "Priced at " + n.bonus.tier + ", the best tier for this list: " +
-            n.bonus.want + " of its " + n.bonus.pool + " live relics" + "\n" +
-            "are ones you want, so a random one is worth " + pct(n.bonus.value) +
-            " on" + "\n" + "average, at Exceptional." + "\n\n" +
-            "The same figure lands on every endless node, so it never" + "\n" +
-            "reorders them against each other. What it changes is endless" + "\n" +
-            "against short, and that comparison holds however the fissures" + "\n" +
-            "happen to be sitting.")
+            "Five rotations in a fissure pays a free relic, worth " +
+            pct(n.bonus.value) + " here.\nOnly if this node is a fissure — " +
+            "nothing here knows that.")
           }">+relic if fissure</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
-            "Hands its relics over already Radiant." + "\n\n" +
-            (n.tracesSaved
-              ? "That is " + n.tracesSaved + " Void Traces you do not spend, on top of\n" +
-                "whatever the relic itself is worth.\n\n"
-              : "") +
+            "Hands its relics over already Radiant" +
+            (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces" : "") + ".\n" +
             (n.overshot
-              ? "But this plan wanted less refinement than that. Radiant\n" +
-                "trades commons away for rares - 25.33% down to 16.67% -\n" +
-                "and what you are blocked on here is a common, so a copy\n" +
-                "from this node is worth less to you than one off the star\n" +
-                "chart. Scored at what it is actually worth, not at what a\n" +
-                "relic of this name would be worth if the choice were yours."
-              : "This plan wanted Radiant anyway, so that is the whole\n" +
-                "refinement cost avoided and nothing given up for it.") + "\n\n" +
-            "The traces are counted, not scored: what 100 of them are worth\n" +
-            "depends on how many you have, which this app cannot see.")
+              ? "Scored lower: this plan wanted them less refined."
+              : "This plan wanted Radiant anyway."))
           }">${n.overshot ? "pre-refined" : "radiant"}</span>` : ""}${
           n.halved ? ` · <span class="est" data-tip="${esc(
-            "Scored at half, deliberately." + "\n\n" +
-            "Three hidden caches inside a boarded Railjack base is the" + "\n" +
-            "worst relics-per-run in the list, and nobody runs Railjack" + "\n" +
-            "for them - you run a Skirmish and open what you pass. Left" + "\n" +
-            "unweighted they sort in among ordinary star-chart nodes," + "\n" +
-            "which is not where they belong." + "\n\n" +
-            "A flat 50%: a judgement, not a measurement, and the only" + "\n" +
-            "one in the model. The relic count on this row is untouched" + "\n" +
-            "- what the run drops is a fact.")
+            "Scored at half on purpose — nobody runs Railjack for caches.\n" +
+            "The relic count is untouched.")
           }">halved</span>` : ""}${
+          /* A borrowed number stays visible even after the corner was cut back:
+             a guess you can see beats a guess you cannot. */
+          n.minutesAssumed ? ` · <span class="est" data-tip="${esc(
+            "No minutes set for " + n.mode + ", so it is costed at the average\n" +
+            "of the types you did set.")
+          }">est. ${n2(n.minutes)} min</span>` : ""}${
           n.aya ? ` · <span class="aya" data-tip="${esc(
-            "Also drops Aya at " + pct(n.aya / 100) + " per reward." + "\n\n" +
-            "One Aya buys one relic of your choosing at Varzia. Counted at " +
-            pct(ayaValue) + " here, the value of the best relic it could buy you.")
+            "Drops Aya at " + pct(n.aya / 100) + " a reward, counted as " +
+            pct(ayaValue) + ".\nOne Aya buys any relic Varzia is selling.")
           }">aya</span>` : ""}</div>
         ${scoreBlock(n)}
       </div>`;
@@ -1058,12 +976,17 @@
        on, because the common is likelier. Openings put the blocked one first,
        which is what "what should I crack this weekend" actually means.
 
-       Infinite openings sort last rather than first: a relic whose wanted
-       reward has no chance at any refinement is not urgent, it is impossible. */
+       Ranked per *part cleared*, not per relic. Cracking happens in bulk, so
+       the question is which relic gets the most off your list per opening - and
+       a relic holding three wanted parts is worth more than one holding a
+       single easy one even though it takes longer to exhaust.
+
+       Infinite sorts last rather than first: a relic whose wanted reward has no
+       chance at any refinement is not urgent, it is impossible. */
     const rp = Array.from(relicPlan.entries()).sort((a, b) => {
-      const ao = isFinite(a[1].openings) ? a[1].openings : Infinity;
-      const bo = isFinite(b[1].openings) ? b[1].openings : Infinity;
-      if (ao !== bo) return ao - bo;
+      const ap = isFinite(a[1].perPart) ? a[1].perPart : Infinity;
+      const bp = isFinite(b[1].perPart) ? b[1].perPart : Infinity;
+      if (Math.abs(ap - bp) > 1e-9) return ap - bp;
       return b[1].value - a[1].value;
     });
     $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
@@ -1081,29 +1004,21 @@
         <span class="relic-name">${esc(rname)}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
               data-tip="${esc(
-                "Take this relic to " + p.refinement + "." + "\n\n" +
-                "Chosen to clear the scarcest thing you want here fastest," + "\n" +
-                "rather than for the best overall hit rate. The parts below are" + "\n" +
-                "listed rarest first." +
-                (isFinite(p.openings)
-                  ? "\n\nExpected openings to finish everything wanted here: "
-                    + p.openings.toFixed(1) : ""))}"
+                "Take it to " + p.refinement + ", chosen to clear the scarcest\n" +
+                "thing you want fastest — not for the best hit rate.")}"
           >${esc(p.refinement)}</span>
         <span class="chances" data-tip="${esc(
-          "Openings to finish everything you want out of this relic," + "\n" +
-          "set by whichever wanted reward is scarcest - the one that" + "\n" +
-          "decides when you can stop cracking it." + "\n\n" +
-          (isFinite(p.openings)
-            ? "Expected openings   " + p.openings.toFixed(1) + "   <- ranked on this\n"
-            : "Nothing wanted here can drop at any refinement, so this\n" +
-              "never finishes. Sorted last rather than first.\n") +
-          "Per opening         " + pct(p.value) + " gives something wanted" + "\n\n" +
-          "Ranked on openings rather than on that percentage: a relic" + "\n" +
-          "you are one common away from finishing is likelier to pay" + "\n" +
-          "out and less worth your time than one holding a rare you" + "\n" +
-          "are blocked on.")}"><b>${
-          isFinite(p.openings) ? p.openings.toFixed(1) : "∞"
-        }</b><span class="chances-alt">${pct(p.value)} each</span></span>
+          isFinite(p.openings)
+            ? p.openings.toFixed(1) + " openings to clear all " + p.clears +
+              " thing" + (p.clears === 1 ? "" : "s") + " you want from it.\n" +
+              pct(p.value) + " of openings pay out something wanted."
+            : "Nothing wanted here can drop at any refinement.\nSorted last.")
+          }"><b>${
+          isFinite(p.perPart) ? p.perPart.toFixed(1) : "∞"
+        }</b><span class="chances-alt">${
+          isFinite(p.openings) ? p.openings.toFixed(1) + " openings · " + p.clears +
+            (p.clears === 1 ? " part" : " parts") : "never finishes"
+        }</span></span>
       </div>
       <div class="relic-parts">${
         parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}</span>`).join("")

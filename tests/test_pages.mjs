@@ -204,7 +204,7 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   const spots = page.locator(".spot");
   assert.ok(await spots.count() > 0, "a wanted Prime with live relics must rank somewhere");
   const first = await spots.first().innerText();
-  assert.match(first, /%/, "every row is scored");
+  assert.match(first, /[\d.]+\s*\nrelics \//, "every row carries its ranked figure");
   assert.deepEqual(errors, []);
 });
 
@@ -494,7 +494,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   const before = await order();
   assert.ok(before.length > 1, "need a ranking before there is anything to re-rank");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /[\d.]+\s*\nrelics per objective/,
+               /[\d.]+\s*\nrelics \/ objective/,
                "with nothing set, objective count is the default cost basis");
 
   // an endless mission made expensive per round has to fall behind a fast one
@@ -510,7 +510,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   await set("Capture", 2);
 
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /[\d.]+\s*\nrelics per minute/,
+               /[\d.]+\s*\nrelics \/ min/,
                "the rows say what they are now ranked on");
   assert.notDeepEqual(await order(), before,
                       "costing a long mission twelve minutes a round changed nothing");
@@ -519,30 +519,33 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
 
   await page.reload({ waitUntil: "load" });
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /per minute/, "the weights did not survive a reload");
+               /relics \/ min/, "the weights did not survive a reload");
 
   await page.locator("#advanced > summary").click();
   await page.locator("#effortClear").click();
   assert.deepEqual(await order(), before,
                    "clearing puts the per-objective default back");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /per objective/, "and says so again");
+               /relics \/ objective/, "and says so again");
 
   /* The default is a cost basis, not "no cost basis": a four-round Defense is
      costed four times a single-objective Capture even with every box empty.
      That is the whole of decision 3 - per run flattered anything long. */
+  /* The objective count lives on the meta line - "rot A+B+C · 4 rounds · …" -
+     rather than in the corner, which now carries only the ranked figure and the
+     per-run count. Read it from where it actually is. */
   const basis = await page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#planNodes .spot"));
     return rows.map((s) => ({
+      meta: s.querySelector(".spot-meta").textContent.trim(),
       alt: s.querySelector(".spot-alt").textContent.trim(),
       head: s.querySelector(".spot-score b").textContent.trim(),
     }));
   });
-  const multi = basis.find((r) => /over \d+ (round|vault|cache|stage)s/.test(r.alt));
+  const multi = basis.find((r) => /\b(\d+) (round|vault|cache|stage)s\b/.test(r.meta));
   assert.ok(multi, `no multi-objective row on screen to check: ${JSON.stringify(basis)}`);
-  // "0.83 per run over 4 rounds" against a headline of "0.21"
-  const perRun = Number(multi.alt.match(/^([\d.]+) per run/)[1]);
-  const objectives = Number(multi.alt.match(/over (\d+)/)[1]);
+  const perRun = Number(multi.alt.match(/^([\d.]+) a run/)[1]);
+  const objectives = Number(multi.meta.match(/\b(\d+) (?:round|vault|cache|stage)s\b/)[1]);
   const shown = Number(multi.head);
   assert.ok(Math.abs(shown - perRun / objectives) < 0.01,
             `headline ${multi.head} should be ${perRun} over ${objectives} objectives`);

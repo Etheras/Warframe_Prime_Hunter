@@ -730,7 +730,7 @@
         spots.map((s) => `
           <div class="spot">
             <div class="spot-where">${esc(s.node)}
-              <span class="spot-mode">(${esc(s.mode)})</span>${
+              <span class="spot-mode${s.nonStandard ? " odd" : ""}">(${esc(s.mode)})</span>${
               s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""
               }${demandTags(s)}</div>
             <div class="spot-meta">${

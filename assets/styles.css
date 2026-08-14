@@ -17,7 +17,11 @@
   --red:#e0637a;
   --green:#5fce8f;
   --blue:#5aa9e6;
-  --odd:#684321;      /* non-standard rule, read the tooltip */
+  /* Non-standard rule, read the tooltip. Raised from #684321 when the meta line
+     went to --txt-dim: the rule is that this sits at the SAME brightness as the
+     line it lives on, so hue carries the signal and luminance does not. 6.73:1
+     against --panel, where --txt-dim is 6.68:1. */
+  --odd:#d29455;
   --radius:10px;
   --shadow:0 8px 28px rgba(0,0,0,.45);
 }
@@ -374,7 +378,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .spot:hover{border-color:var(--line)}
 .spot-where{grid-column:1/2;grid-row:1/2;font-size:13.5px;font-weight:600}
-.spot-meta{grid-column:1/2;grid-row:2/3;font-size:11.5px;color:var(--txt-faint)}
+/* --txt-dim, not --txt-faint: the line was measured at 1.97:1 against the panel
+   once its alpha was accounted for, which is well under AA and about half what
+   TODO.md had recorded. It stays smaller than the node name above it, so the
+   hierarchy survives on size rather than on being hard to read. */
+.spot-meta{grid-column:1/2;grid-row:2/3;font-size:11.5px;color:var(--txt-dim)}
 .spot-score{
   grid-column:2/3;grid-row:1/3;align-self:center;text-align:right;
   font-size:11.5px;color:var(--txt-faint);font-variant-numeric:tabular-nums;line-height:1.25;
@@ -383,7 +391,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* Everything derived from the ranked number goes underneath it, smaller — the
    big one is always the number the list is sorted by, so the order of the rows
    is never a mystery. */
-.spot-alt{display:block;font-size:10.5px;color:var(--txt-faint);white-space:nowrap}
+.spot-alt{display:block;font-size:10.5px;color:var(--txt-dim);white-space:nowrap}
 /* A number you did not supply, standing in for one you have not set yet. Same
    brightness as the line it sits on; only the hue changes — see STYLE.md §1. */
 .est{color:var(--odd);cursor:help}
@@ -791,6 +799,11 @@ abbr.rot-odd{
 }
 abbr.rot-odd:hover{color:#c07a3c;text-decoration-color:#c07a3c}
 .spot-mode{font-size:11.5px;font-weight:500;color:var(--teal);opacity:.85}
+/* A mission type that does not follow A->A->B->C wears the same amber as the
+   rotation label that explains it. They were teal and amber, so nothing led the
+   eye from "Disruption" to the one thing on the row that says why Disruption is
+   different - two colours for one fact, and the reader had to find the link. */
+.spot-mode.odd{color:var(--odd);opacity:1}
 /* What a node demands before you can play it — a ship, or other players.
    Not a warning: these are good farms, but the row should say so up front. */
 .demand{font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;
@@ -823,7 +836,10 @@ abbr.rot-odd:hover{color:#c07a3c;text-decoration-color:#c07a3c}
 .plan-main .chances{margin-left:auto;flex:0 0 auto;cursor:help;text-align:right}
 /* Openings is the ranked number here, so it is the big one and the per-opening
    chance sits under it — the same rule the node rows follow (STYLE.md §5). */
-.chances-alt{display:block;font-size:10px;color:var(--txt-faint);white-space:nowrap}
+/* --txt-dim like the meta line, for the same reason: --txt-faint carries an
+   alpha and lands under 2:1. The hierarchy here is carried by size, which is
+   what it should have been carried by all along. */
+.chances-alt{display:block;font-size:10px;color:var(--txt-dim);white-space:nowrap}
 
 /* the wanted list is condensed; the full one is on hover */
 .relic-wants{
