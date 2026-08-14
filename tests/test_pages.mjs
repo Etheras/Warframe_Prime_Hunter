@@ -589,6 +589,62 @@ page_test("a bounty row names the live rotation and how long it has left", async
   assert.match(bounty.text, /^\d+ min$|^\d+h \d\dm$/);
 });
 
+page_test("a fissure that has closed leaves the page without a word", async () => {
+  /* The strip is the only thing here with an expiry, and the failure that
+     matters is the quiet one: a build from this morning going on advertising a
+     fissure that shut at lunchtime. Nobody would see that as a bug - they would
+     see an empty node and conclude the tool is wrong about everything.
+
+     The clock is the subject, so the fissures are planted rather than found:
+     a real feed would have to be re-fetched to make anything expire, and the
+     test would then be about the network. Omnia because it opens any tier, so
+     this holds whatever happens to be on the farm list. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
+    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
+  });
+  await page.reload({ waitUntil: "load" });
+  assert.ok(await page.locator("#planRelics .relic-row").count() > 0,
+            "nothing is being cracked, so there is no strip to test");
+
+  /* Mutated in place: the page took a reference to this array at load, which is
+     also why a reload would undo it. Toggling an option is how a render is
+     asked for from out here — clicked in the page, because the real checkbox
+     sits under a styled span that swallows a pointer. */
+  const rerender = () => page.evaluate(() => document.querySelector("#p-squad").click());
+  const plant = (liveMinutes) => page.evaluate((mins) => {
+    const list = window.WFPRIME_DATA.fissures;
+    const at = (m) => new Date(Date.now() + m * 60000).toISOString();
+    list.splice(0, list.length,
+      { node: "Still Open (Test)", tier: "Omnia", mode: "Survival",
+        ends: at(mins), hard: false, storm: false },
+      { node: "Long Gone (Test)", tier: "Omnia", mode: "Defense",
+        ends: at(-90), hard: false, storm: false });
+  }, liveMinutes);
+
+  await plant(90);
+  await rerender();
+  const strip = page.locator("#planFissures");
+  const said = await strip.innerText();
+  assert.match(said, /Still Open \(Test\)/, "a fissure with 90 minutes left has to show");
+  assert.ok(!/Long Gone/.test(said), `an expired fissure is still being shown: ${said}`);
+  assert.match(said, /1h 2\dm|1h 30m/, "and say how long is left, so it can be judged");
+  assert.equal(said.match(/Still Open/g).length, 1,
+               "an Omnia fissure answers every tier at once, so it gets one row " +
+               `and not one per tier: ${said}`);
+  assert.match(said, /Any tier/, "and that row has to say what it covers");
+
+  await plant(-1);
+  await rerender();
+  assert.equal((await strip.innerText()).trim(), "",
+               "with everything expired the strip must say nothing at all");
+  assert.equal(await strip.evaluate((el) => getComputedStyle(el).display), "none",
+               "and take its border with it, rather than leaving an empty box");
+  assert.deepEqual(errors, []);
+});
+
 // ── the responsive rules, which only a real browser can answer ─────────────
 
 page_test("the sidebar does not push the grid off screen on a phone", async () => {

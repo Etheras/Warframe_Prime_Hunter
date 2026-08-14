@@ -57,6 +57,9 @@
 
   const ITEMS = DATA.items;
   const RELICS = DATA.relics || {};
+  /* Absent on an old build, and absent is a valid answer — see paintFissures. */
+  const FISSURES = DATA.fissures || [];
+  const TIER_ORDER = ["Lith", "Meso", "Neo", "Axi"];
   const BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
   const REFINEMENTS = (DATA.meta && DATA.meta.refinements) ||
     ["Intact", "Exceptional", "Flawless", "Radiant"];
@@ -1068,6 +1071,14 @@
       }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 
+    /* Only the tiers this plan actually wants opened, in tier order rather than
+       in the ranking's — a four-line strip that reshuffles every time you tick
+       a part off is harder to read than one that always says Lith first. */
+    const seen = new Set(rp.map(([rname]) => String(rname).split(" ")[0]));
+    fissureTiers = TIER_ORDER.filter((t) => seen.has(t))
+      .concat(Array.from(seen).filter((t) => TIER_ORDER.indexOf(t) < 0).sort());
+    paintFissures();
+
     // what's left
     $("#planNeeds").innerHTML = needs.map((n) => {
       const liveRelics = n.item.id
@@ -1093,6 +1104,72 @@
       </div>`;
     }).join("");
   }
+
+  /* ── where you can crack them, right now ──────────────────────────
+     The only part of this page about the next hour rather than the next month.
+     Everything else is built from drop tables that move a few times a year; a
+     fissure moves every hour or two. So it is shown and never scored — folding
+     something that short-lived into the ranking would make the ranking wrong in
+     a way nobody could see.
+
+     The list is filtered against the clock on every paint and repainted on a
+     timer, so a page left open does not go on advertising a fissure that closed
+     an hour ago. When the last one expires the block empties itself and says
+     nothing at all: an old build understating what is running is honest, and a
+     line reading "no fissures" would not be.
+
+     One line per tier you are actually cracking. The whole live list is 25-30
+     entries and most of it is about relics you do not hold. */
+  let fissureTiers = [];
+
+  function leftText(mins) {
+    return mins >= 60 ? Math.floor(mins / 60) + "h " + (mins % 60) + "m" : mins + "m";
+  }
+
+  function paintFissures() {
+    const host = $("#planFissures");
+    if (!host) return;
+    const now = Date.now();
+
+    /* One row per tier, then folded — the same trick the node list uses. An
+       Omnia fissure is the answer for every tier at once, so without this a
+       page whose exact-tier fissures have all expired shows four rows naming
+       one node, which reads as a fault rather than as the convenience it is. */
+    const picks = [];
+    fissureTiers.forEach((tier) => {
+      const live = ROT.fissuresFor(FISSURES, tier, now, opts.railjack);
+      if (!live.length) return;
+      const already = picks.find((p) => p.f === live[0]);
+      if (already) already.tiers.push(tier);
+      else picks.push({ f: live[0], tiers: [tier], others: live.length - 1 });
+    });
+
+    const rows = picks.map(({ f, tiers, others }) => {
+      const covers = tiers.length > 1 && tiers.length === fissureTiers.length;
+      /* Two facts, and nothing else: when it shuts, and whether there is
+         anywhere else to go when it does. */
+      const tip = "Closes " + new Date(f.ends).toLocaleTimeString([], {
+        hour: "2-digit", minute: "2-digit" }) + "." +
+        (tiers.length === 1 && others
+          ? " " + others + " other" + (others === 1 ? "" : "s") + " open." : "");
+      const mark = (on, text) =>
+        on ? ' <span class="fissure-any">' + text + "</span>" : "";
+      return `<div class="fissure-row" data-tip="${esc(tip)}">
+        <span class="fissure-tier">${covers ? "Any tier" : esc(tiers.join(" · "))}</span>
+        <span class="fissure-where">${esc(f.node)} · ${esc(f.mode)}${
+          mark(f.tier === ROT.omniaTier && !covers, "any tier")}${
+          mark(f.hard, "Steel Path")}${mark(f.storm, "Void Storm")}</span>
+        <span class="fissure-left">${esc(leftText(ROT.minutesLeft(f, now)))}</span>
+      </div>`;
+    });
+    host.innerHTML = rows.length
+      ? '<div class="fissure-head">Open now</div>' + rows.join("")
+      : "";
+  }
+
+  /* A minute is finer than this needs to be — the numbers are in minutes — and
+     coarse enough that nothing is being animated at anybody. */
+  setInterval(paintFissures, 60000);
 
   /* ── add-to-list search ──────────────────────────────────────── */
   const searchBox = $("#addSearch"), results = $("#addResults");

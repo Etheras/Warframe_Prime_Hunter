@@ -49,6 +49,11 @@ VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
 # and for the same reason: DE's own worldState.php is 404 (PROJECT.md §6).
 SYNDICATE_MISSIONS = "https://api.warframestat.us/pc/syndicateMissions?language=en"
 WORLD_EVENTS = "https://api.warframestat.us/pc/events?language=en"
+# Where relics can be cracked right now. Every entry carries its own expiry,
+# which is what makes this safe to ship in a file: the page shows what is still
+# running when you look at it and silently drops the rest, so an old build
+# understates the fissure map but can never overstate it.
+FISSURES = "https://api.warframestat.us/pc/fissures?language=en"
 IMG_CDN = "https://cdn.warframestat.us/img/"
 
 # Digital Extremes, first party

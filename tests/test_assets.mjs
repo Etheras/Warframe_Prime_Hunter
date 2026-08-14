@@ -509,6 +509,49 @@ test("a Railjack cache is halved, and nothing else in the model is", () => {
   assert.equal(ROT.isRailjackCache({}), false);
 });
 
+test("a fissure that has closed is gone, whatever the build said", () => {
+  /* This is the one list in the app with a shelf life. The build ships whatever
+     was running when it ran; the page is opened hours later. Everything here is
+     about the direction the error goes - it must lose fissures that are still
+     up rather than keep ones that are not, because the second kind sends
+     somebody to an empty node. */
+  const now = Date.parse("2026-08-11T21:00:00Z");
+  const at = (mins) => new Date(now + mins * 60000).toISOString();
+  const ROT = loadRotation({ now });
+  const F = (o) => Object.assign(
+    { node: "?", tier: "Lith", mode: "Defense", hard: false, storm: false }, o);
+
+  const gone = F({ node: "Closed", ends: at(-1) });
+  const chart = F({ node: "Plain", ends: at(30) });
+  const steel = F({ node: "Steel", ends: at(90), hard: true });
+  const storm = F({ node: "Storm", ends: at(120), storm: true });
+  const omnia = F({ node: "Omnia", tier: "Omnia", ends: at(200) });
+  const list = [gone, storm, omnia, steel, chart];
+
+  const named = (tier, allowStorm, from) =>
+    plain(ROT.fissuresFor(from === undefined ? list : from, tier, now, allowStorm))
+      .map((f) => f.node);
+
+  assert.deepEqual(named("Lith", false), ["Plain", "Steel", "Omnia"],
+                   "expired dropped; the one you can just fly to first, though it " +
+                   "closes an hour before the Steel Path one; Omnia last");
+  assert.deepEqual(named("Lith", true), ["Plain", "Storm", "Steel", "Omnia"],
+                   "a Void Storm only counts when Railjack is switched on, and then " +
+                   "it is one gate like the Steel Path, so time settles the two");
+  assert.deepEqual(named("Neo", false), ["Omnia"],
+                   "Omnia opens any tier, so it is the answer when nothing else is");
+  assert.deepEqual(named("Requiem", false), ["Omnia"]);
+  assert.deepEqual(named("Lith", true, []), []);
+  assert.deepEqual(named("Lith", true, null), [],
+                   "an old build carries no list at all, which is not an error");
+
+  // Ten seconds left is not eleven minutes, and it is not nothing either.
+  assert.equal(ROT.minutesLeft(chart, now), 30);
+  assert.equal(ROT.minutesLeft(F({ ends: new Date(now + 659000).toISOString() }), now), 10,
+               "floored, so a chip never claims more time than there is");
+  assert.equal(ROT.minutesLeft(gone, now), 0, "closing now reads as 0, not as -1");
+});
+
 test("the Steel Path is recognised by name, and by the tier the wiki gates", () => {
   const ROT = loadRotation();
   const sp = (node) => ROT.isSteelPath({ node });

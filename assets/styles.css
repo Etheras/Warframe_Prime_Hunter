@@ -489,6 +489,26 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
 }
 .mat-row .mat-del:hover{color:var(--red)}
 .part-count{font-size:11.5px;color:var(--txt-faint)}
+
+/* Fissures open right now — the one thing on this page with an expiry. Teal,
+   the colour this app already uses for "live, and it will not be later": the
+   bounty clock and the permanent-source badge both wear it. Deliberately
+   quieter than the ranking beneath, because it is context for that list rather
+   than a competing one, and it is absent entirely when nothing is running. */
+.fissures:empty{display:none}
+.fissures{margin:0 0 10px;border:1px solid #2a5a55;border-radius:8px;overflow:hidden}
+.fissure-head{
+  padding:5px 12px;background:#132522;color:var(--teal);
+  font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+}
+.fissure-row{
+  display:flex;align-items:baseline;gap:9px;cursor:help;
+  padding:6px 12px;border-top:1px solid var(--line-soft);font-size:12.5px;
+}
+.fissure-tier{font-weight:600;min-width:46px;white-space:nowrap}
+.fissure-where{flex:1;color:var(--txt-dim)}
+.fissure-any{color:var(--teal);font-size:11px}
+.fissure-left{color:var(--teal);font-variant-numeric:tabular-nums;white-space:nowrap}
 .relic-row{
   display:flex;align-items:center;gap:9px;flex-wrap:wrap;
   padding:8px 12px;border-top:1px solid var(--line-soft);font-size:12.5px;

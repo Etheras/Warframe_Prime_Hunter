@@ -52,10 +52,11 @@ import official                                           # noqa: E402
 import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
-                     DROP_FILES, EXPORT_MANIFEST, EXPORT_WANTED, IMG_CDN, ITEMS_API,
-                     MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, SYNDICATE_MISSIONS,
-                     VAULT_TRADER, WORLD_EVENTS, WIKI_RAW, fetch, fetch_json, head,
-                     load_state, log, save_state, upstream_signature)
+                     DROP_FILES, EXPORT_MANIFEST, EXPORT_WANTED, FISSURES, IMG_CDN,
+                     ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE,
+                     SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WIKI_RAW,
+                     fetch, fetch_json, head, load_state, log, save_state,
+                     upstream_signature)
 from artwork import cache_images                          # noqa: E402
 from catalogue import (CATEGORY_ORDER, NAME_ALIASES,                # noqa: E402
                        NON_RELIC_CATEGORIES, REFINEMENTS, TIER_ORDER,
@@ -518,6 +519,59 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
     }
 
 
+# --------------------------------------------------------------------------
+# where relics can be cracked right now
+# --------------------------------------------------------------------------
+#
+# Requiem is left out. Those fissures take Requiem relics, which come from Kuva
+# Liches and carry no Prime parts, so a Requiem fissure is not somewhere this app
+# can send anyone. Omnia stays and is the most useful line of the lot: the wiki
+# is explicit that it opens "Lith, Meso, Neo and Axi Relics (but not Requiem)",
+# so it fits whatever you are holding.
+#
+# The rest of the app deliberately knows nothing about which nodes are fissures
+# (TODO: the endless bonus). That has not changed: this list is shown, never
+# scored. A fissure moves every hour or two while the ranking is built from drop
+# tables that move every few months, and folding one into the other would make
+# the ranking wrong in a way nobody could see.
+FISSURE_TIERS = ("Lith", "Meso", "Neo", "Axi", "Omnia")
+OMNIA_OPENS = ("Lith", "Meso", "Neo", "Axi")
+
+
+def build_fissures(raw, now: datetime) -> list:
+    """
+    The fissures still running, each carrying the moment it ends.
+
+    Expiry is the whole point. A build is hours old by the time anyone reads it,
+    so the page cannot be handed a list of fissures and told to trust it - it is
+    handed the end time of each and drops the ones that have passed. That makes
+    the list wrong only ever by omission, which is the safe direction: it can
+    stop mentioning a fissure that is in fact still up, but it cannot send
+    anybody to one that closed two hours ago.
+    """
+    out = []
+    for entry in raw or []:
+        tier = str(entry.get("tier") or "")
+        if tier not in FISSURE_TIERS or not _is_live(entry, now):
+            continue
+        node = str(entry.get("node") or "").strip()
+        if not node:
+            continue
+        out.append({
+            "node": node,
+            "tier": tier,
+            "mode": str(entry.get("missionType") or "").strip(),
+            "ends": _instant(entry.get("expiry")).isoformat(timespec="seconds"),
+            # Steel Path, and the Railjack ones, which are their own missions
+            # with their own tables rather than an overlay on a normal node
+            "hard": bool(entry.get("isHard")),
+            "storm": bool(entry.get("isStorm")),
+        })
+    order = {t: i for i, t in enumerate(FISSURE_TIERS)}
+    out.sort(key=lambda f: (order[f["tier"]], f["hard"], f["storm"], f["ends"]))
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the Warframe Prime Hunter data payload.")
     ap.add_argument("--offline", action="store_true", help="rebuild from the HTTP cache only")
@@ -560,10 +614,20 @@ def main() -> int:
             print("stale - a rebuild would pick up changes" if moved else "up to date")
             return 0 if moved else 2
         if not moved and state.get("built"):
-            log(f"no upstream changes since {state.get('built')} - nothing to do")
-            print("-" * 60)
-            return 0
-        log("upstream changed: " + (", ".join(sorted(moved)) or "first run"))
+            # This used to stop here, and for the heavy sources it still does:
+            # everything below now comes out of the HTTP cache, which takes well
+            # under a second and touches nobody's servers.
+            #
+            # It no longer stops entirely, because one source has certainly moved
+            # - the fissure list always has, it turns over every hour or two -
+            # and it is small enough to fetch on any schedule. So a scheduled run
+            # that finds nothing new still costs one small request and a local
+            # rebuild, and comes back with somewhere to crack relics tonight.
+            log(f"no upstream changes since {state.get('built')} - "
+                f"rebuilding from cache, with a fresh fissure list")
+            off = True
+        else:
+            log("upstream changed: " + (", ".join(sorted(moved)) or "first run"))
 
     # ---- fetch -----------------------------------------------------------
     # Neither of these is fatal: the catalogue can be rebuilt from DE's export
@@ -589,6 +653,14 @@ def main() -> int:
     syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
                                     off, critical=False, optional=True)
     world_events = fetch_json(WORLD_EVENTS, "api_events", off,
+                              critical=False, optional=True)
+
+    # Fetched live even when everything else is coming from the cache, because
+    # this is the one source where a cached copy is worth nothing: every entry
+    # in it will have expired. `args.offline` rather than `off` for exactly that
+    # reason - only an explicit --offline settles for yesterday's fissures.
+    log("api: void fissures running right now")
+    fissures_raw = fetch_json(FISSURES, "api_fissures", args.offline,
                               critical=False, optional=True)
 
     log("export: DE public item manifest")
@@ -940,6 +1012,7 @@ def main() -> int:
                 "resurgence": "https://api.warframestat.us/pc/vaultTrader (live worldstate)",
                 "bounties": "https://api.warframestat.us/pc/syndicateMissions + /pc/events"
                             " (live worldstate)",
+                "fissures": "https://api.warframestat.us/pc/fissures (live worldstate)",
                 "images": ("assets/img (local copies; nothing fetched at runtime)"
                            if local_images else "https://cdn.warframestat.us/img"),
             },
@@ -951,6 +1024,9 @@ def main() -> int:
         # so it is worth more than a random relic - but it is a currency, not a
         # reward, hence a flat list rather than anything keyed by item.
         "aya": normalise_sources({"Aya": aya_sources}).get("Aya", []),
+        # Each carries its own end time, so the page can drop the ones that have
+        # closed since the build. Shown, never scored - see build_fissures.
+        "fissures": build_fissures(fissures_raw, datetime.now(timezone.utc)),
     }
 
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -985,6 +1061,10 @@ def main() -> int:
     log(f"relics kept    {len(relics_out)}  ({payload['meta']['farmableRelicCount']} farmable)")
     log(f"farmable items {with_farm}")
     log(f"resurgence     {sum(1 for i in out_items if i['flags']['resurgence'])}")
+    fis = payload["fissures"]
+    log(f"fissures       {len(fis)} running"
+        + (f", next closes {min(f['ends'] for f in fis)[11:16]}Z" if fis
+           else " (none, or unreachable)"))
     log(f"wrote          data/prime-data.js  ({len(blob)/1024/1024:.2f} MB)")
 
     if STALE:

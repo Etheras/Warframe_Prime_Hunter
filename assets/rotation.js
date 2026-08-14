@@ -357,6 +357,41 @@
     )[0];
   }
 
+  /* ── where a relic can be cracked right now ───────────────────────
+     The build ships the fissures that were running when it ran, each with the
+     moment it closes. This filters that list against the clock instead of
+     trusting it, so a page opened hours later shows fewer fissures than are
+     really up and never one that has gone. Wrong by omission only.
+
+     An Omnia fissure opens any tier but Requiem, so it counts for every relic
+     here — but it is named last, because four tiers all pointing at the same
+     Omnia node reads like a bug rather than the useful fact it is.
+
+     Order after that: fewest gates first. The Steel Path has to be unlocked and
+     a Void Storm needs a crewed Railjack, so each is one thing standing between
+     you and the mission, and the one you can simply fly to wins even when it
+     closes sooner. Time remaining breaks the tie, since the row's whole job is
+     "there is still time to go and do this". */
+  const OMNIA = "Omnia";
+  const gatesOn = (f) => (f.hard ? 1 : 0) + (f.storm ? 1 : 0);
+
+  function fissuresFor(list, tier, now, allowStorm) {
+    const live = (list || []).filter((f) =>
+      (f.tier === tier || f.tier === OMNIA) &&
+      (allowStorm || !f.storm) &&
+      Date.parse(f.ends) > now);
+    return live.sort((a, b) =>
+      (a.tier === tier ? 0 : 1) - (b.tier === tier ? 0 : 1) ||
+      gatesOn(a) - gatesOn(b) ||
+      Date.parse(b.ends) - Date.parse(a.ends));
+  }
+
+  /* Whole minutes left, floored, so a chip never claims more time than there
+     is. Zero is a real answer and means "closing now", not "no fissure". */
+  function minutesLeft(fissure, now) {
+    return Math.max(0, Math.floor((Date.parse(fissure.ends) - now) / 60000));
+  }
+
   /* ── which sources count at all ───────────────────────────────────
      Railjack nodes need a crewed ship and a different star chart, so they are
      opt-in; they are never hidden from the collection view, since some live
@@ -585,6 +620,7 @@
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     signature, pickNode,
+    fissuresFor, minutesLeft, omniaTier: OMNIA,
     isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
     isRailjackCache, cachePenalty: CACHE_PENALTY,
     isEventNode, notADestination,

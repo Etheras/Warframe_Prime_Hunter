@@ -411,6 +411,49 @@ def test_live_event_bounties() -> None:
           {"family": "standard", "rotations": "ABC"})
 
 
+def test_only_fissures_worth_going_to_are_shipped() -> None:
+    """
+    The build ships the fissures that were running when it ran, and the page
+    filters them again by their own expiry. This is the first of those two
+    passes, and it is also where the entries that could never be useful are
+    dropped: a Requiem fissure takes Requiem relics, which come from Kuva Liches
+    and hold no Prime parts, so it is somewhere this app must never send anyone.
+    """
+    def raw(**kw):
+        base = {"tier": "Lith", "node": "Lith (Earth)", "missionType": "Defense",
+                "activation": "2026-08-11T20:00:00Z", "expiry": "2026-08-11T22:00:00Z",
+                "isHard": False, "isStorm": False}
+        base.update(kw)
+        return base
+
+    got = build_data.build_fissures([
+        raw(tier="Requiem", node="Requiem (Earth)"),
+        raw(node="Closed (Earth)", expiry="2026-08-11T20:30:00Z"),
+        raw(node="Later (Mars)", tier="Axi"),
+        raw(node="", tier="Meso"),
+        raw(node="Omni (Lua)", tier="Omnia"),
+        raw(node="Up (Earth)"),
+    ], _NOW)
+    nodes = [f["node"] for f in got]
+
+    check("fissures: Requiem is not somewhere to send anyone",
+          [n for n in nodes if "Requiem" in n], [])
+    check("fissures: one that closed before the build is not shipped",
+          [n for n in nodes if "Closed" in n], [])
+    check("fissures: a nameless node is dropped rather than shown blank",
+          len(nodes), 3)
+    check("fissures: tier order, so the strip reads the same way every build",
+          nodes, ["Up (Earth)", "Later (Mars)", "Omni (Lua)"])
+    check("fissures: the end time travels with each one",
+          got[0]["ends"], "2026-08-11T22:00:00+00:00",
+          "without it the page cannot tell a live fissure from a dead one")
+    check("fissures: the two gates are carried, not inferred later",
+          (got[0]["hard"], got[0]["storm"]), (False, False))
+
+    check("fissures: an unreachable feed is an empty strip, not a crash",
+          build_data.build_fissures(None, _NOW), [])
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # the built dataset, if one is present
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1356,7 +1399,8 @@ def main() -> int:
                      test_relic_key, test_parse_prime_page]),
         ("join", [test_normalise_sources, test_no_source_cap]),
         ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
-                      test_bounty_family_split, test_live_event_bounties]),
+                      test_bounty_family_split, test_live_event_bounties,
+                      test_only_fissures_worth_going_to_are_shipped]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build, test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
