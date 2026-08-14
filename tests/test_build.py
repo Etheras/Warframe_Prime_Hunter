@@ -1018,6 +1018,18 @@ def test_server_serves_only_the_site() -> None:
           [p for p in ("192.168.1.169", "10.0.0.4", "203.0.113.9", "", None)
            if serve.allowed("temp_mockup.html", p)], [],
           "a LAN guest must never reach an unreviewed local page")
+    # Who is reading is the server's answer to give, since it is the only party
+    # that can see the peer. The page used to guess from location.hostname and
+    # got your own LAN address wrong - warned about something you could fix,
+    # and not told how.
+    check("owner: this machine is the owner, however it spells itself",
+          [p for p in ("127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost")
+           if not serve.is_loopback(p)], [])
+    check("owner: everyone else is a guest",
+          [p for p in ("192.168.1.169", "203.0.113.9", "10.0.0.4", "", None)
+           if serve.is_loopback(p)], [],
+          "a guest told to double-click a file they do not have is noise")
+
     check("mockup: a real page is still served over the LAN",
           serve.allowed("index.html", "192.168.1.169"), True,
           "the local-only rule must not have narrowed the site itself")

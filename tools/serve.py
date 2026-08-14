@@ -326,7 +326,14 @@ class VorFrameHandler(http.server.SimpleHTTPRequestHandler):
             if os.path.exists(path):
                 with open(path, "rb") as fh:
                     blob = fh.read()
-                tail = "\nwindow.VORFRAME_UPSTREAM = " + json.dumps(freshness()) + ";\n"
+                # `owner` is per-request and must not go in the cached body:
+                # freshness() is shared by every peer, and this is the one part
+                # of the payload that differs between them. The page cannot work
+                # this out for itself - it only knows the URL it was opened
+                # with, which says nothing about who is at the other end.
+                payload = dict(freshness(),
+                               owner=is_loopback(self.client_address[0]))
+                tail = "\nwindow.VORFRAME_UPSTREAM = " + json.dumps(payload) + ";\n"
                 blob += tail.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/javascript")

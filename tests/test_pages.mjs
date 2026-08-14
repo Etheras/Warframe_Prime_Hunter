@@ -283,6 +283,45 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   assert.deepEqual(errors, []);
 });
 
+page_test("the server decides who is told how to fix stale data", async () => {
+  /* The exact bug: these tests run on 127.0.0.1, so the old hostname guess
+     called every reader the owner. Browse your own server by its LAN address and
+     it made the opposite mistake - warned you about something you could fix and
+     did not say how. Only the server can see the peer, so only the server can
+     answer, and it stamps the answer on the payload it already attaches.
+
+     Injected before the page scripts run, which is where serve.py puts it. */
+  const banner = async (upstream) => {
+    const page = await browser.newPage();
+    await page.addInitScript((u) => { window.VORFRAME_UPSTREAM = u; }, upstream);
+    await page.goto(origin + "/index.html", { waitUntil: "load" });
+    const el = page.locator(".databar");
+    const text = await el.count() ? await el.first().innerText() : "";
+    await page.close();
+    return text;
+  };
+  const stale = { ok: true, stale: true, moved: ["droptables"] };
+
+  const asOwner = await banner({ ...stale, owner: true });
+  assert.match(asOwner, /Out of date/, "a moved upstream has to raise the banner");
+  assert.match(asOwner, /refresh-data/,
+               "whoever runs the server is the only one who can fix this");
+
+  const asGuest = await banner({ ...stale, owner: false });
+  assert.match(asGuest, /Out of date/, "a guest still gets the warning");
+  assert.ok(!/refresh-data/.test(asGuest),
+            "on 127.0.0.1 the old hostname guess called this reader the owner; " +
+            "the server said otherwise and the server is right");
+
+  /* No server at all - file:// or a static host. The one claim that needs an
+     upstream answer must not be made without one; everything else the banner
+     says comes from the build itself and is unaffected. On fresh data that
+     means no banner, which is the correct amount to say. */
+  const noServer = await banner(undefined);
+  assert.ok(!/Out of date/.test(noServer),
+            `nothing checked upstream, so nothing may claim it moved: ${noServer}`);
+});
+
 page_test("a Steel Path node is ranked, and says so on the row", async () => {
   /* Deliberately not filtered. It gates entering a node, which by the usual rule
      would exclude it - but every Steel Path table carrying a relic is a Faceoff

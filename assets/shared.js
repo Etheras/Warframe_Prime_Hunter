@@ -98,9 +98,21 @@
        the only terms that matter to them - the file they double-click. Anyone
        else is just reading someone else's copy: telling them to run a script
        they do not have is noise, so they get the warning and nothing more.
-       Being on localhost is the closest thing to "this is your copy" that the
-       page can actually know. */
-    const yours = ["localhost", "127.0.0.1", "::1", ""].indexOf(location.hostname) >= 0;
+
+       The server answers this, because it is the only party that can: it sees
+       the peer address and stamps `owner` onto the payload it already attaches
+       to the data file. The page used to guess from location.hostname and was
+       wrong in both directions - browse your own server by its LAN address and
+       you were treated as a guest, warned about something you could fix and not
+       told how.
+
+       With no server there is no answer and the guess is all there is, which is
+       fine for the two cases it covers: a file:// copy has an empty hostname and
+       you must have the folder to be reading it at all, while a published site
+       has a real one and its readers cannot fix anything. */
+    const yours = up && typeof up.owner === "boolean"
+      ? up.owner
+      : ["localhost", "127.0.0.1", "::1", ""].indexOf(location.hostname) >= 0;
     const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
 
     el.innerHTML = moved

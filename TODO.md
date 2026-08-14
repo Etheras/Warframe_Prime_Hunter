@@ -25,7 +25,7 @@ move its reasoning into `PROJECT.md`.
 | # | Decision | Status |
 |---|---|---|
 | 7 | **Already done** — `serve.py` has served from a strict allowlist for some time; `.cache/`, `tools/`, `.git/` and directory listings all 404 already. The entry was stale, not open. Verified by calling `allowed()` directly. | ✅ nothing to do |
-| 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ⬜ |
+| 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ✅ done |
 | 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
 | 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ⬜ |
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ⬜ |
@@ -712,7 +712,18 @@ framing: nothing served is sensitive, so this was housekeeping rather than a
 security fix, and an allowlist was the right shape because it fails closed —
 anything added to the folder later is refused until someone names it.
 
-### The banner guesses who is reading it from the hostname — decision 6
+### The banner guesses who is reading it from the hostname **[done 2026-08-14]**
+
+**Option 1 was built, as recommended.** `serve.py` stamps `owner` onto the
+`VORFRAME_UPSTREAM` payload it already attaches to the data file — per request,
+not in the cached freshness body, since it is the one part that differs between
+peers — and `staleBanner` reads it. The hostname guess survives only as the
+fallback for when there is no server to ask, which is exactly the two cases it
+was ever right about: a `file://` copy, and a published static host.
+
+Kept below because the reasoning is the record of why option 1 beat the others.
+
+### The original entry, for the reasoning
 
 `staleBanner()` decides whether to add "Double-click `refresh-data.cmd` to update it"
 by checking whether `location.hostname` is localhost. That is a guess standing in for
