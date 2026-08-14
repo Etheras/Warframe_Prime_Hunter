@@ -230,6 +230,7 @@
     special: ["special", "OTHER SOURCE"],
     vaultsoon: ["vaultsoon", "VAULTING SOON"],
     perm: ["perm", "P · NEVER VAULTED"],
+    railjack: ["railjack", "RAILJACK ONLY"],
     fresh: ["fresh", "NEW"],
   };
 
@@ -245,7 +246,14 @@
     if (f.farmable) out.push("farmable");
     else if (f.vaulted && !f.founder) out.push("vaulted");
     if (it.vaultSoon) out.push("vaultsoon");
-    if (f.permanent) out.push("perm");
+    /* "Never vaulted" and "Railjack only" are the same wiki marker seen from
+       two sides, and only one of them can be said to someone with no ship. Six
+       Primes carry the marker *and* DE's vaulted flag, because their relics
+       left the star chart for Railjack instead of for the vault - the badge
+       says which of the two you are looking at rather than flattening both into
+       "its relics keep dropping indefinitely". Worked out from the drop table
+       in rotation.js, not from the markers. */
+    if (f.permanent) out.push(ROT.railjackOnly(it, RELICS) ? "railjack" : "perm");
     if (f.baro) out.push("baro");
     return out;
   }
@@ -260,6 +268,12 @@
     if (kind === "vaultsoon") return VAULT_SOON_WHY;
     if (kind === "founder") return "Only ever available to original Founders. This will never return.";
     if (kind === "perm") return "Never vaulted — its relics keep dropping indefinitely.";
+    if (kind === "railjack") {
+      return "Never vaulted, but no longer on the star chart: every relic you " +
+             "can still farm for its parts drops in Railjack and nowhere else.\n\n" +
+             "So it will not become unobtainable — and you will need a Railjack, " +
+             "and a crew or an AI crew, to get it at all.";
+    }
     return "";
   }
 

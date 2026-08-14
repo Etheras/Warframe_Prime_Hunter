@@ -229,12 +229,17 @@
       });
     });
 
+    /* Places that hold something wanted and were left out by an option rather
+       than by the data. Counted so an empty ranking can name the switch that
+       emptied it - see `noNodes`. */
     const nodes = new Map();
+    const blocked = { railjack: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
       (RELICS[rname].sources || []).forEach((s) => {
         if (notADestination(s)) return;      // quest, or not modelled yet
-        if (!opts.railjack && isRailjack(s)) return;
-        if (!opts.event && isEvent(s)) return;
+        const skip = `${s.planet}|${s.node}|${s.mode}`;
+        if (!opts.railjack && isRailjack(s)) { blocked.railjack.add(skip); return; }
+        if (!opts.event && isEvent(s)) { blocked.event.add(skip); return; }
         const key = `${s.planet}|${s.node}|${s.mode}`;
         let n = nodes.get(key);
         if (!n) {
@@ -367,7 +372,8 @@
     });
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-             ayaRotationLive, ayaMissing, perMinute: !!mins };
+             ayaRotationLive, ayaMissing, perMinute: !!mins,
+             blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -624,6 +630,36 @@
     }).join("");
   }
 
+  /* "Where to go" with nothing under it is the one place this page can strand
+     you outright. The relic list directly beneath goes on saying four relics are
+     dropping and every part has "1 relic dropping" against it, so an empty
+     heading reads as a fault rather than as an option you have switched off.
+
+     Nyx Prime is the case that exposed it: all four of its parts come from
+     relics that exist only on Proxima, so with Railjack off the page finds eight
+     perfectly good places, discards every one of them, and says nothing. Name
+     the switch and say where it is. */
+  function noNodes(blocked) {
+    const off = [];
+    if (blocked.railjack) {
+      off.push([blocked.railjack, "a Railjack mission", "Include Railjack"]);
+    }
+    if (blocked.event) {
+      off.push([blocked.event, "an event node", "Include event nodes"]);
+    }
+    if (!off.length) {
+      return `<p class="hint">The relics below do drop, but nowhere you can get to
+        right now — every source is a quest or something the model cannot rank yet.</p>`;
+    }
+    return `<p class="hint">Nowhere to send you, and not because nothing drops. ` +
+      off.map(([n, what, box]) =>
+        `<strong>${n}</strong> place${n === 1 ? "" : "s"} carr${n === 1 ? "ies" : "y"} ` +
+        `what you want and ${n === 1 ? "it is" : "each of them is"} ${what}, left out ` +
+        `by default — tick <strong>${esc(box)}</strong> on the left to rank ` +
+        `${n === 1 ? "it" : "them"}.`
+      ).join(" ") + `</p>`;
+  }
+
   /* ── the effort boxes ─────────────────────────────────────────────
      One row per mission type the plan actually ranks, and no others - every
      type in the data would ask for numbers about places this list is not
@@ -671,7 +707,7 @@
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
-            ayaRotationLive, ayaMissing, perMinute } = buildPlan();
+            ayaRotationLive, ayaMissing, perMinute, blocked } = buildPlan();
     renderEffort(ranked);
 
     $("#formaShort").textContent = formaShort > 0 ? `short ${formaShort}` : "";
@@ -723,7 +759,8 @@
 
     // nodes: show the best few, with the rest behind a hover
     const SHOW = 8;
-    $("#planNodes").innerHTML = ranked.slice(0, SHOW).map((n) => {
+    if (!ranked.length) $("#planNodes").innerHTML = noNodes(blocked);
+    else $("#planNodes").innerHTML = ranked.slice(0, SHOW).map((n) => {
       // most useful relic first: how much of this node's score each one accounts
       // for, i.e. the chance it drops here times what one opening is worth
       const rl = Array.from(n.relics.entries())

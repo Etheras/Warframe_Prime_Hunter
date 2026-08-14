@@ -208,6 +208,43 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("the never-vaulted badge splits, because it means two things", async () => {
+  /* The wiki's "Never Vaulted" marker covers 14 Primes, and six of them carry
+     Digital Extremes' vaulted flag at the same time. Both are true: those six
+     left the ordinary drop tables and their relics went into Railjack rather
+     than into the vault, so they never become unobtainable and you cannot touch
+     them without a ship. Saying "its relics keep dropping indefinitely" to
+     someone with no Railjack is the failure being pinned here. */
+  const { page } = await open("/index.html");
+  const split = await page.evaluate(() => {
+    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    const marked = D.items.filter((i) => (i.flags || {}).permanent);
+    const rj = marked.filter((i) => R.railjackOnly(i, D.relics)).map((i) => i.name);
+    return { marked: marked.length, rj: rj.sort() };
+  });
+  assert.ok(split.marked > split.rj.length && split.rj.length > 0,
+            "both halves of the marker have to exist, or there is nothing to split");
+  assert.ok(split.rj.every((n) => /Prime$/.test(n)));
+
+  const shows = async (name, badge) => {
+    const it = await page.evaluate((n) =>
+      (window.VORFRAME_DATA.items.find((i) => i.name === n) || {}).id, name);
+    await page.locator(`[data-id="${it}"]`).click();
+    const text = await page.locator(".d-badges").innerText();
+    await page.locator(".drawer-close").click();
+    return text.includes(badge);
+  };
+  assert.ok(await shows(split.rj[0], "RAILJACK ONLY"),
+            `${split.rj[0]} can only be farmed with a ship and the card must say so`);
+
+  const plain = await page.evaluate((rj) => {
+    const D = window.VORFRAME_DATA;
+    return (D.items.find((i) => (i.flags || {}).permanent && !rj.includes(i.name)) || {}).name;
+  }, split.rj);
+  assert.ok(await shows(plain, "NEVER VAULTED"),
+            `${plain} really is never vaulted, and must keep saying so`);
+});
+
 page_test("a card whose relic drops only on Railjack still says where", async () => {
   /* The collection view answers "where does this item's relic drop", not "where
      should I go next", so it must not hide a node for being awkward. Nyx Prime's
@@ -240,6 +277,42 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   // reader sees is the thing worth pinning
   assert.match(await spots.first().locator(".demand").innerText(), /^RAILJACK$/,
                "a node that needs a ship has to say so, since it is the only option");
+  assert.deepEqual(errors, []);
+});
+
+page_test("an empty ranking names the switch that emptied it", async () => {
+  /* The one place the planner can strand you. Nyx Prime's four parts all come
+     from relics that exist only on Proxima, so with Railjack off the page finds
+     eight good places, discards every one, and used to print an empty heading -
+     while the list directly beneath went on saying four relics are dropping and
+     every part has one dropping for it. That reads as a fault, not a setting. */
+  const { page, errors } = await open("/plan.html");
+  const stranded = await page.evaluate(() => {
+    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
+    const it = D.items.find((i) => R.railjackOnly(i, D.relics));
+    if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ railjack: false }));
+    return it ? it.name : null;
+  });
+  if (!stranded) return;   // nothing in this dataset is Railjack-only
+  await page.reload({ waitUntil: "load" });
+
+  const where = page.locator("#planNodes");
+  assert.equal(await where.locator(".spot").count(), 0,
+               `${stranded} is Railjack-only, so nothing should rank with Railjack off`);
+  const said = await where.innerText();
+  assert.match(said, /Include Railjack/,
+               "an empty ranking has to name the switch, and it is the only clue there is");
+  assert.match(said, /\d+ places/, "and say how much is behind it");
+
+  // the native box is hidden behind a styled span, so click the label a real
+  // reader would click, not the input
+  await page.locator("label:has(#p-railjack)").click();
+  assert.ok(await page.locator("#p-railjack").isChecked());
+  assert.ok(await where.locator(".spot").count() > 0,
+            "ticking the box the message names has to actually produce places");
+  assert.equal(await where.locator(".spot").first().locator(".demand").innerText(),
+               "RAILJACK", "and every one of them says what it needs");
   assert.deepEqual(errors, []);
 });
 

@@ -760,8 +760,7 @@ Railjack* checkbox — it answers "where should I go next", and Railjack is a
 different activity with its own star chart and its own setup. The **collection
 view keeps them**, because it answers a different question: "where does this
 item's relic drop". Five live relics (Lith C7, Meso N11, Neo V9, Axi S8, Axi V10)
-have no other source at all, and they carry never-vaulted frames like Nyx and
-Valkyr.
+have no other source at all — see *Six Primes need a ship* below.
 
 That distinction was written down here long before the code did it. Until
 2026-08-14 `bestSpots` filtered Railjack out of the collection view as well, so
@@ -994,6 +993,52 @@ like an answer.
 
 Aya and Forma are in the percentage and out of the count. Neither is a relic, and the
 count claims to be relics.
+
+### Six Primes need a ship, and "never vaulted" was hiding it
+
+The wiki marks 14 Primes **Never Vaulted (P)**. Six of them carry Digital
+Extremes' `vaulted` flag at the same moment, and *both markers are correct*:
+
+| Marker | What it means | Which |
+|---|---|---|
+| `P` only | never left the ordinary drop tables | Akbronco, Braton, Bronco, Burston, Fang, Lex, Orthos, Paris Prime |
+| `P` **and** `V` | left the star chart, relics went to **Railjack** rather than to the vault | **Cernos, Hikou, Nyx, Scindo, Valkyr, Venka Prime** |
+
+The second group never becomes unobtainable, which is exactly what the wiki
+marker claims — and until 2026-08-14 the card told them apart from the first
+group not at all. Both showed `P · NEVER VAULTED`, tooltipped *"its relics keep
+dropping indefinitely"*, which is a poor thing to say to someone with no
+Railjack. Nyx Prime's card compounded it by showing no farm section whatsoever,
+for the separate reason recorded above.
+
+Those six now show **`RAILJACK ONLY`** in the same blue as the node badge,
+because it is the same requirement seen at a different scale.
+
+**The badge is derived, not read off the two markers.** `ROT.railjackOnly` walks
+the item's still-live relics, drops any with no reachable source at all — a
+quest-only relic is not an alternative to Railjack, it is not an alternative to
+anything — and asks whether every route that remains is Railjack. So it corrects
+itself if DE ever moves one of those relics back to the star chart, the same
+reason `flags.farmable` is computed rather than parsed. That it agrees exactly
+with `permanent && vaulted` on today's data is corroboration, not the definition.
+
+Five relics carry all six: **Lith C7, Meso N11, Neo V9, Axi S8, Axi V10**.
+
+### An empty ranking has to say what emptied it
+
+Put one of those six on the farm list with *Include Railjack* off and the planner
+used to print the *Where to go* heading with nothing under it — while the panel
+directly beneath went on listing four relics as dropping and marked every part
+"1 relic dropping". Eight perfectly good places were found and discarded, and the
+page said nothing about it. An empty heading beside a full one reads as a fault,
+not as a setting.
+
+It now names the switch, counts what is behind it, and says where it is:
+*"Nowhere to send you, and not because nothing drops. 38 places carry what you
+want and each of them is a Railjack mission, left out by default — tick **Include
+Railjack** on the left to rank them."* Same treatment for event nodes, and a
+plainer sentence when the exclusions are the data's own (quest and unmodelled
+sources) and no switch would help.
 
 ### Effort is the player's to give, and blank until they do
 

@@ -199,6 +199,28 @@ Note that the effort weights now give a *mechanism* for this without a special
 case — a Railjack cache run costed honestly in minutes sinks on its own — but
 only for a player who fills the box in, so it is not an answer to the default.
 
+**And it is not as simple as demoting them.** Six Primes — Cernos, Hikou, Nyx,
+Scindo, Valkyr and Venka — can *only* be farmed on Railjack, and four of those
+six come from `Caches` specifically (`PROJECT.md §7`). For their owners the worst
+rows in the list are the only rows in the list. Any rule that sinks caches has to
+leave them reachable for the people who have no alternative.
+
+### A part you cannot reach still reads as one you can
+
+Narrower than the entry above, and left open deliberately.
+
+The *Still needed* panel says **"1 relic dropping"** against a part whose only
+relic drops somewhere the current options exclude — a Railjack node with Railjack
+off, or an event node. It is true and it is misleading in the same breath: the
+relic does drop, and you are not being sent anywhere for it.
+
+The whole-list case is handled — an empty ranking now names the switch and counts
+what is behind it (`PROJECT.md §7`). The **partial** case is not: three parts
+reachable and one only on Railjack still shows four identical-looking rows. The
+count of blocked places is already computed per plan; making it per *part* is the
+work, and the honest wording for the row is the part that needs thought — "1
+relic dropping, nowhere you have switched on" is accurate and clumsy.
+
 ### The Ghoul and Plague Star detection has never seen a live event
 
 The bounty clock and the event gating both shipped on 2026-08-12

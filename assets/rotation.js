@@ -385,6 +385,31 @@
   const notADestination = (s) =>
     s.access === "quest" || s.access === "unmodelled";
 
+  /* ── the Primes you cannot get without a ship ─────────────────────
+     Six items are marked "Never Vaulted" by the wiki and vaulted by Digital
+     Extremes at the same time, and both are true: Cernos, Hikou, Nyx, Scindo,
+     Valkyr and Venka Prime left the ordinary drop tables, and their relics went
+     into Railjack rather than into the vault. So they never become
+     unobtainable, which is what the wiki marker means - but telling someone
+     without a Railjack that its relics "keep dropping indefinitely" is not a
+     useful thing to have said.
+
+     Read off the drop table rather than off that pair of markers, so it
+     corrects itself if DE ever moves one of those relics back to the star
+     chart. Same reason `flags.farmable` is computed instead of parsed.
+
+     A relic with nowhere reachable to farm it - quest-only, or a shape the model
+     cannot express - is skipped rather than counted against this. It is not an
+     alternative to Railjack; it is not an alternative to anything. And an item
+     with no reachable route at all is not Railjack-only, it is simply vaulted. */
+  function railjackOnly(item, relics) {
+    const routes = (item.relics || [])
+      .filter((r) => relics[r] && !relics[r].vaulted)
+      .map((r) => (relics[r].sources || []).filter((s) => !notADestination(s)))
+      .filter((from) => from.length);
+    return routes.length > 0 && routes.every((from) => from.every(isRailjack));
+  }
+
   /* DE's drop table lists event nodes permanently but never says which event
      they belong to, and the node only exists in the game while that event is
      running. Recommending one you cannot reach is worse than leaving it out, so
@@ -429,7 +454,7 @@
     RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
-    isRailjack, isPvPvE, demandsOf, isEventNode, notADestination,
+    isRailjack, isPvPvE, demandsOf, railjackOnly, isEventNode, notADestination,
     bountyEvent, eventRunning,
   };
 })();

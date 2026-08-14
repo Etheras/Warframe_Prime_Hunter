@@ -286,6 +286,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .badge.founder{color:var(--gold);border-color:var(--gold-dim);background:#241d0e}
 .badge.special{color:var(--teal);border-color:#2a5a55;background:#132522}
 .badge.perm{color:var(--teal);border-color:#2a5a55;background:#132522}
+/* Blue, matching the .demand badge on a node row, because it says the same
+   thing about the same requirement: you will need a ship. */
+.badge.railjack{color:var(--blue);border-color:#2c4a63;background:#111e29;cursor:help}
 .badge.vaultsoon{color:#f0a860;border-color:#6b4523;background:#2a1c10;cursor:help}
 .badge.special{cursor:help}
 .badge.founder{cursor:help}

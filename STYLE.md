@@ -32,6 +32,12 @@ against another squad — finding that out inside the mission is the wrong momen
 Every badge carries a tooltip naming the demand; without one it is just a word in
 a box.
 
+The **same blue** carries the same requirement at item scale: a card whose every
+farmable relic drops on Railjack says `RAILJACK ONLY`, in place of the `P · NEVER
+VAULTED` teal it would otherwise wear. Two badges, one colour, one meaning —
+*you will need a ship*. Choosing a different colour for the card would have made
+them look like two unrelated facts.
+
 **A rule that does not apply everywhere gets `--odd` amber** (`#684321`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and

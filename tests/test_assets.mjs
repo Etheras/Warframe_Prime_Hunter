@@ -144,6 +144,31 @@ test("Disruption does not use the AABC cycle, and rotation A needs a squad", () 
   assert.match(squad.planName, /under-defending/);
 });
 
+test("a Prime whose every live relic is Railjack-only is spotted from the data", () => {
+  const ROT = loadRotation();
+  const relics = {
+    "Neo V9": { vaulted: false, sources: [{ node: "Flexa", planet: "Veil Proxima" }] },
+    "Axi S8": { vaulted: false, sources: [{ node: "Peregrine Axis", planet: "Saturn" }] },
+    "Axi V1": { vaulted: false, sources: [{ node: "Ukko", planet: "Void" }] },
+    "Lith Q1": { vaulted: true, sources: [{ node: "Ukko", planet: "Void" }] },
+    "Meso Z1": { vaulted: false, sources: [{ node: "Sunkiller", planet: "Earth",
+                                            access: "quest" }] },
+  };
+  const only = (list) => ROT.railjackOnly({ relics: list }, relics);
+
+  assert.equal(only(["Neo V9", "Axi S8"]), true,
+               "Proxima by planet and a named node by name - both count");
+  assert.equal(only(["Neo V9", "Axi V1"]), false,
+               "one star-chart route is enough to stop saying Railjack only");
+  assert.equal(only(["Neo V9", "Lith Q1"]), true,
+               "a vaulted relic is not a route, so it cannot make one");
+  assert.equal(only(["Lith Q1"]), false,
+               "nothing live at all is plain vaulted, not Railjack-only");
+  assert.equal(only([]), false);
+  assert.equal(only(["Neo V9", "Meso Z1"]), true,
+               "a quest-only source is not somewhere you can decide to go either");
+});
+
 // ── the same run, counted rather than valued ───────────────────────────────
 
 test("the count and the probability come from the rounds the value chose", () => {
