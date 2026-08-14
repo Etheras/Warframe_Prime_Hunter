@@ -492,6 +492,16 @@ test("the node named for a group is the one the tie-breaks would have picked", (
                "Casta", "Aya outranks a lower level, exactly as the sort does");
   assert.equal(ROT.pickNode([n("Zeta", null), n("Alpha", null)]).node, "Alpha",
                "with nothing to separate them, the name - so it never wobbles");
+
+  /* A fissure goes ahead of both. These nodes are the same bet by construction,
+     so naming the one you can also crack a relic at costs nothing - and naming
+     any other would be recommending the identical node without the free relic. */
+  const hot = (x) => x.node === "Casta";
+  assert.equal(ROT.pickNode([n("Lith", [2, 5], 4.17), n("Casta", [90, 95])], hot).node,
+               "Casta", "a fissure outranks Aya and the lowest level together");
+  assert.equal(ROT.pickNode([n("Lith", [2, 5]), n("Casta", [90, 95])],
+                            () => false).node, "Lith",
+               "and when none of them is one, nothing about the old order moves");
 });
 
 test("a Railjack cache is halved, and nothing else in the model is", () => {
@@ -521,34 +531,33 @@ test("a fissure that has closed is gone, whatever the build said", () => {
   const F = (o) => Object.assign(
     { node: "?", tier: "Lith", mode: "Defense", hard: false, storm: false }, o);
 
-  const gone = F({ node: "Closed", ends: at(-1) });
-  const chart = F({ node: "Plain", ends: at(30) });
-  const steel = F({ node: "Steel", ends: at(90), hard: true });
-  const storm = F({ node: "Storm", ends: at(120), storm: true });
-  const omnia = F({ node: "Omnia", tier: "Omnia", ends: at(200) });
-  const list = [gone, storm, omnia, steel, chart];
+  const HERE = "Coba (Earth)";
+  const gone = F({ node: HERE, tier: "Axi", ends: at(-1) });
+  const soon = F({ node: HERE, tier: "Meso", ends: at(30) });
+  const later = F({ node: HERE, tier: "Lith", ends: at(90) });
+  const storm = F({ node: HERE, tier: "Neo", ends: at(200), storm: true });
+  const elsewhere = F({ node: "Hydron (Sedna)", tier: "Lith", ends: at(200) });
+  const list = [gone, soon, storm, elsewhere, later];
 
-  const named = (tier, allowStorm, from) =>
-    plain(ROT.fissuresFor(from === undefined ? list : from, tier, now, allowStorm))
-      .map((f) => f.node);
+  const named = (allowStorm, from, node) =>
+    plain(ROT.fissuresAt(from === undefined ? list : from,
+                         node || HERE, now, allowStorm)).map((f) => f.tier);
 
-  assert.deepEqual(named("Lith", false), ["Plain", "Steel", "Omnia"],
-                   "expired dropped; the one you can just fly to first, though it " +
-                   "closes an hour before the Steel Path one; Omnia last");
-  assert.deepEqual(named("Lith", true), ["Plain", "Storm", "Steel", "Omnia"],
-                   "a Void Storm only counts when Railjack is switched on, and then " +
-                   "it is one gate like the Steel Path, so time settles the two");
-  assert.deepEqual(named("Neo", false), ["Omnia"],
-                   "Omnia opens any tier, so it is the answer when nothing else is");
-  assert.deepEqual(named("Requiem", false), ["Omnia"]);
-  assert.deepEqual(named("Lith", true, []), []);
-  assert.deepEqual(named("Lith", true, null), [],
+  assert.deepEqual(named(false), ["Lith", "Meso"],
+                   "expired dropped, longest remaining named first");
+  assert.deepEqual(named(true), ["Neo", "Lith", "Meso"],
+                   "a Void Storm only counts when Railjack is switched on");
+  assert.deepEqual(named(true, undefined, "Hydron (Sedna)"), ["Lith"],
+                   "another node's fissure is another node's business");
+  assert.deepEqual(named(true, undefined, "Nowhere (Mars)"), []);
+  assert.deepEqual(named(true, []), []);
+  assert.deepEqual(named(true, null), [],
                    "an old build carries no list at all, which is not an error");
 
   // Ten seconds left is not eleven minutes, and it is not nothing either.
-  assert.equal(ROT.minutesLeft(chart, now), 30);
+  assert.equal(ROT.minutesLeft(soon, now), 30);
   assert.equal(ROT.minutesLeft(F({ ends: new Date(now + 659000).toISOString() }), now), 10,
-               "floored, so a chip never claims more time than there is");
+               "floored, so a badge never claims more time than there is");
   assert.equal(ROT.minutesLeft(gone, now), 0, "closing now reads as 0, not as -1");
 });
 

@@ -348,42 +348,44 @@
   /* Which of a group of identical nodes to actually name. The same tie-breaks
      the ranking already uses, in the same order, so the pick agrees with what
      the list would have done if these had stayed separate rows: Aya first,
-     then the lowest enemy level, then the name so it never wobbles. */
-  function pickNode(group) {
+     then the lowest enemy level, then the name so it never wobbles.
+
+     `first` goes ahead of all of them, and the planner passes "is this one a
+     fissure right now". Among nodes that are provably the same bet, one of them
+     being a fissure is not a preference, it is a free relic — and it cannot
+     distort anything, because the alternatives were already established to be
+     worth exactly the same. Left out, the fold would name a node that is
+     identical in every way except the one that matters today. */
+  function pickNode(group, first) {
+    const ahead = first ? (n) => (first(n) ? 0 : 1) : () => 0;
     return group.slice().sort((a, b) =>
+      ahead(a) - ahead(b) ||
       (b.aya || 0) - (a.aya || 0) ||
       (a.lvl ? a.lvl[0] : Infinity) - (b.lvl ? b.lvl[0] : Infinity) ||
       (a.node || "").localeCompare(b.node || "")
     )[0];
   }
 
-  /* ── where a relic can be cracked right now ───────────────────────
+  /* ── is this node a fissure right now ─────────────────────────────
      The build ships the fissures that were running when it ran, each with the
      moment it closes. This filters that list against the clock instead of
-     trusting it, so a page opened hours later shows fewer fissures than are
-     really up and never one that has gone. Wrong by omission only.
+     trusting it, so a page opened hours later reports fewer fissures than are
+     really up and never one that has gone. Wrong by omission only, which is the
+     safe direction: it can fail to mention a fissure, but it cannot send anyone
+     to a node that stopped being one two hours ago.
 
-     An Omnia fissure opens any tier but Requiem, so it counts for every relic
-     here — but it is named last, because four tiers all pointing at the same
-     Omnia node reads like a bug rather than the useful fact it is.
+     Asked per node, not per tier, because the useful question here is not "where
+     can I crack a Lith" — the navigation console answers that — but "is this
+     place, which I already have a reason to run, also a fissure". Longest
+     remaining first, since that is the one worth naming.
 
-     Order after that: fewest gates first. The Steel Path has to be unlocked and
-     a Void Storm needs a crewed Railjack, so each is one thing standing between
-     you and the mission, and the one you can simply fly to wins even when it
-     closes sooner. Time remaining breaks the tie, since the row's whole job is
-     "there is still time to go and do this". */
-  const OMNIA = "Omnia";
-  const gatesOn = (f) => (f.hard ? 1 : 0) + (f.storm ? 1 : 0);
-
-  function fissuresFor(list, tier, now, allowStorm) {
-    const live = (list || []).filter((f) =>
-      (f.tier === tier || f.tier === OMNIA) &&
-      (allowStorm || !f.storm) &&
-      Date.parse(f.ends) > now);
-    return live.sort((a, b) =>
-      (a.tier === tier ? 0 : 1) - (b.tier === tier ? 0 : 1) ||
-      gatesOn(a) - gatesOn(b) ||
-      Date.parse(b.ends) - Date.parse(a.ends));
+     Void Storms are Railjack, so they answer to the same switch everything else
+     Railjack does rather than appearing on a page that has it turned off. */
+  function fissuresAt(list, node, now, allowStorm) {
+    return (list || [])
+      .filter((f) => f.node === node && (allowStorm || !f.storm) &&
+                     Date.parse(f.ends) > now)
+      .sort((a, b) => Date.parse(b.ends) - Date.parse(a.ends));
   }
 
   /* Whole minutes left, floored, so a chip never claims more time than there
@@ -620,7 +622,7 @@
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     signature, pickNode,
-    fissuresFor, minutesLeft, omniaTier: OMNIA,
+    fissuresAt, minutesLeft,
     isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
     isRailjackCache, cachePenalty: CACHE_PENALTY,
     isEventNode, notADestination,

@@ -345,8 +345,9 @@ changed on one platform and left alone on the other is not a visible mistake.
 - The **"this data is old" banner** is what the task exists to prevent, so it has to
   run several times over inside that window. At 24 runs a day a long run of failures
   is needed before anyone is told anything is wrong.
-- The **fissure strip** only shows fissures that have not expired, so it is exactly
-  as fresh as this task. Hourly it is nearly always right; daily it is always empty.
+- The **fissure badges** on the ranked nodes only appear for fissures that have not
+  expired, so they are exactly as fresh as this task. Hourly they are nearly always
+  right; daily there are never any.
 
 ### Why `--if-changed` is cheap
 
@@ -1055,6 +1056,41 @@ different*. Nothing is hidden — a fold is not a filter.
 
 Both pages do it, through the same two functions, so they cannot disagree about
 what counts as a duplicate or which of a group to name.
+
+A live fissure goes ahead of every other tie-break. The members of a group are the
+same bet by construction, so naming the one you can also crack a relic at cannot
+cost anything — and naming any other would be recommending the identical node minus
+a free relic.
+
+### The fissure marks the ranking; it is never a list of its own
+
+**Built as a list on 2026-08-14, and moved the same day.** The first version was a
+strip above the crack list: every open fissure for the tiers you hold, by node and
+time remaining. The owner's objection killed it in one line — *the game already shows
+you that*. It does, in the navigation console, more accurately and without a build
+step. Reprinting it was the app being a worse copy of something the player already
+has open.
+
+What the game cannot show is the **intersection**. It knows every fissure; it knows
+nothing about your farm list. The planner knows which places are worth running for
+what you still need, so the useful sentence is not "here are the fissures" but
+*"the place ranked third is a fissure for the next 40 minutes"* — go there and one
+run earns the relic and cracks one. On a typical evening 18 of the ~25 live fissure
+nodes are also relic sources, so this lands on real rows rather than being a
+theoretical overlap.
+
+**Shown, never scored.** A fissure lasts an hour or two; the ranking is built from
+drop tables that move a few times a year. Letting it into the score would reshuffle
+the list hourly for a reason that has already expired by the time it is read, and a
+ranking that changes under you is one you stop trusting. It is a badge on a row the
+ranking chose for its own reasons — with one exception, above, where the choice was
+already a coin toss.
+
+The badges are painted into slots and repainted on a one-minute timer rather than
+rendered with the row, so a page left open stops claiming a closed fissure without
+re-sorting the list under the reader. Every entry carries its own expiry, so the
+error is only ever omission: it can fail to mark a node that is still a fissure, and
+it cannot send anyone to one that closed at lunchtime.
 
 ### Two lists, two questions, never one score
 

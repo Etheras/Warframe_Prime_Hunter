@@ -57,9 +57,12 @@
 
   const ITEMS = DATA.items;
   const RELICS = DATA.relics || {};
-  /* Absent on an old build, and absent is a valid answer — see paintFissures. */
+  /* Absent on an old build, and absent is a valid answer — see paintFissures.
+     `nodeKey` is how DE name a node in that list, and it is what the ranking
+     has to be matched against. Declared up here because the fold reads it, and
+     the fold runs before anything further down this file has been evaluated. */
   const FISSURES = DATA.fissures || [];
-  const TIER_ORDER = ["Lith", "Meso", "Neo", "Axi"];
+  const nodeKey = (n) => n.node + " (" + n.planet + ")";
   const BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
   const REFINEMENTS = (DATA.meta && DATA.meta.refinements) ||
     ["Intact", "Exceptional", "Flawless", "Radiant"];
@@ -567,14 +570,24 @@
       groups.set(key, [n]);
       order.push(key);
     });
+    /* Ahead of every other tie-break: if one node in a group of equals happens
+       to be a fissure this hour, name that one. The group members are the same
+       bet by construction, so this cannot cost anything, and it turns the fold
+       from something that hides options into something that picks the best one
+       available today. */
+    const now = Date.now();
+    const isFissureNow = (n) =>
+      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack).length > 0;
+
     /* The picked node *becomes* the row rather than being named beside it, so
        everything else on the row - level, planet, demand badges - is that
        node's too. Naming one node and showing another's level was the obvious
        way to build this and would have been quietly wrong. */
     const folded = order.map((key) => {
       const group = groups.get(key);
-      const pick = group.length > 1 ? ROT.pickNode(group) : group[0];
+      const pick = group.length > 1 ? ROT.pickNode(group, isFissureNow) : group[0];
       pick.sameAs = group.length > 1 ? group : null;
+      pick.pickedForFissure = !!(pick.sameAs && isFissureNow(pick));
       return pick;
     });
 
@@ -963,12 +976,15 @@
           n.sameAs ? `<span class="same" data-tip="${esc(
             n.sameAs.length + " nodes are this same bet — same relics, same rates.\n" +
             "Shown: " + n.node +
-            (n.aya ? ", which also drops Aya." : ", the lowest level of them.") + "\n\n" +
+            (n.pickedForFissure ? ", the one that is a fissure right now."
+              : n.aya ? ", which also drops Aya."
+                : ", the lowest level of them.") + "\n\n" +
             n.sameAs.map((x) => "  " + x.node + " (" + x.planet + ")" +
               (x.lvl ? "  lvl " + x.lvl[0] + "–" + x.lvl[1] : "")).join("\n"))
           }">+${n.sameAs.length - 1} same</span>` : ""}
           ${demandTags(n)}
-          ${n.event ? `<span class="tag">event</span>` : ""}</div>
+          ${n.event ? `<span class="tag">event</span>` : ""}
+          <span class="fissure-slot" data-node="${esc(nodeKey(n))}"></span></div>
         <div class="spot-meta">${runTag(n)}${
           n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
@@ -1071,12 +1087,6 @@
       }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 
-    /* Only the tiers this plan actually wants opened, in tier order rather than
-       in the ranking's — a four-line strip that reshuffles every time you tick
-       a part off is harder to read than one that always says Lith first. */
-    const seen = new Set(rp.map(([rname]) => String(rname).split(" ")[0]));
-    fissureTiers = TIER_ORDER.filter((t) => seen.has(t))
-      .concat(Array.from(seen).filter((t) => TIER_ORDER.indexOf(t) < 0).sort());
     paintFissures();
 
     // what's left
@@ -1105,66 +1115,39 @@
     }).join("");
   }
 
-  /* ── where you can crack them, right now ──────────────────────────
-     The only part of this page about the next hour rather than the next month.
-     Everything else is built from drop tables that move a few times a year; a
-     fissure moves every hour or two. So it is shown and never scored — folding
-     something that short-lived into the ranking would make the ranking wrong in
-     a way nobody could see.
+  /* ── which of these places is a fissure right now ─────────────────
+     The game already lists every open fissure, so listing them again would be
+     the app repeating something you can read in the navigation console. What it
+     cannot tell you is the *intersection*: of the places worth farming for what
+     is on your list, which one is a fissure this hour. Go there and the same run
+     earns the relic and cracks one.
 
-     The list is filtered against the clock on every paint and repainted on a
-     timer, so a page left open does not go on advertising a fissure that closed
-     an hour ago. When the last one expires the block empties itself and says
-     nothing at all: an old build understating what is running is honest, and a
-     line reading "no fissures" would not be.
+     Shown, never scored. A fissure lasts an hour or two while the ranking is
+     built from drop tables that move a few times a year, so letting it move the
+     order would make the list reshuffle hourly for a reason that has expired by
+     the time you read it. It is a badge on a row the ranking chose for its own
+     reasons.
 
-     One line per tier you are actually cracking. The whole live list is 25-30
-     entries and most of it is about relics you do not hold. */
-  let fissureTiers = [];
-
+     Painted into slots rather than rendered with the row, and repainted on a
+     timer, so a page left open stops claiming a fissure that has closed without
+     re-sorting the list under the reader. */
   function leftText(mins) {
     return mins >= 60 ? Math.floor(mins / 60) + "h " + (mins % 60) + "m" : mins + "m";
   }
 
   function paintFissures() {
-    const host = $("#planFissures");
-    if (!host) return;
     const now = Date.now();
-
-    /* One row per tier, then folded — the same trick the node list uses. An
-       Omnia fissure is the answer for every tier at once, so without this a
-       page whose exact-tier fissures have all expired shows four rows naming
-       one node, which reads as a fault rather than as the convenience it is. */
-    const picks = [];
-    fissureTiers.forEach((tier) => {
-      const live = ROT.fissuresFor(FISSURES, tier, now, opts.railjack);
-      if (!live.length) return;
-      const already = picks.find((p) => p.f === live[0]);
-      if (already) already.tiers.push(tier);
-      else picks.push({ f: live[0], tiers: [tier], others: live.length - 1 });
+    $$(".fissure-slot").forEach((slot) => {
+      const live = ROT.fissuresAt(FISSURES, slot.dataset.node, now, opts.railjack);
+      if (!live.length) { slot.innerHTML = ""; return; }
+      const f = live[0];
+      const tip = "A " + f.tier + " fissure is running here, closing " +
+        new Date(f.ends).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
+        ".\nSo this run earns the relic and cracks one." +
+        (f.hard ? "\nSteel Path." : "") + (f.storm ? "\nVoid Storm." : "");
+      slot.innerHTML = '<span class="tag fissure" data-tip="' + esc(tip) + '">' +
+        esc(f.tier) + " fissure " + esc(leftText(ROT.minutesLeft(f, now))) + "</span>";
     });
-
-    const rows = picks.map(({ f, tiers, others }) => {
-      const covers = tiers.length > 1 && tiers.length === fissureTiers.length;
-      /* Two facts, and nothing else: when it shuts, and whether there is
-         anywhere else to go when it does. */
-      const tip = "Closes " + new Date(f.ends).toLocaleTimeString([], {
-        hour: "2-digit", minute: "2-digit" }) + "." +
-        (tiers.length === 1 && others
-          ? " " + others + " other" + (others === 1 ? "" : "s") + " open." : "");
-      const mark = (on, text) =>
-        on ? ' <span class="fissure-any">' + text + "</span>" : "";
-      return `<div class="fissure-row" data-tip="${esc(tip)}">
-        <span class="fissure-tier">${covers ? "Any tier" : esc(tiers.join(" · "))}</span>
-        <span class="fissure-where">${esc(f.node)} · ${esc(f.mode)}${
-          mark(f.tier === ROT.omniaTier && !covers, "any tier")}${
-          mark(f.hard, "Steel Path")}${mark(f.storm, "Void Storm")}</span>
-        <span class="fissure-left">${esc(leftText(ROT.minutesLeft(f, now)))}</span>
-      </div>`;
-    });
-    host.innerHTML = rows.length
-      ? '<div class="fissure-head">Open now</div>' + rows.join("")
-      : "";
   }
 
   /* A minute is finer than this needs to be — the numbers are in minutes — and

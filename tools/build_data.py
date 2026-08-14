@@ -534,11 +534,10 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
 # is explicit that it opens "Lith, Meso, Neo and Axi Relics (but not Requiem)",
 # so it fits whatever you are holding.
 #
-# The rest of the app deliberately knows nothing about which nodes are fissures
-# (TODO: the endless bonus). That has not changed: this list is shown, never
-# scored. A fissure moves every hour or two while the ranking is built from drop
-# tables that move every few months, and folding one into the other would make
-# the ranking wrong in a way nobody could see.
+# This list marks the ranking, it never scores it. A fissure moves every hour or
+# two while the ranking is built from drop tables that move every few months, so
+# letting it into the score would reshuffle the list hourly for a reason that
+# has expired by the time anyone reads it.
 FISSURE_TIERS = ("Lith", "Meso", "Neo", "Axi", "Omnia")
 OMNIA_OPENS = ("Lith", "Meso", "Neo", "Axi")
 
@@ -551,8 +550,8 @@ def build_fissures(raw, now: datetime) -> list:
     so the page cannot be handed a list of fissures and told to trust it - it is
     handed the end time of each and drops the ones that have passed. That makes
     the list wrong only ever by omission, which is the safe direction: it can
-    stop mentioning a fissure that is in fact still up, but it cannot send
-    anybody to one that closed two hours ago.
+    stop marking a node that is in fact still a fissure, but it cannot send
+    anybody to one that stopped being one two hours ago.
     """
     out = []
     for entry in raw or []:

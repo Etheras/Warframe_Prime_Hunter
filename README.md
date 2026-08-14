@@ -434,10 +434,10 @@ changed it sends four small requests, rebuilds from what is already on disk in u
 a second, and touches nobody's servers — a full download only happens when Digital
 Extremes actually publish something.
 
-Hourly rather than daily because of the **fissures**: the planner shows where relics
-can be cracked right now, and only ever shows ones that have not expired yet. That
-list is exactly as fresh as this task. Run it hourly and it is nearly always right;
-run it daily and it is empty by the time you look.
+Hourly rather than daily because of the **fissures**: the planner marks which of the
+places it is sending you are a fissure right now, and only ever marks ones that have
+not expired yet. Those badges are exactly as fresh as this task. Run it hourly and
+they are nearly always right; run it daily and there are never any.
 
 Only the scheduling is Windows-specific — the build itself runs anywhere.
 
@@ -572,10 +572,10 @@ Pages needs a **public** repo on the free plan.
 republishes the site — so it stays up to date whether or not your PC is switched on,
 and the data still never enters the repository.
 
-One thing the published copy cannot do is show you tonight's fissures: they turn over
-every hour or two, so a site rebuilt once a day always finds them expired and shows
+One thing the published copy cannot do is mark tonight's fissures: they turn over
+every hour or two, so a site rebuilt once a day always finds them expired and marks
 nothing. That is why the local hourly task is still worth keeping if you use the
-planner to decide what to crack.
+planner to decide where to go.
 
 > The workflow has **read-only** access to your code and uses no secrets or API
 > keys — every source it touches is public.

@@ -442,7 +442,7 @@ def test_only_fissures_worth_going_to_are_shipped() -> None:
           [n for n in nodes if "Closed" in n], [])
     check("fissures: a nameless node is dropped rather than shown blank",
           len(nodes), 3)
-    check("fissures: tier order, so the strip reads the same way every build",
+    check("fissures: tier order, so two builds an hour apart diff cleanly",
           nodes, ["Up (Earth)", "Later (Mars)", "Omni (Lua)"])
     check("fissures: the end time travels with each one",
           got[0]["ends"], "2026-08-11T22:00:00+00:00",
@@ -450,7 +450,7 @@ def test_only_fissures_worth_going_to_are_shipped() -> None:
     check("fissures: the two gates are carried, not inferred later",
           (got[0]["hard"], got[0]["storm"]), (False, False))
 
-    check("fissures: an unreachable feed is an empty strip, not a crash",
+    check("fissures: an unreachable feed is an unmarked ranking, not a crash",
           build_data.build_fissures(None, _NOW), [])
 
 

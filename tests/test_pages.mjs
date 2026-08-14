@@ -589,16 +589,18 @@ page_test("a bounty row names the live rotation and how long it has left", async
   assert.match(bounty.text, /^\d+ min$|^\d+h \d\dm$/);
 });
 
-page_test("a fissure that has closed leaves the page without a word", async () => {
-  /* The strip is the only thing here with an expiry, and the failure that
-     matters is the quiet one: a build from this morning going on advertising a
-     fissure that shut at lunchtime. Nobody would see that as a bug - they would
-     see an empty node and conclude the tool is wrong about everything.
+page_test("a ranked node says when it is a fissure, and stops saying so", async () => {
+  /* The badge is the only thing on this page with an expiry, and the failure
+     that matters is the quiet one: a build from this morning still saying a node
+     is a fissure when it shut at lunchtime. Nobody reads that as a bug — they
+     fly there, find an ordinary mission, and conclude the tool is wrong about
+     everything.
 
-     The clock is the subject, so the fissures are planted rather than found:
-     a real feed would have to be re-fetched to make anything expire, and the
-     test would then be about the network. Omnia because it opens any tier, so
-     this holds whatever happens to be on the farm list. */
+     The clock is the subject, so the fissures are planted rather than found: a
+     real feed would have to be re-fetched to make anything expire, and the test
+     would then be about the network. The node is read off the row the planner
+     ranked rather than chosen here, so this cannot quietly pass by marking a
+     node nobody is being sent to. */
   const { page, errors } = await open("/plan.html");
   await page.evaluate(() => {
     const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
@@ -606,42 +608,39 @@ page_test("a fissure that has closed leaves the page without a word", async () =
     localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
   });
   await page.reload({ waitUntil: "load" });
-  assert.ok(await page.locator("#planRelics .relic-row").count() > 0,
-            "nothing is being cracked, so there is no strip to test");
+
+  const first = page.locator("#planNodes .spot").first();
+  assert.ok(await first.count() > 0, "nothing ranked, so there is no row to mark");
+  const key = await first.locator(".fissure-slot").getAttribute("data-node");
+  assert.ok(key && /\(.+\)/.test(key),
+            `the row has to carry the name DE use for the node, got ${key}`);
 
   /* Mutated in place: the page took a reference to this array at load, which is
      also why a reload would undo it. Toggling an option is how a render is
      asked for from out here — clicked in the page, because the real checkbox
      sits under a styled span that swallows a pointer. */
   const rerender = () => page.evaluate(() => document.querySelector("#p-squad").click());
-  const plant = (liveMinutes) => page.evaluate((mins) => {
+  const plant = (node, mins) => page.evaluate(([n, m]) => {
     const list = window.WFPRIME_DATA.fissures;
-    const at = (m) => new Date(Date.now() + m * 60000).toISOString();
+    const at = (x) => new Date(Date.now() + x * 60000).toISOString();
     list.splice(0, list.length,
-      { node: "Still Open (Test)", tier: "Omnia", mode: "Survival",
-        ends: at(mins), hard: false, storm: false },
-      { node: "Long Gone (Test)", tier: "Omnia", mode: "Defense",
-        ends: at(-90), hard: false, storm: false });
-  }, liveMinutes);
+      { node: n, tier: "Neo", mode: "Survival", ends: at(m), hard: false, storm: false },
+      { node: n, tier: "Axi", mode: "Defense", ends: at(-90), hard: false, storm: false });
+  }, [node, mins]);
 
-  await plant(90);
+  await plant(key, 90);
   await rerender();
-  const strip = page.locator("#planFissures");
-  const said = await strip.innerText();
-  assert.match(said, /Still Open \(Test\)/, "a fissure with 90 minutes left has to show");
-  assert.ok(!/Long Gone/.test(said), `an expired fissure is still being shown: ${said}`);
-  assert.match(said, /1h 2\dm|1h 30m/, "and say how long is left, so it can be judged");
-  assert.equal(said.match(/Still Open/g).length, 1,
-               "an Omnia fissure answers every tier at once, so it gets one row " +
-               `and not one per tier: ${said}`);
-  assert.match(said, /Any tier/, "and that row has to say what it covers");
+  const badge = first.locator(".tag.fissure");
+  assert.equal(await badge.count(), 1, `${key} is a fissure and the row does not say so`);
+  const said = await badge.innerText();
+  assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
+  assert.ok(!/AXI/i.test(said), `an expired fissure is still being named: ${said}`);
+  assert.match(said, /1H 2\dM|1H 30M/i, "and how long is left, so it can be judged");
 
-  await plant(-1);
+  await plant(key, -1);
   await rerender();
-  assert.equal((await strip.innerText()).trim(), "",
-               "with everything expired the strip must say nothing at all");
-  assert.equal(await strip.evaluate((el) => getComputedStyle(el).display), "none",
-               "and take its border with it, rather than leaving an empty box");
+  assert.equal(await first.locator(".tag.fissure").count(), 0,
+               "with it expired the row must stop claiming a fissure entirely");
   assert.deepEqual(errors, []);
 });
 
