@@ -15,6 +15,38 @@ raised again from scratch. Everything else is genuinely outstanding.
 
 ---
 
+## Waiting on a decision, not on work
+
+Everything here is built, or buildable in an hour, and stopped on a judgement that
+is the owner's to make. Each one says what the question is, what the options are,
+and **what happens if nothing is said** — because the default is already shipping,
+and silence is itself a choice. Nothing else in this file is blocked on anyone.
+
+| # | The question | Options | If nothing is said |
+|---|---|---|---|
+| 1 | **Split the two loops?** "Where to go" would rank on relics per run, "What to crack" on openings needed. The ingredient exists and is on screen. | (a) split, and the big number in the left column becomes a **count**, not a percentage — which contradicts "% on top, like they used to"; (b) keep one combined score; (c) split, but show the *share of runs that drop something* as the headline so it stays a percentage | stays combined |
+| 2 | **Should Profit-Taker come back in?** It turns out to fit the model exactly — see below. Four phases, no rotation, two relics each. | (a) include all four as ordinary flat nodes, badged for the Old Mate gate; (b) leave hidden | stays hidden, and eight relic rows stay invisible |
+| 3 | **Rank per objective by default?** Costing per run is out by up to 9.6× across mission types; per objective, 2.4×. Neither asks the player for anything. | (a) keep per run; (b) default to per objective, still overridable by the effort boxes | stays per run |
+| 4 | **What rule demotes Railjack caches?** They are the worst rows in the list — but for six Primes they are the *only* rows. | (a) leave ranked as they are; (b) never above a star-chart node; (c) a fixed penalty; (d) leave it to the effort weights | stays as it is |
+| 5 | **Raise the meta line off 3.48:1?** Below AA, and deliberately dimmed as secondary. Raising it changes the visual hierarchy on both pages. | (a) leave it; (b) raise the whole meta line; (c) raise only the rotation label | stays below AA |
+| 6 | **How should the banner know who is reading it?** It currently guesses from the hostname and is wrong in both directions. | (a) let `serve.py` say so — the plumbing is already there, and this is the recommendation; (b) a `--guest` flag; (c) say nothing to anyone | keeps guessing |
+| 7 | **Close the two server holes?** Directory listing is on, and `.cache/` is served. Nothing served is sensitive, so this is a priority call rather than a security one. | (a) do both, a few lines; (b) leave it | stays open |
+| 8 | **What is the project called?** See *The name is not load-bearing yet* below. | any name; the audit says what would have to move | stays VorFrame |
+| 9 | **How should Railjack be presented?** Two parts: where the six locked Primes sit in the collection's availability buckets, and whether the planner should keep making you opt in to your only option. | **(a)** (i) badge only; (ii) a seventh bucket; (iii) a cross-cutting *Needs a Railjack* filter — recommended. **(b)** (i) leave it; (ii) auto-include when it is the only route — recommended; (iii) a three-state checkbox | badge only, and the opt-in stays |
+| 10 | **Model pre-refined relic rewards?** Elite Sanctuary Onslaught, Void Storms and Profit-Taker hand you the relic **already Radiant** — 80 reward rows — and we discard that. Worth 100 Void Traces and, on a blocked rare, ~40 openings. | (a) keep discarding it; (b) keep the refinement and let those nodes score on it, which moves the ranking and breaks the one-refinement-per-relic assumption | keeps discarding it |
+
+**Yours to do elsewhere, not here:** four corrections belong on
+[`wiki.warframe.com/w/Prime`](https://wiki.warframe.com/w/Prime) rather than in this
+code — Gotva Prime's redundant `(S)`, the years-stale `(R)` markers, the `(V)` markers
+the item API disagrees with, and the Isolation Vault rotation contradiction. All four
+are written up under *Should be fixed on the wiki, not here*, and the app already
+works around each one.
+
+**Blocked on the game, not on you:** the Ghoul Purge and Plague Star detection cannot
+be verified until one of them next runs. Nothing to decide; just a thing to catch.
+
+---
+
 ## A round is not a universal unit of effort
 
 The planner costs every mission in "rounds" and assumes one round means the same
@@ -47,7 +79,7 @@ The wiki also names two more exceptions we do not currently see in relic sources
 several tiers inside a **single mission**. We cost a three-vault Spy run as three
 rounds of Defense.
 
-### 3. Mission length is still not modelled *by default*
+### 3. Mission length is still not modelled *by default* — decision 3
 
 Four rounds of Disruption score four times a bounty that may take just as long in real
 minutes, and single-reward missions sink however fast they are. This became
@@ -145,20 +177,88 @@ Salvage, Legacyte Harvest, Void Cascade/Flood/Armageddon) and **Standard**
 reverse-engineering, from a source, and it independently confirms Spy is not
 endless.
 
-### Profit-Taker does not fit the model, so hide it for now
+### Profit-Taker turns out to fit the model exactly — decision 2
 
-`Level 40 - 60 PROFIT-TAKER - PHASE 1/2/3` and `Level 50 - 60 PHASE 4` are a
-multi-phase heist, not a bounty, and Phase 3 splits into a **first completion**
-(a guaranteed Gravimag, once ever) and **subsequent completions** (everything
-after, and the only half carrying relics). Nothing in the planner can express
-"once ever", and the four phases are not four independent things you choose
-between.
+**Revisited 2026-08-14 against [the wiki's Heist page](https://wiki.warframe.com/w/Heist#Profit-Taker_Orb_Heist)
+and DE's own table, and the original objection does not survive either.**
 
-**Decision: exclude the Profit-Taker nodes from the ranking** until the shape is
-worked out, rather than rank them wrongly. Six relic rows are affected. Revisit
-with the numbers in hand.
+What was written here before: that the four phases are not independent, and that
+Phase 3's first/subsequent split makes it unmodellable. Both are wrong.
 
-### Rank the two loops apart, and never merge them again
+- **The phases are independent.** The wiki: *"The Heist must initially be
+  accomplished in sequence for the first time before being able to freely replay
+  each stage."* After one clear you pick any phase you like — which is exactly
+  four things to choose between.
+- **The split costs us nothing.** DE's table gives Phase 3 two sections. *First
+  Completion* is a Gravimag at 100% and **carries no relics at all**, so for a
+  relic planner it is not a source. *Subsequent Completions* is the steady state.
+  There is no "once ever" to express, because the thing that happens once is not
+  something we track.
+
+What is actually there, from the drop table:
+
+| Node | Level | Rotation | Relics |
+|---|---|---|---|
+| `PROFIT-TAKER - PHASE 1` | 40–60 | none | Lith Q3 15%, Lith A12 12.5% |
+| `PROFIT-TAKER - PHASE 2` | 40–60 | none | Lith K12 15%, Meso Y2 12.5% |
+| `PROFIT-TAKER - PHASE 3` | 40–60 | none | Meso D8 15%, Neo C7 12.5% |
+| `PROFIT-TAKER - PHASE 4` | 50–60 | none | Neo A16 17.14%, Axi S20 14.29% |
+
+Eight relic rows, not six. Every one is awarded **already Radiant**, which the
+model throws away — see *Some nodes hand you the relic already refined* below.
+
+**No rotation on any of them** — one fixed table each. That is the flat
+`rot.none` case `runValue` already handles: one reward per run, `rounds: null`,
+scored exactly like a Capture. The reason it looked hard is that it was filed
+under `Bounty`, and bounties are the one thing on a clock.
+
+**What it needs, and none of it is new machinery:**
+
+1. Drop the `access: unmodelled` tag from the four nodes.
+2. A **gate badge**, the same shape as `Railjack` and `PvPvE`: Solaris United
+   **Rank 5 (Old Mate)**, plus one sequential clear of all four. A standing
+   requirement, not a reason to hide it — the same call already made for Railjack.
+3. Do **not** put it on the bounty clock. It is reached from Eudico's backroom,
+   not the bounty board, and has no rotation to be on.
+4. Effort: one objective per run. Phase 2 has a stated 4–5 minute timer, which is
+   the only published duration of the four.
+
+### Some nodes hand you the relic already refined, and we discard that — decision 10
+
+Found 2026-08-14 while checking the Profit-Taker tables, and it is worth more
+than the thing that led to it.
+
+DE's drop table names a refinement on a relic reward when the relic arrives
+**pre-refined**. Ordinary mission rows say `Lith Q3 Relic`; these say
+`Lith Q3 Relic (Radiant)`. There are **80 such reward rows**, every one of them
+Radiant, in exactly three places:
+
+| Where | Rows |
+|---|---|
+| **Elite Sanctuary Onslaught** | 28 |
+| **Void Storms** — the Railjack fissures, six planets | 44 |
+| **Profit-Taker**, all four phases | 8 |
+
+`sources.py` parses the relic name and drops the parenthesis. A source record
+carries `{kind, planet, node, mode, rotation, chance, rarity, stage, access}` and
+no refinement, so every node in the app looks like it hands out an Intact relic.
+
+**Why that matters more than it sounds.** Refining a relic to Radiant costs 100
+Void Traces, and by this project's own numbers it moves a blocked rare from ~50
+expected openings to ~10 (`PROJECT.md §7`). A node that hands it over Radiant has
+done that for free. Today the planner will rank such a node as though it gave you
+the Intact relic, and then advise you to go and refine it.
+
+It also lands on the entry above: `bestRefinement` picks one refinement per relic
+because *"you can't hold the same relic two ways"* — which stops being true when
+one node gives you a Radiant copy and another an Intact one.
+
+**What it needs:** keep the refinement on the source in `sources.py`, then let
+`relicValue` use it where present instead of assuming the chosen refinement. The
+parse is a one-line change; the model change needs thought, and the ranking will
+move.
+
+### Rank the two loops apart, and never merge them again — decision 1
 
 **Settled 2026-08-13.** Collecting relics and cracking relics are two different
 activities with two different bottlenecks, and a single score covering both
@@ -183,7 +283,7 @@ that corner was "% on top, like they used to". Splitting the ranking means the b
 number on the left column becomes a relic *count*, not a percentage, and that is
 the decision still to make.
 
-### Railjack caches probably should not be ranked at all
+### Railjack caches probably should not be ranked at all — decision 4
 
 Of the two things once listed here against the same 38 Proxima nodes, the labelling
 half shipped on 2026-08-14: `Skirmish` and `Caches` now both carry a **Railjack**
@@ -221,6 +321,100 @@ count of blocked places is already computed per plan; making it per *part* is th
 work, and the honest wording for the row is the part that needs thought — "1
 relic dropping, nowhere you have switched on" is accurate and clumsy.
 
+**A correction to how this was first written up.** It was described as "three
+parts reachable and one on Railjack", as though those six Primes were a mixed
+case. They are not, and the reason matters:
+
+> Nyx and Valkyr predate Railjack. Their original relics are **vaulted** — that
+> is the legacy route, and it is not a route. Railjack is not one source among
+> several; it has been the **only** current source for years.
+
+So there is no mix to display. Whichever of the six you look at, every reachable
+route is Railjack, and the badge says so. The mixed case the entry above describes
+is real but hypothetical — nothing in today's data is in it. Written down anyway,
+because the display question is the same either way and the data can change.
+
+**And it is tolerable by design.** A handful of very legacy relics sitting vaulted
+behind a current Railjack source is exactly the shape this project is happy with:
+the app is about what is farmable now, and it says what "now" costs you.
+
+### How Railjack should be presented — decision 9
+
+The badges landed on 2026-08-14 and they are the floor, not the answer: a node row
+says `RAILJACK`, and a card whose every route is Railjack says `RAILJACK ONLY`.
+Two things are still presented awkwardly, and both are judgement calls.
+
+**a. Those six Primes sit in the *Farmable now* bucket, which is true and unhelpful.**
+The sidebar sorts by availability, one bucket per item, precedence
+`founder → resurgence → farmable → baro → special → vaulted`. Cernos, Hikou, Nyx,
+Scindo, Valkyr and Venka land in *Farmable now* alongside 100-odd star-chart
+Primes, and only the badge distinguishes them. There is no way to ask "what needs
+a ship?" or to exclude them from a list you are shopping from.
+
+- (i) leave it — one badge, no new bucket, and the availability filter keeps
+  meaning exactly one thing
+- (ii) a **seventh bucket**, `Railjack only`, ranked just above `farmable` — the
+  six leave *Farmable now*, which is arguably more honest than it sounds: they are
+  not farmable on the star chart at all
+- (iii) not a bucket but a **cross-cutting filter**, the way *Hide vaulted* works —
+  buckets stay as they are and a `Needs a Railjack` toggle hides or isolates them
+
+(iii) is the most flexible and the least disruptive to a rule the project has kept
+carefully. (ii) is the most honest and the most likely to surprise someone.
+
+**b. The planner makes you opt in to your only option.** Put one of the six on
+the farm list with *Include Railjack* off and the ranking is empty. It now names
+the switch and counts what is behind it, which is a large improvement on silence —
+but an opt-in gate in front of a thing with no alternative is still a strange
+shape. Options:
+
+- (i) leave it — the message is clear, and the checkbox means one thing
+- (ii) **auto-include a Railjack node when it is the only route to something on
+  your list**, badged as now, with the summary saying why it appeared despite the
+  setting. Keeps the checkbox honest for everything else
+- (iii) turn the checkbox into three states — off / only when it is the only
+  route / always
+
+(ii) reads best and is the smallest change: the information to do it already
+exists, since `railjackOnly` answers exactly that question per item.
+
+### Railjack is the only activity that locks anyone in
+
+Swept 2026-08-14, at the owner's suggestion, across every gated activity in the
+data — not just Railjack. For each item: which activities do its still-live,
+still-reachable relics belong to?
+
+| Activity | live relics it touches | items locked to it alone |
+|---|---|---|
+| **Railjack** (Proxima + 28 named nodes) | 34 | **6** — Cernos, Hikou, Nyx, Scindo, Valkyr, Venka |
+| Railjack (Void Storms) | 29 | 0 |
+| Sanctuary Onslaught | 29 | 0 |
+| Faceoff (PvPvE) | 22 | 0 |
+| Bounties (landscape) | 26 | 0 |
+| Isolation Vault | 15 | 0 |
+| Zariman | 15 | 0 |
+| Höllvania / 1999 | 15 | 0 |
+| Ascension | 15 | 0 |
+| The Perita Rebellion | 8 | 0 |
+| Duviri | 7 | 0 |
+| Enemy drops | 11 | 0 |
+
+**Nothing else needs a new category.** Every other gated activity is one route
+among several for everything it carries, so a badge on the node row already says
+all there is to say. Railjack is the single case where the gate is the whole
+answer, which is why it — and only it — earns an item-level badge.
+
+Two things worth keeping from the sweep:
+
+- **Zero items are stranded entirely.** No item's live relics are all
+  unreachable, so `access: quest` and `access: unmodelled` never orphan anything.
+  That is the design working: quest content is out of scope — this tracks
+  farmable parts from relics, not every way a Prime has ever entered the game —
+  and excluding it costs nobody a route.
+- The classifier used for this sweep is throwaway. If a second activity ever
+  locks someone in, the honest move is to promote `railjackOnly` to a general
+  `onlyFrom(activity)` rather than add a second special case beside it.
+
 ### The Ghoul and Plague Star detection has never seen a live event
 
 The bounty clock and the event gating both shipped on 2026-08-12
@@ -234,13 +428,76 @@ unexpected shape degrades to "not running" rather than crashing. And a missed
 detection is a nuisance rather than a dead end: the *include event nodes* checkbox
 still forces those bounties back into the ranking.
 
+**There is a better key than keywords, and it was there all along.** Every event
+in `/pc/events` carries a **`tag`** — the two running on 2026-08-12 were tagged
+`HeatFissure` (Thermia Fractures) and `WaterFight` (Dog Days). A tag is a stable
+machine identifier; a description is prose DE can reword. Match on `tag` first and
+keep the keyword scan as the fallback. This still cannot be *confirmed* for Ghoul
+Purge or Plague Star without one of them running — their tags are unobserved — but
+it means the first sighting yields a permanent answer rather than another guess.
+
+**Also useful when one runs:** `activation`/`expiry` are already used, but events
+carry `node` (`"Orb Vallis (Venus)"`), `maximumScore`, `interimSteps` and
+`rewards[]` too. Capture the whole entry, not just the window.
+
 **What to do when one of them next runs:** refresh the data, check the build log
 says `limited-time events running - Ghoul Purge` (or `Plague Star`), and confirm
 the bounty appears in the planner without the checkbox. If it does not, capture the
 raw worldstate entry — that is the fixture this cannot be written against today.
 Plague Star matters most: it carries 26 relics, more than any other bounty.
 
-### Read each bounty's rotation letter directly, instead of inheriting it
+### The worldstate publishes far more than the two fields we read
+
+Swept 2026-08-14, at the owner's suggestion, and it changes several entries below.
+We fetch `/pc/syndicateMissions` and `/pc/events` already, use two fields, and
+throw the rest away. What is in there, per bounty job:
+
+| Field | What it is | What it would fix |
+|---|---|---|
+| `uniqueName` | ends `…Tier<X>Table<Y>Rewards` | **`Table<Y>` is the rotation letter, published per tier.** See the entry below — this is the whole of it |
+| `standingStages[]` | its length is the **stage count**, and it varies: 3, 4 or 5 by tier | `objectivesOf` hard-codes 4 stages for every bounty. Tier A is 3, Tier D is 5 |
+| `enemyLevels[]` | e.g. `[40, 60]` | **every bounty node in our data has `lvl: null`** — 13 of them — so bounties can never win the level tie-break |
+| `minMR` | mastery gate, 0 to 10 | the 100–100 tiers need MR10. "Only recommend what can be run today" has never considered mastery |
+| `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | a real name instead of `Level 20 - 40 Cetus Bounty` |
+| `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | a cross-check against DE's static table, which is how the letter is currently derived at all |
+
+And on `/pc/events`, a **`tag`** field — `HeatFissure`, `WaterFight` — a stable
+machine identifier instead of the keyword scan described two entries down.
+
+None of this needs a new request. It is in the response we already cache.
+
+### Read each bounty's rotation letter directly — **the worldstate already says it**
+
+**Answered 2026-08-14.** The letter does not need deriving per tier. DE publishes
+it in each job's `uniqueName`, and a reading of the cached worldstate for the
+window ending `2026-08-12T20:25:13.214Z` matches our own derivation exactly:
+
+| Job | `uniqueName` tail | Our derived letter |
+|---|---|---|
+| Ostrons tiers A–E, Solaris tiers A–E, Entrati tiers A/B/C/E | `Tier*Table**A**Rewards` | `standard: A` (16 of 16 votes) |
+| Isolation Vault chambers A, B, C | `VaultBountyTier*Table**B**Rewards` | `vault: B` (6 of 6 votes) |
+
+Two independent methods, 22 votes, no disagreement. That settles what `Table<Y>`
+means.
+
+**And it answers the open question below outright.** Entrati's *Reclaim What's
+Ours* (level 30–40, our `Level 30 - 40 Cambion Drift Bounty`, the tier that
+publishes only rotations **AB**) came back `TierDTable**B**Rewards` — on **B**,
+while every other Entrati tier in the same window was on **A**. So the tier is
+not inheriting the family letter and it is not falling back to A. It runs its own
+letter, and DE says which, every window.
+
+The two readings recorded below — *"the tier falls back to A whenever the board is
+on C"* versus *"the tier runs its own two-letter cycle"* — no longer need choosing
+between. Neither is load-bearing once the letter is read rather than inferred.
+
+**What is left is the work**, not the question: parse `Tier<X>Table<Y>` out of
+`uniqueName`, key it by the tier's `enemyLevels` to reach our node names, and keep
+`derive_bounty_rotation`'s reward-matching as the fallback for a worldstate that
+cannot be read. Only Aya is affected today, on one node, which is still why this
+is written down rather than done.
+
+### The old version of that entry, kept for the evidence
 
 The letter is currently derived once per *family* — one for the standard bounties,
 one for the Isolation Vaults — and every bounty in that family is assumed to be on
@@ -269,18 +526,45 @@ Two readings fit all three: the tier falls back to A whenever the board is on C,
 the tier runs its own two-letter cycle that happens to line up. They only diverge
 about eight hours after the last reading above, so neither is confirmed.
 
-**The fix does not need that question answered.** Every bounty tier appears in every
-window, so its letter can be read straight from the worldstate the same way the
-family's is — per group rather than per family — and the group's own published
-rotations become its sequence. `derive_bounty_rotation` already does the matching;
-it just aggregates the votes one level too high. Tiers whose rotations are
-indistinguishable (several pay the same handful of resources in all three) keep the
-family letter as a fallback.
+**Superseded by the entry above** — DE names the letter in `uniqueName`, so none of
+this has to be inferred from reward matching. Kept because the three readings are
+real observations and would be the check on any implementation.
 
-Only Aya is affected today, on one node, which is why this is written down rather
-than done.
+Tiers whose rotations are indistinguishable (several pay the same handful of
+resources in all three) keep the family letter as a fallback.
 
-### Serving to a network exposes the folder, read-only
+### The name is not load-bearing yet, and should stay that way — decision 8
+
+The project will be renamed at some point. Nothing needs deciding to keep that
+cheap, but it needs *not forgetting*, because a name gets harder to remove every
+week it sits in a file that other things depend on.
+
+**Audited 2026-08-14.** The name appears in 30 tracked files. Almost all of it is
+prose — comments, headings, `--help` text, the browser title — which is a
+find-and-replace and nothing more. Four uses are **not** prose, and those are the
+ones that cost something:
+
+| Where | What | Cost of changing it |
+|---|---|---|
+| `assets/shared.js` | six `localStorage` keys, `vorframe.collected.v1` and friends | **loses every user's data unless migrated.** One read-old-write-new pass on first load, then the old keys can be dropped a release later |
+| `tools/build_data.py` → `data/vorframe-data.js` | the global `window.VORFRAME_DATA`, plus `VORFRAME_UPSTREAM` from `serve.py` | mechanical: one writer, one reader per page, all in this repo |
+| `tools/bundle.py` | output filename `dist/vorframe.html` | mechanical, but it is the thing people are told to download |
+| `tools/sources.py` | HTTP `User-Agent: VorFrame/1.0` | mechanical, and worth updating out of politeness to the APIs |
+
+Plus the file names `data/vorframe-data.{js,json}`, which are referenced by both
+pages, `.gitignore`, `serve.py`, the bundler and the GitHub workflow.
+
+**The rule until then:** do not add a *fifth*. New storage keys, new globals, new
+filenames and new URLs should not carry the name. Prose can say VorFrame as much
+as it likes — prose is free to change.
+
+**The backup format is already safe, and better than it looks.** The export writes
+`vorframe: 3`, but `parseBackup` never reads it — it accepts anything carrying a
+`collected` array and reads the rest by section name. So a renamed app restores an
+old file with no migration at all. The only branded thing in that path is the
+error message *"this doesn't look like a VorFrame backup"*, which is prose.
+
+### Serving to a network exposes the folder, read-only — decision 7
 
 Raised 2026-08-11 while planning a Raspberry Pi deployment.
 
@@ -310,7 +594,7 @@ Worth doing anyway, cheaply:
 Neither needs authentication, and both are small. Deferred rather than urgent,
 because nothing served is sensitive.
 
-### The banner guesses who is reading it from the hostname
+### The banner guesses who is reading it from the hostname — decision 6
 
 `staleBanner()` decides whether to add "Double-click `refresh-data.cmd` to update it"
 by checking whether `location.hostname` is localhost. That is a guess standing in for
@@ -341,7 +625,7 @@ something they do not have. Worth fixing properly all the same.
 
 Option 1 is the real fix; the plumbing for it is already there.
 
-### The rotation label sits at 3.48:1 contrast
+### The rotation label sits at 3.48:1 contrast — decision 5
 
 Measured 2026-08-10 while checking the new amber. `.spot-meta` renders in
 `--txt-faint`, which is below AA (4.5:1) and well below the 7:1 `STYLE.md §3`
@@ -378,7 +662,7 @@ rotation comes via the WarframeStat proxy. **There is no first-party route to fi
 nothing to do here until DE publishes one. Documented in `PROJECT.md §6` and left
 open only so the search can resume if that changes.
 
-### Enemy levels are missing for 31% of live-relic nodes **[settled]**
+### Enemy levels are missing for 31% of live-relic nodes **[partly reopened]**
 
 Levels come from DE's `ExportRegions_en.json` (269 nodes, `minEnemyLevel` /
 `maxEnemyLevel`), joined after stripping the `Event:` prefix. The gap is entirely
@@ -388,6 +672,13 @@ Railjack/Proxima nodes, which DE's export omits.
 which is the correct behaviour — a made-up level would silently distort the tie-break
 that levels exist to serve. Kept as a note so the 69% figure is not mistaken for a
 join bug.
+
+**Reopened in part, 2026-08-14.** The Railjack half stands — DE's export genuinely
+omits Proxima. But **all 13 bounty nodes also have `lvl: null`**, and that half is
+not a gap in the data at all: `/pc/syndicateMissions` publishes `enemyLevels` for
+every live bounty tier, `[5, 15]` through `[100, 100]`, and it is the same number
+already sitting in our own node names (`Level 40 - 60 Cetus Bounty`). Two routes to
+it, both free. Bounties currently lose every level tie-break by default.
 
 ### Event nodes cannot be tied to their event **[settled]**
 
