@@ -255,6 +255,51 @@
     };
   }
 
+  /* ── the free relic for staying in a fissure ──────────────────────
+     An endless Void Fissure pays a bonus relic for depth: five rotations gives
+     a random *Exceptional* relic of the fissure's tier, ten a Flawless, and
+     every fifth after fifteen a Radiant. Only the `bonus` run mode goes deep
+     enough to collect one - see rotation.js.
+
+     Three things make this different from every other number on a row, and all
+     three are the reason it is computed here rather than per node:
+
+       * it is *random of the tier*, so its worth is the mean over every live
+         relic in that tier - including the many worth nothing to this plan
+       * the tier is your choice, since you pick which fissure to run, so the
+         best tier is the one to price it at
+       * it does not depend on the node at all. Any endless mission run as a
+         fissure pays the same bonus, so this is a flat addition, and what it
+         actually changes is endless-versus-short rather than one endless node
+         against another.
+
+     Railjack is excluded: its fissures are Void Storms, which are their own
+     nodes with their own tables and no rotations to stay for. */
+  function fissureBonus(relicPlan) {
+    const tiers = {};
+    Object.keys(RELICS).forEach((name) => {
+      if (RELICS[name].vaulted) return;
+      const tier = String(name).split(" ")[0];
+      const t = tiers[tier] || (tiers[tier] = { n: 0, value: 0, wanted: 0 });
+      t.n += 1;
+      const rp = relicPlan.get(name);
+      if (rp) {
+        t.value += (rp.byRefinement || {}).Exceptional || 0;
+        t.wanted += 1;
+      }
+    });
+    let best = { tier: null, value: 0, count: 0 };
+    Object.keys(tiers).forEach((tier) => {
+      const t = tiers[tier];
+      if (!t.n) return;
+      const value = t.value / t.n;
+      if (value > best.value) {
+        best = { tier, value, count: t.wanted / t.n, pool: t.n, want: t.wanted };
+      }
+    });
+    return best;
+  }
+
   /* ── the plan ────────────────────────────────────────────────── */
 
   function buildPlan() {
@@ -408,6 +453,7 @@
 
     // value each node as a whole run, which is what you actually commit to
     const mins = effort();
+    const bonus = opts.runMode === "bonus" ? fissureBonus(relicPlan) : null;
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
       const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live, n.cnt);
@@ -416,7 +462,13 @@
          run hands you is a fact, this is only what we think it is worth going
          for. */
       n.halved = ROT.isRailjackCache(n);
-      n.score = r.total * (n.halved ? 1 - ROT.cachePenalty : 1);
+      /* The free relic for staying, once per run, and only where the run
+         actually reaches it: an endless mission taken to five rotations, run as
+         a fissure. Railjack has Void Storms instead of fissures, so it is out. */
+      n.bonus = bonus && (r.rounds || 0) >= ROT.bonusRotations && !isRailjack(n)
+        ? bonus : null;
+      n.score = (r.total + (n.bonus ? n.bonus.value : 0)) *
+                (n.halved ? 1 - ROT.cachePenalty : 1);
       n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
@@ -473,6 +525,10 @@
           "cycle, all four rewards counted.",
     aabcaa: "Each run is six rounds — four rotation A rewards plus a B and a C, " +
             "all of which count.",
+    bonus: "Each run is five rotations, which is what an endless Void Fissure " +
+           "pays a free Exceptional relic for reaching. Only endless missions " +
+           "can go that deep, so this is the mode that says whether the depth is " +
+           "worth it.",
   };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
@@ -881,6 +937,17 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}${
+          n.bonus ? ` · <span class="pre" data-tip="${esc(
+            "Five rotations here also pays the Void Fissure depth bonus:" + "\n" +
+            "one free relic, random, of the tier you are running." + "\n\n" +
+            "Priced at " + n.bonus.tier + ", the best tier for this list: " +
+            n.bonus.want + " of its " + n.bonus.pool + " live relics" + "\n" +
+            "are ones you want, so a random one is worth " + pct(n.bonus.value) +
+            " on" + "\n" + "average, at Exceptional." + "\n\n" +
+            "It is the same bonus at every endless node, so it does not" + "\n" +
+            "reorder them against each other - it is what makes staying" + "\n" +
+            "worth more than a short mission. Only counts in a fissure.")
+          }">+relic</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant." + "\n\n" +
             (n.tracesSaved

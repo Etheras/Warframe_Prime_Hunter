@@ -356,6 +356,60 @@ test("a node says what it demands before you can play it", () => {
                    ["PvPvE", "Steel Path"]);
 });
 
+test("staying for the fissure bonus is a fourth run mode, five rotations deep", () => {
+  const ROT = loadRotation();
+  /* The other three stop at four rotations or six. An endless Void Fissure pays
+     a free Exceptional relic at five, so the first bonus is either unreachable
+     or a coincidence unless the run is chosen for it. */
+  assert.ok(ROT.RUN_MODES.includes("bonus"));
+  assert.equal(ROT.bonusRotations, 5);
+
+  const rot = { A: 1, B: 1, C: 1, none: 0 };
+  const at = (mode) => ROT.runValue(rot, mode, "Defense", false, null).rounds;
+  assert.equal(at("full"), 4, "one whole cycle, and short of the bonus");
+  assert.equal(at("bonus"), 5, "exactly the depth the bonus is paid at");
+  assert.equal(at("aabcaa"), 6);
+
+  // AABCA over five rounds - the fifth is a second lap of rotation A
+  assert.deepEqual(plain(ROT.runValue(rot, "bonus", "Defense", false, null).counts),
+                   { A: 3, B: 1, C: 1 });
+
+  // a mission with no rotation cannot stay for anything, so it gets no rounds
+  assert.equal(ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 },
+                            "bonus", "Capture", false, null).rounds, null);
+});
+
+test("an enemy says it is an enemy, and names the event it rides", () => {
+  const ROT = loadRotation();
+  /* The Hemocyte is the only enemy in DE's entire relic table, and it is not a
+     destination: four spawn in the final stage of the Plague Star bounty, so
+     its row and the Plague Star row are one trip counted twice. */
+  const demand = ROT.demandsOf({ kind: "enemy", node: "Hemocyte",
+                                 access: "event:Plague Star" })[0];
+  assert.equal(demand.label, "Enemy");
+  assert.match(demand.tip, /not a destination/i);
+  assert.match(demand.tip, /Plague Star/, "the row has to name what it rides");
+
+  const bare = ROT.demandsOf({ kind: "enemy", node: "Something" })[0];
+  assert.equal(bare.label, "Enemy");
+  assert.ok(!/final stage/.test(bare.tip),
+            "with no event known it must not invent one");
+
+  assert.deepEqual(plain(ROT.demandsOf({ kind: "mission", node: "Ukko" })), [],
+                   "an ordinary node is not an enemy");
+});
+
+test("the Profit-Taker heist asks for standing, and says so", () => {
+  const ROT = loadRotation();
+  const labels = (node) => ROT.demandsOf({ kind: "bounty", node }).map((d) => d.label);
+  assert.deepEqual(plain(labels("Level 40 - 60 PROFIT-TAKER - PHASE 1")), ["Old Mate"]);
+  assert.deepEqual(plain(labels("Level 50 - 60 PROFIT-TAKER - PHASE 4")), ["Old Mate"]);
+  assert.deepEqual(plain(labels("Level 15 - 25 Plague Star")), [],
+                   "an ordinary board bounty asks for nothing extra");
+  assert.match(ROT.demandsOf({ node: "Level 40 - 60 PROFIT-TAKER - PHASE 1" })[0].tip,
+               /Rank 5/, "the tip has to name the rank, not just imply a gate");
+});
+
 test("a Railjack cache is halved, and nothing else in the model is", () => {
   const ROT = loadRotation();
   const cache = (extra) => ROT.isRailjackCache(Object.assign(

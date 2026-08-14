@@ -619,11 +619,18 @@ def test_unreachable_sources_are_tagged() -> None:
     check("a repeatable key mission is not", got["Jordas Golem Assassinate"], None,
           "Jordas needs a crafted key but can be run as often as you like")
     check("an event-only enemy rides its event", got["Hemocyte"], "event:Plague Star")
-    check("Profit-Taker is tagged unmodelled",
-          got["Level 40 - 60 PROFIT-TAKER - PHASE 1"], "unmodelled")
+    # Profit-Taker was tagged "unmodelled" here until 2026-08-14, on the belief
+    # that its phases were not independent and that Phase 3's first/subsequent
+    # split could not be expressed. Both were wrong: the wiki says each phase is
+    # freely replayable after one sequential clear, and the "First Completion"
+    # table carries a Gravimag and no relics, so there is no "once ever" to
+    # express. It is permanent content with a standing gate, which is a badge
+    # rather than a reason to hide it.
+    check("Profit-Taker is a place you can go",
+          got["Level 40 - 60 PROFIT-TAKER - PHASE 1"], None)
     check("an ordinary node is left alone", got["Ukko"], None)
     check("and the build can report what it tagged", counts,
-          {"quest": 1, "event:Plague Star": 1, "unmodelled": 1})
+          {"quest": 1, "event:Plague Star": 1})
 
     # the same tagging reaches the Aya rows, which are scored the same way
     aya = [{"kind": "enemy", "node": "Hemocyte", "mode": "Enemy", "chance": 1.0}]

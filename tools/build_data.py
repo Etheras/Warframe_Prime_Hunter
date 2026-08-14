@@ -303,10 +303,19 @@ def tag_access(relic_sources: dict, aya_sources: list) -> dict:
             access = "quest"
         elif node in EVENT_ENEMIES:
             access = "event:" + EVENT_ENEMIES[node]
-        elif "PROFIT-TAKER" in node.upper():
-            # a multi-phase heist with a one-time first completion; the model
-            # has no way to express either, so it is hidden until it does
-            access = "unmodelled"
+        # Profit-Taker was tagged "unmodelled" here until 2026-08-14, on two
+        # beliefs that both turned out to be wrong: that its four phases were
+        # not independent, and that Phase 3's first/subsequent split could not
+        # be expressed. The wiki says each phase is freely replayable once the
+        # heist has been done in sequence, and DE's own table gives the "First
+        # Completion" section a Gravimag and no relics at all - so there is no
+        # "once ever" to express, because the thing that happens once is not
+        # something this app tracks. Each phase is a single fixed table with no
+        # rotation, which is the flat case the model has always handled.
+        #
+        # What it does have is a standing gate, Solaris United Rank 5, and that
+        # is a demand badge rather than a reason to hide it - the same call
+        # already made for Railjack. See rotation.js.
         if access:
             row["access"] = access
             counts[access] = counts.get(access, 0) + 1

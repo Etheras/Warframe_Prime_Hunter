@@ -43,7 +43,17 @@
      A node with no rotation pays once per run and is added flat. That equates a
      round to a whole mission, which flatters long ones - deliberate, since
      mission length is not modelled anywhere. */
-  const RUN_MODES = ["reset", "full", "aabcaa"];
+  /* `bonus` exists because of something the other three cannot reach. An
+     endless Void Fissure hands out a free relic for staying: five rotations
+     gives a random Exceptional of the fissure's tier, ten a Flawless, and every
+     fifth after fifteen a Radiant (wiki: Void Fissure). The other modes stop at
+     four rotations or six, so the first bonus is either unreachable or a
+     coincidence - the run has to be chosen for it.
+
+     Five rotations, then restart: the second bonus is twice as far away for a
+     reward one refinement step better, which is a worse trade every time. */
+  const RUN_MODES = ["reset", "full", "aabcaa", "bonus"];
+  const BONUS_ROTATIONS = 5;
 
   /* Rotation pattern, by mission type.
 
@@ -107,6 +117,7 @@
     let n;
     if (runMode === "full") n = 4;
     else if (runMode === "aabcaa") n = 6;
+    else if (runMode === "bonus") n = BONUS_ROTATIONS;
     else {
       n = 0;                                    // reset: last round that pays
       for (let r = 1; r <= p.cycle; r++) if ((rot[p.plan(r, rot)] || 0) > 0) n = r;
@@ -369,6 +380,14 @@
       "Vehrvod District is squad versus squad; Lower Vehrvod is",
       "against AI-controlled Tenno.",
     ].join("\n") },
+    heist: { label: "Old Mate", tip: [
+      "The Profit-Taker heist, from Eudico's backroom in Fortuna -",
+      "not the bounty board, and not on the bounty clock.",
+      "",
+      "Needs Solaris United Rank 5 (Old Mate), and the four phases",
+      "run in sequence once. After that any phase can be replayed",
+      "on its own, which is why they are ranked as four places.",
+    ].join("\n") },
     steel: { label: "Steel Path", tip: [
       "On the Steel Path, which is a second star chart unlocked",
       "by clearing the first one. Until then the node is not on",
@@ -394,10 +413,43 @@
     /\(Steel Path\b[^)]*\)/i.test(s.node || "") ||
     /^Level\s+100\s*-\s*100\b/i.test(s.node || "");
 
+  /* The Profit-Taker heist. Named rather than inferred: it is the only content
+     in the data reached from a syndicate's back room instead of from a mission
+     node or a bounty board, and DE gives it no marker of its own. A sweep of
+     every bounty, key, enemy and transient source found nothing else shaped
+     like it (`TODO.md`), so a list of one is honest and a general rule would be
+     a rule about a single case. */
+  const isHeist = (s) => /PROFIT-TAKER/i.test(s.node || "");
+
+  /* An enemy is not a place you can go.
+     DE files relic-dropping enemies in their own section, and there is exactly
+     one in the whole table: the Hemocyte, which spawns four to a run in the
+     final stage of the Plague Star bounty. That makes it a *second row for a
+     trip already listed* - the Plague Star bounty is the other one - rather
+     than somewhere else to be.
+
+     Keyed on the kind rather than the name, so a second relic-dropping enemy
+     would be caught too. The tip names the event when the build knows it, which
+     is the only thing that makes such a row reachable at all. */
+  function enemyDemand(s) {
+    const ev = String(s.access || "").indexOf("event:") === 0
+      ? String(s.access).slice(6) : null;
+    return { label: "Enemy", tip: [
+      "An enemy, not a destination. You do not travel here - it",
+      "spawns where it spawns, and the relics come off its body.",
+      ev ? "" : null,
+      ev ? "That is the final stage of " + ev + ", four of them per" : null,
+      ev ? "run, so this row and the " + ev + " row are one trip" : null,
+      ev ? "counted from two tables DE publishes separately." : null,
+    ].filter((l) => l !== null).join("\n") };
+  }
+
   function demandsOf(s) {
     const out = [];
     if (isRailjack(s)) out.push(DEMANDS.railjack);
     if (isPvPvE(s)) out.push(DEMANDS.pvpve);
+    if (isHeist(s)) out.push(DEMANDS.heist);
+    if (s.kind === "enemy") out.push(enemyDemand(s));
     if (isSteelPath(s)) out.push(DEMANDS.steel);
     return out;
   }
@@ -496,9 +548,10 @@
 
   window.VorFrameRotation = {
     RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
+    bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
-    isRailjack, isPvPvE, isSteelPath, demandsOf, railjackOnly,
+    isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
     isRailjackCache, cachePenalty: CACHE_PENALTY,
     isEventNode, notADestination,
     bountyEvent, eventRunning,

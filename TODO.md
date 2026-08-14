@@ -30,7 +30,7 @@ move its reasoning into `PROJECT.md`.
 | 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ✅ done |
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
 | 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save; model the **endless-fissure bonus relic**; and reduce the value of a relic handed over at a *higher* refinement than the plan wants. | 🟡 **refinement done.** Traces are counted and shown, not scored — they need a player fact, like Mastery Rank. The fissure bonus is verified and deferred to decision 1, where it belongs: it is a reward for *cracking*, and no run mode here is long enough to reach it |
-| 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ⬜ |
+| 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ✅ **done.** Profit-Taker's four phases are in, badged *Old Mate*, off the bounty clock. Swept every bounty, key, enemy and transient source for others: the only one is **Hemocyte**, which is already event-gated and now badged as an enemy rather than a place — see *Plague Star and Profit-Taker are the same shape* |
 | 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ⬜ |
 | 9 | **(a)(ii) a seventh availability bucket**, and **(b)(ii) auto-include Railjack when it is the only route.** Owner wants to review all of #9 — **mock it up first.** | ⬜ mockup |
 | 5 | **Cannot be answered on paper** — it is a visual change and needs seeing. **Mock it up.** | ⬜ mockup |
@@ -173,7 +173,50 @@ Salvage, Legacyte Harvest, Void Cascade/Flood/Armageddon) and **Standard**
 reverse-engineering, from a source, and it independently confirms Spy is not
 endless.
 
-### Profit-Taker turns out to fit the model exactly — decision 2
+### Plague Star and Profit-Taker are the same shape, modelled two ways
+
+**Raised by the owner 2026-08-14, and they are right that something is off.**
+Both are gated multi-stage activities that end in a boss dropping relics. Here
+is what is actually different, and only one of the three differences is ours.
+
+| | Profit-Taker | Plague Star |
+|---|---|---|
+| Available | **permanent**, no timer, since 2019 | **a recurring Operation** — only on the board when DE runs it |
+| Reached from | Eudico's back room, Fortuna | the Cetus bounty board |
+| Gate | Solaris United Rank 5, plus one sequential clear | none beyond the event running |
+| Shape | four independent flat tables, no rotation, off the clock | one bounty, rotation A, on the board |
+| Boss relics live in | **the phase table itself** | **a separate enemy table** (`Hemocyte`) |
+
+The first four differences are real and the two are modelled correctly *because*
+of them: Profit-Taker is permanent so it gets a badge, Plague Star is not so it
+gets an event gate. **To answer the question directly: Profit-Taker is always
+active once unlocked. There is no timer on it.**
+
+**The last row is the problem, and it is ours.** DE files Profit-Taker's boss
+rewards inside the bounty table and Plague Star's boss rewards in the enemy
+table — the same game structure, published two ways. We follow the publication
+rather than the structure, so when Plague Star next runs the planner will list
+**two rows for one trip**: `Level 15 - 25 Plague Star` at 1.14%, and `Hemocyte`
+at 12.91% with eleven relics, from `planet: "Enemy drops"`, a place that does
+not exist.
+
+`Hemocyte` is the only enemy in DE's entire relic table, so this is a list of
+one — but a list of one that reads as a phantom destination scoring ten times
+the real node beside it.
+
+**Half-fixed now:** the row carries an `Enemy` badge saying it is not a place,
+that four spawn in the Plague Star final stage, and that the two rows are one
+trip. That stops it lying without pretending to be finished.
+
+**The rest, when Plague Star next runs.** Folding the enemy rows into the bounty
+they ride needs a probability structure the model does not have. DE publishes
+`Hemocyte Relic Drop Chance: 20.00%` and then 12.91% per relic within that, and
+four spawn per run — so a run is worth `4 × 0.20 = 0.8` relic rolls, not the one
+roll currently assumed. Getting that right is arithmetic; getting it *checked*
+needs the event live, which is the same blocker as the detection below. Do both
+in the same sitting.
+
+### Profit-Taker turns out to fit the model exactly **[done 2026-08-14]** — decision 2
 
 **Revisited 2026-08-14 against [the wiki's Heist page](https://wiki.warframe.com/w/Heist#Profit-Taker_Orb_Heist)
 and DE's own table, and the original objection does not survive either.**
@@ -280,9 +323,28 @@ A rotation is 5 waves of Defense, 5 minutes of Survival, 1 Interception round or
   from everything else on the row, which is about a specific relic at a specific
   node.
 
-**Do it with decision 1**, on the cracking side, where it answers a question that
-side actually asks: *given you are cracking these relics, is it worth staying to
-rotation 5?*
+**Built 2026-08-14 as a fourth run mode**, *Stay for the fissure bonus*, after
+the owner confirmed the reading. Five rotations, then restart — the second bonus
+is twice as far for one refinement step better, which is a worse trade every
+time.
+
+It is priced as what it is: a **random** relic of the tier, so its worth is the
+mean over every live relic in the best tier, most of which are worth nothing to
+the plan. On a two-Prime list that came to *Meso, 3 of 9 live relics wanted,
+8.07% at Exceptional*. It is the same bonus at every endless node, so it does
+not reorder endless nodes against each other — what it changes is **endless
+versus short**, which is the question the mode exists to answer. On that list
+Mithra went from third at 15.96% over four rotations to first at 16.57% over
+five, overtaking the single-objective missions.
+
+Railjack is excluded: its fissures are Void Storms, which are their own nodes
+with their own tables and no rotations to stay for.
+
+**What is still deferred to decision 1:** the bonus is a reward for *cracking*
+relics, and it currently sits on the collecting side because that is where the
+run modes live. When the two loops split, it should be stated on the cracking
+side too — *given you are opening these relics anyway, is it worth staying to
+rotation 5?* — rather than only as a modifier on where to go.
 
 ### Some nodes hand you the relic already refined **[done 2026-08-14]** — decision 10
 
