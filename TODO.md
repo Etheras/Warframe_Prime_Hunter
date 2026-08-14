@@ -457,7 +457,7 @@ throw the rest away. What is in there, per bounty job:
 | `uniqueName` | ends `…Tier<X>Table<Y>Rewards` | **`Table<Y>` is the rotation letter, published per tier.** See the entry below — this is the whole of it |
 | `standingStages[]` | its length is the **stage count**, and it varies: 3, 4 or 5 by tier | `objectivesOf` hard-codes 4 stages for every bounty. Tier A is 3, Tier D is 5 |
 | `enemyLevels[]` | e.g. `[40, 60]` | **every bounty node in our data has `lvl: null`** — 13 of them — so bounties can never win the level tie-break |
-| `minMR` | mastery gate, 0 to 10 | the 100–100 tiers need MR10. "Only recommend what can be run today" has never considered mastery |
+| `minMR` | **Minimum Mastery Rank**, 0 to 10 — see the caveat below | "Only recommend what can be run today" has never considered mastery at all |
 | `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | a real name instead of `Level 20 - 40 Cetus Bounty` |
 | `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | a cross-check against DE's static table, which is how the letter is currently derived at all |
 
@@ -465,6 +465,34 @@ And on `/pc/events`, a **`tag`** field — `HeatFissure`, `WaterFight` — a sta
 machine identifier instead of the keyword scan described two entries down.
 
 None of this needs a new request. It is in the response we already cache.
+
+**`minMR` is Minimum Mastery Rank**, the account-wide progression rank — earned by
+levelling frames, weapons and Intrinsics and passing a test per rank, capped at 30
+before Legendary ranks. Checked against
+[the wiki's Bounty page](https://wiki.warframe.com/w/Bounty), which matches the
+worldstate tier for tier:
+
+| Bounty level | Wiki | `minMR` |
+|---|---|---|
+| 5–15 | no mastery lock | 0 |
+| 10–30 | MR 1 | 1 |
+| 20–40 | MR 2 | 2 |
+| 30–50 | MR 3 | 3 |
+| 40–60 | MR 5 | 5 |
+| 100–100 | **MR 10 and The Steel Path unlocked** | 10 |
+| 50–70 Narmer | no requirement | 0 |
+
+**Two caveats that stop this being a filter.** First, the wiki: *"These can still be
+played, when an eligible squad member selects one."* The rank gates **selecting** a
+bounty, not running it — so excluding a tier outright would be wrong for anyone
+playing with friends. Second, the 100–100 tier carries a **second** gate the
+worldstate does not publish at all: The Steel Path must be unlocked.
+
+So this is not a candidate for the exclusion rule. It is a candidate for a **demand
+badge** — the same shape as `Railjack` and `PvPvE`, saying what a node asks of you
+before you get there — and it would need the player's own rank, which is the first
+thing this project would have to ask about itself rather than derive. Worth noting
+that the same question is open for Profit-Taker, which needs Solaris United Rank 5.
 
 ### Read each bounty's rotation letter directly — **the worldstate already says it**
 
