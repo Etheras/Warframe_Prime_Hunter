@@ -261,6 +261,15 @@
      every fifth after fifteen a Radiant. Only the `bonus` run mode goes deep
      enough to collect one - see rotation.js.
 
+     **It is not conditioned on the node actually being a fissure, because
+     nothing here can know that.** Fissures are an overlay that moves every hour
+     or two; this dataset is refreshed daily. Fetching the live list was
+     considered and rejected: a fissure list a few hours old is wrong more often
+     than right, and a confidently wrong answer is worse than an honest
+     assumption. So the mode means "when you run one of these as a fissure",
+     the row says so, and the arithmetic below is deliberately node-independent -
+     which is what makes that safe. See TODO.md.
+
      Three things make this different from every other number on a row, and all
      three are the reason it is computed here rather than per node:
 
@@ -526,9 +535,13 @@
     aabcaa: "Each run is six rounds — four rotation A rewards plus a B and a C, " +
             "all of which count.",
     bonus: "Each run is five rotations, which is what an endless Void Fissure " +
-           "pays a free Exceptional relic for reaching. Only endless missions " +
-           "can go that deep, so this is the mode that says whether the depth is " +
-           "worth it.",
+           "pays a free Exceptional relic for reaching — <b>assuming you are " +
+           "running one</b>. Nothing here knows which nodes carry a fissure: they " +
+           "move every hour or two and this data is refreshed daily, so a list of " +
+           "them would be wrong more often than right. The bonus is therefore " +
+           "added to every endless node equally, which never reorders them against " +
+           "each other — it only weighs staying against a short mission, and that " +
+           "comparison holds whatever the fissure map looks like.",
   };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
@@ -937,17 +950,23 @@
           `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
             rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
             rl.length === 1 ? "" : "s"}</span>`}${
-          n.bonus ? ` · <span class="pre" data-tip="${esc(
-            "Five rotations here also pays the Void Fissure depth bonus:" + "\n" +
-            "one free relic, random, of the tier you are running." + "\n\n" +
+          n.bonus ? ` · <span class="est" data-tip="${esc(
+            "IF you run this as a Void Fissure. Nothing here knows whether" + "\n" +
+            "it is one." + "\n\n" +
+            "Which nodes carry a fissure changes every hour or two, and this" + "\n" +
+            "data is refreshed daily, so a list of them would be wrong more" + "\n" +
+            "often than right - worse than no list. What is counted is the" + "\n" +
+            "depth bonus a fissure pays for staying: five rotations gives one" + "\n" +
+            "free relic, random, of the tier being run." + "\n\n" +
             "Priced at " + n.bonus.tier + ", the best tier for this list: " +
             n.bonus.want + " of its " + n.bonus.pool + " live relics" + "\n" +
             "are ones you want, so a random one is worth " + pct(n.bonus.value) +
             " on" + "\n" + "average, at Exceptional." + "\n\n" +
-            "It is the same bonus at every endless node, so it does not" + "\n" +
-            "reorder them against each other - it is what makes staying" + "\n" +
-            "worth more than a short mission. Only counts in a fissure.")
-          }">+relic</span>` : ""}${
+            "The same figure lands on every endless node, so it never" + "\n" +
+            "reorders them against each other. What it changes is endless" + "\n" +
+            "against short, and that comparison holds however the fissures" + "\n" +
+            "happen to be sitting.")
+          }">+relic if fissure</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant." + "\n\n" +
             (n.tracesSaved

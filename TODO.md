@@ -340,6 +340,28 @@ five, overtaking the single-objective missions.
 Railjack is excluded: its fissures are Void Storms, which are their own nodes
 with their own tables and no rotations to stay for.
 
+**The app does not know which nodes are fissures, and deliberately does not
+try.** The owner asked how this is calculated; the honest answer is that it is
+not. A fissure is an overlay that moves every hour or two, and this dataset is
+refreshed daily — so a fetched list (`/pc/fissures` exists) would be stale
+within hours and wrong more often than right. **A confidently wrong fissure map
+is worse than an honest assumption**, because the whole point of the ranking is
+to be trusted without checking.
+
+So the bonus is added to every endless node **equally**, the row says *"+relic
+if fissure"* in amber, and the tooltip leads with the assumption rather than
+burying it. That is safe precisely because it is node-independent: a constant
+added to every endless node cannot reorder them against each other, so the only
+comparison it affects is *endless versus short* — and that one holds whatever
+the fissure map happens to look like.
+
+**What would change this:** if the app ever refreshed often enough to hold a
+live fissure list — a running `serve.py` could poll it the way it already polls
+upstream freshness — then the bonus could be conditioned per node and the mode
+could name which nodes are fissures right now. That is a real feature, and it is
+the same shape as the freshness check that already exists. Not worth it on a
+daily build.
+
 **What is still deferred to decision 1:** the bonus is a reward for *cracking*
 relics, and it currently sits on the collecting side because that is where the
 run modes live. When the two loops split, it should be stated on the cracking
