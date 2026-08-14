@@ -375,9 +375,16 @@ filters.
 **Still open:** whether an unfilled field should be treated as "rank unknown, say
 nothing" (safe, and the default everything else in this project takes) or should
 prompt once. And whether the same header slot should hold the other things the
-app would like to know about the player — Solaris United standing for
-Profit-Taker, and Steel Path, which now has its own checkbox in the planner
-sidebar and is arguably in the wrong place for the same reason this field is not.
+app would like to know about the player — Solaris United standing, if
+Profit-Taker comes in under decision 2, and the Steel Path.
+
+The Steel Path is the interesting precedent there. It had a sidebar checkbox for
+one afternoon and it was removed on measurement: every Steel Path table carrying
+a relic is a Faceoff variant identical to its ordinary twin, so the option moved
+the ranking by two duplicate rows and asked a question for nothing
+(`PROJECT.md §7`). If a header of player facts is ever built, the Steel Path
+belongs in it as a *fact* — feeding badges, not filters — rather than back in the
+sidebar as an option. Same shape as this field, same reasoning.
 
 ### How Railjack should be presented — decision 9
 
@@ -425,6 +432,11 @@ exists, since `railjackOnly` answers exactly that question per item.
 Squad* and *Faceoff: Squad VS Squad (Steel Path)* — four rows, all at 4.7% per
 minute, filling half the visible eight. They are not merely similar; each Steel
 Path table is the same 22 relics at the same 8.33% as its ordinary twin.
+
+That duplication is also **why the Steel Path has no checkbox** — an option that
+moves two identical rows is not worth asking about, so the badge carries it
+instead (`PROJECT.md §7`). Which leaves the duplication itself unanswered, and
+it is this sub-decision.
 
 This is the same class of problem as the entry above and wants deciding with it:
 

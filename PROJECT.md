@@ -54,7 +54,7 @@ named once, in `assets/shared.js`, because both pages read and write them:
 | `vorframe.parts.v1` | per-part counts | yes |
 | `vorframe.materials.v1` | the manual materials checklist | yes |
 | `vorframe.wishlist.v1` | the farm list, shared with the planner | no |
-| `vorframe.plan.v1` | planner options (squad, event, Railjack, Steel Path, run mode, effort minutes) | no |
+| `vorframe.plan.v1` | planner options (squad, event, Railjack, run mode, effort minutes) | no |
 | `vorframe.filters.v1` | collection filters, sort and view toggles | no |
 
 **Backup** exports the first three as one document and still accepts the old
@@ -1050,27 +1050,38 @@ with `permanent && vaulted` on today's data is corroboration, not the definition
 
 Five relics carry all six: **Lith C7, Meso N11, Neo V9, Axi S8, Axi V10**.
 
-### The Steel Path is asked about, Mastery Rank is not
+### Neither the Steel Path nor Mastery Rank is an option — for different reasons
 
-Both are gates on entering a node; only one of them is a reason to hide it, and
-the difference is worth writing down because it looks arbitrary otherwise.
+Both gate entering a node. Neither gets a control, and the two reasons are not
+the same, which is worth writing down because the outcome looks uniform.
 
 **The Steel Path is a second star chart**, unlocked once by clearing the first.
 Until you have, its nodes are not on your chart at all — the same shape as an
-event that is not running, and the same answer: excluded by default, with a
-*Steel Path unlocked* checkbox in the planner sidebar beside *Include Railjack*.
-Recognised two ways in `ROT.isSteelPath`: DE names most of them `(Steel Path)`,
-and one Faceoff table `(Steel Path Winner)`; the level `100 - 100` bounty tier is
-not named but is gated all the same, on the wiki's authority — *"Requires Mastery
-Rank 10 and unlock The Steel Path"*.
+event that is not running, and by the rule below it *ought* to be excluded by
+default with a checkbox, exactly like Railjack.
 
-**Leaving it off costs nothing today.** The only Steel Path content carrying
-relics is the Faceoff pair, and each variant is identical to its ordinary twin:
-the same 22 relics at the same 8.33%. Ticking the box moves the ranking from 152
-places to 154 and adds no reward that was not already reachable. No 100–100 tier
-carries a relic at all, so that half of the rule is written for the day one does.
+It had one for an afternoon on 2026-08-14, and it was removed after measuring
+what it did. **The only Steel Path content carrying relics is the Faceoff pair,
+and each variant is identical to its ordinary twin — the same 22 relics at the
+same 8.33%.** Ticking the box moved the ranking from 152 places to 154 and
+offered no reward that was not already reachable, while adding a fifth question
+to a sidebar that has to earn every one. An option that changes two duplicate
+rows and nothing else is a question not worth asking.
 
-**Mastery Rank gates nothing here, deliberately.** The worldstate publishes
+So the classifier stays and the control does not. `ROT.isSteelPath` recognises
+them two ways — DE names most `(Steel Path)` and one Faceoff table `(Steel Path
+Winner)`; the level `100 - 100` bounty tier is not named but is gated all the
+same, on the wiki's authority (*"Requires Mastery Rank 10 and unlock The Steel
+Path"*) — and feeds the **demand badge** on the row, beside `PvPvE` where both
+apply. No 100–100 tier carries a relic at all, so that half of the rule is
+written for the day one does.
+
+**Revisit if that stops being true.** The moment a Steel Path table pays
+something its ordinary twin does not, the badge stops being sufficient and the
+checkbox earns its place.
+
+**Mastery Rank gates nothing here either, and would not even if it mattered.**
+The worldstate publishes
 `minMR` per bounty tier and it matches the wiki exactly — MR1 at level 10–30
 through MR10 at 100–100 — so filtering by it would be easy and would be wrong.
 The wiki: *"These can still be played, when an eligible squad member selects
@@ -1080,7 +1091,9 @@ It belongs with the demand badges instead, which is what `TODO.md` records
 alongside the header field the owner has specified for it.
 
 That is the general rule these two cases establish: **a gate on *reaching* a node
-excludes it; a gate on *starting* it only annotates it.**
+excludes it; a gate on *starting* it only annotates it** — and a gate that
+excludes only duplicates of things you can already reach annotates too, because
+an option nobody's answer changes is worse than no option.
 
 ### An empty ranking has to say what emptied it
 

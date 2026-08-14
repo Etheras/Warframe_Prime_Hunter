@@ -27,7 +27,6 @@
   const untilText = ROT.untilText;
   const isRailjack = ROT.isRailjack;
   const isEvent = ROT.isEventNode;
-  const isSteelPath = ROT.isSteelPath;
   const bountyEvent = ROT.bountyEvent;
   const eventRunning = ROT.eventRunning;
   const notADestination = ROT.notADestination;
@@ -93,8 +92,8 @@
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, steelPath: false,
-      runMode: "reset", aya: true, minutes: {} },
+    { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
+      minutes: {} },
     load(KEY_PLAN, {}));
 
   const needOf = (p) => p.itemCount || 1;
@@ -233,15 +232,21 @@
     /* Places that hold something wanted and were left out by an option rather
        than by the data. Counted so an empty ranking can name the switch that
        emptied it - see `noNodes`. */
+    /* The Steel Path is deliberately NOT a filter here. It gates entering a
+       node, so by the rule in PROJECT.md 7 it ought to be one - but every Steel
+       Path table carrying a relic today is a Faceoff variant identical to its
+       ordinary twin, same 22 relics at the same 8.33%. An option that changes
+       two duplicate rows and nothing else is a question not worth asking. The
+       demand badge on the row says which nodes need it; that is the whole of
+       what there is to say. */
     const nodes = new Map();
-    const blocked = { railjack: new Set(), event: new Set(), steelPath: new Set() };
+    const blocked = { railjack: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
       (RELICS[rname].sources || []).forEach((s) => {
         if (notADestination(s)) return;      // quest, or not modelled yet
         const skip = `${s.planet}|${s.node}|${s.mode}`;
         if (!opts.railjack && isRailjack(s)) { blocked.railjack.add(skip); return; }
         if (!opts.event && isEvent(s)) { blocked.event.add(skip); return; }
-        if (!opts.steelPath && isSteelPath(s)) { blocked.steelPath.add(skip); return; }
         const key = `${s.planet}|${s.node}|${s.mode}`;
         let n = nodes.get(key);
         if (!n) {
@@ -375,8 +380,7 @@
 
     return { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
-             blocked: { railjack: blocked.railjack.size, event: blocked.event.size,
-                        steelPath: blocked.steelPath.size } };
+             blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -649,9 +653,6 @@
     }
     if (blocked.event) {
       off.push([blocked.event, "an event node", "Include event nodes"]);
-    }
-    if (blocked.steelPath) {
-      off.push([blocked.steelPath, "on the Steel Path", "Steel Path unlocked"]);
     }
     if (!off.length) {
       return `<p class="hint">The relics below do drop, but nowhere you can get to
@@ -934,7 +935,7 @@
     });
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
-   ["p-railjack", "railjack"], ["p-steel", "steelPath"]].forEach(([id, key]) => {
+   ["p-railjack", "railjack"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
@@ -974,7 +975,10 @@
     writeForma(Math.max(0, Number(opts.formaHave) || 0),
                Math.max(0, Number(opts.formaNeed) || 0));
   }
-  delete opts.formaHave; delete opts.formaNeed; save(KEY_PLAN, opts);
+  // `steelPath` was a checkbox for one afternoon; drop it rather than leave a
+  // dead key riding along in every backup
+  delete opts.formaHave; delete opts.formaNeed; delete opts.steelPath;
+  save(KEY_PLAN, opts);
 
   {
     const cur = readForma() || { have: 0, need: 0 };

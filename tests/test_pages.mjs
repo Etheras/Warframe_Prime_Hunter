@@ -283,12 +283,12 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   assert.deepEqual(errors, []);
 });
 
-page_test("Steel Path nodes stay off the list until you say you have it", async () => {
-  /* The Steel Path is a second star chart, unlocked once. Until then its nodes
-     are not on your chart at all, so recommending one is the same mistake as
-     recommending an event node that is not running. Costs nothing to leave off
-     today either: both Steel Path relic tables in the data are Faceoff, and each
-     is identical to its ordinary twin. */
+page_test("a Steel Path node is ranked, and says so on the row", async () => {
+  /* Deliberately not filtered. It gates entering a node, which by the usual rule
+     would exclude it - but every Steel Path table carrying a relic is a Faceoff
+     variant identical to its ordinary twin, so an option would have changed two
+     duplicate rows and nothing else. The badge carries the whole message, which
+     is what this pins: the node ranks, and the row says what it needs. */
   const { page, errors } = await open("/plan.html");
   /* Pick the subject by node NAME, never by calling isSteelPath. Choosing the
      target with the function under test makes the whole case vacuous: break the
@@ -303,7 +303,7 @@ page_test("Steel Path nodes stay off the list until you say you have it", async 
       return rec && !rec.vaulted && (rec.sources || []).some(named);
     }));
     if (it) localStorage.setItem("vorframe.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("vorframe.plan.v1", JSON.stringify({ steelPath: false }));
+    localStorage.removeItem("vorframe.plan.v1");
     return it ? it.id : null;
   });
   assert.ok(target,
@@ -311,53 +311,42 @@ page_test("Steel Path nodes stay off the list until you say you have it", async 
             "removed them all, delete this test rather than letting it pass empty");
   await page.reload({ waitUntil: "load" });
 
-  /* Count the whole ranking, not the visible eight. A Faceoff table is one
-     reward a run against 22 relics, so it sorts well below anything endless -
-     out of sight of the rows and of the "+N more" hover both. The summary
-     counts every place, so the arithmetic is what gets checked: switching this
-     on has to add exactly the Steel Path nodes and nothing else. */
-  const places = () => page.evaluate(() =>
-    Number((document.querySelector("#planSummary").textContent
-      .match(/(\d+) places?/) || [])[1] || 0));
-  const visible = () => page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll("#planNodes .spot-where"))
-      .map((e) => e.textContent.replace(/\s+/g, " ").trim());
-    const more = document.querySelector(".more-nodes");
-    return rows.join(" | ") + " | " + (more ? more.dataset.tip : "");
+  assert.equal(await page.locator("#p-steel").count(), 0,
+               "there is no Steel Path checkbox, and adding one back needs a reason");
+
+  /* A Faceoff table is one reward a run against 22 relics, so it sorts well
+     below anything endless and is out of sight of both the eight rows and the
+     "+N more" hover. Rather than assert on something invisible, use the effort
+     weights to bring it into view - which is what a player with those timings
+     would see anyway. */
+  await page.locator("#advanced > summary").click();
+  await page.evaluate(() => {
+    // re-query every time: each change re-renders the panel, so a list captured
+    // up front is a list of detached nodes and setting .value on one does nothing
+    const modes = Array.from(document.querySelectorAll(".effort-row input"))
+      .map((el) => el.dataset.mode);
+    modes.forEach((mode) => {
+      const el = Array.from(document.querySelectorAll(".effort-row input"))
+        .find((x) => x.dataset.mode === mode);
+      if (!el) return;
+      el.value = mode === "Special" ? "1" : "25";
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
   });
 
-  const expected = await page.evaluate((id) => {
-    const D = window.VORFRAME_DATA, R = window.VorFrameRotation;
-    const seen = new Set();
-    (D.items.find((i) => i.id === id).relics || []).forEach((r) => {
-      const rec = D.relics[r];
-      if (!rec || rec.vaulted) return;
-      (rec.sources || []).forEach((s) => {
-        // the planner tests these in order, so a node that is also Railjack or
-        // an event was already excluded by an earlier rule. Again by name, so
-        // the expected number is independent of the code being measured.
-        if (R.notADestination(s) || R.isRailjack(s) || R.isEventNode(s)) return;
-        if (/\(Steel Path/i.test(s.node || "")) {
-          seen.add(s.planet + "|" + s.node + "|" + s.mode);
-        }
-      });
-    });
-    return seen.size;
-  }, target);
-  assert.ok(expected > 0, "picked an item with no Steel Path route to test with");
-
-  const off = await places();
-  assert.ok(off > 0, "the ordinary twin still ranks, so the list is not empty");
-  assert.ok(!/Steel Path/i.test(await visible()),
-            "a Steel Path node ranked while the box was off");
-
-  await page.locator("label:has(#p-steel)").click();
-  assert.ok(await page.locator("#p-steel").isChecked());
-  assert.equal(await places(), off + expected,
-               `ticking it must add exactly the ${expected} Steel Path node(s)`);
-
-  await page.reload({ waitUntil: "load" });
-  assert.ok(await page.locator("#p-steel").isChecked(), "the answer has to survive a reload");
+  const steel = page.locator("#planNodes .spot").filter({ hasText: "(Steel Path)" });
+  assert.ok(await steel.count() > 0,
+            "a Steel Path node has to be rankable - it is not filtered out");
+  // innerText, not textContent: the badge is uppercased in CSS
+  const labels = await steel.first().locator(".demand").allInnerTexts();
+  assert.ok(labels.includes("STEEL PATH"),
+            `the row must say what it needs, got ${JSON.stringify(labels)}`);
+  assert.ok(labels.includes("PVPVE"),
+            "and Faceoff's own demand stacks with it rather than replacing it");
+  assert.match(await steel.first().locator(".demand")
+                          .filter({ hasText: "STEEL PATH" }).first()
+                          .evaluate((e) => e.closest("[data-tip]").dataset.tip),
+               /second star chart/i, "the badge has to carry its explanation");
   assert.deepEqual(errors, []);
 });
 
