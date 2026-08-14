@@ -564,6 +564,11 @@ def test_offline_build() -> None:
     second = read_json(os.path.join(ROOT, "data", "prime-data.json"))
     for d in (first, second):
         d["meta"].pop("generated", None)
+        # The fissure list is filtered against the clock by design, so a fissure
+        # closing between these two builds is the feature working, not the build
+        # being non-deterministic. Left in, it would fail about one run in two
+        # hundred and look like a real fault every time.
+        d.pop("fissures", None)
     check("offline build: deterministic", first == second,  True,
           "two builds from the same cache must agree")
 
@@ -1259,10 +1264,18 @@ def test_a_refresh_clears_the_stale_banner() -> None:
     # 1. The stamp is the state file's write time, measured here rather than
     #    asked of the code under test. A stamp that always answered the same
     #    thing would sail through part 2 untouched.
+    #
+    #    A cold checkout has no state file at all - CI runs the suite before the
+    #    build, and its cache does not always survive - so that half is only
+    #    asserted when there is a file to assert it about. The absent case is
+    #    checked either way, below, by pointing the module at a folder that
+    #    certainly is not there.
     state = os.path.join(sources.CACHE_DIR, sources.STATE_FILE)
-    check_true("freshness: there is a state file to stamp", os.path.exists(state))
-    check("freshness: the stamp is when the state file was written",
-          serve.state_stamp(), os.path.getmtime(state))
+    if os.path.exists(state):
+        check("freshness: the stamp is when the state file was written",
+              serve.state_stamp(), os.path.getmtime(state))
+    else:
+        print("  skip freshness stamp value (no state file - nothing built yet)")
 
     real_cache = sources.CACHE_DIR
     try:
@@ -1399,6 +1412,16 @@ def test_bundle_is_self_contained() -> None:
     there.
     """
     import re
+    # There is nothing to inline without a dataset, and CI runs the suite before
+    # the build - so on a cold runner this used to fail twice and say only
+    # "missing data/prime-data.js". It passed at all in CI because a warm source
+    # cache let the offline-build test write one first, which made a green run
+    # depend on a cache surviving rather than on the code being right. The
+    # bundler is still exercised there: the workflow's Assemble step runs it for
+    # real, after the build, and a broken one fails the publish.
+    if not os.path.exists(os.path.join(ROOT, "data", "prime-data.js")):
+        print("  skip bundle (no dataset - run tools/build_data.py first)")
+        return
     r = subprocess.run([sys.executable, "tools/bundle.py"],
                        cwd=ROOT, capture_output=True, text=True)
     check("bundle: exits 0", r.returncode, 0, r.stderr[-300:])
