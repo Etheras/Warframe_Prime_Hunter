@@ -15,25 +15,25 @@ raised again from scratch. Everything else is genuinely outstanding.
 
 ---
 
-## Waiting on a decision, not on work
+## Decided — the batch being built now
 
-Everything here is built, or buildable in an hour, and stopped on a judgement that
-is the owner's to make. Each one says what the question is, what the options are,
-and **what happens if nothing is said** — because the default is already shipping,
-and silence is itself a choice. Nothing else in this file is blocked on anyone.
+**All ten answered by the owner on 2026-08-14.** This table is the plan of record.
+Work through it in the order below, committing each step on its own, so an
+interruption costs one step rather than the batch. Delete a row when it ships and
+move its reasoning into `PROJECT.md`.
 
-| # | The question | Options | If nothing is said |
-|---|---|---|---|
-| 1 | **Split the two loops?** "Where to go" would rank on relics per run, "What to crack" on openings needed. The ingredient exists and is on screen. | (a) split, and the big number in the left column becomes a **count**, not a percentage — which contradicts "% on top, like they used to"; (b) keep one combined score; (c) split, but show the *share of runs that drop something* as the headline so it stays a percentage | stays combined |
-| 2 | **Should Profit-Taker come back in?** It turns out to fit the model exactly — see below. Four phases, no rotation, two relics each. | (a) include all four as ordinary flat nodes, badged for the Old Mate gate; (b) leave hidden | stays hidden, and eight relic rows stay invisible |
-| 3 | **Rank per objective by default?** Costing per run is out by up to 9.6× across mission types; per objective, 2.4×. Neither asks the player for anything. | (a) keep per run; (b) default to per objective, still overridable by the effort boxes | stays per run |
-| 4 | **What rule demotes Railjack caches?** They are the worst rows in the list — but for six Primes they are the *only* rows. | (a) leave ranked as they are; (b) never above a star-chart node; (c) a fixed penalty; (d) leave it to the effort weights | stays as it is |
-| 5 | **Raise the meta line off 3.48:1?** Below AA, and deliberately dimmed as secondary. Raising it changes the visual hierarchy on both pages. | (a) leave it; (b) raise the whole meta line; (c) raise only the rotation label | stays below AA |
-| 6 | **How should the banner know who is reading it?** It currently guesses from the hostname and is wrong in both directions. | (a) let `serve.py` say so — the plumbing is already there, and this is the recommendation; (b) a `--guest` flag; (c) say nothing to anyone | keeps guessing |
-| 7 | **Close the two server holes?** Directory listing is on, and `.cache/` is served. Nothing served is sensitive, so this is a priority call rather than a security one. | (a) do both, a few lines; (b) leave it | stays open |
-| 8 | **What is the project called?** See *The name is not load-bearing yet* below. | any name; the audit says what would have to move | stays VorFrame |
-| 9 | **How should Railjack and its lookalikes be presented?** Three parts: where the six locked Primes sit in the collection's availability buckets; whether the planner should keep making you opt in to your only option; and whether Steel Path variants that are *exact duplicates* should both be ranked. | **(a)** (i) badge only; (ii) a seventh bucket; (iii) a cross-cutting *Needs a Railjack* filter — recommended. **(b)** (i) leave it; (ii) auto-include when it is the only route — recommended; (iii) a three-state checkbox. **(c)** (i) rank both twins; (ii) collapse identical twins — recommended; (iii) show the variant only when its table is better | badge only, the opt-in stays, and four identical Faceoff rows can fill half the list |
-| 10 | **Model pre-refined relic rewards?** Elite Sanctuary Onslaught, Void Storms and Profit-Taker hand you the relic **already Radiant** — 80 reward rows — and we discard that. Worth 100 Void Traces and, on a blocked rare, ~40 openings. | (a) keep discarding it; (b) keep the refinement and let those nodes score on it, which moves the ranking and breaks the one-refinement-per-relic assumption | keeps discarding it |
+| # | Decision | Status |
+|---|---|---|
+| 7 | **Already done** — `serve.py` has served from a strict allowlist for some time; `.cache/`, `tools/`, `.git/` and directory listings all 404 already. The entry was stale, not open. Verified by calling `allowed()` directly. | ✅ nothing to do |
+| 6 | **(a)** `serve.py` says who is reading. It already decorates the data file with `VORFRAME_UPSTREAM` and knows the peer address; add `owner` to that payload and let `staleBanner` read it instead of sniffing `location.hostname`. | ⬜ |
+| 8 | **Rename to `Warframe Prime Hunter`.** Owner expects to change it again, so leave a map of every place the name lives — see *Renaming, and where the name lives* below. Needs a `localStorage` migration for the six keys. | ⬜ |
+| 4 | **(c) a fixed 50% penalty on Railjack caches.** Deliberately rough. The owner's reason is the one that matters: *"caches on a Railjack is insanely out-of-order and out-of-place"*. | ⬜ |
+| 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ⬜ |
+| 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save, which the owner rates a serious bottleneck; model the **endless-fissure bonus relic** (claim to verify first); and reduce — only slightly — the value of a relic handed over at a *higher* refinement than the plan wants. | ⬜ |
+| 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ⬜ |
+| 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ⬜ |
+| 9 | **(a)(ii) a seventh availability bucket**, and **(b)(ii) auto-include Railjack when it is the only route.** Owner wants to review all of #9 — **mock it up first.** | ⬜ mockup |
+| 5 | **Cannot be answered on paper** — it is a visual change and needs seeing. **Mock it up.** | ⬜ mockup |
 
 **Yours to do elsewhere, not here:** four corrections belong on
 [`wiki.warframe.com/w/Prime`](https://wiki.warframe.com/w/Prime) rather than in this
@@ -633,11 +633,12 @@ real observations and would be the check on any implementation.
 Tiers whose rotations are indistinguishable (several pay the same handful of
 resources in all three) keep the family letter as a fallback.
 
-### The name is not load-bearing yet, and should stay that way — decision 8
+### Renaming, and where the name lives — decision 8
 
-The project will be renamed at some point. Nothing needs deciding to keep that
-cheap, but it needs *not forgetting*, because a name gets harder to remove every
-week it sits in a file that other things depend on.
+**Decided: `Warframe Prime Hunter`.** The owner expects to change it again, so
+the point of this entry is no longer "should we" but **"make the next one
+cheap"** — the map below is the deliverable, and it should be kept accurate as
+the project grows rather than re-derived each time.
 
 **Audited 2026-08-14.** The name appears in 30 tracked files. Almost all of it is
 prose — comments, headings, `--help` text, the browser title — which is a
@@ -664,7 +665,24 @@ as it likes — prose is free to change.
 old file with no migration at all. The only branded thing in that path is the
 error message *"this doesn't look like a VorFrame backup"*, which is prose.
 
-### Serving to a network exposes the folder, read-only — decision 7
+### Serving to a network exposes the folder, read-only **[done — the entry was stale]**
+
+**Checked 2026-08-14 and there was nothing to do.** Both holes described below
+were closed at some point after this was written, and nobody deleted the entry.
+`serve.py` does not serve the folder at all: it serves an **allowlist** —
+`index.html`, `plan.html`, five asset files, the data file, and flat files under
+`assets/img/`. Everything else is a 404, including the two things named here:
+
+```
+.cache/state.json    refused        tools/serve.py   refused
+.cache/api_events.gz refused        .git/config      refused
+TODO.md              refused        directory listing refused
+```
+
+`temp_mockup.html` is refused too, except to a loopback peer. Kept below as the
+reasoning about what is and is not sensitive, which is still worth having.
+
+### The original entry, for the reasoning
 
 Raised 2026-08-11 while planning a Raspberry Pi deployment.
 
@@ -686,13 +704,13 @@ rather than anything about credentials.
 
 Worth doing anyway, cheaply:
 
-1. **Turn off directory listing**, so the folder is not browsable even though its
-   contents are harmless. A few lines in the request handler.
-2. **Do not serve `.cache/`.** Nothing in the page needs it, and it is the only
-   directory whose presence invites a second look.
+1. ~~**Turn off directory listing**~~ — done, via the allowlist.
+2. ~~**Do not serve `.cache/`**~~ — done, via the allowlist.
 
-Neither needs authentication, and both are small. Deferred rather than urgent,
-because nothing served is sensitive.
+Both were small and both are in. What remains true and worth keeping is the
+framing: nothing served is sensitive, so this was housekeeping rather than a
+security fix, and an allowlist was the right shape because it fails closed —
+anything added to the folder later is refused until someone names it.
 
 ### The banner guesses who is reading it from the hostname — decision 6
 
