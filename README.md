@@ -730,6 +730,50 @@ To reproduce what CI does, without pushing:
 python tests/test_build.py --online
 ```
 
+### Blocking shell writes to source files — optional, and only if you use Claude Code
+
+`tools/guard_shell_writes.py` refuses any shell command that would write
+`assets/*.js`, `assets/*.css`, `tools/*.py`, `tests/*` or an `.html` file — a
+heredoc, a `>` redirect, `sed -i`, `Set-Content`, `python -c`. Reads, greps,
+builds and redirects to `/tmp` are untouched.
+
+It exists because a shell mangles escapes on the way in, three times here: `\b`
+became a literal backspace byte and shipped a regex that matched nothing, `\n`
+became a real newline mid-string, and a stray multibyte character rode in from a
+paste. All three pass `node --check`, look right in a diff, and show up only as
+behaviour that quietly does not happen. Editors do not have this failure mode.
+
+The suite already catches the damage — that runs for everyone, with nothing to
+set up. This is the other half, and it only helps if an assistant is writing
+files here. `.claude/` is gitignored, so wire it per machine in
+`.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/tools/guard_shell_writes.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Check it before trusting it — this must print a refusal rather than creating the
+file:
+
+```bash
+echo '{"tool_input":{"command":"echo x >> assets/app.js"}}' | python tools/guard_shell_writes.py
+```
+
 ---
 
 ## Want more detail?

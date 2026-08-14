@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 import build_data  # noqa: E402
 import catalogue  # noqa: E402
+import guard_shell_writes  # noqa: E402
 import official  # noqa: E402
 import relics  # noqa: E402
 import sources  # noqa: E402
@@ -890,6 +891,70 @@ def test_runs_on_the_other_platform() -> None:
               [])
 
 
+def test_no_source_file_carries_a_control_byte() -> None:
+    """
+    A regex reached the browser as `/^Faceoff\\x08/i` — a shell heredoc turned
+    the word boundary `\\b` into a literal backspace byte. It matched nothing,
+    threw nothing, and simply never showed the badge it was written for.
+
+    That failure mode is the reason this exists: an escape mangled on its way
+    through a shell into a file is invisible in an editor, survives every syntax
+    check, and only shows up as behaviour that quietly does not happen. Tab,
+    newline and carriage return are the only control characters a source file
+    has any business containing.
+    """
+    import glob
+    allowed = {0x09, 0x0A, 0x0D}
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "assets", "*.js")) +
+                       glob.glob(os.path.join(ROOT, "assets", "*.css")) +
+                       glob.glob(os.path.join(ROOT, "tools", "*.py")) +
+                       glob.glob(os.path.join(ROOT, "tests", "*.py")) +
+                       glob.glob(os.path.join(ROOT, "tests", "*.mjs")) +
+                       glob.glob(os.path.join(ROOT, "*.html"))):
+        for byte in read_bytes(path):
+            if byte < 0x20 and byte not in allowed:
+                offenders.append(f"{os.path.basename(path)}: 0x{byte:02x}")
+                break
+    check("no source file carries a stray control byte", offenders, [],
+          "an escape mangled through a shell is invisible in an editor")
+
+
+def test_the_guard_refuses_shell_writes_to_source() -> None:
+    """
+    The test above finds the damage; `tools/guard_shell_writes.py` refuses the
+    path that causes it, as a PreToolUse hook on the shell tools. A guard that
+    over-blocks gets switched off within the hour, so both directions matter:
+    it has to stop a heredoc writing `assets/rotation.js` and stay out of the
+    way of the dozens of ordinary reads, builds and greps that touch the same
+    files. `README.md` has the wiring; the hook itself is machine-local.
+    """
+    refuse = [
+        "cat > assets/rotation.js <<'EOF'\nconst x = 1;\nEOF",
+        "echo hi >> tools/build_data.py",
+        "sed -i s/a/b/ assets/styles.css",
+        "python -c \"open('tests/test_build.py','w').write(1)\"",
+        "cat header.txt > index.html",
+        "Set-Content -Path assets/model.js -Value $x",
+    ]
+    allow = [
+        "python tests/test_build.py",
+        "node --check assets/rotation.js",
+        "sed -n 1,20p assets/plan.js",
+        "grep -n foo assets/*.js 2>/dev/null",
+        "cp assets/app.js /tmp/app.bak",
+        "python tools/build_data.py > /tmp/build.log 2>&1",
+        "python tools/build_data.py --offline",
+        "git commit -m 'message'",
+    ]
+    check("guard: refuses every shell write to a source file",
+          [c for c in refuse if not guard_shell_writes.blocked(c)], [],
+          "a write that slips past the guard is the bug class coming back")
+    check("guard: leaves ordinary shell work alone",
+          [c for c in allow if guard_shell_writes.blocked(c)], [],
+          "over-blocking is how a guard gets switched off")
+
+
 def test_markup_is_xml_well_formed() -> None:
     """
     The pages are served as HTML5 and always will be, but they are held to XML
@@ -1153,6 +1218,8 @@ def main() -> int:
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,
                          test_runs_on_the_other_platform,
+                         test_no_source_file_carries_a_control_byte,
+                         test_the_guard_refuses_shell_writes_to_source,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_bundle_is_self_contained]),

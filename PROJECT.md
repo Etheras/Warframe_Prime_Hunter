@@ -184,6 +184,46 @@ Three rules, all enforced rather than remembered:
 - **Not part of the site.** Nothing in `index.html`, `plan.html`, the bundle or
   the published build references it. It is never a place to put real features.
 
+### Edit source files with an editor, never through a shell
+
+**Never write `assets/*.js`, `assets/*.css`, `tools/*.py`, `tests/*` or any
+`.html` file with a shell heredoc, a redirect, `sed -i`, `Set-Content` or
+`python -c`.** Open the file and edit it.
+
+This is not style. A shell parses the text on its way into the file, and it has
+mangled this project three separate times:
+
+- `\b` arrived as a literal backspace byte, so `/^Faceoff\b/i` shipped as
+  `/^Faceoff\x08/i` — a regex that matches nothing, throws nothing, and simply
+  never showed the badge it was written for.
+- `\n` inside a JavaScript string arrived as a real newline and split the string
+  across two lines.
+- A stray multibyte character rode in from a paste.
+
+Every one of those passes `node --check` and `ast.parse`, and looks correct in a
+diff — the byte is invisible in an editor. The cost is not the bug, it is that
+the bug presents as *behaviour that quietly does not happen*, which is the most
+expensive thing to debug in a codebase with no runtime.
+
+Three layers hold the rule, because remembering it demonstrably did not work:
+
+- **A test that catches the damage.** `test_no_source_file_carries_a_control_byte`
+  sweeps every source file for control bytes outside tab, newline and carriage
+  return. It runs in the offline suite and in CI.
+- **A hook that refuses the path.** `tools/guard_shell_writes.py` reads a
+  PreToolUse payload and denies any shell command that would write a guarded
+  file, with an explanation of what to do instead. It stays out of the way of
+  reads, greps, builds and redirects to `/tmp` — `test_the_guard_refuses_shell_writes_to_source`
+  asserts both directions, because a guard that over-blocks gets switched off.
+  The wiring lives in `.claude/settings.local.json`, which is gitignored along
+  with the rest of `.claude/`; `README.md` has it for anyone setting up a fresh
+  machine.
+- **This paragraph**, so the next person to hit a silently-dead regex knows the
+  first thing to check.
+
+Generated files are exempt and always were — `data/`, `.cache/` and `dist/` are
+written by the build and verified by it.
+
 ### Verifying a change
 
 Run the tests before pushing anything that touches the pipeline:
