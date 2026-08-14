@@ -126,11 +126,26 @@ $action = New-ScheduledTaskAction -Execute $python `
 
 # -Once with a repetition, rather than N daily triggers: it says "every hour" in
 # one object, instead of registering twenty-four of them.
-# MaxValue is how the Task Scheduler spells "indefinitely" - checked under both
-# Windows PowerShell 5.1 and 7, where it comes back as P99999999DT23H59M59S.
+#
+# No -RepetitionDuration, and that omission IS the setting: leaving it out emits
+# a <Repetition> element with an <Interval> and no <Duration>, which is how the
+# Task Scheduler spells "indefinitely". Read back after registering, it reports
+# interval PT1H and an empty duration.
+#
+# This first shipped as -RepetitionDuration ([TimeSpan]::MaxValue), which every
+# example on the internet recommends and which fails here:
+#
+#   Register-ScheduledTask : The task XML contains a value which is incorrectly
+#   formatted or out of range. (10,42):Duration:P99999999DT23H59M59S
+#
+# The lesson is not about MaxValue. New-ScheduledTaskTrigger accepted it happily
+# and produced a trigger object that looked right under both 5.1 and 7 - which is
+# exactly what was checked, and it proved nothing, because the schema that
+# rejects it is only consulted by Register-ScheduledTask. A builder that returns
+# an object is not evidence that the object can be stored. Verify at the layer
+# that can refuse you.
 $trigger = New-ScheduledTaskTrigger -Once -At $Time `
-    -RepetitionInterval (New-TimeSpan -Hours $EveryHours) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+    -RepetitionInterval (New-TimeSpan -Hours $EveryHours)
 
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `

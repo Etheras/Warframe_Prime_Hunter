@@ -573,6 +573,74 @@ def test_offline_build() -> None:
           "two builds from the same cache must agree")
 
 
+def test_the_scheduled_task_can_actually_be_registered() -> None:
+    """
+    Register the task for real, read it back, and remove it.
+
+    This exists because the hourly trigger shipped broken. It was built with
+    -RepetitionDuration ([TimeSpan]::MaxValue), which is what every example
+    recommends, and it was "verified" by constructing the trigger object under
+    both PowerShell editions and printing it. That proved nothing:
+    New-ScheduledTaskTrigger will hand back any object you ask for, and the
+    schema that rejects P99999999DT23H59M59S is only consulted by
+    Register-ScheduledTask. The owner found out by running it.
+
+    So this drives the real script through the real cmdlet under a throwaway
+    name. A static check on the source could pin the one spelling that failed;
+    only this can catch the next spelling that fails.
+
+    The empty duration is asserted as hard as the exit code, because the two
+    failure modes are opposite and equally bad: a duration the schema rejects
+    stops the task existing, and a duration it accepts stops the task repeating
+    once that long has passed - quietly, months later.
+    """
+    if os.name != "nt":
+        print("  skip task registration (Scheduled Tasks are a Windows feature)")
+        return
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        print("  skip task registration (no PowerShell on PATH)")
+        return
+
+    script = os.path.join(ROOT, "tools", "schedule.ps1")
+    probe = "Warframe Prime Hunter test probe (auto-removed)"
+    run = lambda *extra: subprocess.run(                          # noqa: E731
+        [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+         "-TaskName", probe, *extra],
+        cwd=ROOT, capture_output=True, text=True, timeout=120)
+    read = lambda: subprocess.run(                                # noqa: E731
+        [shell, "-NoProfile", "-Command",
+         f"$t = Get-ScheduledTask -TaskName '{probe}' -ErrorAction SilentlyContinue; "
+         "if ($null -eq $t) { 'ABSENT' } else "
+         "{ \"$($t.Triggers[0].Repetition.Interval)|$($t.Triggers[0].Repetition.Duration)\" }"],
+        cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
+
+    try:
+        made = run()
+        check("schedule: registering the task exits 0", made.returncode, 0,
+              (made.stderr or made.stdout)[-400:])
+        interval, _, duration = read().partition("|")
+        check("schedule: it repeats every hour, as the default says", interval, "PT1H")
+        check("schedule: with no duration, which is how it means indefinitely",
+              duration, "",
+              "a bounded duration registers fine and then stops refreshing")
+
+        eight = run("-EveryHours", "8")
+        check("schedule: -EveryHours reaches the trigger", eight.returncode, 0,
+              (eight.stderr or eight.stdout)[-400:])
+        check("schedule: and is what gets stored", read().partition("|")[0], "PT8H")
+
+        gone = run("-Remove")
+        check("schedule: -Remove exits 0", gone.returncode, 0, gone.stderr[-300:])
+        check("schedule: -Remove actually removes it", read(), "ABSENT")
+    finally:
+        # belt and braces: a failed assertion above must not leave a task behind
+        subprocess.run([shell, "-NoProfile", "-Command",
+                        f"Unregister-ScheduledTask -TaskName '{probe}' -Confirm:$false "
+                        "-ErrorAction SilentlyContinue"],
+                       cwd=ROOT, capture_output=True, text=True, timeout=120)
+
+
 def test_a_blocked_host_is_routed_around() -> None:
     """
     Digital Extremes publish the export index on two hosts, and answer a GitHub
@@ -1537,6 +1605,7 @@ def main() -> int:
                       test_only_fissures_worth_going_to_are_shipped]),
         ("built payload", [test_built_payload]),
         ("integration", [test_offline_build,
+                         test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
