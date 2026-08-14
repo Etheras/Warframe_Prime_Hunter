@@ -539,7 +539,7 @@ def test_cold_failure_is_fatal() -> None:
             if f.endswith(".py"):
                 shutil.copy(os.path.join(ROOT, "tools", f), os.path.join(tmp, "tools", f))
         # no .cache and no network: every fetch is a cold miss
-        env = dict(os.environ, VORFRAME_TEST_NO_NETWORK="1",
+        env = dict(os.environ, PRIMEHUNTER_TEST_NO_NETWORK="1",
                    http_proxy="http://127.0.0.1:9", https_proxy="http://127.0.0.1:9")
         r = subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
                            cwd=tmp, capture_output=True, text=True, env=env, timeout=180)

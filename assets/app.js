@@ -143,7 +143,7 @@
   /* Both of these live in the planner's store on purpose. Both pages rank nodes
      with them and PROJECT.md guarantees the two cannot disagree, so there is
      exactly one copy rather than one per page. `squad` used to be kept here
-     *and* in vorframe.filters.v1, which meant the pages could quietly disagree
+     *and* in the filters key, which meant the pages could quietly disagree
      about whether you were farming solo. */
   const planOpts = load(KEY_PLAN, null);
   if (planOpts && RUN_MODES.includes(planOpts.runMode)) state.runMode = planOpts.runMode;

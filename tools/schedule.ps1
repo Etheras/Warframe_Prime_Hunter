@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Register (or remove) a Windows Scheduled Task that keeps VorFrame's data current.
+    Register (or remove) a Windows Scheduled Task that keeps this site's data current.
 
 .DESCRIPTION
     The task runs  build_data.py --if-changed  once a day. That call is cheap when
@@ -27,10 +27,17 @@
 [CmdletBinding()]
 param(
     [string]$Time = "18:30",
-    [string]$TaskName = "VorFrame data refresh",
+    [string]$TaskName = "Warframe Prime Hunter data refresh",
     [switch]$Remove,
     [switch]$RunNow
 )
+
+# The task this script registered before the project was renamed on 2026-08-14.
+# A task already sitting in Task Scheduler keeps the name it was created with,
+# so changing the default above is not enough on its own: -Remove would stop
+# finding it, and re-registering would leave two tasks doing the same refresh
+# twice a day. Both paths below clean it up.
+$LegacyTaskName = "VorFrame data refresh"
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
@@ -49,7 +56,7 @@ if (-not $onWindows) {
     Write-Host "Scheduled Tasks are a Windows feature, and this is not Windows."
     Write-Host "Use cron instead. Run 'crontab -e' and add a daily line such as:"
     Write-Host ""
-    Write-Host "  30 18 * * * cd /path/to/VorFrame && ./refresh-data.sh --if-changed"
+    Write-Host "  30 18 * * * cd /path/to/the/folder && ./refresh-data.sh --if-changed"
     Write-Host ""
     exit 1
 }
@@ -61,13 +68,25 @@ if (-not (Get-Module -ListAvailable -Name ScheduledTasks)) {
 $root = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $root "tools\build_data.py"
 
-if ($Remove) {
-    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+# Registered under either name. Named separately from the -Remove path because
+# registering has to drop the old one too, or the machine ends up refreshing
+# twice a day from two tasks that both think they own the job.
+function Remove-TaskIfPresent {
+    param([string]$Name)
+    $existing = Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
     if ($null -ne $existing) {
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-        Write-Host "Removed scheduled task '$TaskName'."
-    } else {
-        Write-Host "No scheduled task named '$TaskName'."
+        Unregister-ScheduledTask -TaskName $Name -Confirm:$false
+        Write-Host "Removed scheduled task '$Name'."
+        return $true
+    }
+    return $false
+}
+
+if ($Remove) {
+    $gone = Remove-TaskIfPresent -Name $TaskName
+    if (Remove-TaskIfPresent -Name $LegacyTaskName) { $gone = $true }
+    if (-not $gone) {
+        Write-Host "No scheduled task named '$TaskName' (or '$LegacyTaskName')."
     }
     return
 }
@@ -98,8 +117,12 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
     -MultipleInstances IgnoreNew
 
-$description = "Refreshes VorFrame's Prime data from Digital Extremes' drop table " +
-               "and public export. Rebuilds only when upstream changes."
+$description = "Refreshes Warframe Prime Hunter's Prime data from Digital Extremes' " +
+               "drop table and public export. Rebuilds only when upstream changes."
+
+# Before registering, not after: -Force replaces a task of the SAME name, and the
+# old one has a different name, so it would otherwise survive alongside the new.
+if ($TaskName -ne $LegacyTaskName) { Remove-TaskIfPresent -Name $LegacyTaskName | Out-Null }
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Settings $settings -Description $description -Force | Out-Null

@@ -9,4 +9,4 @@
 *.sh  text eol=lf
 
 # Generated payload: big, machine-written, and not useful to read in a diff.
-data/vorframe-data.js linguist-generated=true -diff
+data/prime-data.js linguist-generated=true -diff
