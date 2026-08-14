@@ -593,6 +593,17 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 }
 .relic-state.open{color:var(--green);border-color:#2d5a41;background:#12241a}
 .relic-state.shut{color:#cbbcf2;border-color:#584379;background:#191330}
+/* The whole of "Where to go" when a switch has emptied it. Amber and boxed
+   rather than dimmed like an ordinary hint: it is the only thing under that
+   heading, it is entirely actionable, and the failure it replaced was a blank
+   space that read as a bug. */
+.nowhere{
+  margin:0 0 8px;padding:11px 14px;border-radius:8px;font-size:13px;
+  color:var(--txt);background:#241d0e;border:1px solid var(--gold-dim);
+  border-left-width:3px;line-height:1.5;
+}
+.nowhere b{color:var(--gold)}
+
 /* one line: two best spots, then a "+N more" that carries the rest on hover */
 .relic-src{
   padding:2px 12px 9px 12px;font-size:11.5px;color:var(--txt-faint);

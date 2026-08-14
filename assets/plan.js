@@ -788,16 +788,18 @@
       off.push([blocked.event, "an event node", "Include event nodes"]);
     }
     if (!off.length) {
-      return `<p class="hint">The relics below do drop, but nowhere you can get to
-        right now — every source is a quest or something the model cannot rank yet.</p>`;
+      return `<p class="nowhere">These relics drop, but nowhere you can reach —
+        every source is a quest or something the model cannot rank yet.</p>`;
     }
-    return `<p class="hint">Nowhere to send you, and not because nothing drops. ` +
-      off.map(([n, what, box]) =>
-        `<strong>${n}</strong> place${n === 1 ? "" : "s"} carr${n === 1 ? "ies" : "y"} ` +
-        `what you want and ${n === 1 ? "it is" : "each of them is"} ${what}, left out ` +
-        `by default — tick <strong>${esc(box)}</strong> on the left to rank ` +
-        `${n === 1 ? "it" : "them"}.`
-      ).join(" ") + `</p>`;
+    /* Short, and loud. It is the only thing on an otherwise empty heading, and
+       it is entirely actionable: one checkbox away from a full list. Dimming it
+       to match the rest of the page would hide the only thing worth reading. */
+    return off.map(([n, what, box]) =>
+      `<p class="nowhere"><b>${n} place${n === 1 ? "" : "s"}</b> ${
+        n === 1 ? "carries" : "carry"} what you want, ${
+        n === 1 ? "and it is" : "all"} ${what}.<br>` +
+      `Tick <b>${esc(box)}</b> on the left to rank ${n === 1 ? "it" : "them"}.</p>`
+    ).join("");
   }
 
   /* ── the effort boxes ─────────────────────────────────────────────

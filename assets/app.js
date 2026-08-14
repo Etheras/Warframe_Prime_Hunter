@@ -110,9 +110,20 @@
     ).toLowerCase();
   });
 
-  const CATEGORIES = DATA.categories.map((c) => c.name);
+  /* A seventh bucket, decided after seeing it mocked up. Six Primes have no
+     route left that is not Railjack, and sitting them in *Farmable* beside a
+     hundred star-chart ones was true and useless - only a badge told them
+     apart, and no filter could ask "what needs a ship?".
 
-  /* ── filter state ─────────────────────────────────────────── */
+     Only ever taken from `farmable`: Resurgence and Founder outrank it, which
+     the precedence in `statusOf` already decides. Computed here rather than in
+     model.js because it needs the relic table and the Railjack classifier, and
+     model.js deliberately knows about neither.
+
+     It is emphatically NOT the planner's *Include Railjack* checkbox. That one
+     asks whether to rank Railjack nodes at all; this one is a property of an
+     item. The filter's tooltip says so, because the two would otherwise read as
+     the same switch in two places. */
   /* The rotation model - what one run at a node is actually worth - lives in
      assets/rotation.js, so the collection view and the planner cannot disagree
      about it. Aliased here so the call sites read as they always did. */
@@ -124,10 +135,20 @@
   const isEventNode = ROT.isEventNode;
   const CYCLE_MINUTES = ROT.cycleMinutes;
 
+  ITEMS.forEach((it) => {
+    if (it._status === "farmable" && ROT.railjackOnly(it, RELICS)) {
+      it._status = "railjack";
+    }
+  });
+
+  const CATEGORIES = DATA.categories.map((c) => c.name);
+
+  /* ── filter state ─────────────────────────────────────────── */
+
   const rotSlot = (r) =>
     ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
   const state = {
-    avail: { farmable: true, resurgence: true, baro: true, special: true,
+    avail: { farmable: true, railjack: true, resurgence: true, baro: true, special: true,
              vaulted: true, founder: true },
     showCollected: true,
     showMissing: true,
@@ -213,7 +234,8 @@
       CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) ||
       a.name.localeCompare(b.name),
     status: (a, b) => {
-      const order = ["farmable", "resurgence", "baro", "special", "vaulted", "founder"];
+      const order = ["farmable", "railjack", "resurgence", "baro", "special",
+                     "vaulted", "founder"];
       return order.indexOf(a._status) - order.indexOf(b._status) || a.name.localeCompare(b.name);
     },
     release: (a, b) => String(b.releaseDate || "").localeCompare(String(a.releaseDate || "")) ||
@@ -968,9 +990,9 @@
     });
   });
 
-  const availIds = { "f-farmable": "farmable", "f-resurgence": "resurgence",
-    "f-baro": "baro", "f-special": "special", "f-vaulted": "vaulted",
-    "f-founder": "founder" };
+  const availIds = { "f-farmable": "farmable", "f-railjack": "railjack",
+    "f-resurgence": "resurgence", "f-baro": "baro", "f-special": "special",
+    "f-vaulted": "vaulted", "f-founder": "founder" };
   Object.keys(availIds).forEach((id) => {
     const el = $("#" + id);
     el.checked = state.avail[availIds[id]];
