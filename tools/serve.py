@@ -96,14 +96,38 @@ def lan_address() -> str | None:
 # throttled to once an hour so a page reload does not hammer DE, and a failure
 # upstream is silent rather than alarming.
 FRESHNESS_TTL = 3600
-_freshness: dict = {"checked": 0.0, "body": None}
+_freshness: dict = {"checked": 0.0, "stamp": 0.0, "body": None}
 _freshness_lock = threading.Lock()
 
 
+def state_stamp() -> float:
+    """
+    When the file this check compares against was last written.
+
+    The hour is there to spare Digital Extremes, not to make you wait: it is a
+    ceiling on how often we ask them, and nothing else. Refreshing the data
+    answers the same question far better than another HEAD request would, so an
+    answer from before the rebuild is not merely old, it is about a copy of the
+    site that no longer exists.
+
+    Without this the banner outlived the fix that cleared it - refresh-data
+    finishes, the data on disk is current, and the page keeps saying it is behind
+    for whatever was left of the hour. Reloading did not help, because the
+    server, not the browser, was the one holding the old answer.
+    """
+    try:
+        import sources
+        return os.path.getmtime(os.path.join(sources.CACHE_DIR, sources.STATE_FILE))
+    except Exception:                                     # noqa: BLE001
+        return 0.0                                        # no state yet: check
+
+
 def freshness() -> dict:
+    stamp = state_stamp()
     with _freshness_lock:
         age = time.time() - _freshness["checked"]
-        if _freshness["body"] is not None and age < FRESHNESS_TTL:
+        if (_freshness["body"] is not None and age < FRESHNESS_TTL
+                and _freshness["stamp"] == stamp):
             return _freshness["body"]
     try:
         import sources
@@ -118,6 +142,7 @@ def freshness() -> dict:
         body = {"ok": False, "stale": False, "error": str(exc)[:120]}
     with _freshness_lock:
         _freshness["checked"] = time.time()
+        _freshness["stamp"] = stamp
         _freshness["body"] = body
     return body
 

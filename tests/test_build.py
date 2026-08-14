@@ -1154,6 +1154,73 @@ def test_server_serves_only_the_site() -> None:
           "the two artwork onerror attributes are why this exists")
 
 
+def test_a_refresh_clears_the_stale_banner() -> None:
+    """
+    Refreshing the data must retire the banner that told you to refresh it.
+
+    It did not. The upstream check is throttled to an hour so a page reload does
+    not hammer Digital Extremes, and that cached answer outlived the rebuild it
+    was complaining about: refresh-data finished, the data on disk was current,
+    and the page went on saying it was behind for the rest of the hour. Reloading
+    could not help, because the stale answer was held by the server.
+
+    Two properties, because either alone would pass a broken fix: the stamp has
+    to track the file, and the cache has to act on the stamp.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import serve
+    import sources
+
+    # 1. The stamp is the state file's write time, measured here rather than
+    #    asked of the code under test. A stamp that always answered the same
+    #    thing would sail through part 2 untouched.
+    state = os.path.join(sources.CACHE_DIR, sources.STATE_FILE)
+    check_true("freshness: there is a state file to stamp", os.path.exists(state))
+    check("freshness: the stamp is when the state file was written",
+          serve.state_stamp(), os.path.getmtime(state))
+
+    real_cache = sources.CACHE_DIR
+    try:
+        sources.CACHE_DIR = os.path.join(ROOT, ".cache-that-is-not-there")
+        check("freshness: no state file means check, not trust",
+              serve.state_stamp(), 0.0,
+              "a first run must not be handed a cached answer it never made")
+    finally:
+        sources.CACHE_DIR = real_cache
+
+    # 2. The cache is keyed on that stamp. Both upstreams are stubbed, so this
+    #    asks only whether a check was made - and touches neither the network
+    #    nor the real cache.
+    calls = []
+    real_sig, real_state, real_stamp = (sources.upstream_signature,
+                                        sources.load_state, serve.state_stamp)
+    was = dict(serve._freshness)
+    stamps = [1000.0]
+    signature = {"drops": "a"}
+    stored = {"signature": {"drops": "b"}}          # behind: the banner is up
+    try:
+        sources.upstream_signature = lambda offline=False: (calls.append(1), signature)[1]
+        sources.load_state = lambda: stored
+        serve.state_stamp = lambda: stamps[0]
+        serve._freshness.update({"checked": 0.0, "stamp": 0.0, "body": None})
+
+        check("freshness: the first read checks upstream",
+              (serve.freshness()["stale"], len(calls)), (True, 1))
+        check("freshness: a reload within the hour does not ask again",
+              (serve.freshness()["stale"], len(calls)), (True, 1),
+              "the throttle exists to spare DE, and must still hold")
+
+        stored = {"signature": dict(signature)}     # refresh-data has just run
+        stamps[0] = 2000.0
+        check("freshness: a rebuild is re-checked at once, hour or no hour",
+              (serve.freshness()["stale"], len(calls)), (False, 2),
+              "the banner used to outlive the refresh that cleared it")
+    finally:
+        sources.upstream_signature, sources.load_state = real_sig, real_state
+        serve.state_stamp = real_stamp
+        serve._freshness.update(was)
+
+
 def find_node() -> str | None:
     """
     Node, if this machine has it.
@@ -1302,6 +1369,7 @@ def main() -> int:
                          test_the_guard_refuses_shell_writes_to_source,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
+                         test_a_refresh_clears_the_stale_banner,
                          test_bundle_is_self_contained]),
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),

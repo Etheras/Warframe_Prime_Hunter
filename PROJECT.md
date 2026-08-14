@@ -566,6 +566,13 @@ slow first load beats quietly serving data you have no reason to trust. Upstream
 unreachable is silent rather than alarming, and on `file://` or GitHub Pages no server
 runs, so the flag is simply absent and the build-age banner carries on alone.
 
+**The hour is a ceiling on asking DE, not on being right.** The cached answer is
+stamped with the write time of `.cache/state.json` — the file it compares against — and
+a rebuild changes that, so the next request re-checks whatever the clock says. Without
+that stamp the banner outlived the refresh that cleared it: `refresh-data` finished, the
+data on disk was current, and the page went on saying it was behind for the rest of the
+hour. Reloading did not help, because the server held the stale answer, not the browser.
+
 ## 6. Data sources
 
 Ordered by authority. Where two sources overlap, the more official one wins and the
