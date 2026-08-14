@@ -642,6 +642,10 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   font-weight:700;margin:26px 0 8px;
 }
 .plan-h:first-of-type{margin-top:6px}
+/* Each list ranks on its own quantity and says which in its heading, because
+   two lists side by side with one unexplained big number each is the confusion
+   the split was meant to end. */
+.plan-sub{text-transform:none;letter-spacing:0;font-weight:400;opacity:.8}
 
 /* add-to-list search */
 .search-wrap{position:relative}
@@ -816,7 +820,10 @@ abbr.rot-odd:hover{color:#c07a3c;text-decoration-color:#c07a3c}
 }
 .plan-main .relic-row{border-top:none;border-bottom:none;flex-wrap:nowrap;gap:9px;padding:6px 12px 4px}
 .plan-main .relic-name{min-width:74px;flex:0 0 auto}
-.plan-main .chances{margin-left:auto;flex:0 0 auto;cursor:help}
+.plan-main .chances{margin-left:auto;flex:0 0 auto;cursor:help;text-align:right}
+/* Openings is the ranked number here, so it is the big one and the per-opening
+   chance sits under it — the same rule the node rows follow (STYLE.md §5). */
+.chances-alt{display:block;font-size:10px;color:var(--txt-faint);white-space:nowrap}
 
 /* the wanted list is condensed; the full one is on hover */
 .relic-wants{

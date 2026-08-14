@@ -494,7 +494,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   const before = await order();
   assert.ok(before.length > 1, "need a ranking before there is anything to re-rank");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /%\s*\nper objective/,
+               /[\d.]+\s*\nrelics per objective/,
                "with nothing set, objective count is the default cost basis");
 
   // an endless mission made expensive per round has to fall behind a fast one
@@ -510,7 +510,8 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   await set("Capture", 2);
 
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /%\s*\nper minute/, "the rows say what they are now ranked on");
+               /[\d.]+\s*\nrelics per minute/,
+               "the rows say what they are now ranked on");
   assert.notDeepEqual(await order(), before,
                       "costing a long mission twelve minutes a round changed nothing");
   assert.ok(await page.locator("#planNodes .est").count() > 0,
@@ -539,11 +540,12 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   });
   const multi = basis.find((r) => /over \d+ (round|vault|cache|stage)s/.test(r.alt));
   assert.ok(multi, `no multi-objective row on screen to check: ${JSON.stringify(basis)}`);
-  const perRun = Number(multi.alt.match(/^([\d.]+)%/)[1]);
-  const shown = Number(multi.head.replace("%", ""));
+  // "0.83 per run over 4 rounds" against a headline of "0.21"
+  const perRun = Number(multi.alt.match(/^([\d.]+) per run/)[1]);
   const objectives = Number(multi.alt.match(/over (\d+)/)[1]);
-  assert.ok(Math.abs(shown - perRun / objectives) < 0.02,
-            `${multi.head} should be ${perRun}% over ${objectives} objectives`);
+  const shown = Number(multi.head);
+  assert.ok(Math.abs(shown - perRun / objectives) < 0.01,
+            `headline ${multi.head} should be ${perRun} over ${objectives} objectives`);
   assert.deepEqual(errors, []);
 });
 

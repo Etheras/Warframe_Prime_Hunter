@@ -31,7 +31,7 @@ move its reasoning into `PROJECT.md`.
 | 3 | **(b) default to per objective.** Still overridden by any effort minutes set. | ✅ done |
 | 10 | **(b) model it, and more besides.** Keep DE's refinement on pre-refined rewards; price the **Void Traces** they save; model the **endless-fissure bonus relic**; and reduce the value of a relic handed over at a *higher* refinement than the plan wants. | 🟡 **refinement done.** Traces are counted and shown, not scored — they need a player fact, like Mastery Rank. The fissure bonus is verified and deferred to decision 1, where it belongs: it is a reward for *cracking*, and no run mode here is long enough to reach it |
 | 2 | **(a), modelled properly**, and **the same treatment for every other "final boss"-shaped bounty**, not just Profit-Taker. | ✅ **done.** Profit-Taker's four phases are in, badged *Old Mate*, off the bounty clock. Swept every bounty, key, enemy and transient source for others: the only one is **Hemocyte**, which is already event-gated and now badged as an enemy rather than a place — see *Plague Star and Profit-Taker are the same shape* |
-| 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ⬜ |
+| 1 | **(a) split the two loops.** *Where to go* ranks on wanted relics per run; *How to crack them* on openings needed. The left column's headline becomes a **count**, not a percentage — accepted knowingly. | ✅ done |
 | 9 | **(a)(ii) a seventh availability bucket**, and **(b)(ii) auto-include Railjack when it is the only route.** Owner wants to review all of #9 — **mock it up first.** | ⬜ mockup |
 | 5 | **Cannot be answered on paper** — it is a visual change and needs seeing. **Mock it up.** | ⬜ mockup |
 
@@ -409,7 +409,31 @@ because Radiant trades commons for rares (25.33% → 16.67%). Elite Sanctuary
 Onslaught reads `pre-refined` in amber for exactly that reason on a list blocked
 on a common. The trace saving is shown and not scored — see the entry above.
 
-### Rank the two loops apart, and never merge them again — decision 1
+### Rank the two loops apart **[done 2026-08-14]** — decision 1
+
+Built, and documented in `PROJECT.md §7`. *Where to go* ranks on wanted relics
+per objective and leads with a count; *How to crack them* ranks on openings to
+finish and leads with that; each heading names its own quantity. The percentage
+stayed on the node row one line down, because the two genuinely disagree.
+
+Two things the live data showed once it was in, both worth keeping:
+
+- **Meso V15 pays 37% per opening and needs 5.9 openings**, while three relics at
+  20% per opening finish in 5.0 — the old hit-rate sort put V15 first and was
+  answering the wrong question.
+- **The node order changed more than expected.** Ranking on count promotes nodes
+  with many wanted relics at modest chances over nodes with a few good ones, so
+  Disruption and long Survivals rose. That is the intended behaviour and it is
+  also the thing to watch: if it ever feels wrong, the cause will be that you
+  wanted the *value* question, and that number is still on the row.
+
+**One piece is still owed to this entry**, carried over from decision 10: the
+endless-fissure depth bonus is a reward for *cracking*, and it currently only
+appears as a modifier on the collecting side. It should also be stated on the
+cracking side — *given you are opening these relics anyway, is it worth staying
+to rotation 5?* See *Void Traces are counted but not scored*.
+
+### The original entry, for the reasoning
 
 **Settled 2026-08-13.** Collecting relics and cracking relics are two different
 activities with two different bottlenecks, and a single score covering both

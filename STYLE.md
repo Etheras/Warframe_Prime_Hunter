@@ -138,6 +138,11 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   is arbitrary: two equally-scarce parts had one ringed purely because it came
   first in the list. Sorting has no such failure mode, needs no legend, and
   survives ties. Wanted parts sort rarest first, gold to bronze, left to right.
+- **A list that ranks on something says so in its heading.** *Where to go —
+  ranked on relics per objective*, *How to crack them — ranked on openings to
+  finish*. Two lists side by side, each with one large unexplained number, is
+  the confusion that splitting them was meant to end; the headings are what
+  stops the split from just moving it.
 - **The biggest number in a row is the one the row is sorted by.** Everything
   derived from it goes underneath it in the same corner, smaller and dimmer
   (`.spot-alt`). A mockup promoted an average relic count over the ranked

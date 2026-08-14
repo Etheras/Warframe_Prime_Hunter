@@ -456,6 +456,12 @@
         if (prev != null && prev >= (a.chance || 0)) return;
         byNode.set(key + "|" + slot, a.chance || 0);
         n.rot[slot] += ((a.chance || 0) / 100) * ayaValue;
+        /* Aya counts in the relic count too, at one relic each. It is not a
+           relic, but it is the only thing in the game that becomes exactly one
+           relic of your choosing - so for "how fast does the stack fill", which
+           is what the left-hand ranking now asks, it fills it. Only where it is
+           worth something, which is the same condition its value uses. */
+        n.cnt[slot] += (a.chance || 0) / 100;
         n.aya = Math.max(n.aya || 0, a.chance || 0);
       });
     }
@@ -476,15 +482,21 @@
          a fissure. Railjack has Void Storms instead of fissures, so it is out. */
       n.bonus = bonus && (r.rounds || 0) >= ROT.bonusRotations && !isRailjack(n)
         ? bonus : null;
+      // kept as the second number on the row: what a run is worth once the
+      // relics are opened, which is a different question from how many arrive
       n.score = (r.total + (n.bonus ? n.bonus.value : 0)) *
                 (n.halved ? 1 - ROT.cachePenalty : 1);
       n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
       n.planName = r.planName; n.bounty = r.bounty;
-      // the same run counted: how many wanted relics it drops on average, and
-      // how often it drops any at all
-      n.perRun = r.count || 0; n.anyRun = r.any || 0;
+      /* What this run actually hands over: wanted relics on average, and how
+         often it hands over any. Since the split this is the ranked quantity
+         rather than a footnote - see the block above `render`. The fissure
+         bonus is a relic like any other, so it counts here too, at the chance
+         a random one of the tier is wanted. */
+      n.perRun = (r.count || 0) + (n.bonus ? n.bonus.count : 0);
+      n.anyRun = r.any || 0;
 
       const o = ROT.objectivesOf(n);
       n.objectives = o.count; n.unit = o.unit;
@@ -500,7 +512,16 @@
          vault and a bounty stage all take somewhere around 2.5 to 6 minutes.
          Four times closer to the truth, and it asks the player for nothing. */
       n.cost = n.minutes || o.count;
-      n.rate = n.score / n.cost;
+      /* ── the split ──────────────────────────────────────────────────
+         Where to go ranks on **relics per objective** - how fast this node
+         fills the stack - and knows nothing about what a relic is worth once
+         opened. That is the other list's question, and answering both with one
+         number was why "runs to finish" could never be labelled honestly.
+
+         The cache penalty applies here rather than to `perRun`, which stays the
+         raw count DE's numbers imply. So the headline is an adjusted figure and
+         says so on the row; the fact underneath it is not adjusted. */
+      n.rate = (n.perRun / n.cost) * (n.halved ? 1 - ROT.cachePenalty : 1);
     });
 
     // Rate first, then a lower enemy level (faster clears). Rotation used to
@@ -698,11 +719,15 @@
      way round. Two numbers of equal weight in one corner give the reader no
      clue which of them put the rows in this order.
 
-     Both belong there, because they answer different questions. The percentage
-     weighs a relic by what opening it is worth, so it knows a rare you are
-     blocked on is not the same prize as a common; the count does not, and says
-     only how fast the stack fills. A node can hand over more relics and still
-     be worth less. */
+     Since the two loops were split, the ranked number is the **count**: wanted
+     relics per objective. This list answers "where do I go to fill the stack",
+     and nothing more - what a relic turns into once opened is the other list's
+     question. That is why the percentage moved down a line rather than away:
+     they disagree often enough to be worth both. Mithra is worth 63.85% a run
+     while dropping 0.83 wanted relics; Taranis drops 1.47 and is worth 51.25%.
+     More relics, less progress, because what Taranis hands you is the easy
+     part - and which of those you want depends on whether you are short of
+     relics or short of the right ones. */
   /* "4 rounds", "3 vaults", "one run" - how a run's cost reads when nobody has
      put a minute figure on it. */
   const objectivesText = (n) =>
@@ -712,17 +737,28 @@
 
   function scoreBlock(n) {
     const perMin = n.minutes != null;
+    const unit = perMin ? "minute" : "objective";
     const lines = [];
 
-    lines.push("Ranked on what one run here is worth towards your list,");
-    lines.push(perMin ? "per minute of it." : "per objective of it.");
+    lines.push("Ranked on how many relics you want this run hands over,");
+    lines.push("per " + unit + " of it. Nothing on this side knows what a relic");
+    lines.push("is worth once opened - that is the list on the right.");
     if (opts.squad) lines.push("Assumes a 4-squad cracking the same relic.");
     lines.push("");
 
-    lines.push("Whole run   " + pct(n.score) +
-               (perMin ? "   over " + n2(n.minutes) + " min"
-                       : n.cost === 1 ? "   (one objective)"
-                                      : "   over " + objectivesText(n)));
+    lines.push("Relics      " + n2(n.perRun) + " you want, per run on average");
+    lines.push("            " + pct(n.anyRun) + " of runs drop at least one");
+    if (n.halved) {
+      lines.push("");
+      lines.push("The ranked figure is halved - see the note on the row. The");
+      lines.push("count above is not: what a run drops is a fact.");
+    }
+    lines.push("");
+
+    lines.push("Whole run   " + pct(n.score) + "   towards your list" +
+               (perMin ? "\n            over " + n2(n.minutes) + " min"
+                       : n.cost === 1 ? "\n            (one objective)"
+                                      : "\n            over " + objectivesText(n)));
     if (perMin && n.objectives > 1) {
       lines.push("            " + objectivesText(n) + " at " +
                  n2(n.minutes / n.objectives) + " min each");
@@ -742,16 +778,11 @@
       lines.push("it. Put real minutes in under Effort to rank on those instead.");
     }
     lines.push("");
+    lines.push("Two different questions, and they disagree often. The count");
+    lines.push("says how fast the stack fills. The percentage weighs each relic");
+    lines.push("by what opening it is worth, so a rare you are blocked on beats");
+    lines.push("a common - a node can hand over more relics and be worth less.");
 
-    lines.push("Relics      " + n2(n.perRun) + " you want, per run on average");
-    lines.push("            " + pct(n.anyRun) + " of runs drop at least one");
-    lines.push("");
-    lines.push("The percentage weighs each relic by what opening it is worth,");
-    lines.push("so a rare you are blocked on outweighs a common. The count");
-    lines.push("does not - it says only how fast the stack fills.");
-
-    const counted = n2(n.perRun) + " relic" + (n2(n.perRun) === "1" ? "" : "s") +
-                    " · " + pct(n.anyRun) + " of runs";
     /* "over one run" after "per run" says the same thing twice, so a
        single-objective mission just states the per-run figure and stops. */
     const over = perMin
@@ -761,9 +792,9 @@
       : n.cost === 1 ? "" : " over " + esc(objectivesText(n));
 
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
-      <b>${pct(n.rate)}</b>${perMin ? "per minute" : "per objective"}
-      <span class="spot-alt">${pct(n.score)} per run${over}</span>
-      <span class="spot-alt">${counted}</span></div>`;
+      <b>${n2(n.rate)}</b>relics per ${unit}
+      <span class="spot-alt">${n2(n.perRun)} per run${over}</span>
+      <span class="spot-alt">${pct(n.score)} worth · ${pct(n.anyRun)} of runs</span></div>`;
   }
 
   function renderWishlist() {
@@ -894,7 +925,14 @@
       `<b>${ranked.length}</b> place${ranked.length === 1 ? "" : "s"} to run`;
 
     $("#planScoreNote").innerHTML =
-      `The percentage is what <b>one whole run</b> at that node is worth towards your ` +
+      `<b>These are two lists, not one.</b> <i>Where to go</i> ranks on how many ` +
+      `relics you want a run hands over; <i>How to crack them</i> ranks on how many ` +
+      `openings it takes to finish one. Collecting relics and cracking them are ` +
+      `different activities with different bottlenecks, and a single score covering ` +
+      `both answered neither — which is why "about N runs to finish" could never be ` +
+      `given an honest label. Neither list knows anything about the other's question.` +
+      `<br><br>` +
+      `The percentage under each node is what <b>one whole run</b> there is worth towards your ` +
       `list${opts.squad ? ", assuming a 4-squad cracking the same relic" : ""}` +
       (perMinute
         ? `, divided by the minutes you said it costs — so the ranking is per ` +
@@ -903,9 +941,9 @@
           `or a bounty stage. A run is whatever you decide to make it, so it is not ` +
           `a unit; an objective is, and it takes 2.5–6 minutes almost everywhere. ` +
           `Fill in <b>Effort</b> in the sidebar to rank on real minutes instead.`) +
-      ` Beneath it, the same run counted rather than valued: how many relics you want ` +
-      `it hands over on average, and how often it hands over any at all. The percentage ` +
-      `weighs a rare you are blocked on above a common; the count does not. ` +
+      ` It is shown because the two disagree often: a node can hand over more relics ` +
+      `and be worth less, when what it hands over is the easy part. The ranking follows ` +
+      `the count; the percentage is there so you can see when it dissents. ` +
       `Hover the rotations for the per-round rate. ` +
       `Rotation is priced in: the published chance assumes that rotation has come ` +
       `up, so it is not comparable across rotations on its own. ${RUN_BLURB[opts.runMode] || RUN_BLURB.reset} ` +
@@ -1010,8 +1048,24 @@
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
 
-    // per-relic refinement decision
-    const rp = Array.from(relicPlan.entries()).sort((a, b) => b[1].value - a[1].value);
+    /* ── the other half of the split ──────────────────────────────────
+       This list ranks on **openings needed** - how many times you have to crack
+       this relic before everything you want out of it has come - and knows
+       nothing about where it drops. That is the left-hand list's question.
+
+       It used to sort on hit rate, which answered neither: a relic you are one
+       common away from finishing sat above one holding a rare you are blocked
+       on, because the common is likelier. Openings put the blocked one first,
+       which is what "what should I crack this weekend" actually means.
+
+       Infinite openings sort last rather than first: a relic whose wanted
+       reward has no chance at any refinement is not urgent, it is impossible. */
+    const rp = Array.from(relicPlan.entries()).sort((a, b) => {
+      const ao = isFinite(a[1].openings) ? a[1].openings : Infinity;
+      const bo = isFinite(b[1].openings) ? b[1].openings : Infinity;
+      if (ao !== bo) return ao - bo;
+      return b[1].value - a[1].value;
+    });
     $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
       // background = the action (which refinement); chips = each part's rarity
       // Rarest first, so position carries "this is the hard one" — no marker
@@ -1036,7 +1090,20 @@
                     + p.openings.toFixed(1) : ""))}"
           >${esc(p.refinement)}</span>
         <span class="chances" data-tip="${esc(
-          "Chance one opening gives something you want: " + pct(p.value))}"><b>${pct(p.value)}</b></span>
+          "Openings to finish everything you want out of this relic," + "\n" +
+          "set by whichever wanted reward is scarcest - the one that" + "\n" +
+          "decides when you can stop cracking it." + "\n\n" +
+          (isFinite(p.openings)
+            ? "Expected openings   " + p.openings.toFixed(1) + "   <- ranked on this\n"
+            : "Nothing wanted here can drop at any refinement, so this\n" +
+              "never finishes. Sorted last rather than first.\n") +
+          "Per opening         " + pct(p.value) + " gives something wanted" + "\n\n" +
+          "Ranked on openings rather than on that percentage: a relic" + "\n" +
+          "you are one common away from finishing is likelier to pay" + "\n" +
+          "out and less worth your time than one holding a rare you" + "\n" +
+          "are blocked on.")}"><b>${
+          isFinite(p.openings) ? p.openings.toFixed(1) : "∞"
+        }</b><span class="chances-alt">${pct(p.value)} each</span></span>
       </div>
       <div class="relic-parts">${
         parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}</span>`).join("")

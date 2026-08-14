@@ -995,6 +995,51 @@ state or a warning.
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
 
+### Two lists, two questions, never one score
+
+**Split on 2026-08-14.** Collecting relics and cracking them are different
+activities with different bottlenecks, and a single number covering both answered
+neither — which is why *"about N runs to finish"* could never be given an honest
+label. The owner's own pattern makes it concrete: relics get stacked on weekdays
+when there is no time, and cracked in bulk at the weekend.
+
+| | Ranks on | Knows nothing about |
+|---|---|---|
+| **Where to go** | wanted relics per objective | what a relic turns into once opened |
+| **How to crack them** | openings to finish the relic | where the relic came from |
+
+Each heading says which quantity it ranks on, because two lists side by side with
+one unexplained big number each is the confusion the split was meant to end.
+
+**Where to go** now leads with a **count**, not a percentage. The percentage is
+still on the row, one line down, because the two disagree often enough to be
+worth both: Mithra is worth 63.85% a run while dropping 0.83 wanted relics;
+Taranis drops 1.47 and is worth 51.25%. More relics, less progress, because what
+Taranis hands you is the easy part. Which of those you want depends on whether
+you are short of relics or short of the right ones — and that is precisely the
+question one score could not answer.
+
+Two consequences worth knowing:
+
+- **Aya counts as one relic here.** It is not a relic, but it is the only thing
+  in the game that becomes exactly one relic of your choosing, so for "how fast
+  does the stack fill" it fills it. Forma does not: it is a reward *inside* a
+  relic, not a relic.
+- **The cache penalty moved to the ranked figure**, not to the count. `perRun`
+  stays the raw number DE's chances imply; the headline is adjusted and the row
+  says `halved`. A judgement may move the ranking, never the fact.
+
+**How to crack them** used to sort on hit rate, which answered neither question:
+a relic you are one common away from finishing sat above one holding a rare you
+are blocked on, because the common is likelier. Openings put the blocked one
+first. The live data makes the difference visible — Meso V15 pays out **37% per
+opening** and still needs **5.9 openings** to finish, while three relics at 20%
+per opening finish in 5.0, because what is left in V15 is scarcer than what is
+left in them.
+
+Infinite openings sort **last**, not first: a relic whose wanted reward cannot
+drop at any refinement is not urgent, it is impossible.
+
 ### The same run, counted as well as valued
 
 A node row carries two numbers about one run, and they answer different questions.
