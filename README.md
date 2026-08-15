@@ -10,7 +10,7 @@
 > Read it with that in mind. What follows is what the project actually does about
 > it, rather than a disclaimer that ends the sentence:
 >
-> - **Everything is checked by running it.** 233 automated tests, including
+> - **Everything is checked by running it.** 272 automated tests, including
 >   browser tests against the real pages, and the reasoning behind each design
 >   decision is written down in [`PROJECT.md`](PROJECT.md) rather than left in a
 >   chat log. Where a rule exists, the incident that caused it is recorded.
@@ -44,15 +44,22 @@ They share your progress, so ticking off a part in one updates the other.
 Everything runs on your own machine. Your collection never leaves it, and there's
 no account.
 
-> **One exception by default:** item artwork loads from `cdn.warframestat.us` as
-> you browse, rather than being stored locally, so that CDN sees your IP address
-> and which item images your browser asked for. No collection data, ticks or farm
-> list is ever sent anywhere. If your browser reports *"Cookie has been rejected as
-> third-party"* against files like `LavosPrime.png`, that is this — your browser
-> refusing the CDN a cookie, which is the outcome you want.
+> **One thing can reach the internet: the item artwork.** Whether it does depends
+> on how you built the data, and the setup step below gets this right on its own —
+> `refresh-data.cmd` / `.sh` pass `--with-images`, which pulls the pictures down
+> once, so the app then fetches nothing from anywhere.
 >
-> **You can turn that off** — see [Downloading the artwork](#downloading-the-artwork)
-> below. One extra flag and nothing is fetched from anywhere while you use the app.
+> Artwork loads from `cdn.warframestat.us` instead when you have no local copy: if
+> you ran `python tools/build_data.py` yourself without the flag, if you deleted
+> `assets/img/`, or if you are reading the published GitHub Pages copy or the
+> single-file build, neither of which can carry local image files. That CDN then
+> sees your IP address and which item images your browser asked for. If your
+> browser reports *"Cookie has been rejected as third-party"* against files like
+> `LavosPrime.png`, that is this — your browser refusing the CDN a cookie, which is
+> the outcome you want.
+>
+> **No collection data, ticks or farm list is ever sent anywhere, in any of those
+> cases.** See [Downloading the artwork](#downloading-the-artwork) below.
 
 ---
 
@@ -137,8 +144,10 @@ want fresher data — it updates everything, and cleans up anything it no longer
 
 ### Downloading the artwork
 
-By default, item pictures are fetched from a CDN as you scroll. To pull them down
-once and never touch the network again:
+**The setup step above already did this** — `refresh-data` passes `--with-images`,
+which is why the first run takes a couple of minutes. This section is for the case
+where you called the build script yourself instead, since on its own it leaves the
+pictures on the CDN. To pull them down once and never touch the network again:
 
 ```bash
 python tools/build_data.py --with-images
@@ -290,13 +299,29 @@ showing only the parts still missing — **click a part name
 there the moment it drops** and it's banked, the list shrinks, and the plan
 re-ranks. Parts needing two copies take two clicks.
 
-It ranks every node by what **one whole run** there is worth towards *anything*
-still on your list, then tells you what refinement to take each relic to.
+**It is two lists, not one**, and each says at the top what it ranks on.
+Collecting relics and cracking them are different jobs with different
+bottlenecks, and a single number covering both answered neither:
 
-Because it scores the whole run, a longer run can beat a faster one on volume
-alone — four rounds of a Disruption collect four rewards against a bounty's one.
-Hover the rotations on any row for the per-round rate if you want to compare speed
-rather than total.
+- **Where to go** ranks on **how many relics you want a run hands over**, per
+  objective. That is the big number on each row.
+- **How to crack them** ranks on **how many openings it takes to finish** a
+  relic, per part cleared — so a relic you are blocked on a rare for comes above
+  one you are a common away from, which is the right way round when you are
+  cracking a stack.
+
+Neither list knows anything about the other's question, which is the point.
+
+Under each node there is also a **percentage**: what one whole run there is worth
+towards your list once the relics are opened. It is one line down rather than
+gone, because the two genuinely disagree — a node can hand over more relics and be
+worth less, when what it hands over is the easy part. The ranking follows the
+count; the percentage is there so you can see when it dissents.
+
+Because the percentage scores the whole run, a longer run can beat a faster one on
+volume alone — four rounds of a Disruption collect four rewards against a bounty's
+one. Hover the rotations on any row for the per-round rate if you want to compare
+speed rather than total.
 
 **Rotation counts, and it counts for a lot.** The percentage the game publishes
 assumes that rotation has already come up, so it flatters the late ones. Rewards
@@ -312,6 +337,16 @@ all of them count towards that node:
 | **Reset as soon as it drops** | everything up to the last rotation you want something from | 2, 3 or 4, per node |
 | **Run straight through** | A×2 + B + C | 4 |
 | **AABCAA, then reset** | A×4 + B + C | 6 |
+| **Stay for the fissure bonus** | A×3 + B + C, **plus a free relic** | 5 |
+
+The last one is there for something outside the drop tables: staying five
+rotations in an endless **Void Fissure** earns you a free Exceptional relic of
+that fissure's tier. None of the other settings goes deep enough to collect one.
+It is valued as what it is — a *random* relic of the tier, so most of the time
+it is worth nothing to your list — and it is added to every endless node equally,
+which means it never reorders them against each other. What it changes is whether
+staying beats a short mission. Railjack is left out: its fissures are Void
+Storms, which have no rotations to stay for.
 
 On **Reset**, if you want a part from rotation A *and* one from rotation C, it costs
 the run at 4 rounds — because leaving after round 2 would never get you the C part,
@@ -337,6 +372,26 @@ add a relic just for Forma — you pick that up from the rolls that miss anyway.
 table permanently, but the node only exists on your star chart while that event
 is actually running — and the table never says which event it is. There's an
 *Include event nodes* checkbox if you know one is live.
+
+### How long a run costs you — *Effort*
+
+A run is not a unit of anything: how far you take an endless mission is your own
+choice, and the setting above changes it. So everything is costed **per
+objective** instead — a Defense round, a Spy vault, a bounty stage — which takes
+2.5 to 6 minutes almost everywhere and is a fact about the mission rather than a
+guess about your play. That is the default and it asks you for nothing.
+
+If you would rather rank on real time, open **Effort — optional** in the sidebar
+and put minutes against any mission type. One is enough; the whole list re-sorts,
+and the big number on each row changes from *per objective* to *per minute* to say
+so. Types you leave blank are costed at the average of the ones you filled in and
+are drawn in amber on the row, so a borrowed number never looks like one of yours.
+
+Why it is worth filling in: against one player's own timings, ranking per minute
+moved Capture and Exterminate nodes up over a hundred places and dropped Spy by a
+factor of ten. That is far too big to ignore and far too personal to ship a default
+for — a strong player trivialises a Capture while a Spy vault still costs its fixed
+hacking time.
 
 ### Aya
 
@@ -370,18 +425,39 @@ It is **information only**. Nothing in the planner reads it: no ranking, no scor
 no suggestion to sell anything. In particular it has nothing to do with how Aya is
 valued — Aya is measured by the relics it buys, never by ducats.
 
-### Advanced options
+### The rest of the sidebar
 
-At the bottom of the sidebar:
+Under **Assumptions**, besides *How far you run*:
 
-- **4-squad, same relic** — a full squad cracking the same relic sees four
-  rewards and keeps the best, so the odds shown become much better. Leave it off
-  for solo runs. It only changes the numbers displayed, nothing else.
-- **Materials** — a plain checklist of what you have versus what you need
-  (Forma, Orokin Cell, and anything else you add). Purely for your own reference;
-  it doesn't feed the farm advice. Normally you can only edit the *have* number,
-  since that's what changes as you play — press **edit** to rename rows, change
-  targets, or add and remove them.
+- **4-man premade** — a full squad cracking the same relic sees four rewards and
+  keeps the best, so every chance shown improves. Leave it off for solo or public
+  runs. It does one thing beyond the display: it unlocks Disruption's rotation A,
+  which is only reachable by a squad deliberately letting conduits fall to a
+  schedule.
+- **Count Aya drops** — on by default; see *Aya* above.
+- **Include event nodes** — off by default; see above.
+- **Include Railjack** — off by default. Five live relics drop nowhere else.
+
+And **Effort — optional**, covered above.
+
+The same *How far you run* and *4-man premade* controls appear on the collection
+page under **Advanced options**, and they are the same setting — change either and
+both pages follow. (One gap: the collection page's copy of *How far you run* has
+not been given the *Stay for the fissure bonus* option, so choosing that in the
+planner leaves the collection page's box blank. It is written up in
+[`TODO.md`](TODO.md).)
+
+### Materials
+
+On the **collection** page, under *Advanced options*: a plain checklist of what
+you have versus what you need — Forma, Orokin Cell, and anything else you add.
+Normally you can only edit the *have* number, since that is what changes as you
+play; press **edit** to rename rows, change targets, or add and remove them.
+
+Mostly it is for your own reference, with one exception: **the Forma row is the
+same number the planner's Forma field reads and writes**, so a Forma shortfall
+entered in either place raises the value of relics you were already going to run.
+Nothing else on the list touches the farm advice.
 
 ---
 
@@ -507,7 +583,8 @@ already includes the credential manager that handles the login.
 
 ### What actually gets uploaded
 
-Only **21 source files, about 259 KB**. Specifically:
+Only **40 source files, about 760 KB** — over half of that is the four documents.
+Specifically:
 
 - ✅ The code — `index.html`, `plan.html`, `assets/`, `tools/`, the helper scripts and the docs
 - ❌ **Not** Digital Extremes' game data (`data/prime-data.js` / `.json`)
@@ -540,8 +617,10 @@ git commit -m "Warframe Prime Hunter: Prime collection and relic farming tracker
 
 **3. Create an empty repo on the website:** <https://github.com/new>
 
-Name it `Warframe Prime Hunter`. **Don't** tick "Add a README", ".gitignore" or a licence — the
-repo must start empty or the first push will be rejected.
+Name it `warframe-prime-hunter` — GitHub replaces spaces with hyphens anyway, so
+choosing the hyphenated form yourself means the URL is the name you picked.
+**Don't** tick "Add a README", ".gitignore" or a licence — the repo must start
+empty or the first push will be rejected.
 
 **4. Connect and push** (replace `YOURUSERNAME`):
 
@@ -673,12 +752,13 @@ npm install
 npx playwright install chromium
 ```
 
-That adds eleven tests that open the collection and the planner in Chromium and
+That adds nineteen tests that open the collection and the planner in Chromium and
 check what a person would: the grid renders without console errors, ticking a
 part survives a reload, tooltips appear, the backup dialog carries your
 collection, filters and materials stick, the two pages agree about the farm
-list, a bounty row names its rotation, and the layout does not scroll sideways
-on a phone.
+list, a bounty row names its rotation, a node says when it is a fissure and
+stops saying so once it closes, and the layout does not scroll sideways on a
+phone.
 
 Without Playwright you get one line and everything else runs as normal:
 
@@ -711,7 +791,7 @@ run the site or refresh the data.
 | Tool | What it adds | Without it |
 |---|---|---|
 | **Node.js** | The tests covering the JavaScript — rotation model, bounty clock, storage keys, backup validation | Those tests skip; the Python suite still runs |
-| **Playwright** | Eleven tests that drive the real pages in Chromium | Those skip too, with a reason |
+| **Playwright** | Nineteen tests that drive the real pages in Chromium | Those skip too, with a reason |
 | **GitHub CLI** (`gh`) | Watching CI, reading failures, and managing the repo from the terminal | Use the Actions tab in a browser instead |
 
 ### Installing them

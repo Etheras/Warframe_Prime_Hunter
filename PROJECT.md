@@ -10,7 +10,7 @@ both. Judge a change by whether it serves that shared dataset well.
 > Warframe Prime Hunter, and it is only worth that if it matches the code. **Section 2 sets out
 > how to work on this project — read it before changing anything.**
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-15
 
 ---
 
@@ -43,7 +43,8 @@ both. Judge a change by whether it serves that shared dataset well.
 | Plan a farm across several Primes at once | Ranked node list, scored against everything queued |
 | Bank a part the moment it drops | Click it in the farm list; the plan re-ranks |
 | Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
-| Fold **Forma** into the ranking | Have/need field under Advanced options |
+| Fold **Forma** into the ranking | *Forma* have/want field in the planner sidebar, which reads and writes row one of the collection's materials list |
+| Say what a run costs you in real time | *Effort — optional* in the sidebar, minutes per objective per mission type (§7) |
 
 Everything you enter lives in the browser's `localStorage`, across six keys —
 named once, in `assets/shared.js`, because both pages read and write them:
@@ -136,9 +137,10 @@ Chromium through Playwright, which is the only way to cover `app.js` and
 `plan.js` without stubbing a browser badly. That one **is** an npm dependency,
 so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
 the same version, `node_modules/` is not, and the tests skip with a reason when
-it is missing. **174 checks without it, 185 with** — the browser layer is
+it is missing. **253 checks without it, 272 with** — the browser layer is
 deliberately the smaller half, because a test that needs a browser is a test
-that will eventually be skipped.
+that will eventually be skipped. Without Node at all it is 194: the Python suite
+on its own.
 
 The GitHub CLI is a third recommendation, and answers a different question
 from the tests: whether the *published* build agrees, on a clean Linux machine
@@ -250,6 +252,76 @@ Check both directions when you write one: mutate the classifier, confirm the tes
 goes red, revert. A test that cannot fail is worse than no test, because it is
 counted.
 
+### Renaming the project, if it happens again
+
+Renamed to `Warframe Prime Hunter` on 2026-08-14, from `VorFrame`. The deliverable
+was never the rename — the owner expects to change it again — but **making the next
+one cheap**, by taking the name out of everywhere it is load-bearing:
+
+| Was | Is now | Why |
+|---|---|---|
+| `vorframe.*` storage keys | `wfprimes.*` | keyed to **what the data is**, not what the app is called. The game will still be Warframe and these will still be Primes whatever we end up called |
+| `window.VORFRAME_DATA` | `window.WFPRIME_DATA` | same |
+| `VorFrameShared/Rotation/Model` | `WFPrimeShared/…` | same |
+| `data/vorframe-data.js` | `data/prime-data.js` | same |
+| `"vorframe": 3` in a backup | `"format": 3` | a file format carrying a brand needs rewriting every time the brand does |
+| `dist/vorframe.html` | `dist/warframe-prime-hunter.html` | **keeps the name on purpose** — it is what people download |
+| `User-Agent: VorFrame/1.0` | `WarframePrimeHunter/1.0` | ditto, out of politeness to the APIs |
+
+**The standing rule: do not add a fifth load-bearing use.** New storage keys,
+globals, filenames and URLs should not carry the product name. Prose can say it as
+often as it likes — prose is free to change.
+
+The 2026-08-14 rename took two passes because the first missed seven files. Steps 2
+and 4 are what it skipped:
+
+1. **Find every mention.** `git grep -il "warframe prime hunter\|WarframePrimeHunter\|warframe-prime-hunter"`
+   — 31 files today. Almost all prose, and prose is a find-and-replace. **Files you
+   never open are where a rename dies:** last time it was `tools/schedule.ps1`, whose
+   task name is not prose at all.
+2. **Change the six things that are not prose.** Everything else can be wrong for a
+   release and nobody is harmed; these cannot.
+
+   | Where | What | If you get it wrong |
+   |---|---|---|
+   | `tools/schedule.ps1` | `$TaskName`, and `$LegacyTaskName` set to the **outgoing** name | two tasks refresh the same folder, or `-Remove` stops finding the old one |
+   | `tools/bundle.py` | `OUT_FILE` | this is the file people download, and the workflow copies it by name |
+   | `.github/workflows/publish.yml` | that filename, and the `-A` user agent | the publish step fails, or publishes nothing under the old link |
+   | `.github/workflows/publish.yml` | the **cache key prefix** — leave the old one in `restore-keys` | a stored cache keeps the key it was written with, so renaming the prefix orphans every one. **This happened on 2026-08-14**: 31 caches unreachable from one line's change, CI cold every run afterwards, and green only until an upstream refused a datacenter IP with nothing cached to fall back on |
+   | `tools/sources.py` | `UA` | nothing breaks; it is a courtesy to the APIs and should stay honest |
+   | `package.json` | `name` | npm refuses some names — lowercase, no spaces |
+   | `LICENSE`, `NOTICE.md` | the copyright line and the disclaimer | legal text should name whatever the thing is called |
+
+3. **Leave the load-bearing names alone** — the `wfprimes.*` keys, the `WFPRIME_*`
+   globals, `data/prime-data.{js,json}`, `format: 3`, and the cron marker in
+   `tools/schedule.sh`. Renaming a storage key needs a copy-not-move migration;
+   `LEGACY_PREFIX` in `shared.js` is the pattern and has its own test.
+4. **Re-run the search from step 1.** It should return only files you meant to leave.
+5. **`python tests/test_build.py`.** The suite reads several of these by name — the
+   storage keys, the bundle filename, the two page titles — so a half-done rename
+   fails a test rather than surfacing months later.
+
+**Four things keep the old spelling deliberately, and a search for the old name
+finds all four looking like misses:** `LEGACY_PREFIX = "vorframe."` in `shared.js`
+(reads the pre-rename store), `vorframe-sources-` in the workflow's `restore-keys`
+(reaches caches saved under the old prefix), `$LegacyTaskName` in `schedule.ps1`,
+and the planted `vorframe.*` keys in `test_assets.mjs` — the fixture *is* the old
+world, so a migration test cannot use the new names.
+
+#### The repository name is a separate decision, and the answer so far is no
+
+Nothing in the code depends on the remote or the folder name, so renaming the
+GitHub repository buys nothing technical. If it is ever done, four things move:
+the GitHub setting, `git remote set-url origin …` in every clone, the `git clone`
+and `cd` lines in `README.md` plus the note explaining the mismatch, and the local
+folder, which nothing reads.
+
+**The one real cost is asymmetric.** GitHub redirects the old *repository* URL
+indefinitely, so clones keep working — but the **Pages URL is not redirected** and
+the old address 404s. For a site whose whole point is being open on a phone next to
+the game, the bookmark is the expensive part, not the clone. Rename when you are
+ready to re-bookmark.
+
 ### Verifying a change
 
 Run the tests before pushing anything that touches the pipeline:
@@ -349,6 +421,9 @@ changed on one platform and left alone on the other is not a visible mistake.
   expired, so they are exactly as fresh as this task. Hourly they are nearly always
   right; daily there are never any.
 
+The `.DESCRIPTION` block in `tools/schedule.ps1` still calls this the "fissure
+strip", which it stopped being on 2026-08-14 — see `TODO.md`.
+
 ### Why `--if-changed` is cheap
 
 It fetches a fingerprint before doing any real work:
@@ -373,16 +448,19 @@ payload, because the fissures in it have moved even when nothing else has.
 
 `.github/workflows/publish.yml` does the same job in CI on a daily cron, with no
 secrets (every source is public) and no `pip install` (stdlib only). It builds,
-asserts the result is sane — at least 250 items, 40 Warframes, 500 relics, and
-something farmable — then publishes to GitHub Pages.
+asserts the result is sane — at least 120 items, 40 Warframes, 500 relics, and
+something farmable — then publishes to GitHub Pages. The item floor is 120 rather
+than something nearer the real 167 because a wiki-less build is legitimately
+thinner; it is there to catch an empty parse, not to police the catalogue.
 
 It supersedes the Scheduled Task for everything except the fissures, which it cannot
-help with: a site rebuilt once a day always finds them expired, so the published copy
-shows no strip at all. That is the honest answer for a daily build, and it is why the
-local hourly task is still worth running if the planner is what you use.
+help with: a site rebuilt once a day always finds them expired, so no row on the
+published copy is ever marked. That is the honest answer for a daily build, and it is
+why the local hourly task is still worth running if the planner is what you use.
 
 **The dataset is never committed.** It is built in CI and handed to Pages as an
-artifact, so the repo stays source-only (21 files, ~259 KB) and DE's data is not
+artifact, so the repo stays source-only (40 files, ~760 KB, over half of it these
+four documents) and DE's data is not
 redistributed — each build pulls it fresh. The workflow holds `contents: read`, so
 it cannot modify the repository at all.
 
@@ -456,6 +534,7 @@ Warframe Prime Hunter/
 │   ├── official.py         ← parsers for DE's drop table + public export
 │   ├── bundle.py           ← inlines everything into dist/warframe-prime-hunter.html
 │   ├── serve.py            ← local server, picks a working port
+│   ├── guard_shell_writes.py ← the PreToolUse hook that refuses shell writes (§2)
 │   ├── schedule.ps1        ← installs/removes the hourly Scheduled Task
 │   └── schedule.sh         ← the same job in cron, for macOS and Linux
 ├── dist/                   ← GENERATED — single-file build, gitignored
@@ -495,7 +574,7 @@ self-closed, boolean attributes given values, named entities replaced by literal
 They are still **served as `text/html`**, deliberately. Serving as
 `application/xhtml+xml` would make any well-formedness error fatal at runtime: a
 blank page with an XML error rather than a page a browser quietly repaired. With
-19 `innerHTML` sites building markup from data, one bad fragment would take the
+23 `innerHTML` sites building markup from data, one bad fragment would take the
 whole app down in front of whoever was using it.
 
 Checking it in the suite catches the same class of mistake — the ambiguity a
@@ -512,8 +591,9 @@ whole directory it is pointed at, with browsable listings.
 
 For this folder that meant **`.git`**, pack files included, from which a private
 repository can be reconstructed; plus `.cache/`, `tools/` and `tests/`. So it
-serves an **allowlist** instead: six files and `assets/img/`, which is everything
-the two pages request and nothing else. An allowlist rather than a blocklist
+serves an **allowlist** instead: the nine files the two pages ask for — both pages,
+six assets, the dataset — plus flat files under `assets/img/`, and nothing else. An
+allowlist rather than a blocklist
 deliberately — a blocklist has to predict what is worth hiding, and `.git` was
 on nobody's list until someone checked.
 
@@ -596,6 +676,21 @@ that stamp the banner outlived the refresh that cleared it: `refresh-data` finis
 data on disk was current, and the page went on saying it was behind for the rest of the
 hour. Reloading did not help, because the server held the stale answer, not the browser.
 
+**The banner also knows who is reading it, and does not guess.** The same warning is
+seen by whoever runs the server and by anyone they gave the address to, and only the
+first can act on it — so only the first is told to double-click `refresh-data.cmd`.
+The server answers that question because it is the only party that can: it sees the
+peer address and stamps `owner` onto the `WFPRIME_UPSTREAM` payload it is already
+attaching, per request rather than in the cached freshness body, since it is the one
+part that differs between peers.
+
+It used to be inferred from `location.hostname`, which was wrong in both directions:
+browse **your own** server by its LAN address and you were treated as a guest, warned
+about something you could fix and not told how. That guess survives only as the
+fallback for when there is no server to ask, which is exactly the two cases it was
+ever right about — a `file://` copy, where you must have the folder to be reading it
+at all, and a published static host, whose readers cannot fix anything.
+
 ## 6. Data sources
 
 Ordered by authority. Where two sources overlap, the more official one wins and the
@@ -639,9 +734,11 @@ Every CI run starts cold, which is why the workflow persists `.cache/` with
 `actions/cache`. The first run must succeed on its own; after that, a blocked source
 downgrades from critical to a stale alert, exactly as it does locally.
 
-Verified across four states: warm-with-blocked-source (315 items + alert), cold
-(exits 1), cold with `--allow-degraded` (172 items + degraded flag), and healthy
-(315 items, clean).
+Verified across four states: warm-with-blocked-source (full catalogue + alert), cold
+(exits 1), cold with `--allow-degraded` (a wiki-less build, a good deal thinner, plus
+the degraded flag), and healthy (167 items, clean). The counts in that check were
+taken before the catalogue went relic-only (§9), so re-record them next time it is
+run rather than trusting the shape of the four outcomes to have kept the old numbers.
 
 ---
 
@@ -854,6 +951,30 @@ Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 
 | `reset` *(default)* | Reset as soon as it drops | everything up to the **last wanted rotation** | 2, 3 or 4 — **per node** |
 | `full` | Run straight through | A×2 + B + C | 4 |
 | `aabcaa` | AABCAA, then reset | A×4 + B + C | 6 |
+| `bonus` | Stay for the fissure bonus | A×3 + B + C | 5 |
+
+**`bonus` is the only mode that exists for a reward outside the drop table.** An
+endless Void Fissure hands over a free relic for depth — five rotations gives a
+random *Exceptional* of the fissure's tier, ten a Flawless, every fifth after
+fifteen a Radiant. The other three modes stop at four rotations or six, so the
+first bonus is either unreachable or a coincidence; this run is chosen for it.
+Five rotations then restart, because the second bonus is twice as far away for one
+refinement step better, which is a worse trade every time.
+
+It is priced as what it is — a **random** relic of the tier — so its worth is the
+mean over every live relic in the best tier, most of which the plan wants nothing
+from. On a two-Prime list that came to *Meso, 3 of 9 live relics wanted, 8.07% at
+Exceptional*. Because every endless node pays the same bonus it is a flat addition
+and cannot reorder endless nodes against each other; what it moves is **endless
+versus short**, which is the question the mode exists to answer. On that list
+Mithra went from third at 15.96% over four rotations to first at 16.57% over five.
+Railjack is excluded: its fissures are Void Storms, which are their own nodes with
+their own tables and no rotations to stay for.
+
+Two things about it are still wrong and are written up in `TODO.md`: the collection
+page's *How far you run* control does not offer this mode although it reads the same
+setting, and the row's `+relic if fissure` marker still says the app cannot tell
+which nodes are fissures, which stopped being true on 2026-08-14.
 
 `reset` stops at the **deepest rotation holding something you want**, not at the
 best-rate stopping point. Want a part from A and another from C? You run to C — 4
@@ -940,7 +1061,7 @@ assuming B would strand a wanted C.
 
 Implementation: `plansFor(mission, squad)` in `assets/rotation.js` looks the
 mission type up in `ROT_PATTERN` and falls back to AABC, so a mission type nobody has
-thought about degrades to the normal rule rather than to nothing. `assertRotationCoverage()`
+thought about degrades to the normal rule rather than to nothing. `assertCoverage()`
 logs, once per load, how many mission types are in the data and exactly which ones
 are riding on the AABC assumption — the mistake that started this was invisible
 precisely because nothing ever said what was being assumed. The run length still comes
@@ -1025,6 +1146,127 @@ state or a warning.
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
 
+### Some nodes hand you the relic already refined
+
+DE's drop table names a refinement on a relic reward when the relic arrives
+**pre-refined**. An ordinary row says `Lith Q3 Relic`; these say `Lith Q3 Relic
+(Radiant)`. There are **80 such rows, every one of them Radiant**, across 11 nodes
+and nowhere else: Elite Sanctuary Onslaught (28), the six Void Storms (44) and the
+four Profit-Taker phases (8). `official.py` keeps the refinement where DE names one,
+and the planner values those sources at the refinement they actually hand over.
+
+**It cuts both ways, which is why it is not simply a bonus.** `bestRefinement`
+picks one refinement per relic on the assumption that the choice is yours — you
+spend the 100 Void Traces on whatever clears your scarcest wanted reward fastest.
+A node that hands the relic over Radiant has taken that choice away, so the only
+honest value is the value *at the refinement you were given*:
+
+- wanted Radiant anyway → full value, and 100 traces you keep
+- wanted Intact, given Radiant → the common you were after has gone from 25.33% to
+  16.67%, so this copy is worth **less** to this plan than one off the star chart
+
+Elite Sanctuary Onslaught therefore reads `pre-refined` in `--odd` amber on a list
+blocked on a common, and plain `radiant` on one that wanted it. It also puts a crack
+in the "one refinement per relic" rule, which holds only while you cannot hold the
+same relic two ways — and you can, once one node gives you a Radiant copy and
+another an Intact one.
+
+**Void Traces are counted and never scored.** Refining costs 25 / 50 / 100 traces
+for Exceptional / Flawless / Radiant, less whatever has already been spent on that
+relic, so a node handing over a Radiant is worth up to 100 traces on top of the
+relic. That is real — traces come in at 6–30 a fissure run — and it stays off the
+score because **what 100 traces are worth depends on how many you have**, which is
+a fact about the player this app cannot see. Same call as Mastery Rank: a player
+fact we do not know annotates the row rather than moving the ranking. `TODO.md`
+holds the exchange rate that would settle it if a trace count were ever collected.
+
+### One deliberate thumb on the scale, and only one
+
+A Railjack `Caches` run is three hidden caches inside a boarded base, and it is the
+worst relics-per-run in the list. Nobody runs Railjack for them — you run a Skirmish
+and open what you pass. So they are **halved**: one named constant, `CACHE_PENALTY`
+in `rotation.js`, applied by the planner and nowhere else.
+
+This is a judgement, not a measurement, and it is the **only one of its kind in the
+model** — everything else is arithmetic on DE's published numbers. It is one
+constant in one place precisely so it can be argued with, and the row says `halved`
+in amber with the reasoning on hover, because a score moved by an opinion that does
+not admit to it is the thing this project keeps refusing to do.
+
+**The relic count on the same row is untouched.** What a run hands you is a fact;
+the penalty is only what we think it is worth going for, and a fact bent to suit an
+opinion would be a lie. A Veil Proxima cache reads `3.65% per run` beside `0.32
+relics · 28.93% of runs`, and the second pair is what DE's numbers say.
+
+All 38 live `Caches` nodes are Railjack today, so the mode alone would identify
+them; the Railjack test is kept anyway, because a `Caches` mode somewhere else
+would not have earned this.
+
+### Only recommend what can actually be run today
+
+A source belongs in the ranking only if it can be run **now**. Permanent content is
+always shown; content recurring often enough to plan around is modelled but shown
+only while it is live; anything we cannot deterministically tell is live is
+**omitted** — not greyed out, not caveated. The planner answers "where do I go
+next", and a node you cannot enter is not a worse answer than the right one, it is
+not an answer.
+
+The build tags every unreachable row with `access`, and both pages filter on it:
+
+| Tag | Means | Ever reachable? |
+|---|---|---|
+| `quest` | a one-time story mission — eight of them share one reward table | no, and no checkbox offers one |
+| `unmodelled` | content whose shape the model cannot yet express | no, same |
+| `event:X` | rides X's live window from the worldstate | yes, while X runs, or via *include event nodes* |
+
+**The case that exposed the rule was `Hemocyte`**, which ranked *first* in a mockup
+at 0.74 wanted relics a run, carrying 11 live relics. It is not a mission — it is an
+enemy, and it spawns only in the final stage of the Plague Star bounty, four to a
+run. So the top recommendation in the list was content nobody could reach. It is
+gated on Plague Star's window now, and carries an `Enemy` badge saying it is not a
+place and that it and the Plague Star row are one trip.
+
+Two things checked and *not* excluded, because the obvious guess was wrong both
+times: the four **Faceoff** tables are permanent Höllvania content, not event
+content, and get a `PvPvE` badge instead; and the eight quest missions were
+confidently identified as Steel Path Incursions by a search, which the wiki
+disproves — Incursions award Steel Essence and no relics at all.
+
+**Zero items are stranded by any of this.** No item's live relics are all
+unreachable, so `quest` and `unmodelled` never orphan anything. That is the design
+working: quest content is out of scope — this tracks farmable parts from relics, not
+every way a Prime has entered the game — and excluding it costs nobody a route.
+
+### Profit-Taker is four places, not one activity on a clock
+
+The heist looked unmodellable and is not. The wiki: *"The Heist must initially be
+accomplished in sequence for the first time before being able to freely replay each
+stage"* — so after one clear you pick any phase you like, which is exactly four
+things to choose between. DE's Phase 3 split costs nothing either: *First
+Completion* is a Gravimag at 100% and carries no relics, so for a relic planner it
+is not a source at all.
+
+| Node | Level | Rotation | Relics |
+|---|---|---|---|
+| `PROFIT-TAKER - PHASE 1` | 40–60 | none | Lith Q3 15%, Lith A12 12.5% |
+| `PROFIT-TAKER - PHASE 2` | 40–60 | none | Lith K12 15%, Meso Y2 12.5% |
+| `PROFIT-TAKER - PHASE 3` | 40–60 | none | Meso D8 15%, Neo C7 12.5% |
+| `PROFIT-TAKER - PHASE 4` | 50–60 | none | Neo A16 17.14%, Axi S20 14.29% |
+
+**No rotation on any of them** — one fixed table each, which is the flat `rot.none`
+case `runValue` already handles: one reward per run, scored like a Capture. The
+reason it looked hard is that DE files it under `Bounty`, and bounties are the one
+thing on a clock. It is not on the bounty board and not on the clock; it is reached
+from Eudico's back room. All eight rows arrive already Radiant.
+
+The gate is a **demand badge**, the same shape as `Railjack` and `PvPvE`: `Old
+Mate`, Solaris United Rank 5 plus one sequential clear. A standing requirement is a
+reason to annotate, not to hide — the same call already made for Railjack.
+
+Being filed under `Bounty` still costs it one thing: `objectivesOf` charges every
+bounty four stages, so a phase is costed at four objectives when it should be one.
+That is outstanding work, in `TODO.md`.
+
 ### Nodes that are the same bet are one row
 
 **Digital Extremes do not write a relic table per node.** They write one per
@@ -1054,13 +1296,20 @@ The count of what was folded is on the row (`+8 same`) with the full list on
 hover, and the summary keeps both numbers: *233 places to run · 114 genuinely
 different*. Nothing is hidden — a fold is not a filter.
 
-Both pages do it, through the same two functions, so they cannot disagree about
-what counts as a duplicate or which of a group to name.
+Both pages do it, through the same two functions — `ROT.signature` and
+`ROT.pickNode` — so they cannot disagree about what counts as a duplicate.
 
 A live fissure goes ahead of every other tie-break. The members of a group are the
 same bet by construction, so naming the one you can also crack a relic at cannot
 cost anything — and naming any other would be recommending the identical node minus
 a free relic.
+
+**They can currently disagree about which of a group to name**, and that is a
+defect rather than a decision. `pickNode` takes the fissure test as an argument and
+only the planner passes it, so with a fissure live at a non-default member the
+planner names that node and the collection view names the lowest-level one. Since
+the picked node *becomes* the row, its level, planet and demand badges differ too.
+Written up in `TODO.md`.
 
 ### The fissure marks the ranking; it is never a list of its own
 
@@ -1191,6 +1440,30 @@ reason `flags.farmable` is computed rather than parsed. That it agrees exactly
 with `permanent && vaulted` on today's data is corroboration, not the definition.
 
 Five relics carry all six: **Lith C7, Meso N11, Neo V9, Axi S8, Axi V10**.
+
+**Railjack is the only activity that locks anyone in**, and that was checked rather
+than assumed. A sweep across every gated activity in the data — for each item, which
+activities do its still-live, still-reachable relics belong to — found exactly one
+with items locked to it alone:
+
+| Activity | live relics it touches | items locked to it |
+|---|---|---|
+| **Railjack** (Proxima + 28 named nodes) | 34 | **6** |
+| Railjack (Void Storms) | 29 | 0 |
+| Sanctuary Onslaught | 29 | 0 |
+| Bounties (landscape) | 26 | 0 |
+| Faceoff (PvPvE) | 22 | 0 |
+| Isolation Vault · Zariman · Höllvania · Ascension | 15 each | 0 |
+| Enemy drops | 11 | 0 |
+| The Perita Rebellion | 8 | 0 |
+| Duviri | 7 | 0 |
+
+Every other gated activity is one route among several for everything it carries, so
+a badge on the node row says all there is to say. Railjack is the single case where
+the gate is the whole answer, which is why it — and only it — earns an item-level
+badge. If a second activity ever locks someone in, the honest move is to promote
+`railjackOnly` to a general `onlyFrom(activity)` rather than add a second special
+case beside it.
 
 ### Neither the Steel Path nor Mastery Rank is an option — for different reasons
 
@@ -1330,7 +1603,10 @@ so they exist only because wiki editors maintain them — which means they can b
 stale or simply wrong, and two currently are (see TODO). Categories stay here
 deliberately: the wiki agrees with the item API on 250 of 277 items and every
 disagreement favours the wiki, which keeps Exalted, Extractor and Robotic Weapon
-apart where the API flattens them into "Misc" and "Primary".
+apart where the API flattens them into "Misc" and "Primary". Those three
+categories no longer reach the app — they hold nothing any relic drops, so they are
+cut from the catalogue (§9) — but the wiki's precision is still what makes the cut
+possible: you cannot drop a category the source has already blurred into another.
 
 Wiki quirks handled in the parser: non-breaking spaces inside `{{WF}}` output,
 `== Prime Related==` carrying a leading space, and `====` sub-headers that must
@@ -1422,37 +1698,54 @@ These cost real debugging time — worth remembering.
    or without the `?hash` query. Artwork comes from `cdn.warframestat.us/img/<imageName>`
    using the exact casing the items API reports (`AshPrime.png`, not `ash-prime.png`).
 8. **Only ~35 relics drop at any one time.** That looks broken but is correct — the
-   rest are vaulted. It's why only ~36 of 315 Primes are farmable right now.
-9. **This machine has no Node/npm.** Hence a Python-stdlib pipeline and a
-   dependency-free front end. If Node ever gets installed, none of this needs to change.
+   rest are vaulted. It's why only 36 of 167 Primes are farmable right now.
+9. **The pipeline is Python stdlib and the front end has no dependencies**, and that
+   predates Node being available here. Node arrived on 2026-08-12 and changed nothing
+   about either — it runs tests and only tests (§2). Written down because the original
+   constraint was "this machine has no Node", and the *reason* to keep the site
+   dependency-free is not that one, which has expired; it is that the thing has to
+   survive being copied to a USB stick.
 
 ---
 
 ## 9. Current snapshot
 
-As of the last data build (official drop table, 2026-06-25 revision):
+As of the build of 2026-08-15:
 
-- **315 Primes** — 51 Warframes, 34 Primary, 31 Secondary, 41 Melee, 13 Exalted,
-  7 Companion, 6 Robotic Weapon, 2 Archgun, 2 Extractor, 1 Archwing, 126 Cosmetic, 1 Emote
+- **167 Primes** — 51 Warframe, 41 Melee, 34 Primary, 31 Secondary, 7 Companion,
+  2 Archgun, 1 Archwing
 - **763 relics** tracked, **34** currently dropping
-- **36 Primes farmable now**, **5** in Prime Resurgence
+- **36 Primes farmable now**, **5** in Prime Resurgence, 135 vaulted
 - **0 Primes** in DE's export missing from the wiki — the wiki page is currently complete
 - Resurgence rotation runs **2026-08-06 → 2026-09-03** (Baruuk, Revenant, Phantasma,
   Afuris, Tatsu)
-- Bounties were on rotation **A** (standard) and **C** (Isolation Vaults) at the last
-  build, unanimously across 16 and 6 bounties, until 2026-08-12T00:25Z; neither the
-  Ghoul Purge nor Plague Star was running
+- 31 mission types carry a relic; a two-Prime list ranks 27 of them
+
+**The catalogue is relic-only, and that is why it is 167 and not 315.** Five
+categories hold no item any relic can ever drop — verified by exact match against
+every relic reward, 0 of 148 — so `NON_RELIC_CATEGORIES` in `catalogue.py` cuts them
+rather than showing them as permanently "vaulted", which was true and useless:
+
+| Dropped | Because |
+|---|---|
+| Cosmetic, Extractor, Emote | Prime Access / Accessories only |
+| Exalted | intrinsic to the frame that wields it |
+| Robotic Weapon | comes with its Prime sentinel |
+
+Excalibur Prime has no relic parts either and **stays**, because it is a Warframe
+that is Founder-only rather than a different kind of thing, and reads as
+unobtainable. That is the rule: cut a category, never an item.
 
 Switching to the official drop table also picked up sources the mirror lacked:
-enemy drops (e.g. Hemocyte drops several relics) and `Event:` star chart nodes.
+enemy drops (Hemocyte, the only relic-dropping enemy in the table) and `Event:` star
+chart nodes.
 
 Known limits:
 
-- Cosmetics and Emotes have no relic data — they come from Prime Access or accessory
-  bundles, and the drawer says so rather than inventing a farm route.
 - Excalibur, Lato and Skana Prime are Founder-exclusive and have no relics by design.
-- Relic *sources* are deduped and sorted by drop chance, but never capped — an
-  earlier 40-row cap silently hid whole rotations and was removed (`TODO.md`).
+- Relic *sources* are deduped and sorted by drop chance, but never capped. An
+  earlier 40-row cap silently hid whole rotations — it looked like tidying and was
+  losing farms — and was removed.
 - Parts reconstructed from the drop table use DE's raw part names
   (`"Chassis Blueprint"` rather than the API's `"Chassis"`). Cosmetic only.
 

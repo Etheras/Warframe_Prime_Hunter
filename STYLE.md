@@ -23,14 +23,23 @@ Rarity uses the game's own bronze/silver/gold language, so it reads without a
 legend. Never tint a background by rarity *and* put rarity chips on it — that
 was the first attempt and the chips vanished into the gradient.
 
-The third channel is `.demand`, currently `Railjack` and `PvPvE`. It states a
-**requirement, not a verdict**: both are perfectly good farms and neither is
+The third channel is `.demand`: `Railjack`, `PvPvE`, `Old Mate` (Solaris United
+Rank 5, for the Profit-Taker phases), `Steel Path`, and `Enemy`. It states a
+**requirement, not a verdict**: all of them are perfectly good farms and none is
 penalised in the ranking, so it must never borrow the amber or red that mean
 "something here is wrong". A node called "Arva Vector" gives no hint that it needs
 a ship and a crew, and one called "Vehrvod District" none that you will be matched
 against another squad — finding that out inside the mission is the wrong moment.
 Every badge carries a tooltip naming the demand; without one it is just a word in
 a box.
+
+**`Enemy` is the odd one and is worth watching.** It rides the same channel while
+saying something different in kind — not *what this place asks of you* but *this
+is not a place*: the Hemocyte spawns where it spawns, and the relics come off its
+body. It is one badge on one row (the only relic-dropping enemy DE publishes), so
+it does not yet justify a fourth channel. If a second disclaimer-shaped badge ever
+appears, that is the moment to split them, because a channel that carries two
+meanings is exactly what this section exists to prevent.
 
 The **same blue** carries the same requirement at item scale: a card whose every
 farmable relic drops on Railjack says `RAILJACK ONLY`, in place of the `P · NEVER
@@ -146,8 +155,8 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   first in the list. Sorting has no such failure mode, needs no legend, and
   survives ties. Wanted parts sort rarest first, gold to bronze, left to right.
 - **A list that ranks on something says so in its heading.** *Where to go —
-  ranked on relics per objective*, *How to crack them — ranked on openings to
-  finish*. Two lists side by side, each with one large unexplained number, is
+  ranked on relics per objective*, *How to crack them — ranked on openings per
+  part cleared*. Two lists side by side, each with one large unexplained number, is
   the confusion that splitting them was meant to end; the headings are what
   stops the split from just moving it.
 - **The biggest number in a row is the one the row is sorted by.** Everything

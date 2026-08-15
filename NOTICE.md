@@ -119,8 +119,11 @@ reproduced verbatim in a derivative work must remain under CC BY-SA.
   fallback when warframe.com is unreachable.
 - **[warframe-status](https://github.com/WFCD/warframe-status)** —
   Apache-2.0 licensed. Powers `api.warframestat.us`, used for item metadata,
-  component lists, artwork filenames, and the live Prime Resurgence rotation
-  from the game worldstate.
+  component lists, artwork filenames, and four reads of the game worldstate that
+  Digital Extremes publish no working endpoint for: the live Prime Resurgence
+  rotation (`/pc/vaultTrader`), which bounties are on offer and therefore which
+  rotation letter is live (`/pc/syndicateMissions`), which limited-time events are
+  running (`/pc/events`), and the Void Fissures open right now (`/pc/fissures`).
 - **`cdn.warframestat.us`** — serves the item artwork shown on the cards. The
   images themselves remain Digital Extremes' property.
 
