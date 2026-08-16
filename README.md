@@ -104,21 +104,26 @@ whichever works, and substitute it throughout.
 Clone the repository:
 
 ```bash
-git clone https://github.com/Etheras/VorFrame.git
+git clone https://github.com/Etheras/Warframe_Prime_Hunter.git
 ```
 
 Then move into it:
 
 ```bash
-cd VorFrame
+cd Warframe_Prime_Hunter
 ```
 
 No release download is published — the repository *is* the app.
 
-> **The repository is still called `VorFrame`.** The app was renamed to Warframe
-> Prime Hunter on 2026-08-14; the git remote was deliberately left alone, because
-> renaming it breaks every existing clone, bookmark and link for a cosmetic gain.
-> Nothing in the code depends on the folder's name.
+> **Cloned it before 2026-08-15, when it was called `VorFrame`?** Your clone still
+> works — GitHub redirects the old address indefinitely — but point it at the real
+> one so `git remote -v` stops telling you something untrue:
+>
+> ```bash
+> git remote set-url origin https://github.com/Etheras/Warframe_Prime_Hunter.git
+> ```
+>
+> The name of the folder on your disk does not matter; nothing reads it.
 
 ---
 
@@ -574,6 +579,20 @@ Because it's a plain static site, it can live on **GitHub Pages** for free — w
 means you can check your collection from your phone while you're in a mission.
 See *Publishing to GitHub* below.
 
+This repository is public and carries the workflow that does it, so it publishes to
+<https://etheras.github.io/Warframe_Prime_Hunter/> and rebuilds itself daily. Your
+collection does not travel with it: ticks live in whichever browser you are using,
+so the phone and the desktop keep separate tallies unless you move a **Backup**
+between them.
+
+> **The Pages source has to be *GitHub Actions*, not *Deploy from a branch*.** This
+> is the one setting that looks optional and is not. The dataset is deliberately
+> never committed (see below), so a branch build serves the repo exactly as it
+> stands — `index.html` loads, `data/prime-data.js` 404s, and every visitor gets
+> *"No data yet. Double-click refresh-data.cmd"*, which is useless advice to give
+> someone reading your site on their phone. Only the workflow has a dataset to
+> publish, because it builds one. Set it under **Settings → Pages → Source**.
+
 ---
 
 ## Publishing to GitHub
@@ -617,10 +636,10 @@ git commit -m "Warframe Prime Hunter: Prime collection and relic farming tracker
 
 **3. Create an empty repo on the website:** <https://github.com/new>
 
-Name it `warframe-prime-hunter` — GitHub replaces spaces with hyphens anyway, so
-choosing the hyphenated form yourself means the URL is the name you picked.
-**Don't** tick "Add a README", ".gitignore" or a licence — the repo must start
-empty or the first push will be rejected.
+Name it whatever you like — `warframe-prime-hunter`, say. Pick a form with no
+spaces in it: GitHub substitutes them, and the name you get is then not quite the
+name you typed. **Don't** tick "Add a README", ".gitignore" or a licence — the repo
+must start empty or the first push will be rejected.
 
 **4. Connect and push** (replace `YOURUSERNAME`):
 
@@ -829,7 +848,8 @@ npx playwright install chromium
 
 ### Using the GitHub CLI
 
-One-time sign-in, which is what lets it see a private repo:
+One-time sign-in. `gh` acts as you, so it needs this even for a public repo —
+reading your own workflow runs is not an anonymous operation:
 
 ```bash
 gh auth login

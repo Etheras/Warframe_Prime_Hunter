@@ -308,19 +308,32 @@ finds all four looking like misses:** `LEGACY_PREFIX = "vorframe."` in `shared.j
 and the planted `vorframe.*` keys in `test_assets.mjs` — the fixture *is* the old
 world, so a migration test cannot use the new names.
 
-#### The repository name is a separate decision, and the answer so far is no
+#### The repository was renamed too, on 2026-08-15
 
-Nothing in the code depends on the remote or the folder name, so renaming the
-GitHub repository buys nothing technical. If it is ever done, four things move:
-the GitHub setting, `git remote set-url origin …` in every clone, the `git clone`
-and `cd` lines in `README.md` plus the note explaining the mismatch, and the local
-folder, which nothing reads.
+`VorFrame` → **`Warframe_Prime_Hunter`**, and made public at the same time. Four
+things moved, and only four: the GitHub setting, `git remote set-url origin …` in
+this clone, the `git clone` and `cd` lines in `README.md`, and the note that used
+to explain why the repo and the app had different names — which goes when the
+mismatch does. The local folder is still called `VorFrame` and that is fine;
+nothing reads it.
 
-**The one real cost is asymmetric.** GitHub redirects the old *repository* URL
-indefinitely, so clones keep working — but the **Pages URL is not redirected** and
-the old address 404s. For a site whose whole point is being open on a phone next to
-the game, the bookmark is the expensive part, not the clone. Rename when you are
-ready to re-bookmark.
+**Nothing in the code moved, and that is the point of the section above.** A
+repository rename touches no storage key, no global, no filename and no cache
+prefix, because none of them carries the product name any more.
+
+**The cost that was warned about here did not land, for a reason worth keeping.**
+GitHub redirects the old *repository* URL indefinitely, so clones keep working —
+but the **Pages URL is not redirected**, and for a site whose whole point is being
+open on a phone next to the game, a broken bookmark is the expensive part. It cost
+nothing this time only because the repo had been private, so the `deploy` job's
+`github.event.repository.private == false` guard had never once let a Pages build
+through. There was no published address to break. **Rename before you publish, or
+not at all** — from now on `https://etheras.github.io/Warframe_Prime_Hunter/` is a
+bookmark somebody has, and the next rename really does cost what this one was
+supposed to.
+
+Going public has one other consequence: that same guard now passes, so every push
+to `main` and every daily cron actually publishes rather than building and stopping.
 
 ### Verifying a change
 
@@ -466,6 +479,15 @@ it cannot modify the repository at all.
 
 That is also why `data/prime-data.js` is gitignored: a clone has no data until
 `build_data.py` runs, which the README makes the first step.
+
+**It is also why the Pages source must be *GitHub Actions* and not *Deploy from a
+branch*.** The two settings look interchangeable and are not: a branch build serves
+the repository as committed, and the dataset is deliberately not in it, so the
+published page loads and then announces *"No data yet. Double-click
+refresh-data.cmd"* — advice that means nothing to a stranger on a phone. Only the
+workflow has a dataset to hand over, because it is the thing that builds one.
+Observed on 2026-08-16, when Pages was first enabled on the branch default and
+published exactly that.
 
 ### Packaging
 
