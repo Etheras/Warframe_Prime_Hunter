@@ -1888,6 +1888,48 @@ build falls back to the other source.
 which is why the UI leans on it and why the vault/Baro/special/Founder markers
 are treated as annotation rather than truth.
 
+### One store, because two copies drifted twice
+
+**Moved into `shared.js` on 2026-08-24.** The maths was already shared — that is
+what `model.js` and `rotation.js` are for — but the *state* was not. Both pages
+kept their own `collected`, `parts` and `wishlist`, loaded them separately, wrote
+them separately, and were kept in step by hand. They drifted, and neither drift
+was noticed by anyone looking at one page:
+
+- **Only the planner listened for `storage`.** Tick a part there with the
+  collection view open beside it and the collection view showed the old count
+  until it was reloaded. The other direction updated instantly. Nothing recorded
+  that as a decision; it was the half nobody wrote.
+- **The same click meant two things.** A part counter on the collection page
+  cycles `0 → 1 → … → need → 0`; on the planner it incremented and clamped.
+
+`S.state` owns the three slices and every mutation that touches them —
+`cyclePart`, `setAllParts`, `setCollected`, `syncCollected`, the wishlist. Pages
+read through it and never write those keys. The rules moved with the data: what a
+part click means, and that owning every part is not a claim to have built the
+thing, are now each defined once.
+
+**`subscribe` reports whether a change was external, and that distinction is the
+design.** A page that changed something itself already knows what to repaint — one
+counter, one card — and rebuilding everything would throw away the focus and the
+scroll position the drawer works hard to keep. A change arriving from another tab
+has no such context, so the honest response is to redraw. One path, enough
+information to react correctly to both.
+
+**What did not move, and why.** The two import paths stay different on purpose:
+`app.js` merges in place and re-derives per part, `plan.js` writes the keys and
+reloads, which keeps the careful merging as a single implementation rather than
+copying it. The export did move — both pages assembled the same six keys
+independently, which is one place too many for a file format. And `materials`
+stays with the collection view, which is the only page that has it.
+
+**One thing this does not fix.** The planner's wishlist panel lists only the parts
+you are *missing*, so a part completes and its button leaves the list — the cycle
+has nowhere to wrap. Correcting a mis-click there still means opening the item on
+the collection page. That is a property of a worklist rather than of the click, and
+showing owned parts in a list of what is left is a change worth deciding on its own
+merits rather than as a side effect of this.
+
 ### A part can be a whole Prime, and four of them are
 
 **Fixed 2026-08-24, and it was two bugs sharing a cause.** Four akimbo Primes are

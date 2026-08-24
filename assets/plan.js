@@ -99,15 +99,15 @@
     } catch (e) { /* non-fatal */ }
   }
 
-  /* ── state, shared with the collection page where it makes sense ── */
-  let partsOwned = load(KEY_PARTS, {});
-  let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
-  /* Read here as well as written, since 2026-08-24. Banking the last part no
-     longer collects the Prime by itself — having every part is not having the
-     thing, and the planner has no business deciding you built it — so this page
-     has to know which of a finished list you have actually claimed. */
-  let collected = new Set(load(S.KEYS.collected, []));
-  const saveCollected = () => save(S.KEYS.collected, Array.from(collected));
+  /* ── what you own, which is not this page's to keep ──────────────
+     The collection, the parts and the farm list live in `shared.js`. They used
+     to live here as well, and the two copies drifted — see the comment above
+     `makeState`. Everything below reads through `ST`; nothing here writes
+     localStorage for them. */
+  const ST = S.state;
+  // an entry for a Prime the catalogue no longer has is dropped once, here,
+  // rather than filtered on every read by whichever page remembered to
+  ST.pruneWishlist((id) => BY_ID.has(id));
   const opts = Object.assign(
     { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
       minutes: {}, sort: "rate" },
@@ -139,7 +139,7 @@
   const sortBy = () => SORTS[opts.sort] || SORTS.rate;
 
   const needOf = (p) => p.itemCount || 1;
-  const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
+  const haveOf = (id, name) => ST.owns(id, name);
 
   /* ── effort, supplied by the player and empty by default ──────────
      Minutes for one *objective* of each mission type. Nothing is filled in to
@@ -192,7 +192,7 @@
     const want = new Map();   // relic -> [{label, chances, qty, stillNeed}]
     const needs = [];         // for the "still needed" list
 
-    wishlist.forEach((id) => {
+    ST.wishlist.forEach((id) => {
       const it = BY_ID.get(id);
       if (!it) return;
       it.parts.forEach((p) => {
@@ -853,11 +853,11 @@
 
   function renderWishlist() {
     const el = $("#wishlist");
-    if (!wishlist.length) {
+    if (!ST.wishlist.length) {
       el.innerHTML = `<p class="hint">Empty. Search above to add something.</p>`;
       return;
     }
-    el.innerHTML = wishlist.map((id) => {
+    el.innerHTML = ST.wishlist.map((id) => {
       const it = BY_ID.get(id);
       const total = it.parts.length;
       const done = it.parts.filter((p) => haveOf(id, p.name) >= needOf(p)).length;
@@ -865,7 +865,7 @@
       /* Green edge for "you have it", not for "you have the parts" — that is
          the whole distinction the button below exists to draw, so the styling
          has to wait for the same answer the button does. */
-      return `<div class="wish${collected.has(id) ? " wish-done" : ""}">
+      return `<div class="wish${ST.has(id) ? " wish-done" : ""}">
         <div class="wish-head">
           <span class="wish-name">${esc(it.name)}</span>
           <span class="wish-prog">${done}/${total}</span>
@@ -873,7 +873,7 @@
         </div>
         <div class="wish-parts">${
           done === total
-            ? (collected.has(id)
+            ? (ST.has(id)
                 ? `<button class="wish-collect on" data-collect="${esc(id)}"
                      data-tip="${esc("Built and claimed.\nClick to take that back — " +
                        "the parts you banked stay where they are.")
@@ -1304,7 +1304,7 @@
     const q = searchBox.value.trim().toLowerCase();
     if (!q) { results.hidden = true; return; }
     const hits = ITEMS.filter((i) =>
-      i.parts.length && !wishlist.includes(i.id) && i.name.toLowerCase().includes(q)
+      i.parts.length && !ST.wants(i.id) && i.name.toLowerCase().includes(q)
     ).slice(0, 8);
     results.innerHTML = hits.length
       ? hits.map((i) => `<button class="add-hit" data-add="${esc(i.id)}">
@@ -1318,8 +1318,7 @@
   document.addEventListener("click", (e) => {
     const add = e.target.closest("[data-add]");
     if (add) {
-      wishlist.push(add.dataset.add);
-      save(KEY_WISH, wishlist);
+      ST.addWish(add.dataset.add);
       searchBox.value = ""; results.hidden = true;
       render();
       return;
@@ -1330,10 +1329,12 @@
       const it = BY_ID.get(id);
       const p = it && it.parts.find((x) => x.name === name);
       if (p) {
-        // bank one copy; parts needing two take two clicks
-        const next = Math.min(needOf(p), (partsOwned[id] || {})[name] + 1 || 1);
-        partsOwned[id] = Object.assign({}, partsOwned[id], { [name]: next });
-        save(KEY_PARTS, partsOwned);
+        /* One click, and the same meaning it has on the collection page: up by
+           one, round to zero past the last. This used to increment and clamp,
+           so a mis-click here could not be taken back — on the one page with no
+           other control over the number. Two copies of a rule are two rules. */
+        ST.cyclePart(it, p);
+        ST.syncCollected(it);
         render();
       }
       return;
@@ -1352,24 +1353,21 @@
        the parts you banked stay banked either way. */
     const mark = e.target.closest("[data-collect]");
     if (mark) {
-      const id = mark.dataset.collect;
-      if (collected.has(id)) collected.delete(id); else collected.add(id);
-      saveCollected();
+      ST.toggleCollected(mark.dataset.collect);
       render();
       return;
     }
 
     const del = e.target.closest("[data-del]");
     if (del) {
-      wishlist = wishlist.filter((id) => id !== del.dataset.del);
-      save(KEY_WISH, wishlist); render();
+      ST.removeWish(del.dataset.del); render();
       return;
     }
     if (!e.target.closest(".search-wrap")) results.hidden = true;
   });
 
   $("#clearList").addEventListener("click", () => {
-    wishlist = []; save(KEY_WISH, wishlist); render();
+    ST.clearWishlist(); render();
   });
 
   document.addEventListener("keydown", (e) => {
@@ -1454,16 +1452,11 @@
     need.addEventListener("input", push);
   }
 
-  // pick up part ticks made on the collection page in another tab
-  window.addEventListener("storage", (e) => {
-    if (e.key === KEY_PARTS) { partsOwned = load(KEY_PARTS, {}); render(); }
-    if (e.key === KEY_WISH) { wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id)); render(); }
-    // ticked on the collection page in another tab: this page shows the same
-    // claim on every finished row, so it has to hear about it
-    if (e.key === S.KEYS.collected) {
-      collected = new Set(load(S.KEYS.collected, [])); render();
-    }
-  });
+  /* A part ticked, a Prime claimed or a farm list changed on the collection
+     page in another tab. Three `storage` cases became one subscription, and
+     both pages now have it — this page always did, and the collection view did
+     not, which is half a feature nobody had noticed was half. */
+  ST.subscribe((change) => { if (change.external) render(); });
 
 
   /* ── backup ───────────────────────────────────────────────────────────
@@ -1476,22 +1469,13 @@
      per-part merging in app.js as the single implementation rather than
      copying it here. */
   const BACKUP_KEYS = S.KEYS;      // the same six names shared.js owns
-  const readKey = load;
 
   const dlg = $("#dataDlg");
   const dbtn = $("#dataBtn");
   if (dlg && dbtn) {
     dbtn.addEventListener("click", () => {
-      $("#dataArea").value = JSON.stringify({
-        format: 3,          // see app.js - deliberately not the app's name
-        exported: new Date().toISOString(),
-        collected: readKey(BACKUP_KEYS.collected, []),
-        parts: readKey(BACKUP_KEYS.parts, {}),
-        materials: readKey(BACKUP_KEYS.materials, []),
-        wishlist: readKey(BACKUP_KEYS.wishlist, []),
-        filters: readKey(BACKUP_KEYS.filters, null),
-        plan: readKey(BACKUP_KEYS.plan, {}),
-      });
+      // one format, assembled in one place - see shared.js
+      $("#dataArea").value = JSON.stringify(S.backupPayload());
       $("#dlgMsg").style.color = ""; $("#dlgMsg").textContent = "";
       dlg.showModal();
     });

@@ -885,6 +885,59 @@ page_test("banking the last part does not claim the Prime — a button does", as
   assert.deepEqual(errors, []);
 });
 
+page_test("a part banked on the planner reaches an open collection tab", async () => {
+  /* The two pages keep the same three slices of state, and until 2026-08-24
+     they each kept their own copy of them. Only the planner listened for
+     `storage`, so this direction was the broken one: tick a part there with the
+     collection view open beside it and the collection view showed the old count
+     until it was reloaded. The other way round worked. Nothing said that was
+     deliberate — it was simply the half nobody wrote.
+
+     Both pages now subscribe to one store in `shared.js`, and this asserts the
+     direction that never worked rather than the one that always did.
+
+     One browser context, two pages: `storage` fires between tabs of the same
+     origin in the same profile, and the helper above makes a fresh context per
+     page, which would put them in different profiles and fire nothing. */
+  const context = await browser.newContext();
+  const collection = await context.newPage();
+  const planner = await context.newPage();
+  const errors = [];
+  for (const p of [collection, planner]) p.on("pageerror", (e) => errors.push(String(e)));
+
+  await collection.goto(origin + "/index.html", { waitUntil: "load" });
+  const id = await collection.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.parts.length >= 2);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    return it.id;
+  });
+  await collection.reload({ waitUntil: "load" });
+  await planner.goto(origin + "/plan.html", { waitUntil: "load" });
+
+  const card = collection.locator(`[data-id="${id}"] .card-prog`);
+  assert.equal((await card.innerText()).trim(), "0/" + await collection.evaluate(
+    (x) => window.WFPRIME_DATA.items.find((i) => i.id === x).parts.length, id),
+    "nothing is banked yet");
+
+  await planner.locator("#wishlist .wish-part").first().click();
+
+  /* No reload of the collection page anywhere in this test. If the count moves,
+     it moved because the other tab said so. */
+  await collection.locator(`[data-id="${id}"] .card-prog`).filter({ hasText: /^1\// })
+    .waitFor({ timeout: 5000 });
+  assert.match((await card.innerText()).trim(), /^1\//,
+               "the collection view has to hear a part banked in the other tab");
+
+  // and the other direction, which always worked, still does
+  await collection.locator(`[data-id="${id}"]`).click();
+  await collection.locator("#drawerBody .part-own").nth(1).click();
+  await planner.locator("#wishlist .wish-prog").filter({ hasText: /^2\// })
+    .waitFor({ timeout: 5000 });
+
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 page_test("the ranked number, the order and the heading all say the same thing", async () => {
   /* The list was sorted on relics-per-objective with no way to ask for
      relics-per-run, and the two disagree whenever a long run is worth going on

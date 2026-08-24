@@ -57,77 +57,48 @@
      the same predicate on both. */
   S.watchFissures();
 
-  /* ── collection state ─────────────────────────────────────── */
-  // load/save come from shared.js, which swallows a corrupt or unavailable
-  // store: private mode keeps working in memory rather than throwing
-  let collected = new Set(load(KEY_COLLECTED, []));
+  /* ── what you own ─────────────────────────────────────────────
+     The collection, the parts and the farm list all live in `shared.js` now.
+     They used to live here *and* there, kept in step by hand, and they drifted
+     twice — see the comment above `makeState`. The rules moved with them: what
+     a part click means, and that owning every part is not the same as having
+     built the thing.
 
-  const saveCollected = () => save(KEY_COLLECTED, Array.from(collected));
-
-  /* ── part ownership ───────────────────────────────────────────
-     { itemId: { partName: countOwned } }. Keys are the normalised
-     part names the pipeline emits, so they survive a source switch. */
-  let partsOwned = load(KEY_PARTS, {});
-
-  const savePartsOwned = () => save(KEY_PARTS, partsOwned);
-
-  const needOf = (p) => p.itemCount || 1;
-  const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
-
-  function setPart(id, name, n) {
-    const bag = partsOwned[id] || (partsOwned[id] = {});
-    if (n > 0) bag[name] = n; else delete bag[name];
-    if (!Object.keys(bag).length) delete partsOwned[id];
-    savePartsOwned();
-  }
-
-  const partsComplete = (it) =>
-    it.parts.length > 0 && it.parts.every((p) => haveOf(it.id, p.name) >= needOf(p));
-
-  const partsDone = (it) =>
-    it.parts.filter((p) => haveOf(it.id, p.name) >= needOf(p)).length;
-
-  /* Owning every part does NOT make an item collected. It used to, on both
-     pages, and it was wrong in the one direction that matters: a Prime is four
-     parts *and* a build, so the app announced the hunt was over while the
-     blueprint was still in the foundry. Banking the last part now finishes the
-     list and stops there; saying you have the thing is a tick you make.
-
-     This still runs the other way. Nothing can be collected while a part is
-     missing, so taking one back retracts the claim rather than leaving a card
-     reading "collected, 2 of 4". Items with no parts at all — Founder gear,
-     accessories — are untouched here and are only ever ticked by hand. */
-  function syncCollected(it) {
-    if (!it.parts.length) return;
-    if (!partsComplete(it)) collected.delete(it.id);
-  }
-
-  function setAllParts(it, full) {
-    if (!it.parts.length) return;
-    it.parts.forEach((p) => setPart(it.id, p.name, full ? needOf(p) : 0));
-  }
+     Everything below reads through `ST`; nothing here writes localStorage. */
+  const ST = S.state;
+  const needOf = M.needOf;
+  const haveOf = (id, name) => ST.owns(id, name);
+  const partsDone = (it) => ST.partsDone(it);
+  const onWishlist = (id) => ST.wants(id);
 
   // Anything ticked before part tracking existed meant "I have the whole thing",
   // so seed its parts rather than appearing to lose the tick.
   (function migrate() {
-    let touched = false;
     ITEMS.forEach((it) => {
-      if (collected.has(it.id) && it.parts.length && !partsOwned[it.id]) {
-        partsOwned[it.id] = {};
-        it.parts.forEach((p) => (partsOwned[it.id][p.name] = needOf(p)));
-        touched = true;
+      if (ST.has(it.id) && it.parts.length && !Object.keys(ST.parts[it.id] || {}).length) {
+        ST.setAllParts(it, true);
       }
     });
-    if (touched) savePartsOwned();
   })();
 
-  /* ── farm list, shared with plan.html ─────────────────────── */
-  let wishlist = load(KEY_WISH, []);
-  const onWishlist = (id) => wishlist.includes(id);
-  function toggleWishlist(id) {
-    wishlist = onWishlist(id) ? wishlist.filter((x) => x !== id) : wishlist.concat([id]);
-    save(KEY_WISH, wishlist);
-  }
+  /* A change that happened somewhere else — the planner in another tab, most
+     likely. Only external ones: a change this page made has already repainted
+     the one counter or card it affected, and rebuilding everything would throw
+     away the focus and the scroll position for nothing.
+
+     This page had no `storage` listener at all until now, so a part ticked on
+     the planner left an open collection tab showing the old count until it was
+     reloaded, while the reverse updated instantly. Nothing said that was
+     deliberate; it was simply the half nobody wrote. */
+  ST.subscribe((change) => {
+    if (!change.external) return;
+    render();
+    if (!drawer.hidden && drawerItem) {
+      const keep = drawer.scrollTop;
+      openItem(drawerItem);
+      drawer.scrollTop = keep;
+    }
+  });
 
   /* ── availability bucket ──────────────────────────────────────
      Each item gets exactly one bucket so the sidebar toggles are
@@ -261,7 +232,7 @@
     if (skip !== "avail" && !it._buckets.some((b) => state.avail[b])) return false;
     if (skip !== "cat" && !state.cats.has(it.category)) return false;
     if (skip !== "coll") {
-      const has = collected.has(it.id);
+      const has = ST.has(it.id);
       if (has && !state.showCollected) return false;
       if (!has && !state.showMissing) return false;
     }
@@ -356,7 +327,7 @@
     '<line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>';
 
   function cardHTML(it) {
-    const has = collected.has(it.id);
+    const has = ST.has(it.id);
     const art = it.image
       ? `<img src="${esc(it.image)}" alt="" loading="lazy"
              data-fallback="glyph">`
@@ -393,7 +364,7 @@
         if (it.category !== cur) {
           cur = it.category;
           const inCat = shown.filter((x) => x.category === cur);
-          const got = inCat.filter((x) => collected.has(x.id)).length;
+          const got = inCat.filter((x) => ST.has(x.id)).length;
           html += `<div class="cat-heading">${esc(cur)}
             <span class="cat-prog">${got}/${inCat.length}</span></div>`;
         }
@@ -407,7 +378,7 @@
     $("#empty").hidden = shown.length > 0;
 
     const total = ITEMS.length;
-    const got = shown.filter((x) => collected.has(x.id)).length;
+    const got = shown.filter((x) => ST.has(x.id)).length;
     $("#resultCount").innerHTML =
       `<b>${shown.length}</b> of ${total} shown · <b>${got}</b> collected here`;
 
@@ -417,7 +388,7 @@
 
   function updateProgress() {
     const total = ITEMS.length;
-    const got = ITEMS.filter((x) => collected.has(x.id)).length;
+    const got = ITEMS.filter((x) => ST.has(x.id)).length;
     $("#progressNum").textContent = `${got} / ${total}`;
     $("#progressFill").style.width = total ? (got / total) * 100 + "%" : "0%";
   }
@@ -435,7 +406,7 @@
     });
 
     const collPool = ITEMS.filter((it) => matches(it, "coll"));
-    const c = collPool.filter((it) => collected.has(it.id)).length;
+    const c = collPool.filter((it) => ST.has(it.id)).length;
     $('[data-count="collected"]').textContent = c;
     $('[data-count="missing"]').textContent = collPool.length - c;
 
@@ -738,10 +709,17 @@
       esc(rots.join("/"))}</abbr>`;
   }
 
+  /* Which card the drawer is showing, so a change arriving from another tab can
+     redraw it. It used to be recovered by reading the heading text back out of
+     the DOM and matching it against an item name, which worked and was one
+     rename away from not working. */
+  let drawerItem = null;
+
   function openItem(id) {
     const it = ITEMS.find((x) => x.id === id);
     if (!it) return;
-    const has = collected.has(it.id);
+    drawerItem = id;
+    const has = ST.has(it.id);
     const f = it.flags;
 
     const art = it.image
@@ -957,7 +935,7 @@
     const dw = $("#dWish");
     if (dw) {
       dw.addEventListener("click", () => {
-        toggleWishlist(it.id);
+        ST.toggleWish(it.id);
         const keep = drawer.scrollTop; openItem(it.id); drawer.scrollTop = keep;
       });
     }
@@ -993,10 +971,10 @@
         const p = it.parts.find((x) => x.name === btn.dataset.part);
         if (!p) return;
         const need = needOf(p);
-        const have = (haveOf(it.id, p.name) + 1) % (need + 1);
-        setPart(it.id, p.name, have);
-        syncCollected(it);
-        saveCollected();
+        // one definition of what a part click means, shared with the planner
+        ST.cyclePart(it, p);
+        ST.syncCollected(it);
+        const have = haveOf(it.id, p.name);
 
         const full = have >= need;
         btn.classList.toggle("on", full);
@@ -1091,10 +1069,9 @@
      from the other in the direction that would put words in your mouth. */
   function toggle(id) {
     const it = ITEMS.find((x) => x.id === id);
-    const want = !collected.has(id);
-    if (it && it.parts.length) setAllParts(it, want);
-    if (want) collected.add(id); else collected.delete(id);
-    saveCollected();
+    const want = !ST.has(id);
+    if (it && it.parts.length) ST.setAllParts(it, want);
+    ST.setCollected(id, want);
     refreshCard(it);
   }
 
@@ -1115,11 +1092,11 @@
     $$(".cat-heading").forEach((h) => {
       const cat = h.childNodes[0].textContent.trim();
       const inCat = shown.filter((x) => x.category === cat);
-      const got = inCat.filter((x) => collected.has(x.id)).length;
+      const got = inCat.filter((x) => ST.has(x.id)).length;
       const p = h.querySelector(".cat-prog");
       if (p) p.textContent = `${got}/${inCat.length}`;
     });
-    const got = shown.filter((x) => collected.has(x.id)).length;
+    const got = shown.filter((x) => ST.has(x.id)).length;
     $("#resultCount").innerHTML =
       `<b>${shown.length}</b> of ${ITEMS.length} shown · <b>${got}</b> collected here`;
   }
@@ -1195,7 +1172,7 @@
     if (farm) {
       e.stopPropagation();
       const id = farm.dataset.farm;
-      toggleWishlist(id);
+      ST.toggleWish(id);
       const card = grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
       if (card) card.outerHTML = cardHTML(ITEMS.find((x) => x.id === id));
       updateFarmCount();
@@ -1232,13 +1209,17 @@
     }
   });
 
+  /* Both of these mark whole screenfuls, so they set the parts to match the
+     claim exactly as one tick does — otherwise "mark all shown" would leave a
+     hundred cards reading collected at 0/4, and the next part click on any of
+     them would retract the claim it had just made. */
   $("#markAllBtn").addEventListener("click", () => {
-    shown.forEach((it) => collected.add(it.id));
-    saveCollected(); render();
+    shown.forEach((it) => { ST.setAllParts(it, true); ST.setCollected(it.id, true); });
+    render();
   });
   $("#clearAllBtn").addEventListener("click", () => {
-    shown.forEach((it) => collected.delete(it.id));
-    saveCollected(); render();
+    shown.forEach((it) => { ST.setAllParts(it, false); ST.setCollected(it.id, false); });
+    render();
   });
 
   /* Artwork that fails to load, handled without inline onerror attributes.
@@ -1265,20 +1246,7 @@
   $("#dataBtn").addEventListener("click", () => {
     // Everything the user took the trouble to set. A backup that restores your
     // collection but loses your farm list and options is not a backup.
-    const wishlist = load(KEY_WISH, []);
-    const planOpts = load(KEY_PLAN, {});
-    $("#dataArea").value = JSON.stringify({
-      // not the app's name: parseBackup never reads this field, and a file
-      // format that carries a brand needs rewriting every time the brand does
-      format: 3,
-      exported: new Date().toISOString(),
-      collected: Array.from(collected),
-      parts: partsOwned,
-      materials: materials,
-      wishlist: wishlist,
-      filters: load(KEY_FILTERS, null),
-      plan: planOpts,
-    });
+    $("#dataArea").value = JSON.stringify(S.backupPayload({ materials: materials }));
     $("#dlgMsg").style.color = "";
     $("#dlgMsg").textContent = "";
     dlg.showModal();
@@ -1298,9 +1266,14 @@
       const nextWish = backup.wishlist;
       const nextMaterials = backup.materials;
 
-      collected = new Set(ids);
-      partsOwned = nextParts;
+      /* Written straight to the store and then re-read, rather than assigned
+         into the page's own copies: `parseBackup` validates whole slices at
+         once, so this is the one place that legitimately replaces all of them
+         and the object that owns them has to be told. */
+      save(S.KEYS.collected, ids);
+      save(S.KEYS.parts, nextParts);
       if (nextWish) save(KEY_WISH, nextWish);
+      ST.reload();
       // parseBackup has already dropped any option we do not recognise
       if (backup.plan) {
         const cur = Object.assign(load(KEY_PLAN, {}), backup.plan);
@@ -1319,16 +1292,14 @@
          drops a claim the parts in the same file contradict — nothing here
          invents one, which is what would happen if a file listing every part
          but no ticks came back with everything collected. */
-      ITEMS.forEach((it) => syncCollected(it));
-      if (nextMaterials) { materials = nextMaterials; renderMaterials(); }
-
-      saveCollected(); savePartsOwned(); if (nextMaterials) saveMaterials();
+      ITEMS.forEach((it) => ST.syncCollected(it));
+      if (nextMaterials) { materials = nextMaterials; renderMaterials(); saveMaterials(); }
       render();
 
-      const partCount = Object.keys(partsOwned).length;
+      const partCount = Object.keys(ST.parts).length;
       $("#dlgMsg").style.color = "";
       $("#dlgMsg").textContent =
-        `Imported ${collected.size} collected, ${partCount} part-tracked` +
+        `Imported ${ST.collected.size} collected, ${partCount} part-tracked` +
         (nextMaterials ? `, ${nextMaterials.length} material rows` : "") +
         (nextWish ? `, ${nextWish.length} on the farm list` : "") +
         (backup.plan ? ", planner options" : "") +
@@ -1443,8 +1414,8 @@
   function updateFarmCount() {
     const n = $("#planCount");
     if (!n) return;
-    n.textContent = wishlist.length;
-    n.hidden = wishlist.length === 0;
+    n.textContent = ST.wishlist.length;
+    n.hidden = ST.wishlist.length === 0;
   }
   updateFarmCount();
 

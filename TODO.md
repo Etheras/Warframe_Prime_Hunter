@@ -94,9 +94,12 @@ What is left of the entry is two fields and a warning about one of them.
 
 ### One refactor
 
-| Entry | Size |
-|---|---|
-| The two pages own the same state, and have already drifted twice | large |
+Done on 2026-08-24 — the three slices of state moved into `shared.js` and both
+drifts it had cost went with them (`PROJECT.md §7`). One residue, deliberately
+left: the planner's wishlist lists only the parts you are missing, so a completed
+part's button leaves the list and the counter has nowhere to wrap. Correcting a
+mis-click there still means opening the item on the collection page — a property
+of a worklist, not of the click, and worth deciding on its own merits.
 
 ### Cannot be finished today — and why
 
@@ -235,33 +238,6 @@ resurgent, or both founder and anything else — and the literal reading silentl
 empties a bucket whose whole point is that those three can never come back. If the
 order is changed at all, change it to the third row, update `PROJECT.md §7` and the
 test with it, and know that nothing on screen will move.
-
-### The two pages own the same state, and have already drifted twice
-
-The maths is properly shared — `assets/model.js` and `assets/rotation.js` exist so
-the two pages cannot disagree about a number — but the **state** is not. Both files
-read and write the same keys directly, both mutate `wishlist` in their own way, both
-wire their own backup dialog, and both redefine `needOf` and `haveOf` locally while
-`M.needOf` sits exported and unused.
-
-It has cost two real behaviours already:
-
-- **`plan.js` listens for `storage`; `app.js` does not** (`assets/plan.js:1296`).
-  Tick a part on the planner with the collection view open in another tab and the
-  collection view keeps its old count until reloaded. The other direction updates
-  instantly. Nothing says this is deliberate.
-- **The same click means two things.** `.part-own` on the collection page cycles
-  `0 → 1 → … → need → 0` (`assets/app.js:943`); `[data-got]` on the planner only
-  increments and clamps at `need` (`assets/plan.js:1189`). There is no way to undo
-  a mis-click on the planner.
-
-A `State` in `shared.js` owning parts, collected, wishlist and the backup dialog,
-with one change notification both pages subscribe to, is the review's suggestion and
-it is right. Two things it must preserve: the import paths are **deliberately**
-different — `app.js` merges in place and re-derives `collected` per part, `plan.js`
-writes the keys and reloads so that the careful per-part merging stays a single
-implementation (its own comment says so) — and `shared.js` currently touches the DOM
-only for the tooltip and the banner, which is worth keeping true.
 
 ### A priority flag on the farm list
 

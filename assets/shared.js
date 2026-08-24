@@ -69,6 +69,164 @@
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked */ }
   };
 
+  /* ── the collection itself ───────────────────────────────────────
+     Three slices of what you own, and every page reads and writes all three.
+     They lived twice, once per page, kept in step by hand — and they drifted,
+     twice, in ways nobody noticed until someone went looking:
+
+       * only the planner listened for `storage`, so ticking a part there left
+         an open collection tab showing the old count until it was reloaded.
+         The other direction worked. Nothing said that was deliberate.
+       * the same click meant two things. A part counter on the collection page
+         cycles `0 → 1 → … → need → 0`; on the planner it only ever incremented
+         and clamped, so a mis-click there could not be undone.
+
+     Both are gone because both pages now go through here. That is the point of
+     this object: not tidiness, but that there is one place for a rule to live,
+     so a second place cannot disagree with it.
+
+     `subscribe` is how a page hears about a change — including one made in
+     another tab, which arrives through the same path as one made in this one.
+     No DOM is touched here; what a page does about a change is the page's
+     business. */
+  function makeState() {
+    let collected = new Set(load(KEYS.collected, []));
+    let parts = load(KEYS.parts, {});
+    let wishlist = load(KEYS.wishlist, []);
+    const listeners = [];
+
+    /* Which slice moved, and whether it moved somewhere else.
+
+       `external` is the distinction that matters. A page that changes something
+       itself usually knows exactly what to repaint — one counter, one card —
+       and rebuilding everything would throw away the focus and the scroll
+       position for no reason. A change arriving from another tab has no such
+       context: nothing local prompted it, so the honest response is to redraw.
+       One path, with enough information to react correctly to both. */
+    const emit = (what, external) =>
+      listeners.forEach((fn) => fn({ slice: what, external: !!external }));
+
+    const write = {
+      collected: () => save(KEYS.collected, Array.from(collected)),
+      parts: () => save(KEYS.parts, parts),
+      wishlist: () => save(KEYS.wishlist, wishlist),
+    };
+    const commit = (what) => { write[what](); emit(what); };
+
+    const needOf = (p) => (p && p.itemCount) || 1;
+
+    const api = {
+      /* Read-only by convention, and by shape where it is cheap: `collected` is
+         a Set the pages only ever ask `.has()` of. The mutations below are the
+         supported way in, and the only way that saves and notifies. */
+      get collected() { return collected; },
+      get parts() { return parts; },
+      get wishlist() { return wishlist; },
+
+      has: (id) => collected.has(id),
+      owns: (id, part) => (parts[id] || {})[part] || 0,
+      wants: (id) => wishlist.indexOf(id) >= 0,
+
+      /* How many of a part you hold. Clamped to nothing sensible here on
+         purpose — `cyclePart` owns the wrap and `setAllParts` the fill, and a
+         caller that has already worked out the number should be able to set
+         it. */
+      setPart(id, name, n) {
+        const bag = parts[id] || (parts[id] = {});
+        if (n > 0) bag[name] = n; else delete bag[name];
+        if (!Object.keys(bag).length) delete parts[id];
+        commit("parts");
+      },
+
+      /* One click on a part counter, and the one definition of what that
+         means: up by one, and round to zero past the last. It is a cycle
+         rather than a clamp because the alternative is a mis-click you cannot
+         take back, which is exactly what the planner used to be. */
+      cyclePart(item, part) {
+        const need = needOf(part);
+        this.setPart(item.id, part.name, (this.owns(item.id, part.name) + 1) % (need + 1));
+      },
+
+      setAllParts(item, full) {
+        if (!item.parts || !item.parts.length) return;
+        item.parts.forEach((p) => {
+          const bag = parts[item.id] || (parts[item.id] = {});
+          if (full) bag[p.name] = needOf(p); else delete bag[p.name];
+        });
+        if (parts[item.id] && !Object.keys(parts[item.id]).length) delete parts[item.id];
+        commit("parts");
+      },
+
+      partsDone: (item) =>
+        (item.parts || []).filter((p) => api.owns(item.id, p.name) >= needOf(p)).length,
+      partsComplete: (item) =>
+        (item.parts || []).length > 0 &&
+        item.parts.every((p) => api.owns(item.id, p.name) >= needOf(p)),
+
+      /* Owning every part does not make an item collected — that is a claim
+         you make, not one the app makes for you (`PROJECT.md §1`). This only
+         ever retracts: nothing can be collected while a part is missing, so
+         taking one back retracts the claim rather than leaving a card reading
+         "collected, 2 of 4". */
+      syncCollected(item) {
+        if (!item.parts || !item.parts.length) return;
+        if (!api.partsComplete(item) && collected.delete(item.id)) commit("collected");
+      },
+
+      setCollected(id, on) {
+        if (on) collected.add(id); else collected.delete(id);
+        commit("collected");
+      },
+      toggleCollected(id) { api.setCollected(id, !collected.has(id)); },
+
+      addWish(id) {
+        if (wishlist.indexOf(id) >= 0) return;
+        wishlist = wishlist.concat([id]);
+        commit("wishlist");
+      },
+      removeWish(id) {
+        wishlist = wishlist.filter((x) => x !== id);
+        commit("wishlist");
+      },
+      toggleWish(id) {
+        if (wishlist.indexOf(id) >= 0) api.removeWish(id); else api.addWish(id);
+      },
+      clearWishlist() { wishlist = []; commit("wishlist"); },
+
+      /* After a restore, which writes the keys behind this object's back
+         because `parseBackup` validates whole slices at once. */
+      reload() {
+        collected = new Set(load(KEYS.collected, []));
+        parts = load(KEYS.parts, {});
+        wishlist = load(KEYS.wishlist, []);
+      },
+
+      /* Drop wishlist entries for items that are no longer in the catalogue.
+         The planner did this on load and the collection view did not, so a
+         renamed Prime left a farm-list entry only one of them ignored. */
+      pruneWishlist(known) {
+        const kept = wishlist.filter((id) => known(id));
+        if (kept.length !== wishlist.length) { wishlist = kept; commit("wishlist"); }
+      },
+
+      subscribe(fn) { listeners.push(fn); },
+    };
+
+    /* The same change, arriving from another tab. It goes through `emit` like
+       any other, so a page needs one handler rather than two — and both pages
+       now get this, where before only the planner did. */
+    window.addEventListener("storage", (e) => {
+      const slice = Object.keys(write).find((k) => KEYS[k] === e.key);
+      if (!slice) return;
+      if (slice === "collected") collected = new Set(load(KEYS.collected, []));
+      if (slice === "parts") parts = load(KEYS.parts, {});
+      if (slice === "wishlist") wishlist = load(KEYS.wishlist, []);
+      emit(slice, true);
+    });
+
+    return api;
+  }
+
   /* ── the tooltip ─────────────────────────────────────────────────
      One element, moved around, because a native title= is proportional and
      turns the aligned columns in the rotation tooltips to mush. Installs
@@ -153,6 +311,32 @@
             "28 days, and drop tables change with each update." + fix;
     const header = document.querySelector("header.topbar");
     if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
+  }
+
+  /* Everything the reader took the trouble to set. A backup that restores your
+     collection but loses your farm list and options is not a backup.
+
+     Built here because both pages offered the same dialog and assembled the
+     same six keys independently — which is one place too many for a format,
+     and the reason the two once accepted different halves of the same file.
+     Read straight from the store rather than from either page's variables, so
+     it cannot capture a stale copy of anything.
+
+     `extra` is for what a page owns and the store does not: the materials
+     checklist lives only on the collection view. */
+  function backupPayload(extra) {
+    return Object.assign({
+      // Not the app's name: parseBackup never reads this field, and a file
+      // format that carries a brand needs rewriting every time the brand does.
+      format: 3,
+      exported: new Date().toISOString(),
+      collected: load(KEYS.collected, []),
+      parts: load(KEYS.parts, {}),
+      materials: load(KEYS.materials, []),
+      wishlist: load(KEYS.wishlist, []),
+      filters: load(KEYS.filters, null),
+      plan: load(KEYS.plan, {}),
+    }, extra || {});
   }
 
   /* ── backup to and from a file ───────────────────────────────────
@@ -276,6 +460,9 @@
 
   window.WFPrimeShared = {
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
-    watchFissures, FISSURE_REFRESH_MS,
+    watchFissures, FISSURE_REFRESH_MS, backupPayload,
+    /* One store per page, made here so the `storage` listener is registered
+       once and both pages share the rules rather than a copy of them. */
+    state: makeState(),
   };
 })();
