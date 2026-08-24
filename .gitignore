@@ -48,6 +48,13 @@ __pycache__/
 .vscode/
 .idea/
 
+# Cold-start notes for an AI assistant. Local on purpose: it is a map of the
+# four tracked documents rather than a fifth one, so it has no reader who is not
+# already looking at this folder, and nothing in the suite checks it. Keeping it
+# untracked means it can go stale without becoming the kind of published, trusted,
+# wrong document PROJECT.md §2 warns about.
+CLAUDE.md
+
 # OS noise
 Thumbs.db
 desktop.ini
