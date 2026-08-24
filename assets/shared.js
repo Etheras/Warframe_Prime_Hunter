@@ -243,7 +243,12 @@
     let seen = JSON.stringify(live);
     const pull = () => {
       if (typeof fetch !== "function") return;
-      fetch("data/fissures.json", { cache: "no-store" })
+      /* `no-cache` revalidates; `no-store` would refuse to cache at all and pay
+         for the whole four kilobytes every time. The server answers a
+         conditional request with 304 and no body, which is the same trade the
+         build makes against api.warframestat.us - ask often, transfer rarely.
+         Either way the answer is never a cached copy served without asking. */
+      fetch("data/fissures.json", { cache: "no-cache" })
         .then((r) => (r.ok ? r.json() : null))
         .then((doc) => {
           if (!doc || !Array.isArray(doc.fissures)) return;

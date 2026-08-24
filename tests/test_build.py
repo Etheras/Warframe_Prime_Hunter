@@ -559,6 +559,41 @@ def test_built_payload() -> None:
     )
     check("payload: no item has two parts with the same name", dupes, [])
 
+    # What DE publish about each bounty on offer, which until 2026-08-24 was
+    # fetched, cached and thrown away. Two of these are corrections rather than
+    # additions: the letter was derived per family and the families disagree,
+    # and every bounty was costed at four stages when the real number is 3, 4
+    # or 5. Both are only visible if the join to our own group names works, so
+    # that is what is asserted.
+    bounties = D["meta"]["bounties"]
+    groups = bounties.get("groups") or {}
+    if bounties.get("checked") and groups:
+        named = {g: r for g, r in groups.items() if r.get("letter")}
+        check_true("bounties: DE's own letter is read for most tiers",
+                   len(named) >= len(groups) * 0.75,
+                   f"{len(named)} of {len(groups)} — the Narmer tiers publish none, "
+                   f"but a wider gap than that means the join has broken")
+        check("bounties: every published letter is one of the three",
+              sorted({r["letter"] for r in named.values()} - set("ABC")), [])
+        check_true("bounties: an anchor to walk those letters forward from",
+                   bool(bounties.get("windowEnd")),
+                   "a letter with no window is a letter that can never turn over")
+
+        staged = {g: r["stages"] for g, r in groups.items() if r.get("stages")}
+        check_true("bounties: stage counts are read too", len(staged) >= len(named) * 0.9)
+        check("bounties: and they are the three shapes DE actually ships",
+              sorted(set(staged.values())), [3, 4, 5],
+              "four for everything was the assumption this replaced")
+
+        # The vault chambers share their levels with a standard bounty on the
+        # same landscape, so a join on section and levels alone silently gives
+        # one of them the other's letter.
+        vaults = {g: r for g, r in named.items() if r["family"] == "vault"}
+        check_true("bounties: the Isolation Vaults joined to their own jobs",
+                   len(vaults) >= 3,
+                   "Cleanse the Land and Isolation Vault Chamber B are both "
+                   "fought at 30-40 under Entrati; only the uniqueName tells them apart")
+
     # The one part of the payload with an hour to live, published on its own so
     # an open page can re-read it without pulling the other 1.9 MB down again.
     side = os.path.join(ROOT, "data", "fissures.json")

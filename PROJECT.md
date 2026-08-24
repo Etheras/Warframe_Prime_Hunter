@@ -948,6 +948,52 @@ Two smaller consequences worth knowing:
   every 150 minutes, so including it would make `--if-changed` rebuild on every run.
   It does not need to: the page extrapolates the letter from the last anchor.
 
+### DE publish the letter per tier, and the tiers disagree
+
+**Read on 2026-08-24, and it corrected two live nodes.** The letter was derived by
+matching today's reward pool against DE's static table — sound, and it produced
+**one answer for a whole family**. DE publish it per tier instead, in each job's
+`uniqueName`: `…TierDTableARewards`, where `Table<Y>` is the letter.
+
+Both methods were run side by side against the same window. Twenty-two of the
+twenty-four tiers agreed. The two that did not are the point:
+
+| Tier | Derived for its family | DE published | Effect |
+|---|---|---|---|
+| `Level 25 - 30 Cambion Drift Bounty` | C | **A** | its Aya was scored at 5.26% and pays 4% |
+| `Level 30 - 40 Cambion Drift Bounty` | C | **A** | publishes only **AB**, so C was a letter it does not have |
+
+The second is the sharper one. A bounty scored on a letter it does not publish
+takes the off-table path — the run is valued at the mean of what it *does* publish
+and labelled unknown — so the page was hedging about a bounty DE had named
+outright. Both carry Aya, which is what the entry in `TODO.md` predicted would be
+the only thing affected today.
+
+So the published letter wins, and the derived one stays as the fallback: for the
+Narmer tiers, which carry no tier in their `uniqueName` at all, and for any build
+that cannot reach the worldstate. Both are walked forward from the same window end,
+which is now carried at the top of the bounty block rather than per family — a
+published letter should not need the reward-matching to have also succeeded before
+it can be told what time it is.
+
+**The join needs three parts and two of them are not enough.** Section and enemy
+levels are ambiguous: on the Cambion Drift, `Cleanse the Land` and `Isolation Vault
+Chamber B` are both fought at 30–40 under Entrati. The vault jobs carry a
+`VaultBounty` prefix in the `uniqueName`, and which family one of our groups
+belongs to we already knew, so the third part of the key is free.
+
+**Stage counts came out of the same read.** `standingStages` has one entry per
+stage and its length is 3, 4 or 5 by tier — a level 5–15 bounty is three stages, a
+level 40–60 is five. Every bounty was costed at four, so the short ones' rate was
+divided by too much and the long ones' by too little. Four survives only as the
+fallback for a tier DE did not publish.
+
+**And the levels, which needed no worldstate at all.** All 13 bounty nodes carried
+`lvl: null` and lost every level tie-break by default. The level is in the name —
+`Level 40 - 60 Cetus Bounty` — so it is parsed from there, which works on a mirror
+build and needs no network. `enemyLevels` says the same thing and is how the two
+were checked against each other.
+
 ### Two bounties only exist sometimes
 
 `Level 15 - 25 Plague Star` carries **26 relics** — the largest bounty source in the

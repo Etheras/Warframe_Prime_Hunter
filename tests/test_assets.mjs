@@ -130,10 +130,25 @@ const BOUNTY_DATA = {
         standard: { letter: "C", windowEnd: "2026-08-11T21:55:00.000Z", votes: 16, of: 16 },
         vault: { letter: "B", windowEnd: "2026-08-11T21:55:00.000Z", votes: 6, of: 6 },
       },
+      windowEnd: "2026-08-11T21:55:00.000Z",
+      /* `letter` and `stages` are what DE published for that tier, in the
+         job's uniqueName and standingStages. Deliberately not on every group:
+         the Narmer tiers carry no tier at all, and the fallbacks have to stay
+         exercised. Cetus 5-15 has stages and no letter, Cambion Drift 30-40 a
+         letter and no stages, the vault both. */
       groups: {
-        "Level 5 - 15 Cetus Bounty": { family: "standard", rotations: "ABC" },
-        "Level 30 - 40 Cambion Drift Bounty": { family: "standard", rotations: "AB" },
-        "Level 30 - 40 Isolation Vault": { family: "vault", rotations: "ABC" },
+        "Level 5 - 15 Cetus Bounty": {
+          family: "standard", rotations: "ABC", stages: 3 },
+        "Level 30 - 40 Cambion Drift Bounty": {
+          family: "standard", rotations: "AB", letter: "A" },
+        "Level 30 - 40 Isolation Vault": {
+          family: "vault", rotations: "ABC", letter: "B", stages: 5 },
+        /* Publishes two letters and DE named neither, so it falls back to the
+           family's C — a letter it does not have. That is the case the row has
+           to average rather than claim, and it is why the published letters
+           are worth reading: with one, this stops happening. */
+        "Level 25 - 30 Cambion Drift Bounty": {
+          family: "standard", rotations: "AB" },
       },
       events: {
         "Level 15 - 25 Plague Star": {
@@ -324,7 +339,58 @@ test("the vaults keep their own phase", () => {
   assert.equal(ROT.liveRotation("Level 5 - 15 Cetus Bounty").letter, "C");
   assert.equal(ROT.liveRotation("Level 30 - 40 Isolation Vault").letter, "B",
                "one letter everywhere was the wiki's claim, not the worldstate's");
-  assert.equal(ROT.stamp(), "CB", "families sorted: standard, then vault");
+  /* One letter per group on the clock, in name order: Cambion Drift 25-30 (no
+     published letter, so its family's C), Cambion Drift 30-40 (published A),
+     the vault (published B), Cetus (its family's C). Read from the groups
+     rather than the families because the groups are what rows are scored on,
+     and a build can now name their letters without the families having been
+     derived at all. */
+  assert.equal(ROT.stamp(), "CABC");
+});
+
+test("a letter DE published for a tier beats the one derived for its family", () => {
+  /* The derived answer is one letter for a whole family, and the tiers
+     genuinely disagree: read on 2026-08-24, every Ostron and Solaris tier was
+     on C while three of six Cambion Drift tiers were on A. One of those three
+     publishes only rotations A and B, so the family answer was naming it a
+     letter it does not have — which the row then had to paper over as
+     "unknown".
+
+     `Level 30 - 40 Cambion Drift Bounty` is that tier, and it is the subject
+     here for that reason. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const derived = ROT.liveRotation("Level 5 - 15 Cetus Bounty");
+  assert.equal(derived.letter, "C", "no published letter, so the family answers");
+
+  const published = ROT.liveRotation("Level 30 - 40 Cambion Drift Bounty");
+  assert.equal(published.letter, "A",
+               "DE published A for this tier while its family was derived as C");
+  assert.equal(published.endsAt, Date.parse("2026-08-11T21:55:00.000Z"),
+               "and it turns over with everything else, not on a clock of its own");
+
+  // and it walks forward from the published anchor exactly as a family does
+  const later = loadRotation({ data: BOUNTY_DATA, now: Date.parse("2026-08-11T22:00:00Z") });
+  assert.equal(later.liveRotation("Level 30 - 40 Cambion Drift Bounty").letter, "B",
+               "five minutes past the window, A has become B");
+});
+
+test("a bounty is costed at the stages DE says it has, not always four", () => {
+  /* `standingStages` has one entry per stage and its length is 3, 4 or 5 by
+     tier — a level 5-15 bounty is three stages and a level 40-60 is five.
+     Costing every one of them at four divided the short ones' rate by too much
+     and the long ones' by too little.
+     Four remains the fallback for a bounty DE did not publish: the Narmer
+     tiers carry no tier at all, and a mirror build has no worldstate. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const cost = (node) => {
+    const live = ROT.liveRotation(node);
+    const run = ROT.runValue({ A: 1, B: 1, C: 1 }, "reset", "Bounty", false, live, null);
+    return plain(ROT.objectivesOf({ node, mode: "Bounty", ...run }));
+  };
+  assert.deepEqual(cost("Level 5 - 15 Cetus Bounty"), { count: 3, unit: "stage" });
+  assert.deepEqual(cost("Level 30 - 40 Isolation Vault"), { count: 5, unit: "stage" });
+  assert.deepEqual(cost("Level 30 - 40 Cambion Drift Bounty"), { count: 4, unit: "stage" },
+                   "no stage count published for this one, so four stands");
 });
 
 test("when a letter next comes up is arithmetic on the sequence", () => {
@@ -348,7 +414,10 @@ test("a bounty run pays the live letter and nothing else", () => {
 
 test("a bounty that does not publish the live letter is averaged, and says so", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
-  const live = ROT.liveRotation("Level 30 - 40 Cambion Drift Bounty");  // board on C, table AB
+  // DE named no letter for this one, so it falls back to its family's C — a
+  // letter its own table does not have. The subject moved here when the tier
+  // it used to use gained a published letter and stopped being off-table.
+  const live = ROT.liveRotation("Level 25 - 30 Cambion Drift Bounty");  // board on C, table AB
   const r = ROT.runValue({ A: 4, B: 2, C: 0, none: 0 }, "reset", "Bounty", false, live);
   assert.equal(r.total, 3, "the mean of what it does publish");
   assert.equal(r.bounty.letter, null);

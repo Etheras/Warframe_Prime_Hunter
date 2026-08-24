@@ -270,6 +270,22 @@ EVENT_PATTERNS = {
     "Plague Star": re.compile(r"plague\s*star", re.I),
 }
 
+# DE tag every world event with a stable machine identifier - `HeatFissure` is
+# Thermia Fractures, `WaterFight` is Dog Days - and a tag is a far better key
+# than a keyword scan over prose DE can reword at any time.
+#
+# **Empty on purpose, and it is not an oversight.** Neither of the two events
+# that carry relics has run since this project existed, so their tags have never
+# been seen. Guessing one would be worse than scanning: a wrong tag matches
+# nothing and looks like the event is not running, which is exactly the failure
+# the scan was written loosely to avoid.
+#
+# So the scan stays as the way in, and the build *records* the tag of whatever
+# it matched - see `find_live_events`. The first time a Ghoul Purge runs, its
+# tag lands in the payload and in the build log, and it can be added here as a
+# fact rather than a guess.
+EVENT_TAGS: dict[str, str] = {}
+
 CYCLE_MINUTES = 150       # one full day/night of the landscape
 SEQUENCE = "ABC"
 
@@ -470,18 +486,35 @@ def find_live_events(events: list, syndicate_missions: list) -> dict:
     """
     found: dict[str, dict] = {}
 
-    def consider(name: str, blob: str, activation, expiry) -> None:
-        if not expiry or not EVENT_PATTERNS[name].search(blob):
+    def consider(name: str, blob: str, activation, expiry, tag=None, node=None) -> None:
+        """
+        `tag` is matched first where one is known, because it is a machine
+        identifier and the blob is prose. Where none is known - which is both of
+        our events, since neither has run yet - the scan decides and the tag is
+        recorded anyway, so the first sighting turns a guess into a fact.
+        """
+        known = EVENT_TAGS.get(str(tag or ""))
+        if known and known != name:
+            return                       # DE named it, and named something else
+        if not known and not EVENT_PATTERNS[name].search(blob):
+            return
+        if not expiry:
             return
         prev = found.get(name)
         if prev is None or (prev.get("expiry") or "") < expiry:
-            found[name] = {"activation": activation, "expiry": expiry}
+            row = {"activation": activation, "expiry": expiry}
+            if tag:
+                row["tag"] = str(tag)
+            if node:
+                row["node"] = str(node)
+            found[name] = row
 
     for ev in events or []:
         blob = " ".join(str(ev.get(k) or "") for k in
                         ("description", "tooltip", "node", "tag", "name"))
         for name in EVENT_PATTERNS:
-            consider(name, blob, ev.get("activation"), ev.get("expiry"))
+            consider(name, blob, ev.get("activation"), ev.get("expiry"),
+                     ev.get("tag"), ev.get("node"))
 
     for entry in syndicate_missions or []:
         # a purge arrives as its own syndicate whose tag WFCD does not map, so
@@ -495,6 +528,79 @@ def find_live_events(events: list, syndicate_missions: list) -> dict:
     return found
 
 
+_TIER_TABLE = re.compile(r"Tier(\w+?)Table(\w+?)Rewards")
+
+
+def read_bounty_jobs(pools: dict, syndicate_missions, now: datetime | None = None) -> dict:
+    """
+    What the worldstate says about each bounty on offer, keyed by our own group
+    names. `{group: {"letter": "A", "stages": 4, "minMR": 2, "type": "..."}}`.
+
+    Two facts come out of this that nothing else can supply, and one that only
+    confirms what we already knew:
+
+      * **the rotation letter, per tier.** DE put it in each job's uniqueName -
+        `…TierDTableARewards` - and Table<Y> IS the letter. Until now it was
+        derived by matching today's reward pool against DE's static table, which
+        works but only for a bounty publishing all three letters, and produces
+        one answer for a whole family. The worldstate publishes it per tier, and
+        the tiers genuinely disagree: read on 2026-08-24, every Ostron and
+        Solaris tier was on C while three of the six Cambion Drift tiers were on
+        A. One of those, `Level 30 - 40`, publishes only rotations A and B - so
+        the family answer was naming a letter that bounty does not have.
+      * **the stage count.** `standingStages` has one entry per stage, and its
+        length is 3, 4 or 5 by tier - not the four `objectivesOf` assumed.
+      * `enemyLevels`, which is the same answer as the group's own name and is
+        used here only to join the two together.
+
+    **The join needs all three parts of its key.** Section and levels alone are
+    ambiguous: on the Cambion Drift, `Cleanse the Land` and `Isolation Vault
+    Chamber B` are both fought at 30-40 under the same syndicate. The vault
+    jobs carry a `VaultBounty` prefix in the uniqueName, which is what tells
+    them apart - and which family a group belongs to we already know.
+    """
+    if not syndicate_missions:
+        return {"jobs": {}, "windowEnd": None}
+
+    live = {}
+    ends = []
+    for entry in _one_window(
+            [e for e in syndicate_missions
+             if SYNDICATE_SECTION.get(e.get("syndicate")) and (e.get("jobs") or [])],
+            now or datetime.now(timezone.utc)):
+        sid = SYNDICATE_SECTION[entry["syndicate"]]
+        if entry.get("expiry"):
+            ends.append(entry["expiry"])
+        for job in entry.get("jobs") or []:
+            name = job.get("uniqueName") or ""
+            m = _TIER_TABLE.search(name)
+            levels = job.get("enemyLevels") or []
+            if not m or not levels:
+                continue          # Narmer bounties carry no tier at all
+            key = (sid, tuple(levels), "VaultBounty" in name)
+            live[key] = {
+                "letter": m.group(2).upper(),
+                "stages": len(job.get("standingStages") or []) or None,
+                "minMR": job.get("minMR"),
+                "type": (job.get("type") or "").strip() or None,
+            }
+
+    out = {}
+    for sid, by_group in (pools or {}).items():
+        for group in by_group:
+            levels = official.group_levels(group)
+            if not levels:
+                continue
+            rec = live.get((sid, tuple(levels), bounty_family(group) == "vault"))
+            if rec:
+                out[group] = dict(rec)
+    # The board turns over for everybody at once, so this is one instant rather
+    # than one per family. Carried separately from `families` because a
+    # published letter needs an anchor to be walked forward from, and it should
+    # not depend on the reward-matching having also succeeded.
+    return {"jobs": out, "windowEnd": min(ends) if ends else None}
+
+
 def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
                       now: datetime | None = None) -> dict:
     """The whole bounty block of the payload."""
@@ -505,18 +611,46 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
     # actually publishes: a couple of tiers publish two rather than three, and
     # the page has to be able to tell "you want nothing in rotation C" apart
     # from "this bounty has no rotation C".
+    read = (read_bounty_jobs(pools, syndicate_missions, now) if checked
+            else {"jobs": {}, "windowEnd": None})
+    jobs = read["jobs"]
+
     groups = {}
     for sid, by_group in (pools or {}).items():
         for group, rotations in by_group.items():
             if len(rotations) >= 2:
-                groups[group] = {"family": bounty_family(group),
-                                 "rotations": "".join(sorted(rotations))}
+                row = {"family": bounty_family(group),
+                       "rotations": "".join(sorted(rotations))}
+                job = jobs.get(group)
+                if job:
+                    # The letter DE published for THIS tier, which outranks the
+                    # family answer derived from reward matching - see
+                    # read_bounty_jobs. Kept beside the family rather than
+                    # replacing it, because a build that cannot reach the
+                    # worldstate still has the derived one to fall back on.
+                    if job.get("letter"):
+                        row["letter"] = job["letter"]
+                    if job.get("stages"):
+                        row["stages"] = job["stages"]
+                    if job.get("minMR"):
+                        row["minMR"] = job["minMR"]
+                groups[group] = row
+
+    # How far each published letter is from the derived family answer. Two
+    # independent methods disagreeing is worth saying out loud rather than
+    # silently preferring one of them.
+    checked_letters = [(g, r["letter"], families.get(r["family"], {}).get("letter"))
+                       for g, r in groups.items() if r.get("letter")]
+    disagreed = [g for g, pub, fam in checked_letters if fam and pub != fam]
 
     return {
         "cycleMinutes": CYCLE_MINUTES,
         "sequence": SEQUENCE,
         "checked": bool(checked),
         "families": families,
+        "windowEnd": read["windowEnd"],
+        "published": len(checked_letters),
+        "disagreed": sorted(disagreed),
         "groups": groups,
         # every limited-time bounty we know of, with the window if it is running
         "events": {group: {"event": name, **(live.get(name) or {})}
@@ -752,6 +886,20 @@ def main() -> int:
             "say so rather than guess")
     running = sorted({e["event"] for e in bounties["events"].values() if e.get("expiry")})
     log(f"bounties: limited-time events running - {', '.join(running) or 'none'}")
+    # Said out loud because it is the one fact about these events nobody has
+    # been able to observe: add it to EVENT_TAGS and the keyword scan stops
+    # being how they are found.
+    for e in bounties["events"].values():
+        if e.get("expiry") and e.get("tag") and e["tag"] not in EVENT_TAGS:
+            log(f"bounties: ! {e['event']} is running and DE tag it '{e['tag']}' "
+                f"- add that to EVENT_TAGS in tools/build_data.py")
+
+    if bounties.get("published"):
+        log(f"bounties: DE publish the letter for {bounties['published']} of "
+            f"{len(bounties['groups'])} tiers"
+            + (f"; {len(bounties['disagreed'])} disagree with the derived family "
+               f"answer ({', '.join(bounties['disagreed'])})"
+               if bounties.get("disagreed") else "; all agree with the derived answer"))
 
     used_relics: set[str] = set()
     out_items: list[dict] = []
@@ -973,13 +1121,30 @@ def main() -> int:
 
     # trim the relic table to relics actually referenced by a catalogue item
     def with_levels(srcs):
-        """Tag star-chart sources with DE's enemy levels, where they exist."""
+        """
+        Tag sources with the enemy levels they are fought at, where they exist.
+
+        Two routes, because DE publish them two ways. Star-chart nodes are in
+        the public export, joined on planet and node name. Bounties are not in
+        the export at all - and do not need to be, because DE put the levels in
+        the name: `Level 20 - 40 Cetus Bounty` is a bounty fought at 20-40.
+
+        All 13 bounty nodes carried `lvl: null` until 2026-08-24, so a bounty
+        lost every level tie-break in the ranking by default - it sorted as
+        `Infinity` against real numbers. The worldstate publishes `enemyLevels`
+        per tier too, which is the same answer down a second route; the name is
+        used because it needs no network and works on a mirror build.
+        """
         out = []
         for s0 in srcs:
             row = dict(s0)
             if row.get("kind") == "mission":
                 planet = re.sub(r"^Event:\s*", "", row.get("planet") or "").strip()
                 lv = node_levels.get(f"{planet}/{row.get('node')}")
+                if lv:
+                    row["lvl"] = lv
+            elif row.get("kind") == "bounty":
+                lv = official.group_levels(row.get("node") or "")
                 if lv:
                     row["lvl"] = lv
             out.append(row)

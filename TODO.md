@@ -62,17 +62,14 @@ work that makes it correct.
 
 ### The worldstate is already cached, and barely read
 
-| Entry | What it unlocks | Size |
-|---|---|---|
-| The worldstate publishes far more than the two fields we read | stage counts, bounty levels, `minMR`, real bounty names | large — parent of the two below |
-| Read each bounty's rotation letter directly — the worldstate already says it | one node's Aya today, correctness always | session |
-| Baro's actual stock is published, and never read | *back in 6 days* on the label; what he is really selling | session |
+**Mostly read now.** The sweep of 2026-08-24 took the rotation letter per tier, the
+stage counts and the bounty levels; `PROJECT.md §7` records what that corrected.
+What is left of the entry is two fields and a warning about one of them.
 
-One more sits under **Settled** and should not be read as closed: *Enemy levels are
-missing for 31% of live-relic nodes* is marked **[partly reopened]**, and the
-reopened half is free — all 13 bounty nodes still carry `lvl: null` (verified
-2026-08-24) while both the worldstate and our own node names give the numbers, so
-bounties lose every level tie-break by default. Same sweep, same sitting.
+| Entry | What is left | Size |
+|---|---|---|
+| The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
+| Baro's actual stock is published, and never read | *back in 6 days* on the label; what he is really selling | session |
 
 ### Model and ranking
 
@@ -117,9 +114,11 @@ bounties lose every level tie-break by default. Same sweep, same sitting.
 
 The availability precedence asks for something that is **already true** — see its
 entry. *Conditioning the fissure bonus on a live fissure* is **[settled]** against.
-Six answered questions sit under **Settled**, five of them closed and the sixth
-partly reopened as noted above. Four wiki edits sit under **Should be fixed on the
-wiki, not here** — those are edits to `wiki.warframe.com`, not to this repository.
+Six answered questions sit under **Settled**; the one that was partly reopened had
+its open half closed on 2026-08-24, and what remains of it is a note explaining why
+Railjack levels are absent on purpose. Four wiki edits sit under **Should be fixed
+on the wiki, not here** — those are edits to `wiki.warframe.com`, not to this
+repository.
 
 ---
 
@@ -722,23 +721,28 @@ Plague Star matters most: it carries 26 relics, more than any other bounty.
 
 ### The worldstate publishes far more than the two fields we read
 
-Swept 2026-08-14, at the owner's suggestion, and it changes several entries above.
-We fetch `/pc/syndicateMissions` and `/pc/events` already, use two fields, and
-throw the rest away. What is in there, per bounty job:
+Swept 2026-08-14, at the owner's suggestion. **Most of it was read on 2026-08-24**
+and the reasoning is in `PROJECT.md §7`; what is below is what is left.
 
-| Field | What it is | What it would fix |
+| Field | What it is | State |
 |---|---|---|
-| `uniqueName` | ends `…Tier<X>Table<Y>Rewards` | **`Table<Y>` is the rotation letter, published per tier.** See the entry below — this is the whole of it |
-| `standingStages[]` | its length is the **stage count**, and it varies: 3, 4 or 5 by tier | `objectivesOf` hard-codes 4 stages for every bounty. Tier A is 3, Tier D is 5 — and Profit-Taker is not a bounty at all |
-| `enemyLevels[]` | e.g. `[40, 60]` | **every bounty node in our data has `lvl: null`** — 13 of them — so bounties can never win the level tie-break |
-| `minMR` | **Minimum Mastery Rank**, 0 to 10 — see the caveat below | the demand badge the header field above wants |
-| `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | a real name instead of `Level 20 - 40 Cetus Bounty` |
-| `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | a cross-check against DE's static table, which is how the letter is currently derived at all |
+| `uniqueName` | ends `…Tier<X>Table<Y>Rewards` | **read.** The letter, per tier — and the tiers disagreed |
+| `standingStages[]` | its length is the stage count: 3, 4 or 5 by tier | **read.** `objectivesOf` no longer assumes four |
+| `enemyLevels[]` | e.g. `[40, 60]` | **filled**, from the group's own name — all 13 bounty nodes carry levels now |
+| `tag` on `/pc/events` | `HeatFissure`, `WaterFight` | **recorded when seen.** Still unobserved for our two events — see below |
+| `minMR` | Minimum Mastery Rank, 0 to 10 | **carried in the payload, unused.** Needs the player's own rank, which is the header field below |
+| `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | open — a real name instead of `Level 20 - 40 Cetus Bounty` |
+| `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | open — a cross-check against DE's static table |
 
-And on `/pc/events`, a **`tag`** field — `HeatFissure`, `WaterFight` — a stable
-machine identifier instead of the keyword scan described in the entry above.
+**`type` is the one with a trap in it.** Our node names are the join key between
+DE's drop table and the worldstate, and they are what `ROT.signature` folds on and
+what `nodeKey` matches fissures against. Renaming them is not a display change. If
+this is done at all it wants to be an annotation beside the name, not a
+replacement — and it overlaps with *Our four invented "mission types" leak into the
+ranking*, which is the same problem one level up.
 
-None of this needs a new request. It is in the response we already cache.
+Neither of the remaining two needs a new request. Both are in the response we
+already cache.
 
 **`minMR` is Minimum Mastery Rank**, the account-wide progression rank — earned by
 levelling frames, weapons and Intrinsics and passing a test per rank, capped at 30
@@ -765,52 +769,6 @@ worldstate does not publish at all: The Steel Path must be unlocked.
 So this is not a candidate for the exclusion rule. It is a candidate for a **demand
 badge**, and it would need the player's own rank — the first thing this project
 would have to ask about itself rather than derive.
-
-### Read each bounty's rotation letter directly — the worldstate already says it
-
-**Answered 2026-08-14; the work is what is left.** The letter does not need deriving
-per tier. DE publish it in each job's `uniqueName`, and a reading of the cached
-worldstate for the window ending `2026-08-12T20:25:13.214Z` matches our own
-derivation exactly:
-
-| Job | `uniqueName` tail | Our derived letter |
-|---|---|---|
-| Ostrons tiers A–E, Solaris tiers A–E, Entrati tiers A/B/C/E | `Tier*Table**A**Rewards` | `standard: A` (16 of 16 votes) |
-| Isolation Vault chambers A, B, C | `VaultBountyTier*Table**B**Rewards` | `vault: B` (6 of 6 votes) |
-
-Two independent methods, 22 votes, no disagreement. That settles what `Table<Y>`
-means.
-
-**And it answers the tier that never fitted.** Entrati's *Reclaim What's Ours*
-(level 30–40, our `Level 30 - 40 Cambion Drift Bounty`, the tier that publishes only
-rotations **AB**) came back `TierDTable**B**Rewards` — on **B**, while every other
-Entrati tier in the same window was on **A**. So the tier is not inheriting the
-family letter and it is not falling back to A. It runs its own letter, and DE say
-which, every window.
-
-**The work:** parse `Tier<X>Table<Y>` out of `uniqueName`, key it by the tier's
-`enemyLevels` to reach our node names, and keep `derive_bounty_rotation`'s
-reward-matching as the fallback for a worldstate that cannot be read. Tiers whose
-rotations are indistinguishable keep the family letter as a fallback. Only Aya is
-affected today, on one node, which is why this is written down rather than done.
-
-#### The observations that would check any implementation
-
-Three readings of the live worldstate against what the two-rotation Cambion Drift
-tier was actually offering. Without the `uniqueName` reading, two explanations fit
-all three — the tier falls back to A whenever the board is on C, or it runs its own
-two-letter cycle that happens to line up — and they only diverge about eight hours
-after the last reading.
-
-| Bounty window ends | Board is on | That tier offered |
-|---|---|---|
-| 2026-08-11T21:55Z | C | its A table |
-| 2026-08-12T07:55Z | A | its A table |
-| 2026-08-12T10:25Z | B | its B table |
-
-DE's table gives `Level 30 - 40 Cambion Drift Bounty` rotations A and B only;
-`Level 40 - 60` and `Level 100 - 100` publish A alone and are handled correctly, one
-table with nothing to wait for.
 
 ### The meta line is now 6.68:1, and the floor is 7:1 — what is left of decision 5
 
@@ -907,12 +865,16 @@ which is the correct behaviour — a made-up level would silently distort the ti
 that levels exist to serve. Kept as a note so the 69% figure is not mistaken for a
 join bug.
 
-**Reopened in part, 2026-08-14.** The Railjack half stands — DE's export genuinely
-omits Proxima. But **all 13 bounty nodes also have `lvl: null`**, and that half is
-not a gap in the data at all: `/pc/syndicateMissions` publishes `enemyLevels` for
-every live bounty tier, `[5, 15]` through `[100, 100]`, and it is the same number
-already sitting in our own node names (`Level 40 - 60 Cetus Bounty`). Two routes to
-it, both free. Bounties currently lose every level tie-break by default.
+**Reopened in part on 2026-08-14, and that half closed on 2026-08-24.** All 13
+bounty nodes had `lvl: null` and lost every level tie-break by default. They now
+carry levels, read from the group's own name — `Level 40 - 60 Cetus Bounty` is a
+bounty fought at 40-60, so it needs no network and works on a mirror build. The
+worldstate publishes the same numbers as `enemyLevels`, which is how the two were
+checked against each other.
+
+**The Railjack half stands and is still fine.** DE's export genuinely omits
+Proxima, and an unknown level sorting last is the correct behaviour — a made-up one
+would silently distort the tie-break that levels exist to serve.
 
 ### Event nodes cannot be tied to their event **[settled]**
 

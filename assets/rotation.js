@@ -178,11 +178,12 @@
   const CYCLE_MINUTES = (BOUNTY && BOUNTY.cycleMinutes) || 150;
   const CYCLE_MS = CYCLE_MINUTES * 60000;
 
-  /* Where one family's clock has got to, now. */
-  function familyState(name) {
-    const fam = (BOUNTY && (BOUNTY.families || {})[name]) || null;
-    const end = fam && fam.windowEnd ? new Date(fam.windowEnd).getTime() : NaN;
-    const at = SEQ.indexOf(fam ? fam.letter : "");
+  /* One letter, walked forward from the window it was read in. The board turns
+     over every cycle for everybody at once, so this is arithmetic on the
+     sequence rather than anything the data has to carry per step. */
+  function walkFrom(letter, windowEnd) {
+    const end = windowEnd ? new Date(windowEnd).getTime() : NaN;
+    const at = SEQ.indexOf(letter || "");
     if (!isFinite(end) || at < 0) return { letter: null, endsAt: null };
     const now = Date.now();
     const steps = now < end ? 0 : Math.floor((now - end) / CYCLE_MS) + 1;
@@ -190,15 +191,39 @@
              endsAt: end + steps * CYCLE_MS };
   }
 
+  /* Where one family's clock has got to, now. The fallback: used when DE did
+     not publish a letter for a bounty, or could not be reached. */
+  function familyState(name) {
+    const fam = (BOUNTY && (BOUNTY.families || {})[name]) || null;
+    return walkFrom(fam && fam.letter, fam && fam.windowEnd);
+  }
+
   /* {letter, endsAt, published} for a bounty node. letter is null when it
      genuinely cannot be named - a mirror build, or a worldstate that could not
      be read - which the pages say out loud rather than papering over with a
      guess. `published` is the letters DE's table gives this bounty, which is
      not always all three. */
+  /* DE publish the letter per tier, in each job's uniqueName, and that beats
+     deriving it: the derived answer is one letter for a whole family, and the
+     tiers genuinely disagree. Read on 2026-08-24, every Ostron and Solaris tier
+     was on C while three of the six Cambion Drift tiers were on A - and one of
+     those three publishes only rotations A and B, so the family answer was
+     naming it a letter it does not have.
+
+     The family clock stays as the fallback, for a bounty DE did not publish a
+     letter for (the Narmer tiers carry no tier at all) and for a build that
+     could not reach the worldstate. */
   function liveRotation(node) {
     const g = (BOUNTY && BOUNTY.groups && BOUNTY.groups[node]) || null;
     if (!g) return { letter: null, endsAt: null, published: "" };
-    return Object.assign(familyState(g.family), { published: g.rotations || "" });
+    const state = g.letter
+      ? walkFrom(g.letter, BOUNTY.windowEnd)
+      : familyState(g.family);
+    return Object.assign(state, {
+      published: g.rotations || "",
+      // one bounty in the game runs 3 stages, another 5 - see objectivesOf
+      stages: g.stages || null,
+    });
   }
 
   /* When a letter next comes up. The current one runs until endsAt and each one
@@ -217,10 +242,15 @@
       : Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
   }
 
-  /* The letters of every family, for spotting a changeover while a page is
-     open: same string, nothing has moved. */
-  const stamp = () => Object.keys((BOUNTY && BOUNTY.families) || {})
-    .sort().map((f) => familyState(f).letter || "?").join("");
+  /* The letters of everything on the clock, for spotting a changeover while a
+     page is open: same string, nothing has moved.
+
+     Read from the groups rather than the families, because the groups are what
+     the rows are scored on and a build can now name their letters without the
+     families having been derived at all. Every one of them turns over at the
+     same instant, so this changes exactly when the board does. */
+  const stamp = () => Object.keys((BOUNTY && BOUNTY.groups) || {})
+    .sort().map((g) => liveRotation(g).letter || "?").join("");
 
   const anyClocked = () =>
     !!(BOUNTY && Object.keys(BOUNTY.groups || {}).length);
@@ -249,7 +279,7 @@
         stranded: pays.filter((t) => t !== letter),
         planName: null, nonStandard: false,
         bounty: { letter, endsAt: live.endsAt, published: live.published,
-                  offTable: false, unknown: false },
+                  stages: live.stages || null, offTable: false, unknown: false },
       }, tally(Object.assign({ none: 1 }, counts), alt));
     }
     const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
@@ -264,6 +294,7 @@
       total: mean + flat, perRound: mean + flat, rounds: null,
       counts: null, stranded: null, planName: null, nonStandard: false,
       bounty: { letter: null, endsAt: live.endsAt, published: live.published,
+                stages: live.stages || null,
                 offTable: !!live.letter, unknown: pays.length > 1,
                 live: live.letter },
     }, tally({ none: 1, mean: pays.length ? 1 : 0 }, altMean));
@@ -315,9 +346,12 @@
 
      Bounties are not on the round cycle at all, so the model has no round count
      for them - every bounty in the game runs a fixed set of stages, and four is
-     the common shape - but only the common one: `/pc/syndicateMissions`
-     publishes `standingStages[]` per tier and its length is 3, 4 or 5. Reading
-     it is still owed (`TODO.md`).
+     only the common shape. DE publish the real number per tier, one entry per
+     stage in `standingStages`, and it is 3, 4 or 5: a level 5-15 bounty is
+     three stages and a level 40-60 is five. The build reads it and the row
+     carries it, so `BOUNTY_STAGES` is now only the fallback for a bounty DE did
+     not publish - the Narmer tiers, and anything on a build that could not
+     reach the worldstate.
 
      The heist is the exception, and it is one DE's filing hides. Each
      Profit-Taker phase is a whole activity you replay on its own - that is the
@@ -332,7 +366,7 @@
   const OBJECTIVE_UNIT = { Spy: "vault", Caches: "cache" };
   function objectivesOf(n) {
     if (isHeist(n)) return { count: 1, unit: "run" };
-    if (n.bounty) return { count: BOUNTY_STAGES, unit: "stage" };
+    if (n.bounty) return { count: n.bounty.stages || BOUNTY_STAGES, unit: "stage" };
     if (n.rounds) return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
     return { count: 1, unit: "run" };
   }
