@@ -1087,6 +1087,21 @@ def main() -> int:
         fh.write(blob)
         fh.write(";\n")
 
+    # ---- the same fissures, on their own ---------------------------------
+    # Ten kilobytes beside a 1.9 MB payload, and the only part of it with an
+    # hour to live. An open page re-reads this every ten minutes and leaves the
+    # catalogue alone, so a tab left open learns about a fissure that opened
+    # after it loaded without downloading the other 99.5% again.
+    #
+    # Same origin, always: the page fetches this file from wherever it was
+    # served, never api.warframestat.us. That keeps `connect-src 'self'` intact
+    # and keeps the reader's address out of a third party's logs - the refresh
+    # is the scheduled build's job, and this file is how its answer arrives.
+    with open(os.path.join(DATA_DIR, "fissures.json"), "w", encoding="utf-8") as fh:
+        json.dump({"generated": payload["meta"]["generated"],
+                   "fissures": payload["fissures"]},
+                  fh, ensure_ascii=False, separators=(",", ":"))
+
     # remember what upstream looked like, so --if-changed can skip next time
     new_state = {
         "built": payload["meta"]["generated"],

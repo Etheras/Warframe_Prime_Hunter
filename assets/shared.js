@@ -215,7 +215,62 @@
      decides every number on both pages. Takes a probability. */
   const squadOdds = (p) => 1 - Math.pow(1 - p, 4);
 
+  /* ── the one part of the payload that expires ─────────────────────
+     Everything else here moves a few times a year. Fissures move every hour or
+     two, so a page left open all evening was built on a list that had run out -
+     it could only ever lose badges, never gain the ones that opened since.
+
+     `data/fissures.json` is the same list on its own, four kilobytes beside a
+     1.9 MB payload, written by the same build. Re-reading it every ten minutes
+     costs a rounding error and keeps an open tab as current as the schedule
+     behind it: ten minutes on both the local task and the published site.
+
+     **Same origin, always.** It is fetched from wherever the page was served
+     and never from api.warframestat.us, so `connect-src 'self'` stands as it is
+     and nobody reading this site appears in a third party's logs. Keeping the
+     data current is the scheduled build's job; this is only how its answer
+     reaches a page that is already open.
+
+     Mutated in place rather than reassigned, because both pages took a
+     reference to this array at load. Normalised first for the same reason: a
+     build old enough to have no fissure list at all would otherwise leave each
+     page holding a private empty array that this could never reach. */
+  const FISSURE_REFRESH_MS = 10 * 60 * 1000;
+  if (!Array.isArray(DATA.fissures)) DATA.fissures = [];
+
+  function watchFissures(onChange) {
+    const live = DATA.fissures;
+    let seen = JSON.stringify(live);
+    const pull = () => {
+      if (typeof fetch !== "function") return;
+      fetch("data/fissures.json", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((doc) => {
+          if (!doc || !Array.isArray(doc.fissures)) return;
+          const now = JSON.stringify(doc.fissures);
+          if (now === seen) return;         // nothing moved; do not touch the page
+          seen = now;
+          live.splice.apply(live, [0, live.length].concat(doc.fissures));
+          if (onChange) onChange();
+        })
+        /* file://, a bundled single file, a server that does not carry it, or
+           no network. Every one of those means "keep what the payload shipped
+           with", which is the same safe direction the list already fails in:
+           it can go out of date, it cannot invent a fissure. */
+        .catch(() => {});
+    };
+    /* Once on load as well, because the browser may have served the 1.9 MB
+       payload out of its own cache while this four-kilobyte file is fetched
+       fresh - which is exactly the case where the two disagree. */
+    pull();
+    setInterval(pull, FISSURE_REFRESH_MS);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) pull();
+    });
+  }
+
   window.WFPrimeShared = {
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
+    watchFissures, FISSURE_REFRESH_MS,
   };
 })();

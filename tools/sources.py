@@ -90,6 +90,35 @@ def cache_path(key: str) -> str:
     return os.path.join(CACHE_DIR, safe + ".gz")
 
 
+# The validator that came with a cached body, beside the body rather than in a
+# shared index: one file per key cannot be corrupted by another key's write, and
+# a missing or unreadable one costs a full download rather than a wrong answer.
+def etag_path(path: str) -> str:
+    return path + ".etag"
+
+
+def read_etag(path: str):
+    if not os.path.exists(path):
+        return None          # no body to validate, so nothing to ask about
+    try:
+        with open(etag_path(path), encoding="utf-8") as fh:
+            return fh.read().strip() or None
+    except OSError:
+        return None
+
+
+def write_etag(path: str, tag) -> None:
+    try:
+        if tag:
+            with open(etag_path(path), "w", encoding="utf-8") as fh:
+                fh.write(tag.strip())
+        elif os.path.exists(etag_path(path)):
+            # the source stopped sending one; a stale validator is worse than none
+            os.remove(etag_path(path))
+    except OSError:
+        pass
+
+
 # A failed fetch means two very different things, and they are tracked apart:
 #
 #   STALE   - the refresh failed but a previous copy exists, so the build
@@ -139,23 +168,38 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
     urls = [url] if isinstance(url, str) else list(url)
     last_err = None
+    prior = read_etag(path)
     for attempt in range(3):
         for one in urls:
             try:
-                req = urllib.request.Request(one, headers={
-                    "User-Agent": UA,
-                    "Accept-Encoding": "gzip",
-                })
+                headers = {"User-Agent": UA, "Accept-Encoding": "gzip"}
+                # Ask only for what we do not already hold. The fissure list is
+                # polled every ten minutes and changes every hour or two, so most
+                # of those requests should cost a header exchange and no body -
+                # api.warframestat.us answers 304 with zero bytes, and sits behind
+                # a CDN that declares max-age=120 of its own.
+                if prior:
+                    headers["If-None-Match"] = prior
+                req = urllib.request.Request(one, headers=headers)
                 with urllib.request.urlopen(req, timeout=120) as resp:
                     raw = resp.read()
                     if resp.headers.get("Content-Encoding") == "gzip":
                         raw = gzip.decompress(raw)
+                    tag = resp.headers.get("ETag")
                 os.makedirs(CACHE_DIR, exist_ok=True)
                 with gzip.open(path, "wb") as fh:
                     fh.write(raw)
+                write_etag(path, tag)
                 return raw
-            except (urllib.error.URLError, urllib.error.HTTPError,
-                    TimeoutError, OSError) as exc:
+            except urllib.error.HTTPError as exc:
+                # 304 is a success: the server has confirmed what we hold is
+                # current. Only reachable when a body was cached, since the
+                # header is only sent then.
+                if exc.code == 304:
+                    with gzip.open(path, "rb") as fh:
+                        return fh.read()
+                last_err = exc
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 last_err = exc
         if attempt < 2:
             time.sleep(1.5 * (attempt + 1))
@@ -290,6 +334,11 @@ def prune_cache(live_keys: set[str]) -> int:
             continue
         try:
             os.remove(os.path.join(CACHE_DIR, fname))
+            # its validator goes with it, or the next fetch of a key that
+            # happened to reuse the name would send a header for a body we no
+            # longer hold and take a 304 it cannot answer
+            if os.path.exists(os.path.join(CACHE_DIR, fname + ".etag")):
+                os.remove(os.path.join(CACHE_DIR, fname + ".etag"))
             dropped += 1
         except OSError:
             pass

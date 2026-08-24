@@ -556,6 +556,23 @@ def test_built_payload() -> None:
     )
     check("payload: no item has two parts with the same name", dupes, [])
 
+    # The one part of the payload with an hour to live, published on its own so
+    # an open page can re-read it without pulling the other 1.9 MB down again.
+    side = os.path.join(ROOT, "data", "fissures.json")
+    check_true("payload: the fissure list is also written on its own",
+               os.path.exists(side))
+    if os.path.exists(side):
+        with open(side, encoding="utf-8") as fh:
+            alone = json.load(fh)
+        check("payload: and it is the same list, not a second answer",
+              alone.get("fissures"), D.get("fissures"),
+              "two files disagreeing about the fissures is worse than one stale one")
+        check_true("payload: it says when it was built, so staleness is visible",
+                   bool(alone.get("generated")))
+        check_true("payload: and it is small enough to poll every ten minutes",
+                   os.path.getsize(side) < 200 * 1024,
+                   f"{os.path.getsize(side)} bytes is not a ten-minute request")
+
     # Named subjects, not "everything carrying builtFrom": that flag is written
     # by the code under test, so selecting on it would let a fold that stopped
     # happening pass by finding nothing at all (PROJECT.md section 2).
@@ -660,15 +677,25 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
         check("schedule: registering the task exits 0", made.returncode, 0,
               (made.stderr or made.stdout)[-400:])
         interval, _, duration = read().partition("|")
-        check("schedule: it repeats every hour, as the default says", interval, "PT1H")
+        check("schedule: it repeats every ten minutes, as the default says",
+              interval, "PT10M",
+              "the fissure list is the reason for the cadence; it lasts an hour or two")
         check("schedule: with no duration, which is how it means indefinitely",
               duration, "",
               "a bounded duration registers fine and then stops refreshing")
 
+        half = run("-EveryMinutes", "30")
+        check("schedule: -EveryMinutes reaches the trigger", half.returncode, 0,
+              (half.stderr or half.stdout)[-400:])
+        check("schedule: and is what gets stored", read().partition("|")[0], "PT30M")
+
+        # kept working rather than kept around: anyone who set the old cadence
+        # should get it, and the conversion is the only thing that could rot
         eight = run("-EveryHours", "8")
-        check("schedule: -EveryHours reaches the trigger", eight.returncode, 0,
+        check("schedule: -EveryHours still reaches the trigger", eight.returncode, 0,
               (eight.stderr or eight.stdout)[-400:])
-        check("schedule: and is what gets stored", read().partition("|")[0], "PT8H")
+        check("schedule: and converts to minutes on the way",
+              read().partition("|")[0], "PT8H")
 
         gone = run("-Remove")
         check("schedule: -Remove exits 0", gone.returncode, 0, gone.stderr[-300:])
@@ -1403,22 +1430,62 @@ def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     sh = read_text(os.path.join(ROOT, "tools", "schedule.sh"))
     shared = read_text(os.path.join(ROOT, "assets", "shared.js"))
 
-    win = re.search(r"\$EveryHours\s*=\s*(\d+)", ps)
-    nix = re.search(r"(?m)^EVERY=(\d+)", sh)
+    win = re.search(r"\$EveryMinutes\s*=\s*(\d+)", ps)
+    nix = re.search(r"(?m)^EVERY_MIN=(\d+)", sh)
     check_true("schedule: the Windows default is findable", bool(win))
     check_true("schedule: the cron default is findable", bool(nix))
-    hours = int(win.group(1))
+    mins = int(win.group(1)) if win else 0
     check("schedule: both platforms refresh on the same clock",
-          int(nix.group(1)), hours,
+          int(nix.group(1)) if nix else -1, mins,
           "a default changed on one platform and not the other is invisible")
 
     # the banner the whole thing exists to prevent, read from where it is set
     days = re.search(r"days\s*>=\s*(\d+)", shared)
     check_true("schedule: the banner's patience is findable", bool(days))
     check_true("schedule: three refreshes fit inside the banner's patience, twice over",
-               hours * 3 <= int(days.group(1)) * 24,
-               f"refreshing every {hours}h against a banner at {days.group(1)} days "
+               0 < mins * 3 <= int(days.group(1)) * 24 * 60,
+               f"refreshing every {mins} min against a banner at {days.group(1)} days "
                f"leaves no room for a failed run")
+
+    # And the reason the cadence is what it is, rather than merely consistent.
+    # A fissure lasts an hour or two and the pages only show ones that have not
+    # expired, so the refresh has to be a small fraction of that or the badges
+    # are mostly absent. Read from the page, which is what actually re-reads it.
+    poll = re.search(r"FISSURE_REFRESH_MS\s*=\s*(\d+)\s*\*\s*60\s*\*\s*1000", shared)
+    check_true("schedule: the page's own fissure poll is findable", bool(poll))
+    check("schedule: the page re-reads on the same clock the job writes on",
+          int(poll.group(1)) if poll else -1, mins,
+          "a page polling faster than the job writes just re-reads its own answer")
+    check_true("schedule: the cadence is well inside a fissure's life",
+               0 < mins <= 20,
+               "a fissure runs an hour or two; refreshing slower than that shows none")
+
+    # The third scheduler, and the one that reaches anybody who is not running
+    # this locally. Same job, same reason, and it drifts the same way if nobody
+    # checks: the published site rebuilt once a day always shows no fissures.
+    flow = read_text(os.path.join(ROOT, ".github", "workflows", "publish.yml"))
+    crons = re.findall(r'- cron: "(.+?)"', flow)
+    step = re.search(r"(?m)^\s*- cron: \"\*/(\d+) \* \* \* \*\"", flow)
+    check_true("schedule: the published site has a short-interval refresh too",
+               bool(step), f"crons found: {crons}")
+    check("schedule: and it runs on the same clock as the local job",
+          int(step.group(1)) if step else -1, mins,
+          "a site refreshed slower than the page polls polls for nothing")
+    check_true("schedule: the daily full build is still there",
+               any(not c.startswith("*/") for c in crons),
+               "the ten-minute run takes its heavy sources from the cache, so "
+               "something has to fill that cache")
+    # The whole point of the short run is that it does NOT re-download the wiki,
+    # the drop tables and DE's export 144 times a day.
+    check_true("schedule: the short run rebuilds from cache rather than refetching",
+               "--if-changed" in flow,
+               "without this the ten-minute cron is a full fetch of every upstream")
+    check_true("schedule: and never writes a cache entry of its own",
+               "actions/cache/restore@" in flow,
+               "actions/cache saves whenever its key missed, which this key always does")
+    check_true("publish: the site carries the fissure list on its own",
+               "cp data/fissures.json" in flow,
+               "the page re-reads that file; without it there is nothing to re-read")
 
 
 def test_a_refresh_clears_the_stale_banner() -> None:

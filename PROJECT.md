@@ -63,9 +63,20 @@ bare-array format by expanding each ticked item into fully-owned parts. Imports
 are validated against the current catalogue: unknown ids and part names are
 skipped, and counts clamped to what the part needs.
 
-**Parts are the source of truth** for anything that has them: an item counts as
-collected exactly when every part is owned, and ticking the card sets or clears
-them all. Items with no parts — cosmetics, Founder gear — stay manually ticked.
+**Parts are inventory; collected is a claim you make.** They were the same fact
+until 2026-08-24, when owning every part marked the item collected on its own —
+wrong in the one direction that matters, because a Prime is four parts *and* a
+build, and the app announced the hunt was over while the blueprint was still in the
+foundry. Banking the last part now finishes the list and stops there.
+
+- **The card tick** (collection view) and **Mark as collected** (the planner, on a
+  finished row) are the two ways in, and both are a sentence you type yourself. The
+  tick also sets the parts to match, because claiming the whole thing implies them.
+- **It still works the other way.** Taking a part back retracts the claim, so no
+  card can read "collected, 2 of 4". Nothing is ever added automatically.
+- Items with no parts — cosmetics, Founder gear — were always manually ticked and
+  are untouched by any of this.
+
 Progress saved before part tracking existed is migrated on load by treating a
 ticked item as "all parts owned", so nothing appears to vanish.
 
@@ -413,26 +424,42 @@ regular row structure, so the whole refresh is deterministic parsing — there i
 model in the loop and no API key to hold. A scheduled task can maintain the site
 indefinitely on its own.
 
-### Install the hourly task
+### Install the ten-minute task
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
 Registers a Windows Scheduled Task ("Warframe Prime Hunter data refresh") that runs
-`build_data.py --if-changed` **every hour**. Options: `-EveryHours 8`, `-Time 07:30`,
-`-RunNow`, `-Remove`. `tools/schedule.sh` installs the same job into cron on macOS
-and Linux, with the same defaults — a test compares the two, because a default
-changed on one platform and left alone on the other is not a visible mistake.
+`build_data.py --if-changed` **every ten minutes**. Options: `-EveryMinutes 30`,
+`-EveryHours 8`, `-Time 07:30`, `-RunNow`, `-Remove`. `tools/schedule.sh` installs
+the same job into cron on macOS and Linux, with the same defaults — a test compares
+the two, because a default changed on one platform and left alone on the other is
+not a visible mistake. The same test reads the interval out of the published
+workflow and out of the page's own poll, so all three move together or the suite
+says so.
 
-**Why hourly.** Two reasons, and neither is "to be current for its own sake":
+**Why ten minutes.** One reason, and it is not "to be current for its own sake":
 
-- The **"this data is old" banner** is what the task exists to prevent, so it has to
-  run several times over inside that window. At 24 runs a day a long run of failures
-  is needed before anyone is told anything is wrong.
 - The **fissure badges** on the ranked nodes only appear for fissures that have not
-  expired, so they are exactly as fresh as this task. Hourly they are nearly always
-  right; daily there are never any.
+  expired, and a fissure runs an hour or two. They are exactly as fresh as this
+  task. At ten minutes they are as good as live; hourly they were mostly right;
+  daily there are never any.
+- The **"this data is old" banner** the task also exists to prevent gets the same
+  cover for free. It is patient for 14 days, so at 144 runs a day the margin is
+  absurd — which is fine, because the margin was never the binding constraint.
+
+**Why that is not rude.** The one source polled every run is
+`api.warframestat.us/pc/fissures`, and it is 5× slower than what that endpoint asks
+for: it sits behind a CDN advertising `Cache-Control: max-age=120`, so a
+two-minute-old answer is one it is happy to serve to anyone. Every fetch is
+conditional — measured against the live endpoint, an `If-None-Match` with the stored
+validator returns **304 and zero bytes** — so a run that finds nothing new
+transfers essentially nothing. Five minutes is the floor the script enforces, and
+that is manners rather than a technical limit; nothing in the data changes faster
+than that.
+
+The whole run costs **1.7 seconds** on a warm cache, measured end to end.
 
 The `.DESCRIPTION` block in `tools/schedule.ps1` still calls this the "fissure
 strip", which it stopped being on 2026-08-14 — see `TODO.md`.
@@ -451,25 +478,53 @@ It fetches a fingerprint before doing any real work:
 Fingerprints live in `.cache/state.json`. The first three decide whether anything is
 downloaded. The fissure list is fetched every run regardless and never enters the
 fingerprint, because it changes constantly — putting it in would mean a full download
-every hour to learn something a 10 KB document already said.
+every ten minutes to learn something a 10 KB document already said.
 
 So a quiet run costs four small requests and a rebuild **from the cache**, which
-takes 0.65 s. It used to exit having written nothing at all; it now rewrites the
-payload, because the fissures in it have moved even when nothing else has.
+takes 1.7 s end to end. It used to exit having written nothing at all; it now
+rewrites the payload, because the fissures in it have moved even when nothing else
+has.
+
+**Every fetch is conditional.** A cached body is stored with the `ETag` that came
+with it, in a `.etag` file beside it — one per key, so a bad write cannot poison
+another source — and the next request sends it as `If-None-Match`. A 304 is treated
+as success and answered from the cache. That is what makes a ten-minute schedule
+cost about as much as an hourly one used to: the requests still happen, the bodies
+mostly do not.
 
 ### Or let GitHub run it
 
-`.github/workflows/publish.yml` does the same job in CI on a daily cron, with no
-secrets (every source is public) and no `pip install` (stdlib only). It builds,
-asserts the result is sane — at least 120 items, 40 Warframes, 500 relics, and
-something farmable — then publishes to GitHub Pages. The item floor is 120 rather
-than something nearer the real 167 because a wiki-less build is legitimately
-thinner; it is there to catch an empty parse, not to police the catalogue.
+`.github/workflows/publish.yml` does the same job in CI, with no secrets (every
+source is public) and no `pip install` (stdlib only). It builds, asserts the result
+is sane — at least 120 items, 40 Warframes, 500 relics, and something farmable —
+then publishes to GitHub Pages. The item floor is 120 rather than something nearer
+the real 167 because a wiki-less build is legitimately thinner; it is there to catch
+an empty parse, not to police the catalogue.
 
-It supersedes the Scheduled Task for everything except the fissures, which it cannot
-help with: a site rebuilt once a day always finds them expired, so no row on the
-published copy is ever marked. That is the honest answer for a daily build, and it is
-why the local hourly task is still worth running if the planner is what you use.
+**Two schedules, and the difference between them is the point.**
+
+| Cron | What runs | Why |
+|---|---|---|
+| `40 18 * * *` | probe, full test suite, full fetch, cache **saved** | Resurgence flips at 18:00 UTC; this is the build that fills the cache |
+| `*/10 * * * *` | cache **restored read-only**, `--if-changed`, no probe, no tests | the fissure list, and nothing else, at the cadence it deserves |
+
+The short run exists because the published site had the one gap the local task did
+not: rebuilt once a day, it always found the fissures expired and marked no row at
+all. It takes the heavy sources from the restored cache, so it is not re-downloading
+the wiki, the drop tables and DE's export 144 times a day — and it uses
+`actions/cache/restore` rather than `actions/cache`, because the latter saves a new
+entry whenever its key missed, and that key misses by construction. Left as it was,
+the ten-minute run would have written a fresh copy of `.cache` 144 times a day and
+evicted everything else the repository keeps.
+
+**Two things to know before changing that number.** GitHub schedules are best
+effort — five minutes is the documented floor, and runs are queued, delayed, and
+dropped entirely under load, so ten minutes is a target rather than a guarantee.
+And Pages allows on the order of ten deployments an hour; six is comfortably inside
+that, three-minute polling would not be.
+
+A cold cache falls through to a full build, which is the right failure: slower,
+never thinner.
 
 **The dataset is never committed.** It is built in CI and handed to Pages as an
 artifact, so the repo stays source-only (40 files, ~760 KB, over half of it these
@@ -539,9 +594,10 @@ Warframe Prime Hunter/
 │   └── plan.js             ← wishlist, scoring model, ranked node plan
 ├── data/
 │   ├── prime-data.js    ← GENERATED — window.WFPRIME_DATA = {...}
-│   └── prime-data.json  ← GENERATED — same payload as plain JSON
+│   ├── prime-data.json  ← GENERATED — same payload as plain JSON
+│   └── fissures.json    ← GENERATED — just the fissures, re-read every 10 min
 ├── .github/workflows/
-│   └── publish.yml         ← daily rebuild in CI, runs the tests, publishes to Pages
+│   └── publish.yml         ← daily full rebuild + a ten-minute fissure refresh
 ├── tests/
 │   ├── test_build.py       ← the suite, and the one command to run
 │   ├── test_assets.mjs     ← rotation + store, under Node
@@ -557,7 +613,7 @@ Warframe Prime Hunter/
 │   ├── bundle.py           ← inlines everything into dist/warframe-prime-hunter.html
 │   ├── serve.py            ← local server, picks a working port
 │   ├── guard_shell_writes.py ← the PreToolUse hook that refuses shell writes (§2)
-│   ├── schedule.ps1        ← installs/removes the hourly Scheduled Task
+│   ├── schedule.ps1        ← installs/removes the ten-minute Scheduled Task
 │   └── schedule.sh         ← the same job in cron, for macOS and Linux
 ├── dist/                   ← GENERATED — single-file build, gitignored
 └── .cache/                 ← GENERATED — HTTP cache + state.json, safe to delete
@@ -613,8 +669,9 @@ whole directory it is pointed at, with browsable listings.
 
 For this folder that meant **`.git`**, pack files included, from which a private
 repository can be reconstructed; plus `.cache/`, `tools/` and `tests/`. So it
-serves an **allowlist** instead: the nine files the two pages ask for — both pages,
-six assets, the dataset — plus flat files under `assets/img/`, and nothing else. An
+serves an **allowlist** instead: the ten files the two pages ask for — both pages,
+six assets, the dataset, and `data/fissures.json` for the ten-minute re-read —
+plus flat files under `assets/img/`, and nothing else. An
 allowlist rather than a blocklist
 deliberately — a blocklist has to predict what is worth hiding, and `.git` was
 on nobody's list until someone checked.
@@ -1393,6 +1450,29 @@ a ranking built for a rotation letter that had turned over while nobody was look
 Everything that reads the clock now runs once on `visibilitychange`, which is what
 makes skipping the work while hidden safe rather than merely cheap: hidden work is
 only safe to skip when something covers the gap it leaves.
+
+**The list itself is re-read, and that was the other half.** The one-minute repaint
+could only ever *lose* badges: it re-reads a list fixed at page load, so it retires
+fissures as they close and never hears about one that opened since. `build_data.py`
+now also writes **`data/fissures.json`** — the same list on its own, four kilobytes
+beside a 1.9 MB payload — and `shared.js` re-reads it every ten minutes, on load, and
+on `visibilitychange`. The array is spliced in place because both pages took a
+reference to it at load; `shared.js` normalises it to an array first, so a build old
+enough to have no fissure list cannot leave a page holding a private empty one.
+
+**Same origin, and that is the whole design.** It is fetched from wherever the page
+was served and never from `api.warframestat.us`, so `connect-src 'self'` stays a
+true statement about this site and nobody reading it appears in a third party's
+logs. Keeping the data current is the scheduled build's job — locally and in CI,
+both on ten minutes — and this file is only how that answer reaches a page which is
+already open. It fails silently on `file://`, in the bundled single file, and on any
+server that does not carry it, which is the same safe direction the list already
+fails in: it can go out of date, it cannot invent a fissure.
+
+**Badges only, deliberately.** The fold uses a live fissure to choose which of
+several identical nodes to name. Re-running that on a refresh would rename rows
+under whoever is reading them, for a reason that expires within the hour — the same
+call as never letting a fissure into the score.
 
 ### Two lists, two questions, never one score
 

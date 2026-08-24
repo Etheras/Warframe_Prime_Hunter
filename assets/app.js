@@ -46,8 +46,16 @@
 
      This is the only thing fissures do here. They are not scored, and they are
      not listed: `PROJECT.md §7`. */
-  const FISSURES = DATA.fissures || [];
+  const FISSURES = DATA.fissures;
   const nodeKey = (n) => n.node + " (" + n.planet + ")";
+
+  /* Re-read every ten minutes, from this origin — see shared.js. No callback:
+     nothing on this page is painted from the list, it is only consulted when a
+     drawer opens, and by then the array has whatever the last read left in it.
+     It is here rather than only on the planner because the two pages must not
+     hold different fissure lists — that is the whole reason `pickNode` takes
+     the same predicate on both. */
+  S.watchFissures();
 
   /* ── collection state ─────────────────────────────────────── */
   // load/save come from shared.js, which swallows a corrupt or unavailable
@@ -79,11 +87,19 @@
   const partsDone = (it) =>
     it.parts.filter((p) => haveOf(it.id, p.name) >= needOf(p)).length;
 
-  /* An item that has parts is "collected" exactly when all of them are owned.
-     Items with no parts (cosmetics, Founder gear) stay manually ticked. */
+  /* Owning every part does NOT make an item collected. It used to, on both
+     pages, and it was wrong in the one direction that matters: a Prime is four
+     parts *and* a build, so the app announced the hunt was over while the
+     blueprint was still in the foundry. Banking the last part now finishes the
+     list and stops there; saying you have the thing is a tick you make.
+
+     This still runs the other way. Nothing can be collected while a part is
+     missing, so taking one back retracts the claim rather than leaving a card
+     reading "collected, 2 of 4". Items with no parts at all — Founder gear,
+     accessories — are untouched here and are only ever ticked by hand. */
   function syncCollected(it) {
     if (!it.parts.length) return;
-    if (partsComplete(it)) collected.add(it.id); else collected.delete(it.id);
+    if (!partsComplete(it)) collected.delete(it.id);
   }
 
   function setAllParts(it, full) {
@@ -1068,18 +1084,16 @@
   }
 
   /* ── collection toggles ───────────────────────────────────── */
+  /* The tick, which is the one place that says "I have this". It sets the
+     parts to match, because claiming the whole thing implies them - but it is
+     the tick that decides, not the parts. That inversion is the point: parts
+     are inventory, this is the claim, and `syncCollected` no longer derives one
+     from the other in the direction that would put words in your mouth. */
   function toggle(id) {
     const it = ITEMS.find((x) => x.id === id);
     const want = !collected.has(id);
-    if (it && it.parts.length) {
-      // parts are the source of truth for anything that has them
-      setAllParts(it, want);
-      syncCollected(it);
-    } else if (want) {
-      collected.add(id);
-    } else {
-      collected.delete(id);
-    }
+    if (it && it.parts.length) setAllParts(it, want);
+    if (want) collected.add(id); else collected.delete(id);
     saveCollected();
     refreshCard(it);
   }
@@ -1301,7 +1315,10 @@
         }
       }
       if (backup.filters) save(KEY_FILTERS, backup.filters);
-      // an item with parts is collected iff they're all owned — re-derive it
+      /* A backup carries both facts, so both are restored as written. This only
+         drops a claim the parts in the same file contradict — nothing here
+         invents one, which is what would happen if a file listing every part
+         but no ticks came back with everything collected. */
       ITEMS.forEach((it) => syncCollected(it));
       if (nextMaterials) { materials = nextMaterials; renderMaterials(); }
 

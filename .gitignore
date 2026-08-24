@@ -4,6 +4,9 @@
 # source-only and every build pulls fresh data straight from DE.
 data/prime-data.js
 data/prime-data.json
+# the fissure list on its own, so an open page can re-read the one part of the
+# payload that expires without downloading the other 1.9 MB
+data/fissures.json
 
 # item artwork pulled by --with-images. Same reasoning: it is DE's artwork,
 # served via cdn.warframestat.us, and not ours to redistribute.

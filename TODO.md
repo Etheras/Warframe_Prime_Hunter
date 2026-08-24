@@ -58,7 +58,6 @@ work that makes it correct.
 
 | Entry | Where | Size |
 |---|---|---|
-| The page says it cannot see fissures, on a row showing a fissure | `plan.js`, three places | small |
 | Three comments describe things that no longer exist | `schedule.ps1`, `index.html`, `build_data.py` | small |
 
 ### The worldstate is already cached, and barely read
@@ -126,45 +125,18 @@ wiki, not here** — those are edits to `wiki.warframe.com`, not to this reposit
 
 ## Defects found by the documentation sweep of 2026-08-15
 
-Five entries, of which **three shipped on 2026-08-24** and were deleted — the two
+Five entries, of which **four shipped on 2026-08-24** and were deleted — the two
 pages naming different nodes for one folded group, the collection page's missing
-fourth run mode, and the Profit-Taker phase costed at four bounty stages. The two
-below are what is left, and they share the cause the group was made for: a
-capability landed and the sentences explaining why it was absent stayed where they
-were.
+fourth run mode, the Profit-Taker phase costed at four bounty stages, and the three
+strings claiming the page could not see fissures. That last one was rewritten while
+the refresh interval was being changed, because the change made it wronger: the
+sentence said the data was *"refreshed daily"* and it is now re-read every ten
+minutes. The decision it justified is unchanged and now argued from what is
+actually true — see `PROJECT.md §7`.
 
-### The page says it cannot see fissures, on a row showing a fissure
-
-**The sharpest of them, because both halves are on screen at once.** Verified
-on one planner row:
-
-| Element | Says |
-|---|---|
-| `.tag.fissure` badge | `Meso fissure 39m` — *"A Meso fissure is running here, closing 12:13 PM."* |
-| `.est` marker, the next item along | `+relic if fissure` — *"Only if this node is a fissure — **nothing here knows that**."* |
-
-Three places carry the old claim, all in `plan.js`:
-
-1. the `+relic if fissure` tooltip (`"nothing here knows that"`),
-2. `RUN_BLURB.bonus`, shown under *How this works* — *"Nothing here knows which
-   nodes carry a fissure: they move every hour or two and **this data is refreshed
-   daily**"*. The scheduler has run hourly since 2026-08-14 and the build fetches
-   `/pc/fissures`,
-3. the block comment above `fissureBonus` — *"because nothing here can know
-   that… Fetching the live list was considered and rejected."* It was fetched, in
-   the commit before.
-
-**The decision is not in question — the reason given for it is.** Keeping fissures
-out of the score is right and `PROJECT.md §7` argues it properly: a fissure lasts an
-hour or two, the ranking is built from tables that move a few times a year, and a
-list that reshuffles hourly on an expired fact is one you stop trusting. What the
-page must say is *"we can see this and deliberately do not score it"*, not *"we
-cannot see this"* — the second is false and the badge beside it proves so.
-
-Worth noting how this survived: the commit that deleted the decisions table
-identified this exact defect, rewrote the sentence in `TODO.md`, and left the
-identical sentence in the product. A doc and a string can drift apart even when one
-person fixes both in the same hour.
+The one below is what is left of the group, and it is the cause the group was made
+for: a capability landed and the sentences explaining why it was absent stayed where
+they were.
 
 ### Three comments describe things that no longer exist
 
@@ -591,10 +563,12 @@ on *Where to go*, because that is where the run modes live. It should also be st
 on the cracking side — *given you are opening these relics anyway, is it worth
 staying to rotation 5?*
 
-Related, and on the same row: the page now carries a badge saying *this is a fissure
-for 40 more minutes* and a marker saying *+relic if fissure*. A reader can join those
-two; the page does not. Worth doing in the same sitting as the tooltip fix at the top
-of this file, since that marker is being rewritten anyway.
+Related, and on the same row: the page carries a badge saying *this is a fissure for
+40 more minutes* and a marker saying *+relic if fissure*. Half of that was fixed on
+2026-08-24 — the marker's tooltip now points at the badge and says the bonus is
+counted on every endless node rather than only the marked ones. What is still owed
+is the join in the other direction: nothing on the *cracking* side mentions the
+bonus at all, so a reader looking at the relic list has no reason to stay.
 
 **The scoring stays as it is.** Feeding the live fissure list into the score is the
 obvious next move and is the wrong one — it would reorder the ranking hourly on a

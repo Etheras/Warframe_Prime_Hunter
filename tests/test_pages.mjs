@@ -833,6 +833,99 @@ page_test("the collection view names the node that is a fissure, as the planner 
   assert.deepEqual(errors, []);
 });
 
+page_test("banking the last part does not claim the Prime — a button does", async () => {
+  /* It used to. Ticking off the fourth part on the planner wrote the Prime into
+     the collected set on its own, and that is wrong in the direction that
+     matters: a Prime is four parts *and* a build, so the app announced the hunt
+     was over while the blueprint was still in the foundry.
+
+     The parts are read off the page rather than counted here, so an item whose
+     part list changes upstream cannot make this pass by finding nothing. */
+  const { page, errors } = await open("/plan.html");
+  const id = await page.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    return it.id;
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const parts = page.locator("#wishlist .wish-part");
+  assert.ok(await parts.count() > 1, "the subject needs parts left to bank");
+
+  // bank them one at a time; each click redraws the list, so re-query each time
+  for (let guard = 0; guard < 20 && await parts.count() > 0; guard++) {
+    await parts.first().click();
+  }
+  assert.equal(await parts.count(), 0, "every part should now be banked");
+
+  const collectedAfterParts = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]"));
+  assert.ok(!collectedAfterParts.includes(id),
+            "banking every part must not decide you have built it");
+  assert.match(await page.locator("#wishlist .wish-prog").first().innerText(), /^(\d+)\/\1$/,
+               "the list is finished even though nothing has been claimed");
+
+  const button = page.locator(`#wishlist [data-collect="${id}"]`);
+  assert.equal(await button.count(), 1, "a finished list has to offer the claim");
+  assert.match(await button.innerText(), /mark as collected/i);
+
+  await button.click();
+  assert.deepEqual(
+    await page.evaluate(() => JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]")),
+    [id], "pressing it is what collects the Prime");
+  assert.match(await button.innerText(), /collected/i);
+
+  /* Reversible, because the alternative is a one-way action with no undo on a
+     page you cannot undo it from. The parts stay banked either way. */
+  await button.click();
+  assert.deepEqual(
+    await page.evaluate(() => JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]")),
+    [], "and pressing it again takes the claim back");
+  assert.equal(await parts.count(), 0, "without disturbing a single banked part");
+  assert.deepEqual(errors, []);
+});
+
+page_test("an open page picks up a fissure that opened after it loaded", async () => {
+  /* The badges used to be fixed at load: a one-minute timer re-read a list that
+     could only shrink, so a tab left open all evening retired fissures as they
+     closed and never heard about one that opened. `data/fissures.json` is the
+     same list on its own — four kilobytes — re-read every ten minutes from this
+     same origin, never from api.warframestat.us.
+
+     The node is read off the row the planner ranked, so this cannot pass by
+     marking somewhere nobody is being sent. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const first = page.locator("#planNodes .spot").first();
+  const key = await first.locator(".fissure-slot").getAttribute("data-node");
+  assert.ok(key, "no row to mark");
+  assert.equal(await first.locator(".tag.fissure").count(), 0,
+               "nothing is running there yet, so nothing should claim one");
+
+  await page.route("**/data/fissures.json", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      generated: new Date().toISOString(),
+      fissures: [{ node: key, tier: "Neo", mode: "Survival",
+                   ends: new Date(Date.now() + 55 * 60000).toISOString(),
+                   hard: false, storm: false }],
+    }),
+  }));
+  // the same thing returning to the tab does, without waiting ten minutes
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await page.locator(".tag.fissure").first().waitFor({ timeout: 5000 });
+
+  const said = await first.locator(".tag.fissure").innerText();
+  assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
+  assert.deepEqual(errors, []);
+});
+
 // ── the responsive rules, which only a real browser can answer ─────────────
 
 page_test("the sidebar does not push the grid off screen on a phone", async () => {

@@ -86,7 +86,7 @@ underneath is identical on all three; only the launchers and the scheduler diffe
 | Get or update the data | `refresh-data.cmd` | `./refresh-data.sh` |
 | Open the site | `serve.cmd` | `./serve.sh` |
 | Open it to your network | `serve-lan.cmd` | `./serve-lan.sh` |
-| Keep it updated hourly | `tools\schedule.ps1` | `./tools/schedule.sh` |
+| Keep it updated automatically | `tools\schedule.ps1` | `./tools/schedule.sh` |
 
 Check Python is available:
 
@@ -510,15 +510,25 @@ Right-click `tools\schedule.ps1` → **Run with PowerShell**, or run this in a t
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
-That sets up a Windows scheduled task that checks **every hour**. When nothing has
-changed it sends four small requests, rebuilds from what is already on disk in under
-a second, and touches nobody's servers — a full download only happens when Digital
-Extremes actually publish something.
+That sets up a Windows scheduled task that checks **every ten minutes**. When
+nothing has changed it sends four small requests — each one asking only for what it
+does not already have, so the usual answer is "nothing new" and no data at all —
+then rebuilds from what is on disk in about a second and a half. A full download
+only happens when Digital Extremes actually publish something.
 
-Hourly rather than daily because of the **fissures**: the planner marks which of the
-places it is sending you are a fissure right now, and only ever marks ones that have
-not expired yet. Those badges are exactly as fresh as this task. Run it hourly and
-they are nearly always right; run it daily and there are never any.
+Ten minutes rather than daily because of the **fissures**: the planner marks which
+of the places it is sending you is a fissure right now, and only ever marks ones
+that have not expired. A fissure runs an hour or two, so those badges are exactly as
+fresh as this task — every ten minutes they are as good as live, daily there are
+never any.
+
+That is well inside what the source asks for. The fissure list is served with a
+two-minute cache lifetime of its own, so this asks five times *less* often than the
+API is happy to answer, and asks conditionally on top of that.
+
+While the page is open it re-reads the fissure list on the same ten minutes, from
+this site and nowhere else, so a tab you left open in the morning is still right
+after lunch without a reload.
 
 Only the scheduling is Windows-specific — the build itself runs anywhere.
 
@@ -526,6 +536,10 @@ Useful variations:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:00
+```
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryMinutes 30
 ```
 
 ```bash
@@ -544,8 +558,8 @@ Same job, installed into `cron`:
 ./tools/schedule.sh
 ```
 
-It takes the same options — `--every 8`, `--at 07:30`, `--remove`, and `--show` to
-print the crontab line without installing it.
+It takes the same options — `--every-minutes 30`, `--every 8` (hours), `--at 07:30`,
+`--remove`, and `--show` to print the crontab line without installing it.
 
 No account, no API key, and no AI involved — it just reads the official data files
 and rebuilds the list.
@@ -670,10 +684,17 @@ Pages needs a **public** repo on the free plan.
 republishes the site — so it stays up to date whether or not your PC is switched on,
 and the data still never enters the repository.
 
-One thing the published copy cannot do is mark tonight's fissures: they turn over
-every hour or two, so a site rebuilt once a day always finds them expired and marks
-nothing. That is why the local hourly task is still worth keeping if you use the
-planner to decide where to go.
+**And it refreshes the fissures every ten minutes.** That used to be the one thing
+the published copy could not do: fissures turn over every hour or two, so a site
+rebuilt once a day always found them expired and marked nothing. A second, much
+lighter run now takes the slow-moving data straight from the build cache and fetches
+only the fissure list, so the published planner marks tonight's fissures the same
+way a local copy does. Your own scheduled task is now a preference rather than a
+necessity.
+
+Worth knowing: GitHub's schedules are best-effort. Runs are queued and can be
+delayed or skipped when the service is busy, so ten minutes is what it aims for
+rather than a promise.
 
 > The workflow has **read-only** access to your code and uses no secrets or API
 > keys — every source it touches is public.

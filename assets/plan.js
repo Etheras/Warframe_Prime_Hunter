@@ -57,11 +57,16 @@
 
   const ITEMS = DATA.items;
   const RELICS = DATA.relics || {};
-  /* Absent on an old build, and absent is a valid answer — see paintFissures.
+  /* Empty is a valid answer — see paintFissures. Taken by reference and never
+     reassigned: `shared.js` re-reads this list every ten minutes and splices
+     the new one into the same array, so a page left open keeps up without
+     either of us re-binding anything. It also guarantees the array exists, so
+     there is no `|| []` here to quietly detach this page from the refresh.
+
      `nodeKey` is how DE name a node in that list, and it is what the ranking
      has to be matched against. Declared up here because the fold reads it, and
      the fold runs before anything further down this file has been evaluated. */
-  const FISSURES = DATA.fissures || [];
+  const FISSURES = DATA.fissures;
   const nodeKey = (n) => n.node + " (" + n.planet + ")";
   const BY_ID = new Map(ITEMS.map((i) => [i.id, i]));
   const REFINEMENTS = (DATA.meta && DATA.meta.refinements) ||
@@ -97,6 +102,12 @@
   /* ── state, shared with the collection page where it makes sense ── */
   let partsOwned = load(KEY_PARTS, {});
   let wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id));
+  /* Read here as well as written, since 2026-08-24. Banking the last part no
+     longer collects the Prime by itself — having every part is not having the
+     thing, and the planner has no business deciding you built it — so this page
+     has to know which of a finished list you have actually claimed. */
+  let collected = new Set(load(S.KEYS.collected, []));
+  const saveCollected = () => save(S.KEYS.collected, Array.from(collected));
   const opts = Object.assign(
     { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
       minutes: {} },
@@ -272,14 +283,17 @@
      every fifth after fifteen a Radiant. Only the `bonus` run mode goes deep
      enough to collect one - see rotation.js.
 
-     **It is not conditioned on the node actually being a fissure, because
-     nothing here can know that.** Fissures are an overlay that moves every hour
-     or two; this dataset is refreshed daily. Fetching the live list was
-     considered and rejected: a fissure list a few hours old is wrong more often
-     than right, and a confidently wrong answer is worse than an honest
-     assumption. So the mode means "when you run one of these as a fissure",
-     the row says so, and the arithmetic below is deliberately node-independent -
-     which is what makes that safe. See TODO.md.
+     **It is not conditioned on the node actually being a fissure, and that is a
+     choice rather than a limit.** It reads as one because of how this comment
+     used to be worded: the live list was fetched from 2026-08-14, and re-read
+     every ten minutes from 2026-08-24, so the badges on these rows have known
+     for some time. What has not changed is the reason. A fissure lasts an hour
+     or two while this ranking is built from tables that move a few times a
+     year, so letting one into the score would reshuffle the list hourly for a
+     fact that expires before anyone acts on it. The mode means "when you run
+     one of these as a fissure", the row says which ones those are, and the
+     arithmetic below is deliberately node-independent - which is what makes the
+     flat addition safe. `PROJECT.md §7`.
 
      Three things make this different from every other number on a row, and all
      three are the reason it is computed here rather than per node:
@@ -616,14 +630,22 @@
           "cycle, all four rewards counted.",
     aabcaa: "Each run is six rounds — four rotation A rewards plus a B and a C, " +
             "all of which count.",
+    /* The clause about refreshing daily was corrected on 2026-08-24, when it
+       stopped being true in both directions at once: the fissure list is now
+       re-read every ten minutes and the badges beside these rows come from it.
+       The decision it was justifying has not changed and is not in question -
+       the bonus stays flat, which is what makes it safe. See `TODO.md` for the
+       rest of that sentence, which still overclaims. */
     bonus: "Each run is five rotations, which is what an endless Void Fissure " +
            "pays a free Exceptional relic for reaching — <b>assuming you are " +
-           "running one</b>. Nothing here knows which nodes carry a fissure: they " +
-           "move every hour or two and this data is refreshed daily, so a list of " +
-           "them would be wrong more often than right. The bonus is therefore " +
-           "added to every endless node equally, which never reorders them against " +
-           "each other — it only weighs staying against a short mission, and that " +
-           "comparison holds whatever the fissure map looks like.",
+           "running one</b>. The badges on the rows above say which nodes carry " +
+           "a fissure right now, but the bonus is deliberately not conditioned " +
+           "on them: a fissure lasts an hour or two, and letting one into the " +
+           "score would reshuffle this list under you for a reason that has " +
+           "already expired. It is added to every endless node equally, which " +
+           "never reorders them against each other — it only weighs staying " +
+           "against a short mission, and that comparison holds whatever the " +
+           "fissure map looks like.",
   };
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
@@ -800,7 +822,10 @@
       const total = it.parts.length;
       const done = it.parts.filter((p) => haveOf(id, p.name) >= needOf(p)).length;
       const missing = it.parts.filter((p) => haveOf(id, p.name) < needOf(p));
-      return `<div class="wish${done === total ? " wish-done" : ""}">
+      /* Green edge for "you have it", not for "you have the parts" — that is
+         the whole distinction the button below exists to draw, so the styling
+         has to wait for the same answer the button does. */
+      return `<div class="wish${collected.has(id) ? " wish-done" : ""}">
         <div class="wish-head">
           <span class="wish-name">${esc(it.name)}</span>
           <span class="wish-prog">${done}/${total}</span>
@@ -808,7 +833,16 @@
         </div>
         <div class="wish-parts">${
           done === total
-            ? `<div class="wish-all">all parts collected</div>`
+            ? (collected.has(id)
+                ? `<button class="wish-collect on" data-collect="${esc(id)}"
+                     data-tip="${esc("Built and claimed.\nClick to take that back — " +
+                       "the parts you banked stay where they are.")
+                     }">✓ Collected</button>`
+                : `<button class="wish-collect" data-collect="${esc(id)}"
+                     data-tip="${esc("Every part is banked, which is not the same as " +
+                       "owning it:\nthe blueprint still has to be built and claimed.\n\n" +
+                       "Say so here and it stops being something you are hunting.")
+                     }">Mark as collected</button>`)
             : missing.map((p) => {
                 const left = needOf(p) - haveOf(id, p.name);
                 return `<button class="wish-part" data-got="${esc(id)}"
@@ -1015,8 +1049,10 @@
              read once instead of hovered eight times. */
           n.bonus ? ` · <span class="est" data-tip="${esc(
             "Five rotations in a fissure pays a free relic, worth " +
-            pct(n.bonus.value) + " here.\nOnly if this node is a fissure — " +
-            "nothing here knows that.")
+            pct(n.bonus.value) + " here.\nCounted on every endless node, not " +
+            "only the ones that are a\nfissure right now — the badge beside " +
+            "the node name says which\nthose are, and it deliberately does not " +
+            "move the ranking.")
           }">+relic if fissure</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant" +
@@ -1181,6 +1217,17 @@
      coarse enough that nothing is being animated at anybody. */
   setInterval(paintFissures, 60000);
 
+  /* That timer only ever removes: it re-reads a list that was fixed when the
+     page loaded, so it can retire a fissure that has closed and never mention
+     one that opened since. `watchFissures` re-reads the list itself, every ten
+     minutes, from this same origin — see shared.js.
+
+     Badges only, deliberately. The fold uses a fissure to choose which of
+     several identical nodes to name, and re-running that would rename rows
+     under whoever is reading them for a reason that expires within the hour.
+     Same call as never letting a fissure into the score (`PROJECT.md §7`). */
+  S.watchFissures(paintFissures);
+
   /* ── catching up after a tab switch ───────────────────────────────
      An interval is not a clock. Browsers throttle a background tab's timers to
      roughly once a minute or worse, and the bounty tick below deliberately does
@@ -1237,18 +1284,28 @@
         const next = Math.min(needOf(p), (partsOwned[id] || {})[name] + 1 || 1);
         partsOwned[id] = Object.assign({}, partsOwned[id], { [name]: next });
         save(KEY_PARTS, partsOwned);
-        // an item whose parts are all owned counts as collected, same as the
-        // collection page — keep the two in step
-        const done = it.parts.every((q) => (partsOwned[id] || {})[q.name] >= needOf(q));
-        /* Through the shared constant, not a literal. This was spelled out by
-           hand in two places here, which the rename found: the store moved and
-           these two would have gone on reading and writing a key nothing else
-           touched, losing ticks silently rather than failing. */
-        const coll = new Set(load(S.KEYS.collected, []));
-        if (done) coll.add(id); else coll.delete(id);
-        save(S.KEYS.collected, Array.from(coll));
         render();
       }
+      return;
+    }
+
+    /* Saying you have built it, which nothing else here is entitled to say.
+
+       Banking the last part used to do this on its own, and that was wrong in
+       the one direction that matters: a Prime is four parts *and* a build, and
+       the app would tell you the hunt was over while the blueprint was still
+       sitting in your foundry. So the last part now finishes the list and stops
+       there, and this is the sentence you type yourself.
+
+       A toggle, because the alternative is a one-way action with no undo on a
+       page you cannot undo it from. It touches nothing but the collected set —
+       the parts you banked stay banked either way. */
+    const mark = e.target.closest("[data-collect]");
+    if (mark) {
+      const id = mark.dataset.collect;
+      if (collected.has(id)) collected.delete(id); else collected.add(id);
+      saveCollected();
+      render();
       return;
     }
 
@@ -1343,6 +1400,11 @@
   window.addEventListener("storage", (e) => {
     if (e.key === KEY_PARTS) { partsOwned = load(KEY_PARTS, {}); render(); }
     if (e.key === KEY_WISH) { wishlist = load(KEY_WISH, []).filter((id) => BY_ID.has(id)); render(); }
+    // ticked on the collection page in another tab: this page shows the same
+    // claim on every finished row, so it has to hear about it
+    if (e.key === S.KEYS.collected) {
+      collected = new Set(load(S.KEYS.collected, [])); render();
+    }
   });
 
 

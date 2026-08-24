@@ -4,21 +4,26 @@
     Register (or remove) a Windows Scheduled Task that keeps this site's data current.
 
 .DESCRIPTION
-    The task runs  build_data.py --if-changed  every hour. That call is cheap when
-    nothing has moved: it fetches DE's ~500-byte export index, sends one HEAD to the
-    drop table, reads the trader window and the current fissures, then rebuilds from
-    the local cache in well under a second. A full download only happens when an
-    upstream actually changed - so hourly costs four small requests an hour, not
-    four downloads.
+    The task runs  build_data.py --if-changed  every ten minutes. That call is cheap
+    when nothing has moved: it fetches DE's ~500-byte export index, sends one HEAD to
+    the drop table, reads the trader window and the current fissures, then rebuilds
+    from the local cache. Measured end to end on a warm cache: 1.7 seconds. A full
+    download only happens when an upstream actually changed, and every fetch is
+    conditional, so a repeat run costs four header exchanges and almost no body.
 
-    Hourly, rather than daily, for two reasons. The "this data is old" banner is the
-    thing this task exists to prevent, so the refresh has to run far more often than
-    the banner is patient - at twenty-four runs a day it takes a long run of
-    failures before anyone sees it. And the fissure strip on the planner only shows
-    fissures that have not expired yet, so it is exactly as current as this task:
-    hourly it is nearly always right, daily it is always empty.
+    Ten minutes, rather than hourly, because of the one source with an hour to live.
+    Void Fissures move every hour or two and the pages only ever show ones that have
+    not expired, so the badges are exactly as current as this task. The rest of the
+    data moves a few times a year and does not care.
 
-    -EveryHours 8 if that is too eager; the trade is only how fresh the fissures are.
+    Ten minutes is also well inside what the source asks for: api.warframestat.us
+    serves the fissure list behind a CDN with Cache-Control: max-age=120, so this
+    polls five times slower than the API's own cache lifetime, and answers a
+    conditional request with 304 and no body when nothing has changed.
+
+    -EveryMinutes 30 or -EveryHours 1 if that is more than you want; the trade is
+    only how fresh the fissures are. Five minutes is the floor, and that is manners
+    rather than a technical limit.
 
     No LLM is involved at any point - every source is JSON or a regularly
     structured HTML table, parsed deterministically.
@@ -33,6 +38,7 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
+    pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryMinutes 30
     pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryHours 8
     pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 07:30
     pwsh       -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
@@ -40,12 +46,23 @@
 [CmdletBinding()]
 param(
     [string]$Time = "18:30",
-    [ValidateRange(1, 24)]
-    [int]$EveryHours = 1,
+    # Five is the floor on purpose. Task Scheduler will accept one minute, and
+    # the endpoint would survive it, but nothing in the data changes that fast -
+    # a fissure lasts an hour or two - so anything under five is cost with no
+    # answer attached.
+    [ValidateRange(5, 1440)]
+    [int]$EveryMinutes = 10,
+    # Kept for anyone who set it before, and for anyone who wants the old
+    # cadence back. Zero means "not given", since PowerShell has no way to ask
+    # whether an int parameter was bound without inspecting $PSBoundParameters.
+    [ValidateRange(0, 24)]
+    [int]$EveryHours = 0,
     [string]$TaskName = "Warframe Prime Hunter data refresh",
     [switch]$Remove,
     [switch]$RunNow
 )
+
+if ($EveryHours -gt 0) { $EveryMinutes = $EveryHours * 60 }
 
 # The task this script registered before the project was renamed on 2026-08-14.
 # A task already sitting in Task Scheduler keeps the name it was created with,
@@ -145,7 +162,7 @@ $action = New-ScheduledTaskAction -Execute $python `
 # an object is not evidence that the object can be stored. Verify at the layer
 # that can refuse you.
 $trigger = New-ScheduledTaskTrigger -Once -At $Time `
-    -RepetitionInterval (New-TimeSpan -Hours $EveryHours)
+    -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes)
 
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
@@ -155,7 +172,9 @@ $settings = New-ScheduledTaskSettingsSet `
 
 $description = "Refreshes Warframe Prime Hunter's Prime data from Digital Extremes' " +
                "drop table and public export. Downloads only when upstream changes; " +
-               "otherwise refreshes the live fissure list and rebuilds from cache."
+               "otherwise refreshes the live Void Fissure list and rebuilds from " +
+               "cache. Every fetch is conditional, so a run that finds nothing new " +
+               "transfers almost nothing."
 
 # Before registering, not after: -Force replaces a task of the SAME name, and the
 # old one has a different name, so it would otherwise survive alongside the new.
@@ -164,7 +183,15 @@ if ($TaskName -ne $LegacyTaskName) { Remove-TaskIfPresent -Name $LegacyTaskName 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Settings $settings -Description $description -Force | Out-Null
 
-$every = if ($EveryHours -eq 1) { "hour" } else { "$EveryHours hours" }
+if ($EveryMinutes -lt 60) {
+    $every = "$EveryMinutes minutes"
+} elseif ($EveryMinutes -eq 60) {
+    $every = "hour"
+} elseif ($EveryMinutes % 60 -eq 0) {
+    $every = "$($EveryMinutes / 60) hours"
+} else {
+    $every = "$EveryMinutes minutes"
+}
 Write-Host "Scheduled '$TaskName' every $every, first run $Time."
 Write-Host "  runs: $python `"$scriptPath`" --if-changed"
 Write-Host "  from: $root"

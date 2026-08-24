@@ -160,6 +160,10 @@ ALLOWED_FILES = frozenset({
     "assets/styles.css", "assets/shared.js", "assets/rotation.js", "assets/model.js",
     "assets/app.js", "assets/plan.js",
     "data/prime-data.js",
+    # The fissure list on its own, re-read by an open page every ten minutes.
+    # Same origin and nothing else: this is what keeps `connect-src 'self'` a
+    # true statement about the site rather than a formality.
+    "data/fissures.json",
 })
 ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 

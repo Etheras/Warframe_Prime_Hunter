@@ -14,10 +14,28 @@ on:
   push:
     branches: [main]
   schedule:
-    # 18:40 UTC daily. Prime Resurgence rotations flip at 18:00 UTC, so this
-    # picks up a new rotation on the same day it starts.
+    # 18:40 UTC daily — the FULL build. Prime Resurgence rotations flip at
+    # 18:00 UTC, so this picks up a new rotation on the same day it starts.
     - cron: "40 18 * * *"
+    # Every ten minutes — the LIGHT build, for the one source with an hour to
+    # live. Void Fissures move every hour or two and the pages only ever show
+    # ones that have not expired, so a site rebuilt once a day always shows
+    # none. This run takes the heavy sources from the restored cache and fetches
+    # only what has actually moved (see `--if-changed` below), so it does not
+    # re-download the wiki, the drop tables or DE's export every ten minutes.
+    #
+    # Two things worth knowing before changing this number. GitHub schedules are
+    # best effort — five minutes is the documented floor, runs are queued and
+    # can be delayed or dropped entirely under load, so ten minutes is a target
+    # rather than a guarantee. And Pages allows on the order of ten deployments
+    # an hour; six is comfortably inside that, three-minute polling would not be.
+    - cron: "*/10 * * * *"
   workflow_dispatch:        # run it by hand from the Actions tab
+
+# Which of the two a run is. A push, a manual run and the daily cron all rebuild
+# from scratch; only the ten-minute cron takes the short path.
+env:
+  FULL: ${{ github.event_name != 'schedule' || github.event.schedule == '40 18 * * *' }}
 
 # Read-only against the repo. This workflow cannot modify your code.
 permissions:
@@ -55,6 +73,7 @@ jobs:
       # line once a run has saved under the new prefix and the old ones have
       # aged out.
       - name: Restore source cache
+        if: env.FULL == 'true'
         uses: actions/cache@v6
         with:
           path: .cache
@@ -63,9 +82,25 @@ jobs:
             prime-sources-
             vorframe-sources-
 
+      # The ten-minute run reads the cache and never writes one. `actions/cache`
+      # saves at the end of any job whose key missed, and this key never hits by
+      # construction — so leaving the step above in charge would have stored a
+      # fresh copy of .cache 144 times a day, evicting everything else the repo
+      # keeps. Restore-only is the whole difference.
+      - name: Restore source cache (read-only)
+        if: env.FULL != 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: .cache
+          key: prime-sources-
+          restore-keys: |
+            prime-sources-
+            vorframe-sources-
+
       # Which sources answer a datacenter IP is not always the same as which
       # answer a home connection, so record it before the build runs.
       - name: Probe the data sources
+        if: env.FULL == 'true'
         run: |
           for url in \
             "https://wiki.warframe.com/index.php?title=Prime&action=raw" \
@@ -89,10 +124,26 @@ jobs:
       # image drops it the group skips rather than failing. No npm packages are
       # involved either - the browser tests use Node's standard library only.
       - name: Run the tests
+        if: env.FULL == 'true'
         run: python tests/test_build.py
 
       - name: Fetch data from Digital Extremes and build
+        if: env.FULL == 'true'
         run: python tools/build_data.py
+
+      # The ten-minute path. `--if-changed` fingerprints the upstreams that move
+      # slowly — DE's ~500-byte export index, one HEAD to the drop table, the
+      # trader window — and rebuilds from the restored cache when none of them
+      # has, which is almost always. The fissure list is fetched live either
+      # way, because it is the one source where a cached copy is worth nothing:
+      # every entry in it has expired. Every fetch is conditional, so a repeat
+      # run takes 304s and transfers almost no body.
+      #
+      # A cold cache falls through to a full build, which is the right failure:
+      # slower, never thinner.
+      - name: Refresh the fissure list and rebuild from cache
+        if: env.FULL != 'true'
+        run: python tools/build_data.py --if-changed
 
       - name: Sanity-check the result
         run: |
@@ -125,6 +176,10 @@ jobs:
           cp -r assets _site/
           mkdir -p _site/data
           cp data/prime-data.js _site/data/
+          # The fissure list on its own. An open page re-reads this every ten
+          # minutes from its own origin — four kilobytes rather than the 1.9 MB
+          # payload, and no request to anyone but this site.
+          cp data/fissures.json _site/data/
           # also offer the single-file build as a download
           python tools/bundle.py
           cp dist/warframe-prime-hunter.html _site/warframe-prime-hunter-standalone.html
