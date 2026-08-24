@@ -817,7 +817,12 @@ at `/temp_mockup.html` while `serve.cmd` is running.
 
 It is **gitignored and served only to this machine**: `serve.py` refuses it to
 any other address, so sharing the LAN server never shares a half-finished idea.
-Delete it whenever; nothing depends on it.
+
+**Clear it once you have decided.** Delete the file, or overwrite it with the next
+idea — nothing depends on it, and a mockup left in place goes stale silently. It
+is not tested, not published and not opened again, so the next person to look
+finds old numbers wearing the app's own styling and has no reason to doubt them.
+Deciding and clearing are the same step.
 
 ---
 

@@ -184,8 +184,36 @@ invented figures in a wireframe.
 
 Use it when a proposal is easier to react to than to read — a new column, a
 different ranking, a reworked row — and when the alternative is a wall of prose
-about a layout. Then delete the draft or overwrite it with the next one; it holds
-one idea at a time and no history.
+about a layout. It holds one idea at a time and no history.
+
+#### Clear it once the proposal has been decided
+
+**Clearing the mockup is part of finishing the work, not a tidy-up afterwards.**
+The moment the idea it argues has been shipped, rejected or deferred, delete the
+file or overwrite it with the next one. Do it in the same pass that updates the
+documentation, for the same reason.
+
+It rots faster than anything else here and is the only thing nothing watches. It
+is gitignored, so no diff shows it; no test reads it; it is not part of the site;
+and nobody opens it except the one time it is being shown. Every guard this
+project has runs somewhere else.
+
+**And it rots into the one shape that gets believed.** A stale mockup does not
+throw, and it does not look broken — it shows *old numbers, in the app's own
+visual language*, which is exactly the authority it was built to borrow. The
+failure mode of this file is a confident screenshot of something that stopped
+being true, which is worse than having no mockup at all.
+
+That is not hypothetical. On 2026-08-24 this scratchpad was still holding the
+decisions 5 and 9 draft from before the rename ten days earlier: it asked for
+`data/vorframe-data.js` and three `VorFrame*` globals, none of which had existed
+since 2026-08-14. It could not have rendered at all, and nothing had noticed,
+because nothing looks. Both decisions had shipped by then — the draft was arguing
+a case that was already closed.
+
+So: **decided means cleared.** If you want to keep what it showed, the finding
+belongs in `TODO.md` or in this file as prose, which is where things are allowed
+to persist.
 
 **If you are an AI assistant working on this project, this is the mechanism to
 reach for.** Write the mockup, serve it, and show it. Do not compute example
@@ -193,8 +221,15 @@ numbers by hand in a side script and paste them into static HTML — wire the pa
 to the real dataset so what the owner sees is what the data actually says.
 
 ```bash
-python tools/serve.py          # then open /temp_mockup.html
+python -m http.server 8781 --bind 127.0.0.1     # then open /temp_mockup.html
 ```
+
+**That is deliberately not `serve.py`, for now.** `serve.py` sends the app's
+strict CSP to every response, and a mockup is one file with an inline `<style>`
+and an inline `<script>` — so it is blocked, the page sits on *Loading…*, and the
+reason appears only in the console. `TODO.md` carries the entry and the three ways
+out; until one is chosen, use the plain server above and remember it gives you
+none of `serve.py`'s protections, so do not bind it to anything but loopback.
 
 Three rules, all enforced rather than remembered:
 
