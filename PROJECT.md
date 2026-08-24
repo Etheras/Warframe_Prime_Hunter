@@ -993,10 +993,18 @@ Mithra went from third at 15.96% over four rotations to first at 16.57% over fiv
 Railjack is excluded: its fissures are Void Storms, which are their own nodes with
 their own tables and no rotations to stay for.
 
-Two things about it are still wrong and are written up in `TODO.md`: the collection
-page's *How far you run* control does not offer this mode although it reads the same
-setting, and the row's `+relic if fissure` marker still says the app cannot tell
-which nodes are fissures, which stopped being true on 2026-08-14.
+**Both pages offer all four, since 2026-08-24.** They share one `runMode` key, and
+the collection page's *How far you run* control listed three — so a planner set to
+`bonus` left that dropdown blank at `selectedIndex: -1` while the collection view
+went on costing every endless node the extra fifth round, and whoever touched the
+box next wrote a different mode back and changed the planner too. The free relic is
+still planner-only, because it is priced against a whole farm list and the
+collection view works one item at a time; the control says so rather than omitting
+a value it was already using.
+
+One thing about it is still wrong and is written up in `TODO.md`: the row's
+`+relic if fissure` marker still says the app cannot tell which nodes are fissures,
+which stopped being true on 2026-08-14.
 
 `reset` stops at the **deepest rotation holding something you want**, not at the
 best-rate stopping point. Want a part from A and another from C? You run to C — 4
@@ -1285,9 +1293,17 @@ The gate is a **demand badge**, the same shape as `Railjack` and `PvPvE`: `Old
 Mate`, Solaris United Rank 5 plus one sequential clear. A standing requirement is a
 reason to annotate, not to hide — the same call already made for Railjack.
 
-Being filed under `Bounty` still costs it one thing: `objectivesOf` charges every
-bounty four stages, so a phase is costed at four objectives when it should be one.
-That is outstanding work, in `TODO.md`.
+Being filed under `Bounty` cost it one more thing until 2026-08-24: `objectivesOf`
+charges every bounty four stages, so a phase was costed at four objectives when it
+is one activity you replay on its own — its rate was divided by four and it sank
+accordingly. `objectivesOf` now names the heist and returns one run for it.
+
+That leaves `Bounty` carrying two units, which is the price of it being **our**
+label rather than DE's. The effort panel asks for minutes per objective per mission
+type, and it takes the unit of the node with the *most* objectives, so a
+single-objective heist cannot relabel a form that is mostly stages and quietly make
+the number typed into it wrong by a factor of four. A plaster, and `TODO.md` keeps
+the wider problem — *Our four invented "mission types" leak into the ranking*.
 
 ### Nodes that are the same bet are one row
 
@@ -1326,12 +1342,18 @@ same bet by construction, so naming the one you can also crack a relic at cannot
 cost anything — and naming any other would be recommending the identical node minus
 a free relic.
 
-**They can currently disagree about which of a group to name**, and that is a
-defect rather than a decision. `pickNode` takes the fissure test as an argument and
-only the planner passes it, so with a fissure live at a non-default member the
-planner names that node and the collection view names the lowest-level one. Since
-the picked node *becomes* the row, its level, planet and demand badges differ too.
-Written up in `TODO.md`.
+**That held for the table and not for the fissure until 2026-08-24.** `pickNode`
+takes the fissure test as an argument and only the planner passed it, so with a
+fissure live at a member that was not the lowest-level one the planner named that
+node and the collection view named another — and since the picked node *becomes*
+the row, its level, planet and demand badges differed too. Both pages pass the
+predicate now.
+
+One difference between them survives and is deliberate: the collection view counts
+**Void Storms** and the planner counts them only when *Include Railjack* is on.
+That is not the two pages disagreeing about a group — this view never hides
+Railjack, since some live relics drop nowhere else, so a Railjack node the planner
+has excluded is not in its group to be named at all.
 
 ### The fissure marks the ranking; it is never a list of its own
 
@@ -1362,6 +1384,15 @@ rendered with the row, so a page left open stops claiming a closed fissure witho
 re-sorting the list under the reader. Every entry carries its own expiry, so the
 error is only ever omission: it can fail to mark a node that is still a fissure, and
 it cannot send anyone to one that closed at lunchtime.
+
+**An interval is not a clock, though, and that gap was closed on 2026-08-24.** A
+background tab has its timers throttled to about once a minute or worse, and the
+bounty tick deliberately does nothing at all while `document.hidden` — so a tab left
+open for an hour came back showing a countdown frozen where it was left and, worse,
+a ranking built for a rotation letter that had turned over while nobody was looking.
+Everything that reads the clock now runs once on `visibilitychange`, which is what
+makes skipping the work while hidden safe rather than merely cheap: hidden work is
+only safe to skip when something covers the gap it leaves.
 
 ### Two lists, two questions, never one score
 
@@ -1659,6 +1690,40 @@ build falls back to the other source.
 which is why the UI leans on it and why the vault/Baro/special/Founder markers
 are treated as annotation rather than truth.
 
+### A part can be a whole Prime, and four of them are
+
+**Fixed 2026-08-24, and it was two bugs sharing a cause.** Four akimbo Primes are
+built from two copies of the single-handed weapon — Aklex from two Lex Primes,
+Akbronco from two Broncos, Akmagnus, Akvasto. DE publish that as **the same
+component listed twice**, `itemCount: 1` each.
+
+**Saved progress is keyed on the part name**, so two parts of one item called
+"Lex Prime" shared one counter and there was nowhere to record holding one of the
+two. Three clicks completed a four-part item; one tick moved the card from 0/4 to
+2/4; Aklex Prime read as collected while you held half of what it needs. The
+pipeline now folds the copies into one part with `itemCount: 2`, which the store
+has always handled — Ivara Prime needs two of some of hers.
+
+**And that component's `drops` are the union of every relic dropping any Lex Prime
+*part*** — 130 of them. No relic drops a built weapon, so no odds can attach to any
+of them: the chance lookup searches for `Aklex Prime …` and the relic pays `Lex
+Prime Barrel`, which never matches. Carried into `item_relics`, that union made
+Aklex Prime the only item in the payload flagged **farmable** on eight relics its
+own card could then find nowhere to farm — `bestSpots` drops every relic worth
+zero, so the section was absent entirely. The fold drops the relics with the
+duplicate and adds `builtFrom`, naming the Prime to go and get instead. Aklex Prime
+now files under Baro, which is what it is.
+
+Two things this deliberately does **not** do. It does not resolve the requirement
+through to the sub-weapon's own parts — that would make one item's relic list
+another's, and a built weapon is not a relic drop. And marking Lex Prime collected
+does not credit the parent: building an akimbo consumes two built Lex Primes, so
+the one you own is one of them, not a spare. The card links to the sub-weapon and
+the counter is yours to set.
+
+`tests/test_build.py` asserts part names are unique within an item, which is the
+assumption the older "part names are normalised" check silently rested on.
+
 ### Shared UI conventions
 
 Both pages share one visual vocabulary so a habit learned on either carries over:
@@ -1671,10 +1736,25 @@ records why it exists, so it is clear when one does not apply.
 
 ### Availability buckets
 
-Each item lands in exactly one bucket so the sidebar toggles stay unambiguous;
+Each item **displays** as exactly one bucket so the sidebar stays unambiguous;
 cards can still show several badges. Precedence:
 
 `founder → resurgence → farmable → baro → special → vaulted`
+
+**The filter reads every bucket an item is in, not the one it displays as** — a
+distinction added 2026-08-24, because filtering on the primary alone made an item
+vanish while a box that covered it was still ticked. Two items today have two
+sources: Lex Prime is farmable *and* sold by Baro, Gotva Prime is a Baro item the
+wiki also marks `(S)`. Unticking *Farmable* took Lex Prime away from the *Baro
+Ki'Teer* box that was still ticked, with nothing on screen saying where it had gone.
+
+So `bucketsOf` answers *which toggles keep this on screen* and `statusOf` — its
+first element, so the two cannot drift — answers *which one does it show as*. The
+counts beside the boxes state **coverage**: what unticking that box would stop
+covering, which means an item with two sources is counted beside both and the
+column can add up to more than 167. The sidebar says so in a line under it. Vaulted
+is the fallback rather than a flag, because it is the absence of a source rather
+than one of them.
 
 Resurgence outranks farmable because it's time-limited. **Baro outranks special**
 because Gotva Prime carries the wiki's bare `(S)` marker but is really a Void

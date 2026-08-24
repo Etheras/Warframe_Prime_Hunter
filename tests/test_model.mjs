@@ -160,6 +160,34 @@ test("availability picks one bucket, in the order that matters", () => {
   assert.equal(M.statusOf({}), "vaulted", "an item with no flags at all");
 });
 
+test("a filter reads every bucket an item is in, not just the one it shows as", () => {
+  /* One bucket is right for the badge, the sort and the heading. It was wrong
+     for the sidebar: filtering on the primary alone meant unticking *Farmable*
+     also hid Lex Prime from the *Baro Ki'Teer* box that was still ticked, and
+     nothing on screen said where it had gone. */
+  const M = load();
+  /* Joined rather than compared as arrays: the model runs in its own vm
+     context, so its Array is not this file's and deepStrictEqual refuses two
+     lists that hold the same strings. */
+  const of = (flags) => M.bucketsOf({ flags }).join(" ");
+  // Lex Prime: its relics still drop, and Baro sells it too
+  assert.equal(of({ farmable: true, baro: true }), "farmable baro");
+  // Gotva Prime: a Baro item that the wiki also marks (S)
+  assert.equal(of({ baro: true, special: true }), "baro special");
+  assert.equal(of({ farmable: true }), "farmable");
+  assert.equal(of({ founder: true, farmable: true }), "founder farmable");
+
+  /* Vaulted is the absence of a source rather than one of them, so it is never
+     one of several - an item with a live source is not also vaulted here, even
+     when DE's own vaulted flag is set. */
+  assert.equal(of({}), "vaulted", "no flags at all");
+  assert.equal(of({ vaulted: true, resurgence: true }), "resurgence");
+
+  // and the one it displays as is the first of them, so the two cannot drift
+  assert.equal(M.statusOf({ flags: { farmable: true, baro: true } }), "farmable");
+  assert.equal(M.statusOf({ flags: { baro: true, special: true } }), "baro");
+});
+
 // ── reading a backup ───────────────────────────────────────────────────────
 
 const CATALOGUE = [

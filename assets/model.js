@@ -115,15 +115,25 @@
      come back; Resurgence next because it is the one with a deadline; Baro
      above Special because Gotva Prime is marked (S) on the wiki but is really
      a Baro item (TODO.md). */
-  function statusOf(item) {
+  const BUCKET_ORDER = ["founder", "resurgence", "farmable", "baro", "special"];
+
+  /* EVERY bucket an item belongs to, primary first. `statusOf` answers "which
+     one does it display as", which is one bucket by design so the sidebar stays
+     unambiguous; this answers "which toggles should keep it on screen", and the
+     two are different questions for anything with more than one source.
+
+     Two items in the current data have two: Lex Prime is farmable *and* sold by
+     Baro, Gotva Prime is a Baro item the wiki also marks (S). Filtering on the
+     single primary bucket made unticking *Farmable* hide a Baro item - the box
+     you left ticked was covering it. Falls back to `vaulted`, which is not a
+     source but the absence of one. */
+  function bucketsOf(item) {
     const f = (item && item.flags) || {};
-    if (f.founder) return "founder";
-    if (f.resurgence) return "resurgence";
-    if (f.farmable) return "farmable";
-    if (f.baro) return "baro";
-    if (f.special) return "special";
-    return "vaulted";
+    const out = BUCKET_ORDER.filter((k) => f[k]);
+    return out.length ? out : ["vaulted"];
   }
+
+  const statusOf = (item) => bucketsOf(item)[0];
 
   /* ── reading a backup ────────────────────────────────────────────
      The one path here that can lose data, so it is the one most worth having
@@ -221,7 +231,7 @@
 
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
-    needOf, rarityOf, refineAdvice, statusOf,
+    needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, parseBackup,
   };
 })();

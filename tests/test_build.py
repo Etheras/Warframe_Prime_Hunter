@@ -541,6 +541,46 @@ def test_built_payload() -> None:
            if p["name"] != "Blueprint" and p["name"].endswith(" Blueprint")]
     check("payload: part names normalised", raw, [])
 
+    # ...and unique within an item, which is the assumption the line above
+    # actually rests on. Saved progress is keyed on the name, so two parts of
+    # one item sharing a name share one counter. DE list the sub-weapon of an
+    # akimbo twice - "Lex Prime", "Lex Prime", one each - and that made three
+    # clicks complete a four-part item, one tick move the counter from 0/4 to
+    # 2/4, and Aklex Prime read as collected while you held one of the two Lex
+    # Primes it needs.
+    dupes = sorted(
+        f"{i['name']}: {p['name']}"
+        for i in D["items"]
+        for n, p in enumerate(i.get("parts") or [])
+        if any(q["name"] == p["name"] for q in (i.get("parts") or [])[:n])
+    )
+    check("payload: no item has two parts with the same name", dupes, [])
+
+    # Named subjects, not "everything carrying builtFrom": that flag is written
+    # by the code under test, so selecting on it would let a fold that stopped
+    # happening pass by finding nothing at all (PROJECT.md section 2).
+    akimbos = {"Aklex Prime": "Lex Prime", "Akbronco Prime": "Bronco Prime",
+               "Akmagnus Prime": "Magnus Prime", "Akvasto Prime": "Vasto Prime"}
+    by_item = {i["name"]: i for i in D["items"]}
+    check("payload: the akimbos and their sub-weapons are all catalogued",
+          sorted(n for n in list(akimbos) + list(akimbos.values()) if n not in by_item), [])
+
+    # One entry, two wanted, and no relics of its own - DE hang the union of
+    # every relic dropping any Lex Prime PART on that component, 130 of them,
+    # and none of them drops a built weapon. Carried through, that union was
+    # what made Aklex Prime the only item flagged farmable on relics its card
+    # could then find nowhere to farm.
+    folded = []
+    for parent, sub in sorted(akimbos.items()):
+        got = [p for p in (by_item.get(parent) or {}).get("parts") or []
+               if p["name"] == sub]
+        one = got[0] if len(got) == 1 else {}
+        folded.append(f"{parent}: {len(got)} entry, need {one.get('itemCount')}, "
+                      f"{len(one.get('relics') or [])} relics, from {one.get('builtFrom')}")
+    check("payload: an akimbo needs one entry for two of its sub-weapon, with no relics",
+          folded,
+          [f"{p}: 1 entry, need 2, 0 relics, from {s}" for p, s in sorted(akimbos.items())])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # integration

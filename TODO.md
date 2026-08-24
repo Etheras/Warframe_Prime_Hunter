@@ -24,9 +24,14 @@ worth more in the document people read to understand the code.
 **Added 2026-08-24.** Fifteen entries from two outside reviews, each checked against
 the code before being written down — they have their own section below, kept
 together because the corrections only make sense beside the claims they correct.
-The first of them, *four Primes whose second sub-weapon cannot be recorded*, is the
-most serious defect on this list; it sits where it does only so the group it arrived
-with stays intact.
+
+**Swept the same day.** Seven entries shipped and were deleted: the four akimbo
+Primes whose second sub-weapon could not be recorded, the availability filter that
+hid items with a second source, the drawer that threw away the focus, the
+Profit-Taker phase costed at four stages, the missing fourth run mode on the
+collection page, the two pages naming different nodes for one folded group, and the
+clocks that stopped dead in a background tab. The reasoning moved to `PROJECT.md`,
+which is what the rule at the top of this file asks for.
 
 ---
 
@@ -41,17 +46,13 @@ further down, where the reasoning lives.
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
 
-### Wrong on screen — do these first
-
-| Entry | Where | Size |
-|---|---|---|
-| Four Primes need two of a sub-weapon, and the store cannot count to two | `build_data.py`, `app.js`, `tests/` | large |
-| Unticking one availability box hides items that have a second source | `app.js` | session |
-| Banking a part from the drawer rebuilds the drawer and drops the focus | `app.js` | session |
-| A Profit-Taker phase is costed at four bounty stages | `rotation.js` | session — do with the worldstate sweep |
-| Choosing *Stay for the fissure bonus* leaves the collection page blank | `index.html` | small |
-| The two pages can name different nodes for the same folded group | `app.js` — one argument | small |
-| Both clocks stop dead in a background tab, and nothing catches up on return | `plan.js` | small |
+**Nothing is currently wrong on screen.** This list opened with seven entries that
+were; they shipped later the same day and have been deleted rather than ticked,
+with the reasoning in `PROJECT.md §7` — *A part can be a whole Prime*,
+*Availability buckets*, *Profit-Taker is four places*, *Nodes that are the same bet
+are one row*, the run-mode table and the fissure section — plus a new focus rule in
+`STYLE.md §6`. What is left below is work that makes the app better rather than
+work that makes it correct.
 
 ### Sentences that are no longer true
 
@@ -125,14 +126,16 @@ wiki, not here** — those are edits to `wiki.warframe.com`, not to this reposit
 
 ## Defects found by the documentation sweep of 2026-08-15
 
-Four of these were introduced on 2026-08-14 by changes that were themselves right;
-none was caught by the suite. They are grouped because they share one cause: a
+Five entries, of which **three shipped on 2026-08-24** and were deleted — the two
+pages naming different nodes for one folded group, the collection page's missing
+fourth run mode, and the Profit-Taker phase costed at four bounty stages. The two
+below are what is left, and they share the cause the group was made for: a
 capability landed and the sentences explaining why it was absent stayed where they
 were.
 
 ### The page says it cannot see fissures, on a row showing a fissure
 
-**The sharpest of the five, because both halves are on screen at once.** Verified
+**The sharpest of them, because both halves are on screen at once.** Verified
 on one planner row:
 
 | Element | Says |
@@ -163,60 +166,6 @@ identified this exact defect, rewrote the sentence in `TODO.md`, and left the
 identical sentence in the product. A doc and a string can drift apart even when one
 person fixes both in the same hour.
 
-### The two pages can name different nodes for the same folded group
-
-`pickNode(group, first)` takes the fissure test as an argument. `plan.js` passes it;
-`app.js` calls `pickNode(group)` with nothing. So with a fissure live at a member
-that is not the lowest-level one, the planner names that node and the collection
-view names another — and since the picked node *becomes* the row, the level, planet
-and demand badges differ too.
-
-Verified against the real Gaia group with a fissure planted at Cinxia: planner
-`Cinxia`, collection `Gaia`.
-
-Both `app.js` and `PROJECT.md` claimed in as many words that the two pages **cannot**
-disagree about which of a group to name. `PROJECT.md` now records the defect
-instead; the comment in `app.js` still makes the claim.
-
-Two ways out, and the first is better: pass the same predicate from `app.js`, or
-drop the guarantee and say the collection view deliberately ignores the hour. The
-first keeps a promise the project has made in three places.
-
-### Choosing *Stay for the fissure bonus* leaves the collection page blank
-
-`plan.html` offers four run modes; `index.html`'s `#f-runmode` offers three; the
-setting is one shared key. Verified:
-
-| Stored `runMode` | Collection dropdown | Ani (Survival) row |
-|---|---|---|
-| `reset` | "Reset as soon as it drops" | 4 rounds · 22.8% per run |
-| `bonus` | **blank** — `selectedIndex: -1` | **5 rounds** · 28.9% per run |
-
-So the collection view silently costs every endless node an extra round while its
-own control shows nothing selected, and it never adds the bonus relic that fifth
-round is for — that part is planner-only. Whoever touches the box next writes a
-different mode back and changes the planner too.
-
-Add the option to `index.html`. If the bonus genuinely does not belong on the
-collection page, the fix is to say so on the control rather than to omit the value
-it is already using.
-
-### A Profit-Taker phase is costed at four bounty stages
-
-`objectivesOf` returns `{count: 4, unit: "stage"}` for anything DE files under
-`Bounty`, and DE files the heist there. Each phase is one activity you replay on its
-own, so its rate is divided by four and it sinks accordingly. Confirmed against the
-live model: `objectivesOf` → `4 stages` for `PROFIT-TAKER - PHASE 1`.
-
-**Its own entry specified this and the entry was marked done** — *"Effort: one
-objective per run"* was step 4 of four, and the other three shipped. Everything else
-about the heist is right: no rotation, not on the bounty clock, `Old Mate` badge,
-four independently replayable phases (`PROJECT.md §7`).
-
-This is the same shape as the wider bug below and wants fixing with it: **`objectivesOf`
-hard-codes four stages for every bounty**, while `/pc/syndicateMissions` publishes
-`standingStages[]` per tier, whose length is 3, 4 or 5. Do both at once.
-
 ### Three comments describe things that no longer exist
 
 Cheap, and each one will mislead somebody:
@@ -243,17 +192,17 @@ were wrong about what this app currently does — and a proposal argued from a
 misreading needs re-arguing, not implementing. Where that happened the correction
 is kept with the entry rather than quietly dropped.
 
-Two of the fifteen turned out to be defects with symptoms you can see on screen,
-and the first of them is the worst thing in this file. Three were already covered
-by entries elsewhere here. Two are settled against, one of them by measurement
-taken while checking it.
+Two of the fifteen turned out to be defects with symptoms you could see on screen,
+and **those two and two more shipped on 2026-08-24**, so their entries are gone and
+the reasoning is in `PROJECT.md`: compound weapons tracking their sub-weapon
+(*A part can be a whole Prime*), the availability filter reading every bucket
+(*Availability buckets*), the drawer keeping its focus (`STYLE.md §6`), and the
+clocks catching up on `visibilitychange` (the fissure section). Three of the
+fifteen were already covered by entries elsewhere here. Two are settled against,
+one of them by measurement taken while checking it. What is below is the rest.
 
 | Source | Asked for | Verdict |
 |---|---|---|
-| roadmap 6 | compound weapons track sub-weapons as parts | **defect, worse than described** — see below |
-| roadmap 4 | a filter should not hide an item with a second source | **defect**, on 3 items, and backwards from the example given |
-| review 4 | catch the clocks up on `visibilitychange` | **defect**, and the interval is 60s not 30s |
-| review 1 | update rows in place instead of rebuilding | **partly already done** — the drawer is the one that is not |
 | roadmap 2 | a toggle between score per objective and per run | open, and `STYLE.md §5` says what it obliges |
 | roadmap 5 | read Baro's live stock from `/pc/voidTrader` | open, with a trap in the "disable the box" half |
 | roadmap 3 | reorder the availability precedence | **the stated goal is already true**; the order as written empties the Founder bucket |
@@ -265,168 +214,6 @@ taken while checking it.
 | roadmap 11 | reward concentrated farms over diluted ones | open, and the only one here nothing observable can check |
 | roadmap 9 | score Void Traces on ESO and Void Storms | already an entry above; one correction to it |
 | roadmap 1 | condition the fissure bonus on a live fissure | **[settled] against** — the observation behind it is already an entry above |
-
-### Four Primes need two of a sub-weapon, and the store cannot count to two
-
-**The worst defect currently known, and it is a data-shape problem wearing a UI
-problem's clothes.** Four akimbo Primes are built from two copies of the
-single-handed Prime, and DE's item database says so by listing that component
-**twice**, `itemCount: 1` each — confirmed in the warm cache (`.cache/api_items.gz`):
-
-```
-Aklex Prime     Blueprint · Lex Prime · Lex Prime · Link
-Akbronco Prime  Blueprint · Bronco Prime · Bronco Prime · Link
-Akmagnus Prime  Blueprint · Link · Magnus Prime · Magnus Prime
-Akvasto Prime   Blueprint · Link · Vasto Prime · Vasto Prime
-```
-
-`tools/build_data.py` copies that faithfully, so four items in `data/prime-data.json`
-carry two parts with the same name. **Part ownership is keyed by part name** —
-`{ itemId: { partName: count } }`, `assets/app.js` — so the two entries share one
-slot and there is nowhere to record that you have one of the two.
-
-Verified against the live data, simulating the collection view's own arithmetic:
-
-| Action | Card reads | `partsComplete` |
-|---|---|---|
-| start | 0/4 | false |
-| click either **Lex Prime** counter once | **2/4** | false |
-| then Blueprint and Link | **4/4** | **true** |
-
-So three clicks complete a four-part item, one tick moves the counter by two, and
-Aklex Prime is marked collected while you hold one of the two Lex Primes it needs.
-`test_build.py` already asserts part names are normalised *"since saved progress is
-keyed on them"* — nothing asserts they are **unique within an item**, which is the
-invariant that assumption actually rests on.
-
-**It is worse in the farm advice, because those pseudo-parts carry no odds.** The
-chance lookup at `tools/build_data.py:793` matches reward rows that start with the
-item's name, so for Aklex Prime it looks for `Aklex Prime …` and the relic pays
-`Lex Prime Barrel`. It never matches, and the row is written with `relic`, `rarity`
-and `farmable` and **no `chances` map at all**. The model skips any entry without
-one, so those relics are inert everywhere — nothing is double-counted, the
-requirement is simply invisible. Consequences, all verified:
-
-| Item | Filed as | "farmable relics" | …carrying odds |
-|---|---|---|---|
-| Aklex Prime | **Farmable** | 8 | **0** |
-| Akbronco Prime | Farmable | 8 | 3 (its own Blueprint and Link) |
-| Akmagnus Prime | Baro Ki'Teer | 0 | 0 |
-| Akvasto Prime | Baro Ki'Teer | 0 | 0 |
-
-Aklex Prime is in the **Farmable** bucket *because of* the pseudo-part:
-`"farmable": bool(farmable_relics)` (`tools/build_data.py:871`) and every one of
-those eight relics reached the union through `Lex Prime`. Open its card and the
-*Best places to farm its relics* section is **absent entirely** — `bestSpots` drops
-every relic worth zero, and all eight are — so the app files it under "you can farm
-this" and then has nowhere to send you. The `rarity` left on those rows is a
-leftover from the union and disagrees with the real part: the Lex Prime row for
-`Lith A2` says Uncommon, where `Lex Prime Barrel` is Common.
-
-On the planner it shows as duplication: `wantedIndex` pushes one *Still needed* row
-per part, so a wishlisted Aklex Prime produces **two identical rows** reading
-*Aklex Prime — Lex Prime*, two identical buttons in the farm-list panel, and
-clicking either clears both.
-
-**Three things to fix, and they are separable.** (1) Give the pipeline a rule for
-a component that is itself a Prime: collapse the duplicate to one part with
-`itemCount: 2`, which the store already handles — Ivara Prime needs two of some of
-hers and the counter cycles correctly. (2) Decide what such a part's relics mean.
-Either resolve them to the sub-weapon's own parts, which makes the requirement
-farmable and rankable and is a real change to what an "item" is, or mark them
-non-scoring and stop them feeding `item_relics`, `farmableRelics` and therefore the
-`farmable` flag. The second is much smaller and would already stop the app claiming
-Aklex Prime is farmable. (3) Add the test: **no item has two parts with the same
-name.** It is one line and it would have caught this before any of the rest.
-
-The review's own suggestion — a `dependencies` array, and marking Lex Prime as
-collected credits the Aklex parent — is a third option and the largest, because it
-makes one item's ownership state depend on another's. Worth noting that the
-dependency is *already in the data*; it is the storage key that cannot express it.
-
-### Unticking one availability box hides items that have a second source
-
-`statusOf` gives each item exactly one bucket and `matches()` tests
-`state.avail[it._status]`, so an item vanishes when its **primary** bucket is
-unticked even if a ticked bucket also applies. Three items in the current 167 carry
-more than one bucket-bearing flag:
-
-| Item | Flags | Files under | Disappears when you untick |
-|---|---|---|---|
-| Aklex Prime | baro + farmable | Farmable | **Farmable** |
-| Lex Prime | baro + farmable + permanent | Farmable | **Farmable** |
-| Gotva Prime | baro + special | Baro | **Baro** |
-
-**Backwards from the review's example**, which assumed Baro won and Farmable was
-the hidden fallback. Farmable is checked first, so unticking *Baro* hides nothing
-at all today except Gotva Prime, and unticking *Farmable* takes two Baro items with
-it. The shape of the bug is real; the direction in the write-up is not.
-
-Two things the review did not know. There is a **seventh bucket**: `railjack`, taken
-out of `farmable` in `assets/app.js` for the six Primes with no non-Railjack route
-(`PROJECT.md §7`), so any fallback rule has to say whether Railjack-only falls back
-to Farmable or stands alone. And the counts beside each box come from `updateCounts`,
-which also groups on `it._status` — a fallback rule that only touches `matches()`
-leaves the numbers no longer adding up to what is on screen.
-
-The bucket itself is a deliberate design (`PROJECT.md §7`, *"exactly one bucket so
-the sidebar toggles stay unambiguous"*), so this is not "make it multi-valued" —
-it is "keep one bucket for display and let the *filter* read the flags". Three
-items is small enough that doing nothing is defensible; it is written down because
-the failure is silent, and a silently missing item in a collection tracker is the
-one kind of wrong this app cannot afford.
-
-### Both clocks stop dead in a background tab, and nothing catches up on return
-
-Two timers keep the planner honest, and neither survives a tab switch well:
-
-- `setInterval(paintFissures, 60000)` (`assets/plan.js:1155`) — **one minute, not
-  the 30 seconds the review states**. Browsers throttle background intervals to
-  roughly once a minute or worse, so the badges are stale on return.
-- the bounty clock, a separate 30-second interval (`assets/plan.js:1384`), whose
-  body opens `if (document.hidden) return;`. So while the tab is hidden it does
-  **nothing by design** — and nothing runs on becoming visible either. Come back
-  after an hour and the countdown reads what it read when you left, for up to
-  thirty seconds.
-
-The second is the one that matters, and the code says why in its own comment: once
-the letter turns over *"the ranking behind it is wrong, not merely old"*. A hidden
-tab can miss several changeovers, and the first thing you see on returning is a
-ranking built for a letter that is no longer up.
-
-**The fix is one listener** — `document.addEventListener("visibilitychange", …)`
-calling the same two functions when `document.hidden` goes false. The `document.hidden`
-guard already in the interval becomes correct rather than merely cheap, because
-something else now covers the gap it leaves.
-
-The fissure badges are the safe half either way: every entry carries its own expiry
-and `ROT.fissuresAt` filters against the clock, so a stale paint can only *omit* a
-fissure, never invent one (`PROJECT.md §7`).
-
-### Banking a part from the drawer rebuilds the drawer and drops the focus
-
-Clicking a `.part-own` counter runs `render()` — refilter, resort and rewrite the
-whole of `#grid` — and then `openItem()`, which replaces `#drawerBody.innerHTML`
-wholesale (`assets/app.js:942`). `drawer.scrollTop` is saved and restored by hand;
-**focus is not**, so the button you just pressed is destroyed and `document.activeElement`
-falls back to `<body>`. Tick three parts with the keyboard and you tab from the top
-of the page three times.
-
-**Two corrections to the review, both in the app's favour.** The card tick is
-already granular: `toggle()` replaces the single `.card` via `outerHTML` and calls
-`updateProgress`/`updateCounts`/`refreshHeadings`, falling back to a full `render()`
-only when the item no longer passes the filter and must disappear
-(`assets/app.js:965`). And `renderMaterials()` does **not** run while you type — the
-`input` handler writes the model and toggles one class on the row
-(`assets/app.js:1256`); it rebuilds only on the edit toggle, add and delete, where
-the row's shape genuinely changes. The general claim that "every interaction
-rebuilds a container" is not true of this code.
-
-So the work is narrow and worth doing: on a part click, update the counter's own
-text and class, the card's `x/y`, the progress bar and the counts, and re-rank only
-the farm-spot section — leaving the element that holds focus alone. The full
-`render()` on every part click is the other half: it re-filters and re-sorts 167
-items and rewrites the grid to change one badge.
 
 ### The planner can only be ranked one way
 
@@ -735,8 +522,13 @@ That matters because the planner presents all of them as places to go:
   stream *inside* a Railjack mission), `The Circuit` and `The Perita Rebellion`
   (single activities whose "type" is their own name).
 
-The `Bounty` bucket is the one currently doing damage, because `objectivesOf` keys
-off it — see *A Profit-Taker phase is costed at four bounty stages*.
+The `Bounty` bucket is the one that has already cost something, because
+`objectivesOf` keys off it: the four Profit-Taker phases were charged four bounty
+stages each until 2026-08-24, when the heist was given a case of its own
+(`PROJECT.md §7`). That fix names one node pattern rather than fixing the label, so
+`Bounty` still carries two units — the effort row takes the unit of whichever node
+has the most objectives so a one-run heist cannot relabel a form that is mostly
+stages. A plaster on exactly the problem this entry describes.
 
 ### Plague Star and Profit-Taker are the same shape, modelled two ways
 

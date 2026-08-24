@@ -315,10 +315,23 @@
 
      Bounties are not on the round cycle at all, so the model has no round count
      for them - every bounty in the game runs a fixed set of stages, and four is
-     the common shape. */
+     the common shape - but only the common one: `/pc/syndicateMissions`
+     publishes `standingStages[]` per tier and its length is 3, 4 or 5. Reading
+     it is still owed (`TODO.md`).
+
+     The heist is the exception, and it is one DE's filing hides. Each
+     Profit-Taker phase is a whole activity you replay on its own - that is the
+     entire point of the four rows, and the `Old Mate` tooltip says so - but DE
+     publish its rewards inside the bounty table, so it arrived here as four
+     stages, its rate was divided by four, and it sank accordingly. One phase is
+     one run.
+
+     `isHeist` is declared further down this file. Safe: nothing calls this
+     during evaluation - the pages call it while rendering, long after. */
   const BOUNTY_STAGES = 4;
   const OBJECTIVE_UNIT = { Spy: "vault", Caches: "cache" };
   function objectivesOf(n) {
+    if (isHeist(n)) return { count: 1, unit: "run" };
     if (n.bounty) return { count: BOUNTY_STAGES, unit: "stage" };
     if (n.rounds) return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
     return { count: 1, unit: "run" };

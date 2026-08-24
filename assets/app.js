@@ -31,6 +31,23 @@
 
   const ITEMS = DATA.items;
   const RELICS = DATA.relics || {};
+  /* Names, because that is what one item calls another: a part named after a
+     whole Prime is a sub-item requirement, and the payload names it rather than
+     carrying an id it may not have minted yet. See `builtFrom`. */
+  const BY_NAME = new Map(ITEMS.map((i) => [i.name, i]));
+
+  /* The fissures that were running when the build ran, each with the moment it
+     closes. Read here for one reason only: when a fold has to pick which of
+     several identical nodes to name, a node that is a fissure right now is the
+     one to name. The planner has always done that; this page called `pickNode`
+     with no predicate and so could name a different member of the same group -
+     and since the pick BECOMES the row, its level, planet and badges came with
+     it. Absent on an old build, and absent is a valid answer.
+
+     This is the only thing fissures do here. They are not scored, and they are
+     not listed: `PROJECT.md §7`. */
+  const FISSURES = DATA.fissures || [];
+  const nodeKey = (n) => n.node + " (" + n.planet + ")";
 
   /* ── collection state ─────────────────────────────────────── */
   // load/save come from shared.js, which swallows a corrupt or unavailable
@@ -103,6 +120,9 @@
 
   ITEMS.forEach((it) => {
     it._status = statusOf(it);
+    /* Every bucket it belongs to, not just the one it displays as. The filter
+       reads this; the badges, the sort and the counts read `_status`. */
+    it._buckets = M.bucketsOf(it);
     it._search = (
       it.name + " " + it.category + " " + (it.type || "") + " " +
       (it.relics || []).join(" ") + " " +
@@ -138,6 +158,8 @@
   ITEMS.forEach((it) => {
     if (it._status === "farmable" && ROT.railjackOnly(it, RELICS)) {
       it._status = "railjack";
+      // it left Farmable, so the Farmable box must stop covering it too
+      it._buckets = it._buckets.map((b) => (b === "farmable" ? "railjack" : b));
     }
   });
 
@@ -217,7 +239,10 @@
   /* ── matching ─────────────────────────────────────────────── */
   function matches(it, skip) {
     skip = skip || "";
-    if (skip !== "avail" && !state.avail[it._status]) return false;
+    /* Any bucket it belongs to, not only the one it displays as. An item with
+       two sources is on screen while either box is ticked - unticking Baro
+       must not take a farmable Prime with it just because Baro also sells it. */
+    if (skip !== "avail" && !it._buckets.some((b) => state.avail[b])) return false;
     if (skip !== "cat" && !state.cats.has(it.category)) return false;
     if (skip !== "coll") {
       const has = collected.has(it.id);
@@ -382,10 +407,15 @@
   }
 
   function updateCounts() {
+    /* What each box COVERS, which is not the same as what displays as it: an
+       item with two sources is counted beside both, so the number beside a box
+       says what unticking it would stop covering. That is the question the
+       counts are read for, and it is why they can add up to more than the
+       total - two of the 167 have two sources. */
     const availPool = ITEMS.filter((it) => matches(it, "avail"));
     Object.keys(state.avail).forEach((k) => {
       const el = $(`[data-count="${k}"]`);
-      if (el) el.textContent = availPool.filter((it) => it._status === k).length;
+      if (el) el.textContent = availPool.filter((it) => it._buckets.includes(k)).length;
     });
 
     const collPool = ITEMS.filter((it) => matches(it, "coll"));
@@ -526,7 +556,14 @@
     /* Fold nodes that are the same bet, exactly as the planner does and through
        the same two functions, so the two pages cannot disagree about what
        counts as a duplicate or which of a group to name. Eight rows for one
-       choice wastes a list that only shows eight. */
+       choice wastes a list that only shows eight.
+
+       `pickNode` takes the fissure test as an argument and this page used to
+       leave it out, which broke the second half of that promise: with a fissure
+       live at a member that is not the lowest-level one, the planner named that
+       node and this page named another. Same predicate, same answer. Void
+       Storms count here where they may not on the planner - this view never
+       hides Railjack, since some live relics drop nowhere else. */
     const order = [];
     const groups = new Map();
     ranked.forEach((e) => {
@@ -535,10 +572,13 @@
       groups.set(key, [e]);
       order.push(key);
     });
+    const now = Date.now();
+    const isFissureNow = (n) => ROT.fissuresAt(FISSURES, nodeKey(n), now, true).length > 0;
     return order.map((key) => {
       const group = groups.get(key);
-      const pick = group.length > 1 ? ROT.pickNode(group) : group[0];
+      const pick = group.length > 1 ? ROT.pickNode(group, isFissureNow) : group[0];
       pick.sameAs = group.length > 1 ? group : null;
+      pick.pickedForFissure = !!(pick.sameAs && isFissureNow(pick));
       return pick;
     }).slice(0, 8);
   }
@@ -758,41 +798,10 @@
         so it's next in line.</div>`;
     }
 
-    /* best farm spots */
-    const spots = bestSpots(it);
-    if (spots.length) {
-      const stillNeeded = relicsStillNeeded(it);
-      const openCount = (it.farmableRelics || []).filter((r) => stillNeeded.has(r)).length
-                        || (it.farmableRelics || []).length;
-      html += `<section class="d-sec">
-        <h3>Best places to farm its relics</h3>
-        <div class="spots">` +
-        spots.map((s) => `
-          <div class="spot">
-            <div class="spot-where">${esc(s.node)}
-              <span class="spot-mode${s.nonStandard ? " odd" : ""}">(${esc(s.mode)})</span>${
-              s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""
-              }${demandTags(s)}${
-              s.sameAs ? `<span class="same" data-tip="${esc(
-                s.sameAs.length + " nodes are this same bet — same relics, same rates.\n" +
-                "Shown: " + s.node +
-                (s.aya ? ", which also drops Aya." : ", the lowest level of them.") + "\n\n" +
-                s.sameAs.map((x) => "  " + x.node + " (" + x.planet + ")" +
-                  (x.lvl ? "  lvl " + x.lvl[0] + "–" + x.lvl[1] : "")).join("\n"))
-              }">+${s.sameAs.length - 1} same</span>` : ""}</div>
-            <div class="spot-meta">${
-              s.kind === "bounty" ? bountyRotTag(s)
-                : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)
-                : "no rotation"}${
-              s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
-              s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
-              s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
-              s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
-            <div class="spot-score" data-tip="What one whole run here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches, so a longer run can outrank a faster one on volume alone."><b>${
-              (s.score * 100).toFixed(1)}%</b>per run</div>
-          </div>`).join("") +
-        `</div></section>`;
-    }
+    /* best farm spots, in a box of their own. Banking a part re-ranks this
+       section and nothing else, and rebuilding the whole drawer to do it threw
+       away the focus - see the part counter's handler below. */
+    html += `<div id="dSpots">${spotsHTML(it)}</div>`;
 
     /* parts → relics */
     if (it.parts && it.parts.length) {
@@ -845,16 +854,28 @@
               ${need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;")}
             </button>
             <span class="part-name">${esc(p.name)}</span>
-            <span class="part-count">${list.length}${
-              list.length !== total ? ` of ${total}` : ""} relic${total === 1 ? "" : "s"}${
-              need > 1 ? " · need " + need : ""}${
+            <span class="part-count">${p.builtFrom
+              ? `built, not dropped · need ${need}`
+              : `${list.length}${
+                list.length !== total ? ` of ${total}` : ""} relic${total === 1 ? "" : "s"}${
+                need > 1 ? " · need " + need : ""}`}${
               p.ducats ? ` · <span class="ducats" data-tip="${esc(
                 "Baro Ki'Teer pays " + p.ducats + " ducats for a spare " + p.name +
                 "." + "\n" + "A fixed game value, not a market price.")
               }">${p.ducats}d</span>` : ""}</span>
           </div>`;
 
-        if (!list.length) {
+        /* A whole weapon, not a part of one: an akimbo Prime is built from two
+           of the single-handed one. No relic drops a built weapon, so the
+           honest thing to show is where the weapon itself comes from - which is
+           another card in this same view. */
+        if (p.builtFrom) {
+          const sub = BY_NAME.get(p.builtFrom);
+          html += `<div class="relic-none">No relic drops a built weapon. Farm ${
+            sub ? `<button class="part-jump" data-open="${esc(sub.id)}">${esc(p.builtFrom)}</button>`
+                : `<b>${esc(p.builtFrom)}</b>`
+          }, build ${need}, then count them here.</div>`;
+        } else if (!list.length) {
           html += `<div class="relic-none">Every relic for this part is vaulted —
             untick <b>Hide vaulted</b> to see which ones to trade for.</div>`;
         }
@@ -938,21 +959,106 @@
         });
       });
 
-    // click a part counter: 0 → 1 → … → need → 0
+    /* Click a part counter: 0 → 1 → … → need → 0.
+
+       Updated in place rather than by re-rendering. This used to call
+       `render()` and then `openItem()`, which rewrote the whole grid and then
+       the whole drawer to change one number - and since `innerHTML` destroys
+       the button that was clicked, `document.activeElement` fell back to
+       `<body>` every time. The scroll position was carefully restored and the
+       focus was not, so ticking three parts from the keyboard meant tabbing in
+       from the top of the page three times.
+
+       So: the counter, the card and the counts move on their own, and the only
+       thing rebuilt is the farm-spot ranking, which genuinely changes and does
+       not hold the focus. */
     $$(".part-own", dbody).forEach((btn) => {
       btn.addEventListener("click", () => {
         const p = it.parts.find((x) => x.name === btn.dataset.part);
         if (!p) return;
         const need = needOf(p);
-        setPart(it.id, p.name, (haveOf(it.id, p.name) + 1) % (need + 1));
+        const have = (haveOf(it.id, p.name) + 1) % (need + 1);
+        setPart(it.id, p.name, have);
         syncCollected(it);
         saveCollected();
-        const keep = drawer.scrollTop;
-        render();          // card progress, counts, filters
-        openItem(it.id);   // re-rank the farm spots against what's left
-        drawer.scrollTop = keep;
+
+        const full = have >= need;
+        btn.classList.toggle("on", full);
+        btn.innerHTML = need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;");
+        const row = btn.closest(".part");
+        if (row) row.classList.toggle("part-done", full);
+
+        /* The one part of this section that is not local: with *Hide collected*
+           on, a part that just filled up has to leave. Rebuilding the section is
+           the honest way to do that, and the focus is going with the row it sat
+           on either way, so put it somewhere sensible rather than nowhere. */
+        if (full && state.hideOwnedParts && row) {
+          const section = row.parentNode;
+          const next = row.nextElementSibling || row.previousElementSibling;
+          row.remove();
+          const move = next && next.querySelector && next.querySelector(".part-own");
+          if (move) move.focus();
+          else if (section && !section.querySelector(".part")) {
+            section.insertAdjacentHTML("beforeend",
+              `<p class="hint">Every part is collected. Untick <b>Hide collected</b>
+                to see their relics again.</p>`);
+          }
+        }
+
+        const owned = $("#hideOwned");
+        const label = owned && owned.parentNode && owned.parentNode.lastChild;
+        if (label && label.nodeType === 3) {
+          const n = it.parts.filter((x) => haveOf(it.id, x.name) >= needOf(x)).length;
+          label.textContent = `Hide collected${n ? ` (${n})` : ""}`;
+        }
+
+        const box = $("#dSpots");
+        if (box) box.innerHTML = spotsHTML(it);
+        refreshCard(it);
       });
     });
+  }
+
+  /* Where to farm what is still missing. Its own function so that banking a
+     part can re-rank it without touching the parts list beside it - which holds
+     the button that was just clicked, and therefore the focus. Declared after
+     its caller, which hoisting allows and which keeps `openItem` readable
+     top-to-bottom. */
+  function spotsHTML(it) {
+    const spots = bestSpots(it);
+    if (!spots.length) return "";
+    const stillNeeded = relicsStillNeeded(it);
+    const openCount = (it.farmableRelics || []).filter((r) => stillNeeded.has(r)).length
+                      || (it.farmableRelics || []).length;
+    return `<section class="d-sec">
+      <h3>Best places to farm its relics</h3>
+      <div class="spots">` +
+      spots.map((s) => `
+        <div class="spot">
+          <div class="spot-where">${esc(s.node)}
+            <span class="spot-mode${s.nonStandard ? " odd" : ""}">(${esc(s.mode)})</span>${
+            s.kind === "mission" ? ` <span class="src-planet">— ${esc(s.planet)}</span>` : ""
+            }${demandTags(s)}${
+            s.sameAs ? `<span class="same" data-tip="${esc(
+              s.sameAs.length + " nodes are this same bet — same relics, same rates.\n" +
+              "Shown: " + s.node +
+              (s.pickedForFissure ? ", the one that is a fissure right now."
+                : s.aya ? ", which also drops Aya." : ", the lowest level of them.") + "\n\n" +
+              s.sameAs.map((x) => "  " + x.node + " (" + x.planet + ")" +
+                (x.lvl ? "  lvl " + x.lvl[0] + "–" + x.lvl[1] : "")).join("\n"))
+            }">+${s.sameAs.length - 1} same</span>` : ""}</div>
+          <div class="spot-meta">${
+            s.kind === "bounty" ? bountyRotTag(s)
+              : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)
+              : "no rotation"}${
+            s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
+            s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
+            s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
+            s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>
+          <div class="spot-score" data-tip="What one whole run here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches, so a longer run can outrank a faster one on volume alone."><b>${
+            (s.score * 100).toFixed(1)}%</b>per run</div>
+        </div>`).join("") +
+      `</div></section>`;
   }
 
   function closeDrawer() {
@@ -975,14 +1081,19 @@
       collected.delete(id);
     }
     saveCollected();
-    // the card also carries a parts counter now, so redraw it wholesale
-    if (it && !matches(it)) {
-      render();   // filtered out — must disappear immediately
-    } else {
-      const card = grid.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
-      if (card) card.outerHTML = cardHTML(it);
-      updateProgress(); updateCounts(); refreshHeadings();
-    }
+    refreshCard(it);
+  }
+
+  /* One card and the numbers around it, without rebuilding the grid. Falls back
+     to a full render exactly when the change moves the card in or out of the
+     list, which is the case a targeted update cannot express. Nothing a part
+     tick changes affects the sort, so a card that stays never moves. */
+  function refreshCard(it) {
+    const card = it && matches(it)
+      ? grid.querySelector(`.card[data-id="${CSS.escape(it.id)}"]`) : null;
+    if (!card) { render(); return; }
+    card.outerHTML = cardHTML(it);
+    updateProgress(); updateCounts(); refreshHeadings();
   }
 
   function refreshHeadings() {
@@ -1047,6 +1158,10 @@
   });
 
   document.addEventListener("click", (e) => {
+    // one card sending you to another - a sub-item requirement in the drawer
+    const jump = e.target.closest("[data-open]");
+    if (jump) { e.stopPropagation(); openItem(jump.dataset.open); return; }
+
     const preset = e.target.closest("[data-preset]");
     if (preset) {
       if (preset.dataset.preset === "cats") {

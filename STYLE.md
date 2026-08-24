@@ -186,6 +186,14 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   `::-webkit-*-spin-button` reset). They are visually noisy at this size.
 - Default-off options that need explaining live under **Advanced options** with
   the reasoning in a tooltip, not in surrounding prose.
+- **A control must not rebuild the container it lives in.** `innerHTML` destroys
+  the element that had the focus, so `document.activeElement` falls back to
+  `<body>` and the keyboard user is returned to the top of the page. The part
+  counters in the drawer did exactly that: the scroll position was carefully
+  saved and restored, and the focus was not, so banking three parts meant tabbing
+  in from the top three times. Update the control and its neighbours in place;
+  rebuild only sections that genuinely changed and do not hold the focus — for
+  that one it is `#dSpots`, the farm-spot ranking, which really does re-rank.
 - **Ask in the unit that holds still.** Effort is collected per *objective* — a
   Defense round, a Spy vault, a bounty stage — never per run, because how far you
   take an endless mission is your own choice and the option directly above it

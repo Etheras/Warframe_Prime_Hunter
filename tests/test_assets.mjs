@@ -269,6 +269,24 @@ test("a run is costed in objectives, and each type has its own word for one", ()
                    "a bounty is not on the round cycle, so it is costed in stages");
 });
 
+test("a Profit-Taker phase is one run, not four bounty stages", () => {
+  /* DE file the heist's rewards inside the bounty table, so it arrived here as
+     a four-stage bounty: its rate was divided by four and it sank down the list
+     accordingly. Each phase is a whole activity you replay on its own - the
+     `Old Mate` tooltip says exactly that, and the four rows exist because of it.
+
+     The node name is the subject rather than anything the model derives, so a
+     classifier that stopped recognising the heist cannot make this pass by
+     finding nothing. */
+  const ROT = loadRotation();
+  const o = (node) => plain(ROT.objectivesOf(
+    { node, mode: "Bounty", rounds: null, bounty: { letter: null } }));
+  assert.deepEqual(o("Level 40 - 60 PROFIT-TAKER - PHASE 1"), { count: 1, unit: "run" });
+  assert.deepEqual(o("Level 50 - 60 PROFIT-TAKER - PHASE 4"), { count: 1, unit: "run" });
+  assert.deepEqual(o("Level 20 - 40 Cetus Bounty"), { count: 4, unit: "stage" },
+                   "and an ordinary bounty is still costed in stages");
+});
+
 // ── the bounty clock ───────────────────────────────────────────────────────
 
 test("the live letter is the one the build read, until its window ends", () => {

@@ -114,6 +114,108 @@ page_test("ticking a part is saved, and survives a reload", async () => {
   assert.equal(after, saved, "and must still be there on the way back in");
 });
 
+page_test("banking a part keeps the focus on the button that was clicked", async () => {
+  /* This used to call render() and then openItem(), rewriting the whole grid
+     and then the whole drawer to change one number - and innerHTML destroys the
+     element that had the focus, so activeElement fell back to <body> on every
+     click. The scroll position was restored by hand and the focus was not, so
+     ticking three parts from the keyboard meant tabbing in from the top of the
+     page three times over.
+
+     The subject is picked by markup rather than by anything app.js decides: the
+     first card that has more than one part counter in its drawer. */
+  const { page, errors } = await open("/index.html");
+  await page.locator("[data-id]").first().click();
+  const own = page.locator("#drawerBody .part-own");
+  assert.ok(await own.count() > 1, "the first card must have parts to bank");
+
+  const btn = own.nth(1);
+  const part = await btn.getAttribute("data-part");
+  await btn.focus();
+  await page.keyboard.press("Enter");
+
+  const focused = await page.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el && el.tagName, part: el && el.dataset && el.dataset.part };
+  });
+  assert.equal(focused.tag, "BUTTON",
+               "the focus must not fall back to the body, or the keyboard is lost");
+  assert.equal(focused.part, part, "and it must still be the counter that was pressed");
+
+  const stored = await page.evaluate(() => localStorage.getItem("wfprimes.parts.v1"));
+  assert.ok(stored && stored.includes(part), `${part} was pressed and not saved`);
+  assert.deepEqual(errors, []);
+});
+
+page_test("a Prime with two sources survives unticking either of them", async () => {
+  /* Lex Prime's relics still drop AND Baro sells it. Each item displays as one
+     bucket, which is right for the badge and was wrong for the filter: it filed
+     under Farmable, so unticking Farmable took it away from the Baro box that
+     was still ticked, with nothing on screen saying where it had gone.
+
+     Named subject, because no property of the raw data picks out "an item with
+     two sources" without reimplementing the classifier (PROJECT.md section 2). */
+  const { page, errors } = await open("/index.html");
+  const flags = await page.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Lex Prime");
+    return it && it.flags;
+  });
+  assert.ok(flags && flags.farmable && flags.baro,
+            "Lex Prime is the subject because it is farmable and a Baro item");
+
+  const card = page.locator('[data-id="secondary-lex-prime"]');
+  await page.locator("#search").fill("Lex Prime");
+  assert.equal(await card.count(), 1, "it has to be on screen before anything is unticked");
+
+  /* Clicked in the page: the real checkbox sits under a styled span that
+     swallows the pointer, which is how the fissure test drives one too. */
+  const box = (id) => page.evaluate((s) => document.querySelector(s).click(), "#" + id);
+
+  await box("f-farmable");
+  assert.equal(await card.count(), 1,
+               "Baro is still ticked and still sells it, so it must stay");
+  await box("f-baro");
+  assert.equal(await card.count(), 0,
+               "with both of its sources unticked it must finally go");
+
+  await box("f-baro");
+  assert.equal(await card.count(), 1, "and come back when either one returns");
+  assert.deepEqual(errors, []);
+});
+
+page_test("an akimbo asks for two of its sub-weapon, and can be given one", async () => {
+  /* DE list the sub-weapon of an akimbo twice, one each, and saved progress is
+     keyed on the part name - so the two entries shared one counter and there
+     was nowhere to record having one of the two. Three clicks completed a
+     four-part item.
+
+     Named subject: Aklex Prime is built from two Lex Primes. */
+  const { page, errors } = await open("/index.html");
+  await page.locator("#search").fill("Aklex Prime");
+  await page.locator('[data-id="secondary-aklex-prime"]').click();
+
+  const counters = page.locator("#drawerBody .part-own");
+  const names = await counters.evaluateAll((els) => els.map((e) => e.dataset.part));
+  assert.deepEqual(names, ["Blueprint", "Lex Prime", "Link"],
+                   "one entry per part, and the sub-weapon named once");
+
+  const sub = page.locator('#drawerBody .part-own[data-part="Lex Prime"]');
+  assert.equal((await sub.innerText()).trim(), "0/2",
+               "it needs two, so the counter has to be able to say so");
+  await sub.click();
+  assert.equal((await sub.innerText()).trim(), "1/2", "one banked is not two");
+
+  const done = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]"));
+  assert.ok(!done.includes("secondary-aklex-prime"),
+            "holding one of the two Lex Primes it needs is not owning it");
+
+  // and the card says where a built weapon actually comes from
+  const note = await page.locator("#drawerBody .relic-none").first().innerText();
+  assert.match(note, /Lex Prime/, "the row has to send you to the weapon itself");
+  assert.deepEqual(errors, []);
+});
+
 page_test("a tooltip appears on hover and says something", async () => {
   const { page } = await open("/index.html");
   await page.locator("[data-tip]").first().hover();
@@ -641,6 +743,93 @@ page_test("a ranked node says when it is a fissure, and stops saying so", async 
   await rerender();
   assert.equal(await first.locator(".tag.fissure").count(), 0,
                "with it expired the row must stop claiming a fissure entirely");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the planner catches up the moment the tab comes back", async () => {
+  /* An interval is not a clock. A background tab has its timers throttled to
+     about once a minute, and the bounty tick deliberately does nothing at all
+     while document.hidden - so a tab left open came back showing a countdown
+     frozen where it was left and a ranking built for a rotation letter that had
+     since turned over, and the interval could take another half-minute to
+     notice.
+
+     Only the visibilitychange handler is exercised here: the fissure is planted
+     and NOTHING else is touched, so a badge appearing can only have come from
+     the page catching itself up. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
+    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const first = page.locator("#planNodes .spot").first();
+  assert.ok(await first.count() > 0, "nothing ranked, so there is no row to mark");
+  const key = await first.locator(".fissure-slot").getAttribute("data-node");
+  assert.equal(await first.locator(".tag.fissure").count(), 0,
+               "no fissure has been planted yet, so nothing should claim one");
+
+  await page.evaluate((n) => {
+    window.WFPRIME_DATA.fissures.splice(0, window.WFPRIME_DATA.fissures.length, {
+      node: n, tier: "Neo", mode: "Survival",
+      ends: new Date(Date.now() + 45 * 60000).toISOString(), hard: false, storm: false,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, key);
+
+  assert.equal(await first.locator(".tag.fissure").count(), 1,
+               "coming back to the tab has to refresh what the clock decides");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the collection view names the node that is a fissure, as the planner does", async () => {
+  /* `pickNode` takes the fissure test as an argument. The planner passed it and
+     this page did not, so with a fissure live at a member that was not the
+     lowest-level one the two named different nodes - and since the pick BECOMES
+     the row, its level, planet and badges came with it.
+
+     The group is read off the rendered tooltip rather than worked out here, so
+     this cannot quietly pass by folding nothing: the member a fissure is planted
+     at is one the page itself said was in the group and did not name. */
+  const { page, errors } = await open("/index.html");
+  const card = page.locator('[data-id="warframe-caliban-prime"]');
+  assert.equal(await card.count(), 1, "the named subject has left the catalogue");
+  await card.click();
+
+  const same = page.locator("#drawerBody .spot .same").first();
+  await same.waitFor({ timeout: 5000 });
+  const group = await same.evaluate((el) => ({
+    tip: el.dataset.tip,
+    named: el.closest(".spot").querySelector(".spot-where").childNodes[0].textContent.trim(),
+  }));
+  assert.ok(group.tip, "this test needs a folded group and the drawer showed none");
+
+  // "  Cinxia (Ceres)  lvl 12–17" -> "Cinxia (Ceres)", skipping the named one
+  const members = group.tip.split("\n")
+    .map((l) => (l.match(/^\s{2}(.+?\s\(.+?\))\s/) || [])[1])
+    .filter(Boolean);
+  const other = members.find((m) => !m.startsWith(group.named + " "));
+  assert.ok(other, `every member of the group is the one already named: ${members}`);
+
+  await page.evaluate((n) => {
+    window.WFPRIME_DATA.fissures.splice(0, window.WFPRIME_DATA.fissures.length, {
+      node: n, tier: "Lith", mode: "Defense",
+      ends: new Date(Date.now() + 40 * 60000).toISOString(), hard: false, storm: false,
+    });
+  }, other);
+  await page.keyboard.press("Escape");
+  await card.click();
+
+  const after = await page.locator("#drawerBody .spot .same").first().evaluate((el) => ({
+    tip: el.dataset.tip,
+    named: el.closest(".spot").querySelector(".spot-where").childNodes[0].textContent.trim(),
+  }));
+  assert.equal(after.named + " ", other.slice(0, after.named.length + 1),
+               `a fissure is live at ${other} and the row still names ${after.named}`);
+  assert.match(after.tip, /the one that is a fissure right now/,
+               "and it has to say why it named that one, in the planner's words");
   assert.deepEqual(errors, []);
 });
 

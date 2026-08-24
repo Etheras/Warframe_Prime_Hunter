@@ -162,7 +162,12 @@
       it.parts.forEach((p) => {
         const short = needOf(p) - haveOf(id, p.name);
         if (short <= 0) return;
-        needs.push({ item: it, part: p.name, short, need: needOf(p) });
+        /* `builtFrom` marks a part that is a whole Prime in its own right - an
+           akimbo is built from two of the single-handed weapon. It has no
+           relics of its own, so without this the row below would fall through
+           to "vaulted", which is the one thing it is not. */
+        needs.push({ item: it, part: p.name, short, need: needOf(p),
+                     builtFrom: p.builtFrom || null });
         p.relics.forEach((r) => {
           if (!want.has(r.relic)) want.set(r.relic, []);
           want.get(r.relic).push({
@@ -861,8 +866,23 @@
   function renderEffort(ranked) {
     const box = $("#effortRows");
     if (!box) return;
-    const unit = new Map();
-    ranked.forEach((n) => { if (!unit.has(n.mode)) unit.set(n.mode, n.unit); });
+    /* One mission type can carry two units, because one of our type names
+       covers two things: `Bounty` holds both the bounty board, costed in
+       stages, and the four Profit-Taker phases, which are one run each. The row
+       takes the unit of the node with the MOST objectives, so a single-objective
+       outlier cannot relabel a form that is mostly stages and quietly make the
+       number typed into it wrong by a factor of four.
+
+       That is a plaster over a wider problem: `Bounty` is our label, not DE's,
+       and it is doing two jobs. See *Our four invented "mission types" leak into
+       the ranking* in `TODO.md`. */
+    const unit = new Map(), most = new Map();
+    ranked.forEach((n) => {
+      const count = n.objectives || 0;
+      if (!unit.has(n.mode) || count > most.get(n.mode)) {
+        unit.set(n.mode, n.unit); most.set(n.mode, count);
+      }
+    });
     const modes = Array.from(unit.keys()).sort();
 
     box.innerHTML = modes.length
@@ -1101,16 +1121,23 @@
                    const best = pp && pp.relics.find((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
                    return best ? rarityOf(best.chances) : ""; })()
         : "";
-      return `<div class="need-row${live ? "" : " need-dead"}${rar ? " rar-row-" + rar : ""}">
+      return `<div class="need-row${live || n.builtFrom ? "" : " need-dead"}${
+        rar ? " rar-row-" + rar : ""}">
         <span class="need-name">${esc(n.item.name)}</span>
         <span class="need-part">${esc(n.part)}${n.short > 1 ? ` ×${n.short}` : ""}</span>
         <span class="need-src">${
           n.bonus ? "picked up along the way — never farmed for on its own"
-                  : (live
-                      ? `<span class="relic-count" data-tip="${esc("Dropping from:" + "\n" +
-                          liveRelics.map((r) => "  " + r).join("\n"))}">${live} relic${
-                          live === 1 ? "" : "s"} dropping</span>`
-                      : "vaulted — trade or wait for Resurgence")}</span>
+            : n.builtFrom
+              ? `<span class="relic-count" data-tip="${esc(
+                  "An akimbo is built from two of the single-handed weapon.\n" +
+                  "No relic drops a built one, so farm " + n.builtFrom +
+                  " on its own\nand come back when you have " + n.short + ".")
+                }">build ${n.short} × ${esc(n.builtFrom)}</span>`
+              : (live
+                  ? `<span class="relic-count" data-tip="${esc("Dropping from:" + "\n" +
+                      liveRelics.map((r) => "  " + r).join("\n"))}">${live} relic${
+                      live === 1 ? "" : "s"} dropping</span>`
+                  : "vaulted — trade or wait for Resurgence")}</span>
       </div>`;
     }).join("");
   }
@@ -1153,6 +1180,26 @@
   /* A minute is finer than this needs to be — the numbers are in minutes — and
      coarse enough that nothing is being animated at anybody. */
   setInterval(paintFissures, 60000);
+
+  /* ── catching up after a tab switch ───────────────────────────────
+     An interval is not a clock. Browsers throttle a background tab's timers to
+     roughly once a minute or worse, and the bounty tick below deliberately does
+     nothing at all while `document.hidden` — so a tab left open for an hour came
+     back showing a countdown frozen where it was left, and, worse, a ranking
+     built for a rotation letter that had turned over while nobody was looking.
+     The interval alone could take another half-minute to notice.
+
+     So the moment the tab is visible again, everything that reads the clock runs
+     once. That also makes the `document.hidden` guard below correct rather than
+     merely cheap: skipping hidden work is only safe when something covers the
+     gap it leaves.
+
+     One listener over a list, because the two things that need it are defined a
+     page apart and neither should have to know about the other. */
+  const onReturn = [paintFissures];
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) onReturn.forEach((fn) => fn());
+  });
 
   /* ── add-to-list search ──────────────────────────────────────── */
   const searchBox = $("#addSearch"), results = $("#addResults");
@@ -1381,13 +1428,15 @@
      it. */
   if (ROT.anyClocked()) {
     let seen = ROT.stamp();
-    setInterval(() => {
+    const tick = () => {
       if (document.hidden) return;
       const now = ROT.stamp();
       if (now !== seen) { seen = now; render(); return; }
       $$("[data-until]").forEach((el) => {
         el.textContent = untilText(Number(el.dataset.until)) + " left";
       });
-    }, 30000);
+    };
+    setInterval(tick, 30000);
+    onReturn.push(tick);      // see visibilitychange above
   }
 })();

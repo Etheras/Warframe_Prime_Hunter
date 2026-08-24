@@ -758,6 +758,9 @@ def main() -> int:
     skipped_non_relic = 0
     unmatched: list[str] = []
     seen_ids: set[str] = set()
+    # Which catalogue Prime a component name refers to, if it refers to one at
+    # all - see the sub-item fold below. Built once rather than per component.
+    catalog_by_norm = {norm(n): n for n in catalog_names}
 
     for entry in catalog:
         name = entry["name"]
@@ -768,6 +771,45 @@ def main() -> int:
         # components -> relics
         parts = []
         for comp in ((api or {}).get("components") or []):
+            part_name = normalise_part(comp.get("name"))
+
+            # A component that is itself a Prime in the catalogue is a whole
+            # weapon, not a part of one: Aklex Prime is built from two Lex
+            # Primes. DE publish that as the SAME component twice, one each,
+            # and saved progress is keyed on the part name - so two entries
+            # called "Lex Prime" share one slot, and the tracker cannot record
+            # that you have one of the two. Three clicks completed a four-part
+            # item. Fold the copies into one requirement and keep the count,
+            # which the store already handles (Ivara Prime needs two of some
+            # of hers).
+            #
+            # Its "drops" are dropped with it, and that is the other half of
+            # the bug. DE list the union of every relic dropping any Lex Prime
+            # PART - 130 of them - and none of those relics drops a built
+            # weapon, so no odds can be attached to any of them (the lookup
+            # below searches for "Aklex Prime …" and the relic pays "Lex Prime
+            # Barrel"). Carried through, that union made Aklex Prime the only
+            # item in the payload flagged farmable on eight relics it could do
+            # nothing with, and its card offered nowhere to farm.
+            sub = catalog_by_norm.get(norm(part_name))
+            if sub and norm(sub) != norm(name):
+                prev = next((p for p in parts if p["name"] == part_name), None)
+                if prev:
+                    prev["itemCount"] = (prev["itemCount"] or 1) + (comp.get("itemCount") or 1)
+                    continue
+                parts.append({
+                    "name": part_name,
+                    "itemCount": comp.get("itemCount") or 1,
+                    "ducats": comp.get("ducats"),
+                    # the catalogue name to send the reader to. Names, not ids:
+                    # an id is minted further down this loop and the sub-item
+                    # may not have reached it yet, while names are the
+                    # catalogue's own key.
+                    "builtFrom": sub,
+                    "relics": [],
+                })
+                continue
+
             drops = comp.get("drops") or []
             rel_map: dict[str, dict] = {}
             for d in drops:
@@ -804,7 +846,7 @@ def main() -> int:
                 r["farmable"] = r["relic"] in relic_sources
 
             parts.append({
-                "name": normalise_part(comp.get("name")),
+                "name": part_name,
                 "itemCount": comp.get("itemCount"),
                 # What Baro pays for a spare. A fixed game constant, published
                 # per component in the item database, so it needs no guessing -
