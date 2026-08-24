@@ -115,7 +115,9 @@ of a worklist, not of the click, and worth deciding on its own merits.
 ### Not work
 
 The availability precedence asks for something that is **already true** — see its
-entry. *Conditioning the fissure bonus on a live fissure* is **[settled]** against.
+entry. *Conditioning the fissure bonus on a live fissure* was **[settled] against**
+and then done anyway on 2026-08-24, at the owner's direction — the entry is gone
+and `PROJECT.md §7` records both the reversal and what it cost.
 Six answered questions sit under **Settled**; the one that was partly reopened had
 its open half closed on 2026-08-24, and what remains of it is a note explaining why
 Railjack levels are absent on purpose. Four wiki edits sit under **Should be fixed
@@ -358,25 +360,6 @@ on 8,000 traces values the saving at zero, and that is the whole reason the numb
 shown rather than scored (`PROJECT.md §7`). The formula in the entry above is the
 same one the review derives.
 
-### Conditioning the fissure bonus on a live fissure **[settled]**
-
-**The observation is right and is already two entries in this file** — the
-`+relic if fissure` tooltip and `RUN_BLURB.bonus` still say *"nothing here knows
-that"* while a fissure badge sits on the same row, and `plan.js` does import
-`DATA.fissures` and does call `ROT.fissuresAt`.
-
-**The proposed fix is settled against**, in `PROJECT.md §7`. The flat bonus is safe
-precisely *because* it is node-independent: it cannot reorder endless nodes against
-each other, so the only comparison it moves is endless-versus-short, which holds
-whatever the fissure map looks like. Feed the live list into `runValue()` and the
-ranking reshuffles hourly on a fact with an hour left to live — which is the exact
-outcome the fissures-are-shown-never-scored decision exists to prevent.
-
-What is open is the **sentence**, not the score, and it is written up at the top of
-this file.
-
----
-
 ## A round is not a universal unit of effort
 
 The planner costs every mission in "rounds" and assumes one round means the same
@@ -509,12 +492,11 @@ on *Where to go*, because that is where the run modes live. It should also be st
 on the cracking side — *given you are opening these relics anyway, is it worth
 staying to rotation 5?*
 
-Related, and on the same row: the page carries a badge saying *this is a fissure for
-40 more minutes* and a marker saying *+relic if fissure*. Half of that was fixed on
-2026-08-24 — the marker's tooltip now points at the badge and says the bonus is
-counted on every endless node rather than only the marked ones. What is still owed
-is the join in the other direction: nothing on the *cracking* side mentions the
-bonus at all, so a reader looking at the relic list has no reason to stay.
+The row half of this is done. The bonus is only applied to nodes carrying a
+fissure now, so the marker says *+free relic* rather than *+relic if fissure*, and
+it sits beside the badge that says why. What is still owed is the *cracking* side:
+nothing in the relic list mentions the bonus at all, so a reader deciding what to
+crack has no reason to stay.
 
 **The scoring stays as it is.** Feeding the live fissure list into the score is the
 obvious next move and is the wrong one — it would reorder the ranking hourly on a

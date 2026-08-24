@@ -164,27 +164,60 @@ const BOUNTY_DATA = {
 
 // ── the ordinary round cycle ───────────────────────────────────────────────
 
-test("AABC: a reset run stops at the last rotation worth anything", () => {
-  const ROT = loadRotation();
-  const onlyA = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "reset", "Defense", false, null);
-  assert.equal(onlyA.rounds, 2, "rounds 1-2 both pay A, so stop at 2");
-  assert.deepEqual(plain(onlyA.counts), { A: 2 });
+test("how far to run a node is decided by the node, not by a setting", () => {
+  /* There used to be a *How far you run* control and one answer for the whole
+     list. It is worked out per node now: every way of playing it is scored and
+     the best rate wins, where the rate is value over rounds-plus-overhead.
 
-  const alsoC = ROT.runValue({ A: 1, B: 0, C: 1, none: 0 }, "reset", "Defense", false, null);
-  assert.equal(alsoC.rounds, 4, "leaving after A never yields the C part");
-  assert.deepEqual(plain(alsoC.counts), { A: 2, B: 1, C: 1 });
+     Restarting is what the overhead prices. Without it, leaving after two
+     rounds and starting again looked free, so `reset` won everywhere by never
+     being charged for the thing it does most. */
+  const ROT = loadRotation();
+  const run = (rot) => ROT.runValue(rot, "Defense", false, null);
+
+  // Rotation A is all you want: four A rewards over six rounds beats two over
+  // two once the trip in and out is charged for.
+  const onlyA = run({ A: 1, B: 0, C: 0, none: 0 });
+  assert.equal(onlyA.mode, "aabcaa");
+  assert.equal(onlyA.rounds, 6);
+  assert.deepEqual(plain(onlyA.counts), { A: 4, B: 1, C: 1 });
+
+  // What you want is deeper in the cycle, so staying past it buys rotations
+  // you want nothing from.
+  const onlyB = run({ A: 0, B: 1, C: 0, none: 0 });
+  assert.equal(onlyB.mode, "reset");
+  assert.equal(onlyB.rounds, 3, "stops at B rather than running on to C");
+  assert.deepEqual(plain(onlyB.counts), { A: 2, B: 1 });
+
+  const mostlyC = run({ A: 0.05, B: 0.1, C: 0.4, none: 0 });
+  assert.equal(mostlyC.mode, "reset");
+  assert.equal(mostlyC.rounds, 4, "runs to C, because that is what pays here");
 });
 
-test("AABC: a full run banks one whole cycle, aabcaa banks six rounds", () => {
+test("the overhead is what makes staying worth it, and it is only two rounds", () => {
+  /* The size of the constant is the whole argument, so it is asserted rather
+     than left implicit: at zero, reset wins an A-only node outright (0.300
+     against 0.200) and nothing ever stays. Two rounds is a mission start -
+     matchmaking, two loading screens, the walk to extraction - and it is enough
+     to make the two exactly equal, at which point the tie goes to the run with
+     fewer restarts. */
   const ROT = loadRotation();
-  const rot = { A: 1, B: 1, C: 1, none: 0 };
-  assert.equal(ROT.runValue(rot, "full", "Defense", false, null).total, 4);
-  assert.equal(ROT.runValue(rot, "aabcaa", "Defense", false, null).total, 6);
+  assert.equal(ROT.RUN_OVERHEAD, 2);
+
+  const rot = { A: 0.3, B: 0, C: 0, none: 0 };
+  const chosen = ROT.runValue(rot, "Defense", false, null);
+  assert.equal(chosen.mode, "aabcaa");
+
+  // the two it was choosing between, priced by hand from the same constant
+  const reset = 0.6 / (2 + ROT.RUN_OVERHEAD);      // 2 rounds, 2 x rot A
+  const aabcaa = 1.2 / (6 + ROT.RUN_OVERHEAD);     // 6 rounds, 4 x rot A
+  assert.ok(Math.abs(reset - aabcaa) < 1e-12,
+            "a dead heat is what the tie-break is for; got " + reset + " vs " + aabcaa);
 });
 
 test("a node with no rotation is added flat, once per run", () => {
   const ROT = loadRotation();
-  const flat = ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 }, "reset", "Capture", false, null);
+  const flat = ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 }, "Capture", false, null);
   assert.equal(flat.total, 0.5);
   assert.equal(flat.rounds, null);
 });
@@ -192,11 +225,11 @@ test("a node with no rotation is added flat, once per run", () => {
 test("Disruption does not use the AABC cycle, and rotation A needs a squad", () => {
   const ROT = loadRotation();
   const wantA = { A: 1, B: 0, C: 0, none: 0 };
-  const solo = ROT.runValue(wantA, "reset", "Disruption", false, null);
+  const solo = ROT.runValue(wantA, "Disruption", false, null);
   assert.equal(solo.total, 0, "defending all four conduits can never reach rotation A");
   assert.ok(solo.stranded.includes("A"));
 
-  const squad = ROT.runValue(wantA, "reset", "Disruption", true, null);
+  const squad = ROT.runValue(wantA, "Disruption", true, null);
   assert.equal(squad.total, 3, "under-defending pays A three times, and only three");
   assert.match(squad.planName, /under-defending/);
 });
@@ -233,12 +266,13 @@ test("the count and the probability come from the rounds the value chose", () =>
   // worth: a rot A relic is the valuable one; chance: rot C drops far more often.
   // The run has to be the SAME run for both, or the row shows a percentage and a
   // count that cannot both be true.
-  const worth = { A: 1, B: 0, C: 0.2, none: 0 };
+  const worth = { A: 0.2, B: 0, C: 1, none: 0 };
   const chance = { A: 0.1, B: 0.5, C: 0.5, none: 0 };
-  const r = ROT.runValue(worth, "reset", "Defense", false, null, chance);
+  const r = ROT.runValue(worth, "Defense", false, null, chance);
 
+  assert.equal(r.mode, "reset", "the value is in C, so there is no reason to stay past it");
   assert.deepEqual(plain(r.counts), { A: 2, B: 1, C: 1 },
-                   "reset runs to C, because a C relic is wanted");
+                   "the run goes to C, because a C relic is wanted");
   // 2 x 0.1 + 1 x 0.5 + 1 x 0.5 - rotation B counts even though it is worth
   // nothing, because the run passes through it and you keep what it hands you
   assert.ok(Math.abs(r.count - 1.2) < 1e-12, "expected wanted relics, got " + r.count);
@@ -248,7 +282,7 @@ test("the count and the probability come from the rounds the value chose", () =>
 
 test("counting is skipped entirely when nothing asks for it", () => {
   const ROT = loadRotation();
-  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "reset", "Defense", false, null);
+  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "Defense", false, null);
   assert.equal(r.count, undefined, "no alt map, no count - not a silent zero");
   assert.equal(r.any, undefined);
 });
@@ -256,15 +290,16 @@ test("counting is skipped entirely when nothing asks for it", () => {
 test("a chance over 100% across one table is held at certainty", () => {
   const ROT = loadRotation();
   // several wanted relics in one table can sum past 1; one roll cannot pay twice
-  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "reset", "Defense", false, null,
+  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "Defense", false, null,
                          { A: 1.4, B: 0, C: 0, none: 0 });
-  assert.equal(r.count, 2, "two rolls at certainty, never 2.8");
+  // rotation A is all this node pays, so the run stays for four of them
+  assert.equal(r.count, 4, "four rolls at certainty, never 5.6");
   assert.equal(r.any, 1);
 });
 
 test("a flat node counts its single roll, and no rounds", () => {
   const ROT = loadRotation();
-  const r = ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 }, "reset", "Capture", false, null,
+  const r = ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 }, "Capture", false, null,
                          { A: 0, B: 0, C: 0, none: 0.25 });
   assert.equal(r.count, 0.25);
   assert.equal(r.any, 0.25);
@@ -384,7 +419,7 @@ test("a bounty is costed at the stages DE says it has, not always four", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
   const cost = (node) => {
     const live = ROT.liveRotation(node);
-    const run = ROT.runValue({ A: 1, B: 1, C: 1 }, "reset", "Bounty", false, live, null);
+    const run = ROT.runValue({ A: 1, B: 1, C: 1 }, "Bounty", false, live, null);
     return plain(ROT.objectivesOf({ node, mode: "Bounty", ...run }));
   };
   assert.deepEqual(cost("Level 5 - 15 Cetus Bounty"), { count: 3, unit: "stage" });
@@ -404,7 +439,7 @@ test("when a letter next comes up is arithmetic on the sequence", () => {
 test("a bounty run pays the live letter and nothing else", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
   const live = ROT.liveRotation("Level 5 - 15 Cetus Bounty");      // C
-  const r = ROT.runValue({ A: 5, B: 3, C: 1, none: 0 }, "reset", "Bounty", false, live);
+  const r = ROT.runValue({ A: 5, B: 3, C: 1, none: 0 }, "Bounty", false, live);
   assert.equal(r.total, 1, "the A and B rewards are a wait, not a longer run");
   assert.equal(r.rounds, null, "a bounty is not costed in rounds");
   assert.deepEqual(plain(r.counts), { C: 1 });
@@ -418,7 +453,7 @@ test("a bounty that does not publish the live letter is averaged, and says so", 
   // letter its own table does not have. The subject moved here when the tier
   // it used to use gained a published letter and stopped being off-table.
   const live = ROT.liveRotation("Level 25 - 30 Cambion Drift Bounty");  // board on C, table AB
-  const r = ROT.runValue({ A: 4, B: 2, C: 0, none: 0 }, "reset", "Bounty", false, live);
+  const r = ROT.runValue({ A: 4, B: 2, C: 0, none: 0 }, "Bounty", false, live);
   assert.equal(r.total, 3, "the mean of what it does publish");
   assert.equal(r.bounty.letter, null);
   assert.equal(r.bounty.offTable, true);
@@ -428,7 +463,7 @@ test("a bounty that does not publish the live letter is averaged, and says so", 
 test("a single-table bounty has nothing to wait for", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
   const live = ROT.liveRotation("Level 15 - 25 Plague Star");   // not in groups at all
-  const r = ROT.runValue({ A: 2, B: 0, C: 0, none: 0 }, "reset", "Bounty", false, live);
+  const r = ROT.runValue({ A: 2, B: 0, C: 0, none: 0 }, "Bounty", false, live);
   assert.equal(r.total, 2);
   assert.equal(r.bounty.unknown, false, "one table is not an unknown rotation");
 });
@@ -437,7 +472,7 @@ test("with no bounty data at all the letter is unknown, never guessed", () => {
   const ROT = loadRotation({ data: { meta: {}, relics: {} } });
   const live = ROT.liveRotation("Level 5 - 15 Cetus Bounty");
   assert.equal(live.letter, null);
-  const r = ROT.runValue({ A: 4, B: 2, C: 0, none: 0 }, "reset", "Bounty", false, live);
+  const r = ROT.runValue({ A: 4, B: 2, C: 0, none: 0 }, "Bounty", false, live);
   assert.equal(r.total, 3, "the mean, flagged unknown - not the sum");
   assert.equal(r.bounty.unknown, true);
 });
@@ -485,27 +520,30 @@ test("a node says what it demands before you can play it", () => {
                    ["PvPvE", "Steel Path"]);
 });
 
-test("staying for the fissure bonus is a fourth run mode, five rotations deep", () => {
+test("a node carrying a fissure is run to five rotations, whatever the rate says", () => {
+  /* An endless Void Fissure pays a free Exceptional relic for reaching five
+     rotations. That is value the rate cannot see - it is not in the drop table
+     at all - so a fissure is *chosen* rather than compared: the run goes to
+     five and the arithmetic does not get a vote.
+
+     Deliberately tested on a node the rate would otherwise run differently, or
+     it proves nothing. */
   const ROT = loadRotation();
-  /* The other three stop at four rotations or six. An endless Void Fissure pays
-     a free Exceptional relic at five, so the first bonus is either unreachable
-     or a coincidence unless the run is chosen for it. */
-  assert.ok(ROT.RUN_MODES.includes("bonus"));
   assert.equal(ROT.bonusRotations, 5);
 
-  const rot = { A: 1, B: 1, C: 1, none: 0 };
-  const at = (mode) => ROT.runValue(rot, mode, "Defense", false, null).rounds;
-  assert.equal(at("full"), 4, "one whole cycle, and short of the bonus");
-  assert.equal(at("bonus"), 5, "exactly the depth the bonus is paid at");
-  assert.equal(at("aabcaa"), 6);
+  const onlyB = { A: 0, B: 1, C: 0, none: 0 };
+  assert.equal(ROT.runValue(onlyB, "Defense", false, null, null, false).mode, "reset",
+               "with no fissure this one leaves as soon as B drops");
 
+  const fissure = ROT.runValue(onlyB, "Defense", false, null, null, true);
+  assert.equal(fissure.mode, "bonus");
+  assert.equal(fissure.rounds, 5, "exactly the depth the bonus is paid at");
   // AABCA over five rounds - the fifth is a second lap of rotation A
-  assert.deepEqual(plain(ROT.runValue(rot, "bonus", "Defense", false, null).counts),
-                   { A: 3, B: 1, C: 1 });
+  assert.deepEqual(plain(fissure.counts), { A: 3, B: 1, C: 1 });
 
   // a mission with no rotation cannot stay for anything, so it gets no rounds
   assert.equal(ROT.runValue({ A: 0, B: 0, C: 0, none: 0.5 },
-                            "bonus", "Capture", false, null).rounds, null);
+                            "Capture", false, null, null, true).rounds, null);
 });
 
 test("an enemy says it is an enemy, and names the event it rides", () => {

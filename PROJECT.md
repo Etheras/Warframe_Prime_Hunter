@@ -1122,56 +1122,77 @@ score = Σ over rotations r in the pattern: count[r] × v[r]      (a whole run)
 Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 4 pays C,
 5–6 pay A again.
 
-| `runMode` | Label in the UI | Pattern | Rounds |
+| Run | Pattern | Rounds | Chosen when |
 |---|---|---|---|
-| `reset` *(default)* | Reset as soon as it drops | everything up to the **last wanted rotation** | 2, 3 or 4 — **per node** |
-| `full` | Run straight through | A×2 + B + C | 4 |
-| `aabcaa` | AABCAA, then reset | A×4 + B + C | 6 |
-| `bonus` | Stay for the fissure bonus | A×3 + B + C | 5 |
+| `reset` | everything up to the **last wanted rotation** | 2, 3 or 4 — per node | what you want sits deep in the cycle, so staying buys rotations you want nothing from |
+| `aabcaa` | A×4 + B + C | 6 | staying pays: usually rotation A, and rotation C on a Disruption held at four conduits |
+| `bonus` | A×3 + B + C | 5 | a Void Fissure is running here **right now** |
 
-**`bonus` is the only mode that exists for a reward outside the drop table.** An
-endless Void Fissure hands over a free relic for depth — five rotations gives a
-random *Exceptional* of the fissure's tier, ten a Flawless, every fifth after
-fifteen a Radiant. The other three modes stop at four rotations or six, so the
-first bonus is either unreachable or a coincidence; this run is chosen for it.
-Five rotations then restart, because the second bonus is twice as far away for one
-refinement step better, which is a worse trade every time.
+**Nobody is asked which, as of 2026-08-24.** There was a *How far you run*
+control with one answer for the whole list, and it was the wrong shape twice
+over: it asked the reader to know something the model can work out, and it
+applied one answer to nodes that want different ones. Every way of playing a
+node is scored now and the best rate wins.
 
-It is priced as what it is — a **random** relic of the tier — so its worth is the
-mean over every live relic in the best tier, most of which the plan wants nothing
-from. On a two-Prime list that came to *Meso, 3 of 9 live relics wanted, 8.07% at
-Exceptional*. Because every endless node pays the same bonus it is a flat addition
-and cannot reorder endless nodes against each other; what it moves is **endless
-versus short**, which is the question the mode exists to answer. On that list
-Mithra went from third at 15.96% over four rotations to first at 16.57% over five.
-Railjack is excluded: its fissures are Void Storms, which are their own nodes with
-their own tables and no rotations to stay for.
+**What made that possible was pricing the restart.** A run costs its rounds *and*
+the getting in and out — matchmaking, two loading screens, the walk to
+extraction — and none of that was costed, so leaving after two rounds and
+starting again looked free. `reset` therefore won everywhere by never being
+charged for the thing it does most. `RUN_OVERHEAD` is **two rounds**, and it is
+an approximation with a known shape: a mission start is a fixed couple of
+minutes, while a "round" runs from a 45-second Defense wave to a five-minute
+Survival rotation, so it over-charges the long ones and under-charges the short.
+It is kept in rounds rather than minutes deliberately — a figure in minutes could
+only apply where minutes have been given, and then the two pages would disagree
+about how long a run is the moment somebody typed into the effort panel. How to
+play a node should be a fact about the node.
 
-**Both pages offer all four, since 2026-08-24.** They share one `runMode` key, and
-the collection page's *How far you run* control listed three — so a planner set to
-`bonus` left that dropdown blank at `selectedIndex: -1` while the collection view
-went on costing every endless node the extra fifth round, and whoever touched the
-box next wrote a different mode back and changed the planner too. The free relic is
-still planner-only, because it is priced against a whole farm list and the
-collection view works one item at a time; the control says so rather than omitting
-a value it was already using.
+Two rounds is also exactly the figure at which an A-only node comes out level:
 
-One thing about it is still wrong and is written up in `TODO.md`: the row's
-`+relic if fissure` marker still says the app cannot tell which nodes are fissures,
-which stopped being true on 2026-08-14.
+| node | reset | AABCAA | at overhead 0 | at overhead 2 |
+|---|---|---|---|---|
+| rotation A only | 2 rounds, 2×A | 6 rounds, 4×A | reset, 0.300 vs 0.200 | **dead heat**, 0.150 |
+| A dominant, pays B+C too | 4 rounds | 6 rounds | AABCAA already | AABCAA, 0.175 vs 0.133 |
+| C dominant | 4 rounds | 6 rounds | reset | reset, 0.100 vs 0.088 |
+
+So the tie-break carries that case, and it is a stated rule rather than an
+accident: **where two ways of running a node come out within two per cent, the
+difference is inside the error of the constant, and the tie goes to the one with
+fewer restarts.**
+
+**The fissure is chosen, not compared.** An endless Void Fissure hands over a free
+relic for depth — five rotations gives a random *Exceptional* of the tier, ten a
+Flawless, every fifth after fifteen a Radiant. That relic is not in the drop table,
+so the rate cannot see it; a node carrying a fissure right now is run to five and
+the arithmetic does not get a vote. It is priced as what it is — a **random** relic
+of the tier — so its worth is the mean over every live relic in the best tier, most
+of which the plan wants nothing from. Railjack is excluded: its fissures are Void
+Storms, their own nodes with their own tables and no rotations to stay for.
+
+**This reverses a decision, and the reversal is the owner's.** The bonus used to be
+added to *every* endless node flat, and the argument for that was explicit: a
+node-independent constant cannot reorder endless nodes against each other, so a
+list built from drop tables that move a few times a year could not be reshuffled by
+something with an hour to live. Conditioning it on a live fissure was raised by an
+outside review, written up, and **settled against** on exactly that ground. It is
+now conditioned on one anyway, at the owner's direction. What that buys is a row
+that means what it says — *this* node pays a free relic, not *some* node might. What
+it costs is the thing the original decision protected: the top of the list now
+moves when the fissure map does, roughly every hour or two.
 
 `reset` stops at the **deepest rotation holding something you want**, not at the
 best-rate stopping point. Want a part from A and another from C? You run to C — 4
 rounds — because leaving after round 2 never yields the C part at all, however good
-the per-round rate looks. A node you only want rotation A from is costed over 2
-rounds, one whose B is the deepest over 3.
+the per-round rate looks.
 
-This was briefly implemented as a rate optimiser, which quietly dropped exactly the
-case it exists for: Io scored 78.01% over 2 rounds by ignoring its rotation C value
-outright. It is now 51.56% over 4, which is what running it actually costs. A
-per-round rate is the wrong objective when you need to *cover* a set rather than
-maximise throughput of any one item — the same reasoning as refinement following
-the bottleneck instead of the likeliest reward.
+That is a property of the `reset` pattern itself and it survives the change above:
+the *choice between* patterns is a rate question, but what one pattern does once
+chosen is not. It was briefly implemented as a rate optimiser inside `reset`, which
+quietly dropped exactly the case it exists for — Io scored 78.01% over 2 rounds by
+ignoring its rotation C value outright. A per-round rate is the wrong objective when
+you need to *cover* a set rather than maximise throughput of any one item, which is
+the same reasoning as refinement following the bottleneck instead of the likeliest
+reward.
 
 This is what makes the modes differ in kind rather than degree. `reset` runs only as
 deep as it must and is scored over the fewest rounds; `aabcaa` always pays for six

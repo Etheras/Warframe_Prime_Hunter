@@ -534,7 +534,7 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
     const R = window.WFPrimeRotation;
     const rot = { A: 0.4, B: 0, C: 0, none: 0 };
     const cnt = { A: 0.4, B: 0, C: 0, none: 0 };
-    const r = R.runValue(rot, "reset", "Caches", false, null, cnt);
+    const r = R.runValue(rot, "Caches", false, null, cnt);
     return { total: r.total, count: r.count, penalty: R.cachePenalty };
   });
   assert.equal(halved.penalty, 0.5);
@@ -992,6 +992,52 @@ page_test("the ranked number, the order and the heading all say the same thing",
   await page.reload({ waitUntil: "load" });
   assert.match((await read()).heading, /per run/);
   assert.equal(await page.locator("#p-sort").inputValue(), "run");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a fissure changes how far the row says to run, on both pages", async () => {
+  /* *How far you run* was a control with one answer for the whole list. It is
+     decided per node now, and a live fissure is the one input that overrides
+     the arithmetic: the free relic for reaching five rotations is value the
+     rate cannot see, so a node carrying one is run to five and that is that.
+
+     Both pages have to reach the same answer — they are two views of one model,
+     and a run costed at six rounds on one page and five on the other is the
+     kind of disagreement this project has had before. The node is read off the
+     row the planner ranked, so this cannot pass by marking somewhere nobody is
+     being sent. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const ids = window.WFPRIME_DATA.items
+      .filter((i) => (i.farmableRelics || []).length).slice(0, 4).map((i) => i.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  // an endless row: one that stays for rotations at all, so five is reachable
+  const endless = page.locator("#planNodes .spot").filter({ hasText: /\d+ rounds/ }).first();
+  assert.ok(await endless.count() > 0, "no endless node ranked, so nothing can stay");
+  const before = await endless.locator(".rounds").innerText();
+  assert.match(before, /6 rounds/,
+               "with no fissure this should be staying for rotation A");
+  const key = await endless.locator(".fissure-slot").getAttribute("data-node");
+
+  const rerender = () => page.evaluate(() => document.querySelector("#p-squad").click());
+  await page.evaluate((n) => {
+    window.WFPRIME_DATA.fissures.splice(0, window.WFPRIME_DATA.fissures.length, {
+      node: n, tier: "Neo", mode: "Survival",
+      ends: new Date(Date.now() + 50 * 60000).toISOString(), hard: false, storm: false,
+    });
+  }, key);
+  await rerender();
+
+  const row = page.locator("#planNodes .spot").filter({ hasText: key.split(" (")[0] }).first();
+  assert.match(await row.locator(".rounds").innerText(), /5 rounds/,
+               "a fissure is up here, so the run goes to five rotations");
+  assert.match(await row.locator(".est").innerText(), /free relic/,
+               "and the row says what the fifth rotation bought");
+  await rerender();          // put the squad box back where it was
+
   assert.deepEqual(errors, []);
 });
 

@@ -21,7 +21,6 @@
      assets/rotation.js, so this page and the collection view cannot disagree
      about it. Aliased here so the call sites read the same as they always did. */
   const ROT = window.WFPrimeRotation;
-  const RUN_MODES = ROT.RUN_MODES;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -109,7 +108,7 @@
   // rather than filtered on every read by whichever page remembered to
   ST.pruneWishlist((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
+    { squad: false, event: false, railjack: false, aya: true,
       minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
 
@@ -529,20 +528,33 @@
 
     // value each node as a whole run, which is what you actually commit to
     const mins = effort();
-    const bonus = opts.runMode === "bonus" ? fissureBonus(relicPlan) : null;
+    /* Worked out once for the whole plan rather than per node, because it is
+       the same number everywhere: a random Exceptional of the best tier is
+       worth what it is worth wherever you were standing. It used to be computed
+       only when the run mode was set to `bonus` by hand; now any node that is a
+       fissure right now uses it, so it is always needed. */
+    const bonus = fissureBonus(relicPlan);
+    const now = Date.now();
+    const fissureHere = (n) =>
+      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack).length > 0;
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
-      const r = runValue(n.rot, opts.runMode, n.mode, opts.squad, live, n.cnt);
+      /* Railjack is excluded from the fissure branch for the same reason its
+         bonus is: Void Storms are their own nodes with their own tables and no
+         rotations to stay for, so "run it to five rotations" means nothing. */
+      const r = runValue(n.rot, n.mode, opts.squad, live, n.cnt,
+                         !isRailjack(n) && fissureHere(n));
       /* The one deliberate thumb on the scale in the whole model - see
          rotation.js. Applied to the score, never to the count below it: what a
          run hands you is a fact, this is only what we think it is worth going
          for. */
       n.halved = ROT.isRailjackCache(n);
       /* The free relic for staying, once per run, and only where the run
-         actually reaches it: an endless mission taken to five rotations, run as
-         a fissure. Railjack has Void Storms instead of fissures, so it is out. */
-      n.bonus = bonus && (r.rounds || 0) >= ROT.bonusRotations && !isRailjack(n)
+         actually reaches it. `r.mode` is now the answer to "did this node
+         choose to stay for it", which only a live fissure makes it do. */
+      n.bonus = bonus && r.mode === "bonus" && (r.rounds || 0) >= ROT.bonusRotations
         ? bonus : null;
+      n.runMode = r.mode;         // how the model decided to run it
       // kept as the second number on the row: what a run is worth once the
       // relics are opened, which is a different question from how many arrive
       n.score = (r.total + (n.bonus ? n.bonus.value : 0)) *
@@ -624,9 +636,9 @@
        bet by construction, so this cannot cost anything, and it turns the fold
        from something that hides options into something that picks the best one
        available today. */
-    const now = Date.now();
-    const isFissureNow = (n) =>
-      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack).length > 0;
+    // the same test the scoring above used, so a group cannot be folded onto a
+    // node that was costed as a fissure while the fold thinks it is not one
+    const isFissureNow = fissureHere;
 
     /* The picked node *becomes* the row rather than being named beside it, so
        everything else on the row - level, planet, demand badges - is that
@@ -653,30 +665,20 @@
   /* Rotation rewards cycle A -> A -> B -> C and repeat, so "rotation C" really
      means "stay for the 4th reward". Spelled out because the letters mean
      nothing on their own. */
-  const RUN_BLURB = {
-    reset: "Each run goes to the last rotation you want something from — 2, 3 or 4 " +
-           "rounds — collecting every rotation on the way.",
-    full: "Each run is a full A → A → B → C " +
-          "cycle, all four rewards counted.",
-    aabcaa: "Each run is six rounds — four rotation A rewards plus a B and a C, " +
-            "all of which count.",
-    /* The clause about refreshing daily was corrected on 2026-08-24, when it
-       stopped being true in both directions at once: the fissure list is now
-       re-read every ten minutes and the badges beside these rows come from it.
-       The decision it was justifying has not changed and is not in question -
-       the bonus stays flat, which is what makes it safe. See `TODO.md` for the
-       rest of that sentence, which still overclaims. */
-    bonus: "Each run is five rotations, which is what an endless Void Fissure " +
-           "pays a free Exceptional relic for reaching — <b>assuming you are " +
-           "running one</b>. The badges on the rows above say which nodes carry " +
-           "a fissure right now, but the bonus is deliberately not conditioned " +
-           "on them: a fissure lasts an hour or two, and letting one into the " +
-           "score would reshuffle this list under you for a reason that has " +
-           "already expired. It is added to every endless node equally, which " +
-           "never reorders them against each other — it only weighs staying " +
-           "against a short mission, and that comparison holds whatever the " +
-           "fissure map looks like.",
-  };
+  /* How far to run each node is worked out per node now, not asked. The row
+     says which answer it got - see `runTag` - and this is the rule behind all
+     of them, said once under *How this works* rather than on eight hovers. */
+  const RUN_BLURB =
+    "How far to run each one is decided per node rather than assumed: every way " +
+    "of playing it is scored and the best rate wins. Restarting is charged for " +
+    "— a run costs its rounds plus about two more for matchmaking, the loading " +
+    "screens and the walk to extraction — which is what stops leaving after two " +
+    "rounds looking free. In practice that means <b>staying six rounds wherever " +
+    "rotation A is what you are there for</b>, and leaving as soon as it drops " +
+    "where what you want sits deeper in the cycle. <b>A node carrying a fissure " +
+    "right now is run to five rotations instead</b>, for the free Exceptional " +
+    "relic that depth pays — chosen rather than compared, because a free relic " +
+    "is value the rate cannot see.";
   const ROT_CYCLE = "Rewards cycle: A -> A -> B -> C -> repeat.";
   const ROT_WHEN = {
     A: "Can drop as the 1st or 2nd reward.\n1 round per shot at it.",
@@ -765,6 +767,28 @@
       lines.push(Object.keys(n.counts)
         .map((r) => "rot " + r + " ×" + n.counts[r]).join(", ") +
         " over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") + ".");
+    }
+    /* Why this many rounds and not some other number. The choice is the
+       model's now rather than the reader's, and an automatic decision that
+       cannot be questioned is one you have to take on faith - so every row
+       says which answer it got and, where it is not obvious, why. */
+    if (n.runMode === "bonus") {
+      lines.push("Run to five rotations: a fissure is up here, and depth pays " +
+                 "a free relic.");
+    } else if (n.runMode === "aabcaa") {
+      /* Read off the counts rather than assumed. It is usually rotation A that
+         staying buys more of, and on Disruption defending all four conduits it
+         is rotation C — the row said "four rotation A rewards" there, on a node
+         where rotation A is unreachable. */
+      const most = Object.keys(n.counts || {})
+        .filter((r) => (n.rot[r] || 0) > 0)
+        .sort((a, b) => n.counts[b] - n.counts[a])[0];
+      lines.push("Worth staying six rounds" +
+                 (most ? " for rot " + most + " ×" + n.counts[most] : "") +
+                 " — one fewer trip in and out than leaving sooner.");
+    } else if (n.rounds) {
+      lines.push("Worth leaving as soon as it drops; staying only buys " +
+                 "rotations you want nothing from.");
     }
     if (n.planName) lines.push("Playing it by " + n.planName + ".");
     (n.stranded || []).forEach((t) => {
@@ -1053,7 +1077,7 @@
       `the count; the percentage is there so you can see when it dissents. ` +
       `Hover the rotations for the per-round rate. ` +
       `Rotation is priced in: the published chance assumes that rotation has come ` +
-      `up, so it is not comparable across rotations on its own. ${RUN_BLURB[opts.runMode] || RUN_BLURB.reset} ` +
+      `up, so it is not comparable across rotations on its own. ${RUN_BLURB} ` +
       `Relics are listed best-first within each node. ` +
       `Ties are broken by lower enemy level.` +
       (formaShort > 0 ? " A Forma shortfall raises the value of relics you were already " +
@@ -1108,13 +1132,18 @@
           /* One line each. These markers exist to say a short thing - the
              reasoning behind each lives under *How this works*, where it can be
              read once instead of hovered eight times. */
+          /* Only on nodes that are a fissure right now, since 2026-08-24 —
+             which is why it no longer says "if". It used to be added to every
+             endless node flat, on the argument that a node-independent constant
+             cannot reorder them; now the run itself is chosen for the fissure,
+             so the relic is real and belongs to this row alone. */
           n.bonus ? ` · <span class="est" data-tip="${esc(
-            "Five rotations in a fissure pays a free relic, worth " +
-            pct(n.bonus.value) + " here.\nCounted on every endless node, not " +
-            "only the ones that are a\nfissure right now — the badge beside " +
-            "the node name says which\nthose are, and it deliberately does not " +
-            "move the ranking.")
-          }">+relic if fissure</span>` : ""}${
+            "Staying five rotations in a fissure pays a free Exceptional relic " +
+            "of the\ntier — worth " + pct(n.bonus.value) + " here, averaged over " +
+            "every live relic in it.\n\nThis run is five rotations because of " +
+            "that: the free relic is worth\nmore than the sixth round would have " +
+            "been.")
+          }">+free relic</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant" +
             (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces" : "") + ".\n" +
@@ -1392,14 +1421,6 @@
   });
 
   /* ── options ─────────────────────────────────────────────────── */
-  const runSel = $("#p-runmode");
-  if (runSel) {
-    runSel.value = RUN_MODES.includes(opts.runMode) ? opts.runMode : "reset";
-    runSel.addEventListener("change", () => {
-      opts.runMode = runSel.value; save(KEY_PLAN, opts); render();
-    });
-  }
-
   const sortSel = $("#p-sort");
   if (sortSel) {
     sortSel.value = SORTS[opts.sort] ? opts.sort : "rate";
@@ -1451,6 +1472,7 @@
   // `steelPath` was a checkbox for one afternoon; drop it rather than leave a
   // dead key riding along in every backup
   delete opts.formaHave; delete opts.formaNeed; delete opts.steelPath;
+  delete opts.runMode;   // decided per node since 2026-08-24, never asked
   save(KEY_PLAN, opts);
 
   {

@@ -135,7 +135,6 @@
      assets/rotation.js, so the collection view and the planner cannot disagree
      about it. Aliased here so the call sites read as they always did. */
   const ROT = window.WFPrimeRotation;
-  const RUN_MODES = ROT.RUN_MODES;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -167,7 +166,6 @@
     hideVaultedRelics: false,
     hideOwnedParts: false,
     squad: false,
-    runMode: "reset",
   };
 
   /* Both of these live in the planner's store on purpose. Both pages rank nodes
@@ -176,7 +174,6 @@
      *and* in the filters key, which meant the pages could quietly disagree
      about whether you were farming solo. */
   const planOpts = load(KEY_PLAN, null);
-  if (planOpts && RUN_MODES.includes(planOpts.runMode)) state.runMode = planOpts.runMode;
   if (planOpts && typeof planOpts.squad === "boolean") state.squad = planOpts.squad;
 
   /* One-time migration: adopt the old per-page value if the shared store has
@@ -501,14 +498,24 @@
       });
     });
 
-    // value each node as a whole run, the same way the planner does
+    /* Value each node as a whole run, the same way the planner does — and now
+       that includes deciding how far to run it, which is why the fissure test
+       has to happen here too. Both pages call the same function with the same
+       answer, so neither can cost a run at a length the other disagrees with.
+
+       Void Storms are allowed, as everywhere on this page: it never hides
+       Railjack, since some live relics drop nowhere else. */
+    const now = Date.now();
+    const isFissureNow = (e) =>
+      ROT.fissuresAt(FISSURES, nodeKey(e), now, true).length > 0;
     map.forEach((e) => {
       const live = e.kind === "bounty" ? liveRotation(e.node) : null;
-      const r = runValue(e.rot, state.runMode, e.mode, state.squad, live);
+      const r = runValue(e.rot, e.mode, state.squad, live, null,
+                         !ROT.isRailjack(e) && isFissureNow(e));
       e.score = r.total; e.perRound = r.perRound;
       e.rounds = r.rounds; e.counts = r.counts;
       e.stranded = r.stranded; e.nonStandard = r.nonStandard;
-      e.planName = r.planName; e.bounty = r.bounty;
+      e.planName = r.planName; e.bounty = r.bounty; e.runMode = r.mode;
     });
 
     const ranked = Array.from(map.values())
@@ -559,8 +566,8 @@
       groups.set(key, [e]);
       order.push(key);
     });
-    const now = Date.now();
-    const isFissureNow = (n) => ROT.fissuresAt(FISSURES, nodeKey(n), now, true).length > 0;
+    // the same test the scoring above used, so the fold cannot name a node the
+    // scoring costed differently
     return order.map((key) => {
       const group = groups.get(key);
       const pick = group.length > 1 ? ROT.pickNode(group, isFissureNow) : group[0];
@@ -1282,10 +1289,6 @@
           state.squad = cur.squad;
           const cb = $("#f-squad"); if (cb) cb.checked = cur.squad;
         }
-        if (RUN_MODES.includes(cur.runMode)) {
-          state.runMode = cur.runMode;
-          const sel = $("#f-runmode"); if (sel) sel.value = cur.runMode;
-        }
       }
       if (backup.filters) save(KEY_FILTERS, backup.filters);
       /* A backup carries both facts, so both are restored as written. This only
@@ -1387,15 +1390,6 @@
     if (last) last.focus();
   });
 
-  const runSel = $("#f-runmode");
-  if (runSel) {
-    runSel.value = state.runMode;
-    runSel.addEventListener("change", () => {
-      state.runMode = runSel.value;
-      writeSharedOption("runMode", state.runMode);   // shared store owns this
-      render();
-    });
-  }
 
   $("#f-squad").checked = state.squad;
   $("#f-squad").addEventListener("change", (e) => {

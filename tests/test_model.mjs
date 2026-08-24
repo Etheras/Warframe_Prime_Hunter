@@ -243,6 +243,10 @@ test("an old bare-array backup means 'these are complete'", () => {
 
 test("only the planner options we recognise come back", () => {
   const M = load();
+  /* `runMode` is in this file on purpose: it was a real option until
+     2026-08-24, so backups in the wild carry it, and an option that stopped
+     existing has to be dropped rather than restored into a setting nothing
+     reads. Same path as `somethingElse` — not named, not kept. */
   const out = M.parseBackup(JSON.stringify({
     collected: [],
     plan: { squad: true, aya: false, formaNeed: 3, runMode: "aabcaa",
@@ -250,7 +254,7 @@ test("only the planner options we recognise come back", () => {
             somethingElse: "ignored", __proto__: "nope" },
   }), CATALOGUE);
   assert.deepEqual(plain(out.plan),
-                   { squad: true, runMode: "aabcaa", aya: false, formaNeed: 3,
+                   { squad: true, aya: false, formaNeed: 3,
                      minutes: { Defense: 2, Spy: 4.5 } },
                    "both pages' options survive, and nothing else does");
 });

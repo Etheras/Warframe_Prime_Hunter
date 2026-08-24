@@ -153,7 +153,12 @@
      minutes per objective. It is passed through whole and sanitised on the way
      into the planner, which drops anything that is not a positive number, so a
      hand-edited backup cannot put a string or a negative cost into the ranking. */
-  const PLAN_OPTIONS = ["squad", "event", "railjack", "runMode", "aya",
+  /* `runMode` was here until 2026-08-24, when *How far you run* stopped being a
+     question: how far to run a node is worked out per node now, so a backup
+     carrying an answer to it would be restoring a setting nothing reads. Old
+     files still list it and are still valid - anything not named here is simply
+     dropped, which is what this list is for. */
+  const PLAN_OPTIONS = ["squad", "event", "railjack", "aya",
                         "minutes", "sort", "formaHave", "formaNeed"];
 
   function parseBackup(text, items) {

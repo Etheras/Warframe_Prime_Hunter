@@ -300,25 +300,74 @@
     }, tally({ none: 1, mean: pays.length ? 1 : 0 }, altMean));
   }
 
+  /* ── restarting is not free, and the model used to think it was ───
+     A run costs its rounds *and* the getting in and out: matchmaking, two
+     loading screens, the walk to extraction. None of that was priced, so a
+     plan that left after two rounds and started again looked cheaper than one
+     that stayed, and *reset* won everywhere by not being charged for the
+     thing it does most.
+
+     Two rounds is the figure, and it is an approximation with a known shape:
+     a mission start is a fixed couple of minutes, while a "round" is anything
+     from a 45-second Defense wave to a five-minute Survival rotation. So this
+     over-charges the long ones and under-charges the short ones. It is kept in
+     rounds rather than minutes anyway, deliberately, because a number in
+     minutes could only be applied where minutes have been given - and then the
+     two pages would disagree about how long a run is the moment somebody typed
+     into the effort panel. A choice about how to play a node should be a fact
+     about the node.
+
+     The tolerance is the other half of it. Where two ways of running a node
+     come out within a couple of per cent, the difference is inside the error
+     of this constant, and the tie goes to the one with fewer restarts. */
+  const RUN_OVERHEAD = 2;
+  const RUN_TIE = 0.02;
+
   /* ── what one run is worth ────────────────────────────────────────
      `live` is the bounty clock's answer for this node, and null for anything
-     that is not a bounty. Where a mission type offers more than one way to play
-     it, take whichever banks more: adding a plan can therefore only ever raise
-     a node's score, so ticking the 4-squad box never makes anything look
-     worse. */
-  function runValue(rot, runMode, mission, squad, live, alt) {
+     that is not a bounty. `isFissure` says whether a Void Fissure is running
+     here right now.
+
+     Two choices are made here rather than asked, which is what replaced the
+     *How far you run* control:
+
+       * **how far to run.** Every way of playing the node is scored and the
+         best rate wins, where the rate is value over rounds-plus-overhead. It
+         lands on AABCAA wherever rotation A is what you are there for - four A
+         rewards for six rounds beats two for two once restarting costs
+         something - and on reset where the value is deeper in the cycle and
+         staying only buys rotations you do not want.
+       * **whether to stay for the fissure bonus.** Chosen, never compared: the
+         free relic for reaching five rotations is value the rate cannot see,
+         so a node that is a fissure right now is run to five and that is that.
+
+     Where a mission type offers more than one way to play it, every plan is
+     crossed with every run length. Adding a plan can still only ever raise a
+     node's score, so ticking the 4-squad box never makes anything look worse. */
+  function runValue(rot, mission, squad, live, alt, isFissure) {
     if (live) return bountyRun(rot, live, alt);
     const hasRot = (rot.A || 0) + (rot.B || 0) + (rot.C || 0) > 0;
-    let best = { total: 0, counts: null, rounds: null, plan: null };
+    let best = { total: 0, counts: null, rounds: null, plan: null, mode: "reset" };
     if (hasRot) {
       const avail = plansFor(mission, squad);
       // a plan flagged onlyChanceAt owns the sole route to that rotation, so
       // when something wanted sits there it is used outright, not compared
       const forced = avail.find((p) => p.onlyChanceAt && (rot[p.onlyChanceAt] || 0) > 0);
+      const modes = isFissure ? ["bonus"] : ["reset", "aabcaa"];
+      const runs = [];
       (forced ? [forced] : avail).forEach((p) => {
-        const r = scorePlan(rot, runMode, p);
-        if (!best.plan || r.total > best.total + 1e-12) best = r;
+        modes.forEach((mode) => {
+          const r = scorePlan(rot, mode, p);
+          const rounds = r.rounds || 1;
+          runs.push({ r: Object.assign({}, r, { mode }), rounds,
+                      rate: r.total / (rounds + RUN_OVERHEAD) });
+        });
       });
+      const top = Math.max.apply(null, runs.map((x) => x.rate));
+      if (top > 0) {
+        best = runs.filter((x) => x.rate >= top * (1 - RUN_TIE))
+                   .sort((a, b) => b.rounds - a.rounds)[0].r;
+      }
     }
     const counts = best.counts;
     const stranded = hasRot
@@ -328,6 +377,7 @@
       total: best.total + (rot.none || 0),
       perRound: best.total / (best.rounds || 1),
       rounds: best.rounds, counts, stranded,
+      mode: best.mode,
       planName: best.plan ? best.plan.name : null,
       nonStandard: !!ROT_PATTERN[mission],
     }, tally(Object.assign({ none: 1 }, counts), alt));
@@ -664,7 +714,7 @@
   assertCoverage();
 
   window.WFPrimeRotation = {
-    RUN_MODES, ROT_PATTERN, runValue, objectivesOf,
+    RUN_MODES, RUN_OVERHEAD, ROT_PATTERN, runValue, objectivesOf,
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
