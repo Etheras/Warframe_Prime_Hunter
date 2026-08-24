@@ -75,6 +75,7 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
+| A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest known distortion |
 | Several of those modes are not round-based at all | session |
 | Our four invented "mission types" leak into the ranking | session |
 | What the misses are worth, in Ducats | session |
@@ -388,6 +389,79 @@ The wiki also names two more exceptions we do not currently see in relic sources
 
 Their objective counts are inherited rather than checked, which is the practical
 cost of the gap.
+
+### A run's fixed cost is not priced, so Capture wins everything
+
+**Measured by the owner from their own runs, 2026-08-24, and it is the largest
+known distortion in the per-minute ranking.** Effort is collected per *objective*
+and the cost of a run is `minutes-per-objective × objectives` — nothing else. So a
+Capture costs exactly its 1.5 minutes and a six-round Survival exactly its 30, as
+though walking in and walking out were free. They are not, and the error is not
+spread evenly: it is a fixed cost, so it lands almost entirely on the short ones.
+
+The owner's figures: a mission **start is about 20 seconds** and a mission **end
+about 15**, so **35 seconds a run**, whatever the run is. Against their own
+measured per-objective times:
+
+| Mission type | min/obj | objectives | costed now | with +35s | cost rises | its rate falls |
+|---|---|---|---|---|---|---|
+| Capture | 1.5 | 1 run | 1.50 | 2.08 | **+38.9%** | **−28.0%** |
+| Exterminate | 2.5 | 1 run | 2.50 | 3.08 | +23.3% | −18.9% |
+| Sabotage | 5.5 | 1 run | 5.50 | 6.08 | +10.6% | −9.6% |
+| Mobile Defense | 6 | 1 run | 6.00 | 6.58 | +9.7% | −8.9% |
+| Defense | 3.5 | 6 rounds | 21.00 | 21.58 | +2.8% | −2.7% |
+| Spy | 10 | 3 vaults | 30.00 | 30.58 | +1.9% | −1.9% |
+| Survival · Interception · Disruption | 5 | 6 rounds | 30.00 | 30.58 | +1.9% | −1.9% |
+
+A twenty-eight per cent correction on Capture against two per cent on Survival is
+the whole of the complaint: **Capture wins by a large margin, and part of that
+margin is an accounting error.**
+
+**The shape asked for.** Two more fields in the effort panel, filled in by hand
+like the rest — *minutes to start a mission* and *minutes to leave one* — kept
+apart rather than summed into one, because they are two different waits and a
+player timing themselves can measure them separately. Blank by default, on the
+same principle as every other number in that panel. Added once per run:
+
+```
+minutes = per(mode) × objectives + start + end
+```
+
+Both belong in `PLAN_OPTIONS` so a backup carries them; they are as expensive to
+lose as the twenty numbers already there.
+
+**Only the per-minute ranking can use them.** With the effort panel empty the list
+is costed in objective *count*, and 35 seconds has no meaning in objectives — a
+round is anything from a 45-second Defense wave to a five-minute Survival rotation.
+So this changes the ranking exactly when minutes are given and does nothing before
+that, which is the same bargain the rest of the effort model makes.
+
+**It leaves two overheads in two units, and that wants thinking about.**
+`ROT.RUN_OVERHEAD` already exists — two *rounds*, in `rotation.js` — and it is what
+makes staying worth it when the model chooses how far to run a node. It is
+deliberately unit-free so both pages reach the same answer and so that answer does
+not move when somebody types into the effort panel (`PROJECT.md §7`). These new
+fields are minutes, and they price the same real thing. The options, in order of
+how much they disturb:
+
+1. **Leave both.** The rounds figure decides *how to play* a node; the minutes
+   figure decides *what it costs* once played. Two questions, two answers, and the
+   pages still agree. Simplest, and slightly embarrassing to explain.
+2. **Feed the minutes into the mode choice when they exist**, keeping the rounds
+   figure as the fallback. More accurate, and it reintroduces exactly the
+   divergence §7 argues against — the collection view has no effort panel, so the
+   two pages would then disagree about how long a run is.
+3. **Derive the rounds figure from the minutes** where both are known, so there is
+   one number with one meaning. Most honest, most work, and it still has to answer
+   what the collection view does.
+
+Start at (1) and only move if the ranking is visibly wrong.
+
+**What to check when it lands.** The collection view ranks per *run* and has no
+effort panel, so it should be untouched — worth asserting, since "both pages agree"
+is a rule here and this is a case where they legitimately differ. And the row's
+`relics / min` label stays honest: the minutes it divides by become the true cost
+of a run, which is what the label already claims.
 
 ### Several of those modes are not round-based at all
 
