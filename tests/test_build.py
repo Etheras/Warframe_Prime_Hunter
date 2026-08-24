@@ -1414,6 +1414,68 @@ def test_server_serves_only_the_site() -> None:
           "the two artwork onerror attributes are why this exists")
 
 
+def test_the_wiki_can_still_be_built_from_the_docs() -> None:
+    """
+    The GitHub wiki is generated from README.md, PROJECT.md and TODO.md, and it
+    names the sections it wants by their headings. Headings get reworded, and
+    the failure that matters is the quiet one: a published page that silently
+    loses half its content and nobody notices for months, which is the exact
+    shape of every documentation bug this project has already had.
+
+    So a rename breaks the suite in front of whoever renamed it, rather than
+    breaking a page nobody is looking at. `--check` writes nothing.
+
+    The pages themselves are asserted for the two properties that make a
+    generated wiki safe: it says it is generated, and it says edits are lost.
+    Without those, someone eventually edits a page on github.com and their work
+    is overwritten by the next build with no warning.
+    """
+    tool = os.path.join(ROOT, "tools", "wiki.py")
+    checked = subprocess.run([sys.executable, tool, "--check"],
+                             cwd=ROOT, capture_output=True, text=True, timeout=120)
+    check("wiki: every section it names still exists", checked.returncode, 0,
+          (checked.stdout + checked.stderr)[-600:])
+
+    built = subprocess.run([sys.executable, tool],
+                           cwd=ROOT, capture_output=True, text=True, timeout=120)
+    check("wiki: it builds", built.returncode, 0, (built.stdout + built.stderr)[-400:])
+
+    out = os.path.join(ROOT, "dist", "wiki")
+    pages = sorted(f for f in os.listdir(out)) if os.path.isdir(out) else []
+    check_true("wiki: a sidebar and a footer are part of it",
+               "_Sidebar.md" in pages and "_Footer.md" in pages,
+               "without a sidebar the wiki has no navigation at all")
+    check_true("wiki: Home is the landing page GitHub looks for", "Home.md" in pages)
+
+    unmarked = []
+    for name in pages:
+        if name.startswith("_"):
+            continue
+        body = read_text(os.path.join(out, name))
+        if "generated" not in body.lower() or "overwritten" not in body.lower():
+            unmarked.append(name)
+    check("wiki: every page says it is generated and will be overwritten",
+          unmarked, [],
+          "a page that does not say so invites an edit that the next build eats")
+
+    # A repo-relative link works in the repository and 404s on the wiki, which
+    # is a different host path entirely. They are rewritten to github.com, so
+    # none should survive.
+    relative = []
+    for name in pages:
+        for label, target in re.findall(r"\[([^\]]*)\]\(([^)]+)\)",
+                                        read_text(os.path.join(out, name))):
+            if target.startswith(("http://", "https://", "#")):
+                continue
+            if target.endswith(".md") and "/" not in target:
+                continue                      # a link to another wiki page
+            if target.startswith(("README.md", "PROJECT.md", "TODO.md", "STYLE.md",
+                                  "NOTICE.md", "LICENSE", "assets/", "tools/",
+                                  "tests/", "data/")):
+                relative.append(f"{name}: {target}")
+    check("wiki: no link points at a path only the repository has", relative, [])
+
+
 def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     """
     Two schedulers, one job. They are separate files because Windows has Task
@@ -1728,6 +1790,7 @@ def main() -> int:
                          test_server_serves_only_the_site,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
+                         test_the_wiki_can_still_be_built_from_the_docs,
                          test_bundle_is_self_contained]),
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
@@ -1749,6 +1812,25 @@ def main() -> int:
             print(f"  {name}\n    {why}\n")
         return 1
     print(f"{PASSED} passed")
+
+    # The README states this number, and the wiki republishes it. It said 272
+    # for as long as it took someone to read it, which is the whole reason the
+    # wiki is generated rather than written. Checked here rather than as a test,
+    # because a test cannot know the final count while it is still one of the
+    # things being counted.
+    #
+    # Only overstating fails. The real total moves with whether Playwright is
+    # installed and whether --online ran, so an exact match is not a property
+    # any machine can hold - but claiming more tests than passed is a claim
+    # about trustworthiness, and that one is always wrong.
+    stated = re.search(r"(\d[\d,]*) automated tests",
+                       read_text(os.path.join(ROOT, "README.md")))
+    if stated and int(stated.group(1).replace(",", "")) > PASSED:
+        print(f"\n  FAIL README claims {stated.group(1)} automated tests and "
+              f"{PASSED} passed here.\n       Lower the figure in README.md, or "
+              f"find out which tests stopped running.")
+        return 1
+
     if not online:
         print("(clone-and-build skipped — re-run with --online for the full set)")
     return 0

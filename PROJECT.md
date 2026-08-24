@@ -526,6 +526,41 @@ that, three-minute polling would not be.
 A cold cache falls through to a full build, which is the right failure: slower,
 never thinner.
 
+### The wiki is generated, never written
+
+**Turned on 2026-08-24, and generated from the first page.** A GitHub wiki is a
+second place a fact can live, and the failure this project keeps having is a fact
+that was true in one place and stale in another — a tooltip that claimed the app
+could not see fissures for ten days after it could, a comment describing a UI
+element that had been replaced, and a README that said *272 automated tests* long
+after there were 299. A hand-written wiki would be the worst version of that,
+because nothing in the suite would ever look at it.
+
+So `tools/wiki.py` assembles every page out of **named sections of `README.md`,
+`PROJECT.md` and `TODO.md`**, rewrites repo-relative links to `github.com`, shifts
+headings to sit under the title GitHub renders from the filename, and emits a
+`_Sidebar` and `_Footer`. Every page carries a banner saying it is generated and
+that edits made on github.com are overwritten — and they are, because the publish
+step replaces the page set wholesale rather than merging into it.
+
+**A missing section is a build failure.** Headings get reworded, and the failure
+mode that matters is the quiet one: a published page that loses half its content
+and stays up for months. `python tools/wiki.py --check` resolves every heading in
+the manifest and exits non-zero if one has moved; the suite runs it, so a rename
+breaks the build in front of whoever renamed it.
+
+`.github/workflows/wiki.yml` is separate from `publish.yml` for one reason:
+pushing to `.wiki.git` needs `contents: write`, and `publish.yml` says in its own
+header that it is read-only against the repository. Splitting them keeps that true
+of the workflow that builds and deploys the site. The default `GITHUB_TOKEN` is
+enough for a wiki in the same repository, so this still needs no secret.
+
+It runs on documentation pushes, daily an hour after the full build so the
+figures on the landing page are that build's, and by hand — **never** on the
+ten-minute schedule. Nothing on these pages moves that fast, and a wiki with 144
+commits a day is one nobody can read the history of. The job commits only when the
+generated content actually differs.
+
 **The dataset is never committed.** It is built in CI and handed to Pages as an
 artifact, so the repo stays source-only (40 files, ~760 KB, over half of it these
 four documents) and DE's data is not
@@ -597,7 +632,8 @@ Warframe Prime Hunter/
 │   ├── prime-data.json  ← GENERATED — same payload as plain JSON
 │   └── fissures.json    ← GENERATED — just the fissures, re-read every 10 min
 ├── .github/workflows/
-│   └── publish.yml         ← daily full rebuild + a ten-minute fissure refresh
+│   ├── publish.yml         ← daily full rebuild + a ten-minute fissure refresh
+│   └── wiki.yml            ← regenerates the GitHub wiki from the docs
 ├── tests/
 │   ├── test_build.py       ← the suite, and the one command to run
 │   ├── test_assets.mjs     ← rotation + store, under Node
@@ -612,6 +648,7 @@ Warframe Prime Hunter/
 │   ├── official.py         ← parsers for DE's drop table + public export
 │   ├── bundle.py           ← inlines everything into dist/warframe-prime-hunter.html
 │   ├── serve.py            ← local server, picks a working port
+│   ├── wiki.py             ← builds the GitHub wiki out of the docs (§4)
 │   ├── guard_shell_writes.py ← the PreToolUse hook that refuses shell writes (§2)
 │   ├── schedule.ps1        ← installs/removes the ten-minute Scheduled Task
 │   └── schedule.sh         ← the same job in cron, for macOS and Linux

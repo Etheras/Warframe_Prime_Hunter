@@ -1,0 +1,117 @@
+name: Publish the wiki
+
+# The GitHub wiki is generated from the documentation already in this repository
+# and pushed here — never edited on github.com. A wiki is a second place a fact
+# can live, and this project has repeatedly been bitten by a fact that was true
+# in one place and stale in another; a hand-written wiki would be the worst
+# version of that, because nothing in the suite would ever look at it.
+#
+# tools/wiki.py assembles the pages out of named sections of README.md,
+# PROJECT.md and TODO.md, and fails loudly if a heading it wants has been
+# reworded. The test suite runs that check, so a rename breaks the build in
+# front of whoever renamed it rather than thinning a page nobody is watching.
+#
+# Deliberately NOT on the ten-minute schedule that publish.yml uses. Nothing on
+# these pages moves that fast, and a wiki with 144 commits a day is a wiki
+# nobody can read the history of.
+
+on:
+  push:
+    branches: [main]
+    # Only when something a page is built from could have changed. Everything
+    # else is caught by the daily run, and the job checks the content really
+    # differs before committing anyway — this filter only saves runner minutes.
+    paths:
+      - "README.md"
+      - "PROJECT.md"
+      - "TODO.md"
+      - "STYLE.md"
+      - "NOTICE.md"
+      - "tools/wiki.py"
+      - ".github/workflows/wiki.yml"
+  schedule:
+    # Daily, an hour after the full site build, so the dataset figures on the
+    # landing page are the ones that build produced.
+    - cron: "40 19 * * *"
+  workflow_dispatch:
+
+# Wider than publish.yml, which stays read-only, and that is why this is a
+# separate workflow: `contents: write` is what GitHub requires to push to the
+# .wiki.git repository behind the wiki tab, and it is not scoped any narrower
+# than that. The job never touches the checkout it was given — it writes only
+# to a clone of the wiki.
+#
+# The default GITHUB_TOKEN is enough for a wiki in the same repository, so this
+# needs no secret and no personal access token, which keeps the project's "no
+# secrets anywhere" property true.
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      # Read-only: the daily site build owns this cache. It is here so the
+      # landing page can state real dataset figures — how many Primes, how many
+      # relics are dropping — rather than saying it had no data.
+      - name: Restore source cache (read-only)
+        uses: actions/cache/restore@v6
+        with:
+          key: prime-sources-
+          path: .cache
+          restore-keys: |
+            prime-sources-
+            vorframe-sources-
+
+      # Cheap on a warm cache and correct on a cold one: with nothing to restore
+      # this does a full build, and the page gets real numbers either way. The
+      # `|| true` covers the case where a cold build cannot reach a source at
+      # all — the wiki is still worth publishing without a figures table, and
+      # tools/wiki.py says so in place of inventing one.
+      - name: Get the dataset, for the figures on the landing page
+        run: python tools/build_data.py --if-changed --no-images || true
+
+      - name: Build the pages
+        run: python tools/wiki.py
+
+      - name: Publish
+        env:
+          # Masked by Actions. Kept out of the command line for the same reason.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.wiki.git" \
+            wiki-repo
+
+          # The wiki is wholly generated, so it is replaced rather than merged:
+          # a page that is no longer in the manifest should stop existing, and
+          # every page says in its own banner that edits here are overwritten.
+          rm -f wiki-repo/*.md
+          cp dist/wiki/*.md wiki-repo/
+
+          cd wiki-repo
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "wiki: already matches the repository, nothing to push"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Regenerate from ${GITHUB_SHA:0:7}
+
+          Built by tools/wiki.py from README.md, PROJECT.md and TODO.md.
+          Edit those, not this wiki — the next run overwrites it."
+          git push
+          echo "wiki: pushed $(git rev-parse --short HEAD)"
