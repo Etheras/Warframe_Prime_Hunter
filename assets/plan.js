@@ -132,9 +132,11 @@
      line down, where the two can be compared. */
   const SORTS = {
     rate: { key: "rate", unit: (perMin) => "relics / " + (perMin ? "min" : "objective"),
-            heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "objective") },
+            heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "objective"),
+            option: (perMin) => "per " + (perMin ? "minute" : "objective") },
     run: { key: "perRun", unit: () => "relics / run",
-           heading: () => "ranked on relics per run" },
+           heading: () => "ranked on relics per run",
+           option: () => "per run" },
   };
   const sortBy = () => SORTS[opts.sort] || SORTS.rate;
 
@@ -1007,6 +1009,18 @@
        makes. It said "per objective" through both until 2026-08-24. */
     const rankedOn = $("#planRankedOn");
     if (rankedOn) rankedOn.textContent = "— " + sortBy().heading(perMinute);
+
+    /* The options say it too, because the control sits on the heading now and
+       has no label of its own beside it: "per objective" has to become "per
+       minute" the moment effort weights turn it into one. Rewritten rather than
+       rebuilt, so the open state of a dropdown someone is using is not lost. */
+    const sel = $("#p-sort");
+    if (sel) {
+      Object.keys(SORTS).forEach((k) => {
+        const opt = sel.querySelector('option[value="' + k + '"]');
+        if (opt) opt.textContent = SORTS[k].option(perMinute);
+      });
+    }
 
     const openRelics = relicPlan.size;
     $("#planSummary").innerHTML =

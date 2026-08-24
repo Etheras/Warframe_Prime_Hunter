@@ -672,11 +672,44 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--txt-faint);
   font-weight:700;margin:26px 0 8px;
 }
-.plan-h:first-of-type{margin-top:6px}
+/* The top heading sits close to the summary above it; the two below it get the
+   full gap. Keyed on the wrapper rather than `:first-of-type`, which stopped
+   meaning "the first one" the moment that heading gained a parent — it then
+   matched *How to crack them* instead and pulled it up by twenty pixels. */
+.plan-head .plan-h{margin-top:6px}
 /* Each list ranks on its own quantity and says which in its heading, because
    two lists side by side with one unexplained big number each is the confusion
    the split was meant to end. */
 .plan-sub{text-transform:none;letter-spacing:0;font-weight:400;opacity:.8}
+
+/* The control that decides which quantity, on the same line as the heading that
+   names it. It began in the sidebar with the assumptions, which was the wrong
+   shelf: everything else there is something the model needs to be told, while
+   this one only changes how the list in front of you is ordered. A control and
+   the thing it reorders should be able to see each other.
+   The heading takes the space it needs and this keeps to the right of it. */
+.plan-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+.plan-head .plan-h{flex:1;min-width:0}
+/* `select.` rather than `.`: `[data-tip]{cursor:help}` is declared later in this
+   file, so at equal specificity it wins on order and would turn this control's
+   pointer into a question mark. One tag name outranks it without moving the rule
+   away from its neighbours (STYLE.md 7). */
+select.rank-by{
+  flex:0 0 auto;
+  padding:4px 8px;
+  background:var(--panel-2);
+  /* Not --txt-dim, which measures 6.27:1 on --panel-2 and misses the 7:1 floor
+     in STYLE.md 3. This is a control rather than context - it is meant to be
+     read and pressed - so it takes the brightness that goes with that, and the
+     quiet comes from its size and its border instead. 13.67:1. */
+  color:var(--txt);
+  border:1px solid var(--line);
+  border-radius:6px;
+  font:inherit;font-size:11.5px;
+  outline:none;cursor:pointer;
+}
+select.rank-by:hover{border-color:var(--gold-dim)}
+select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
 
 /* add-to-list search */
 .search-wrap{position:relative}

@@ -58,13 +58,6 @@
       <h2>Assumptions</h2>
     </div>
     <label class="opt-select">
-      <span class="lbl" data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per objective   how fast a place fills the stack for the effort it costs.&#10;                  A Defense round, a Spy vault, a bounty stage. Becomes&#10;                  per minute once you give effort weights below.&#10;  Per run         how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;Whichever you pick is the big number on every row, because the row has to be sorted by the number it shows largest.">Rank places on</span>
-      <select id="p-sort">
-        <option value="rate">Relics per objective</option>
-        <option value="run">Relics per run</option>
-      </select>
-    </label>
-    <label class="opt-select">
       <span class="lbl" data-tip="Rewards cycle A → A → B → C, one per round.&#10;&#10;How far you take a run changes what each rotation is worth per round, because you can leave once you have what you came for:&#10;&#10;  Reset       A 1.00  B 0.33  C 0.25&#10;  Straight    A 0.50  B 0.25  C 0.25&#10;  AABCAA      A 0.67  B 0.17  C 0.17&#10;&#10;Nodes with no rotation pay once per run and score 1 either way.">How far you run</span>
       <select id="p-runmode">
         <option value="reset">Reset as soon as it drops</option>
@@ -122,7 +115,14 @@
         <div class="result-count" id="planSummary"></div>
       </div>
 
-      <h3 class="plan-h">Where to go <span class="plan-sub" id="planRankedOn">— ranked on relics per objective</span></h3>
+      <div class="plan-head">
+        <h3 class="plan-h">Where to go <span class="plan-sub" id="planRankedOn">— ranked on relics per objective</span></h3>
+        <select id="p-sort" class="rank-by" aria-label="Rank places on"
+                data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per objective   how fast a place fills the stack for the effort it costs.&#10;                  A Defense round, a Spy vault, a bounty stage. Becomes&#10;                  per minute once you give effort weights in the sidebar.&#10;  Per run         how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;Whichever you pick is the big number on every row, because a row has to be sorted by the number it shows largest.">
+          <option value="rate">per objective</option>
+          <option value="run">per run</option>
+        </select>
+      </div>
       <div id="planNodes" class="spots"></div>
 
       <h3 class="plan-h">How to crack them <span class="plan-sub">— ranked on openings per part cleared</span></h3>

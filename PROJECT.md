@@ -1621,6 +1621,14 @@ switched to per minute. And the `+N more` tooltip follows too — it had been
 rendering the ranked count through the percentage formatter since the split, so the
 hidden rows showed `38%` where the visible ones showed `0.38`.
 
+**The control sits on the heading's own line**, right-aligned, not in the sidebar
+where it started. Everything in that sidebar is something the model needs to be
+told — how far you run, whether you have a squad, what an objective costs you —
+while this one only reorders the list in front of you, and a control belongs within
+sight of what it changes. Its options carry the unit rather than a label of their
+own (*per objective* becomes *per minute* with the heading), because on that line
+there is no room for a label and no need for one.
+
 **What is deliberately not offered is a sort on value.** `score` is on the row and
 in the hover, and ranking the left list by it would answer the right list's
 question — which is the thing this whole section exists to prevent. A unit is a

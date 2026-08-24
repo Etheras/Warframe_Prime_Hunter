@@ -159,6 +159,13 @@ The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
   part cleared*. Two lists side by side, each with one large unexplained number, is
   the confusion that splitting them was meant to end; the headings are what
   stops the split from just moving it.
+- **And if the reader can change what it ranks on, the control goes on that
+  heading's line** — right-aligned, small, quiet. It began in the sidebar with
+  the assumptions and that was the wrong shelf: everything else there is
+  something the *model* needs to be told, while this only reorders the list in
+  front of you. A control and the thing it reorders should be able to see each
+  other. The heading still carries the sentence; the control carries the choice,
+  and the two must never disagree — when one says *per minute* so does the other.
 - **The biggest number in a row is the one the row is sorted by.** Everything
   derived from it goes underneath it in the same corner, smaller and dimmer
   (`.spot-alt`). A mockup promoted an average relic count over the ranked
