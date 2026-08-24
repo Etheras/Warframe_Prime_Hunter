@@ -154,7 +154,7 @@
      into the planner, which drops anything that is not a positive number, so a
      hand-edited backup cannot put a string or a negative cost into the ranking. */
   const PLAN_OPTIONS = ["squad", "event", "railjack", "runMode", "aya",
-                        "minutes", "formaHave", "formaNeed"];
+                        "minutes", "sort", "formaHave", "formaNeed"];
 
   function parseBackup(text, items) {
     const raw = typeof text === "string" ? JSON.parse(text) : text;

@@ -110,8 +110,33 @@
   const saveCollected = () => save(S.KEYS.collected, Array.from(collected));
   const opts = Object.assign(
     { squad: false, event: false, railjack: false, runMode: "reset", aya: true,
-      minutes: {} },
+      minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
+
+  /* Which number puts the rows in order. Both count the same thing - wanted
+     relics - and differ only in what they divide it by, which is the question
+     the reader is actually asking:
+
+       rate   per objective, or per minute once minutes are given. How fast a
+              place fills the stack for the effort it costs. The default.
+       run    per run, cost ignored. How much one trip hands over.
+
+     They disagree whenever a long run is worth going on with: a four-round
+     Defense pays more per run than per round, and which of those you care about
+     depends on whether your evening is short of time or short of patience for
+     loading screens. The page could not be asked before.
+
+     Not offered here: ranking on what a relic is *worth* once opened. That is
+     the other list's question and mixing it back in is the thing the split of
+     2026-08-14 exists to prevent (`PROJECT.md §7`). It stays on the row, one
+     line down, where the two can be compared. */
+  const SORTS = {
+    rate: { key: "rate", unit: (perMin) => "relics / " + (perMin ? "min" : "objective"),
+            heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "objective") },
+    run: { key: "perRun", unit: () => "relics / run",
+           heading: () => "ranked on relics per run" },
+  };
+  const sortBy = () => SORTS[opts.sort] || SORTS.rate;
 
   const needOf = (p) => p.itemCount || 1;
   const haveOf = (id, name) => (partsOwned[id] || {})[name] || 0;
@@ -558,13 +583,16 @@
       n.rate = (n.perRun / n.cost) * (n.halved ? 1 - ROT.cachePenalty : 1);
     });
 
-    // Rate first, then a lower enemy level (faster clears). Rotation used to
-    // be a tie-break here; it is priced into the score now, so tie-breaking on
-    // it as well would count it twice. Rate is the score per run until minutes
-    // are given, at which point it is the score per minute - so the list is
-    // always ordered by the number the row shows largest.
+    // Whichever number the reader asked for, then a lower enemy level (faster
+    // clears). Rotation used to be a tie-break here; it is priced into the
+    // score now, so tie-breaking on it as well would count it twice.
+    //
+    // The key is read from the option rather than fixed, and `scoreBlock` reads
+    // the same one - so the list is always ordered by the number the row shows
+    // largest, which is the rule rather than a coincidence (`STYLE.md §5`).
+    const rankKey = sortBy().key;
     const ranked = Array.from(nodes.values()).sort((a, b) => {
-      if (Math.abs(b.rate - a.rate) > 1e-12) return b.rate - a.rate;
+      if (Math.abs(b[rankKey] - a[rankKey]) > 1e-12) return b[rankKey] - a[rankKey];
       const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
       if (al !== bl) return al - bl;
       return (a.node || "").localeCompare(b.node || "");
@@ -797,6 +825,7 @@
   function scoreBlock(n) {
     const perMin = n.minutes != null;
     const cost = perMin ? n2(n.minutes) + " min" : objectivesText(n);
+    const by = sortBy();
 
     const lines = [
       n2(n.perRun) + " wanted relics a run, over " + cost + ".",
@@ -806,9 +835,20 @@
     if (n.halved) lines.push("Ranked figure halved — see the row.");
     if (perMin && n.minutesAssumed) lines.push("Minutes assumed from the ones you set.");
 
+    /* Both numbers stay on the row and they swap places: the one the list is
+       ordered by is the big one, always, and the other goes underneath it. A
+       toggle that changed the order without moving them would leave the row
+       claiming to be sorted by a number it is not. */
+    const big = by.key === "perRun"
+      ? { value: n.perRun, unit: by.unit(perMin) }
+      : { value: n.rate, unit: by.unit(perMin) };
+    const alt = by.key === "perRun"
+      ? n2(n.rate) + " / " + (perMin ? "min" : "objective")
+      : n2(n.perRun) + " a run";
+
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
-      <b>${n2(n.rate)}</b>relics / ${perMin ? "min" : "objective"}
-      <span class="spot-alt">${n2(n.perRun)} a run</span></div>`;
+      <b>${n2(big.value)}</b>${esc(big.unit)}
+      <span class="spot-alt">${esc(alt)}</span></div>`;
   }
 
   function renderWishlist() {
@@ -961,6 +1001,13 @@
     $("#planWrap").hidden = !hasWork;
     if (!hasWork) return;
 
+    /* A list that ranks on something says so in its heading (`STYLE.md §5`),
+       which means the heading is not static: it follows the sort toggle, and it
+       follows the switch from objectives to minutes that giving effort weights
+       makes. It said "per objective" through both until 2026-08-24. */
+    const rankedOn = $("#planRankedOn");
+    if (rankedOn) rankedOn.textContent = "— " + sortBy().heading(perMinute);
+
     const openRelics = relicPlan.size;
     $("#planSummary").innerHTML =
       `<b>${needs.length}</b> thing${needs.length === 1 ? "" : "s"} still needed · ` +
@@ -1080,7 +1127,10 @@
     }).join("") + (ranked.length > SHOW
       ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
           `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${
-            pct(n.rate)}${n.minutes != null ? "/min" : "/obj"}`
+            // the same number these rows are ordered by, in the same unit
+            sortBy().key === "perRun"
+              ? n2(n.perRun) + "/run"
+              : n2(n.rate) + (n.minutes != null ? "/min" : "/obj")}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");
 
@@ -1335,6 +1385,14 @@
     runSel.value = RUN_MODES.includes(opts.runMode) ? opts.runMode : "reset";
     runSel.addEventListener("change", () => {
       opts.runMode = runSel.value; save(KEY_PLAN, opts); render();
+    });
+  }
+
+  const sortSel = $("#p-sort");
+  if (sortSel) {
+    sortSel.value = SORTS[opts.sort] ? opts.sort : "rate";
+    sortSel.addEventListener("change", () => {
+      opts.sort = sortSel.value; save(KEY_PLAN, opts); render();
     });
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],

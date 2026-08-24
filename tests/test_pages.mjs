@@ -885,6 +885,63 @@ page_test("banking the last part does not claim the Prime — a button does", as
   assert.deepEqual(errors, []);
 });
 
+page_test("the ranked number, the order and the heading all say the same thing", async () => {
+  /* The list was sorted on relics-per-objective with no way to ask for
+     relics-per-run, and the two disagree whenever a long run is worth going on
+     with. The rule the toggle has to keep is `STYLE.md §5`: the biggest number
+     in a row is the one the row is sorted by — so flipping the sort has to move
+     both numbers and relabel the heading, or the row claims an order it is not
+     in.
+
+     Everything here is read off the page. Nothing asserts a particular node,
+     because which place wins is a fact about today's drop tables. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const ids = window.WFPRIME_DATA.items
+      .filter((i) => (i.farmableRelics || []).length).slice(0, 4).map((i) => i.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const read = () => page.evaluate(() => ({
+    heading: document.querySelector("#planRankedOn").textContent.trim(),
+    // the label sits between the <b> and the .spot-alt as a bare text node
+    unit: [...document.querySelector("#planNodes .spot-score").childNodes]
+      .filter((n) => n.nodeType === 3).map((n) => n.textContent.trim())
+      .join(" ").trim(),
+    big: [...document.querySelectorAll("#planNodes .spot-score b")].map((b) => Number(b.textContent)),
+    nodes: [...document.querySelectorAll("#planNodes .spot-where")]
+      .map((e) => e.childNodes[0].textContent.trim()),
+  }));
+
+  const byObjective = await read();
+  assert.ok(byObjective.big.length > 2, "not enough rows ranked to compare an order");
+  assert.match(byObjective.heading, /per objective/);
+  assert.match(byObjective.unit, /objective/);
+  assert.deepEqual(byObjective.big, [...byObjective.big].sort((a, b) => b - a),
+                   "the big numbers must be in descending order — that IS the order");
+
+  await page.evaluate(() => {
+    document.querySelector("#p-sort").value = "run";
+    document.querySelector("#p-sort").dispatchEvent(new Event("change"));
+  });
+
+  const byRun = await read();
+  assert.match(byRun.heading, /per run/, "a list that ranks on something says so in its heading");
+  assert.match(byRun.unit, /run/, "and the unit beside the number has to agree");
+  assert.deepEqual(byRun.big, [...byRun.big].sort((a, b) => b - a),
+                   "still sorted by the number now shown largest");
+  assert.notDeepEqual(byRun.big, byObjective.big,
+                      "per run and per objective must not be the same number, or " +
+                      "this toggle is measuring one thing twice");
+
+  // and it survives a reload, because it lives in the planner's saved options
+  await page.reload({ waitUntil: "load" });
+  assert.match((await read()).heading, /per run/);
+  assert.equal(await page.locator("#p-sort").inputValue(), "run");
+  assert.deepEqual(errors, []);
+});
+
 page_test("an open page picks up a fissure that opened after it loaded", async () => {
   /* The badges used to be fixed at load: a one-minute timer re-read a list that
      could only shrink, so a tab left open all evening retired fissures as they

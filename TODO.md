@@ -84,7 +84,6 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| The planner can only be ranked one way | session |
 | A Mastery Rank field in the header | session |
 | A priority flag on the farm list | session |
 | A part you cannot reach still reads as one you can | session — hypothetical on today's data |
@@ -185,34 +184,6 @@ one of them by measurement taken while checking it. What is below is the rest.
 | roadmap 11 | reward concentrated farms over diluted ones | open, and the only one here nothing observable can check |
 | roadmap 9 | score Void Traces on ESO and Void Storms | already an entry above; one correction to it |
 | roadmap 1 | condition the fissure bonus on a live fissure | **[settled] against** — the observation behind it is already an entry above |
-
-### The planner can only be ranked one way
-
-`n.rate = (n.perRun / n.cost)` and the sort is on `rate` alone
-(`assets/plan.js:539`). `scoreBlock` puts `rate` in `.spot-score b` and `perRun` in
-`.spot-alt` beneath it, so the ordering and the largest number agree — which is the
-rule, not an accident: `STYLE.md §5`, *"The biggest number in a row is the one the
-row is sorted by"*. It follows that a sort toggle is not a one-line sort swap. It
-has to move the two numbers, relabel the big one, and change the heading that says
-what the list ranks on.
-
-There are **three** candidate keys, not the two the review names in one breath:
-
-| Key | Answers |
-|---|---|
-| `rate` | how fast this fills the relic stack, per objective or per minute — today's ranking |
-| `perRun` | how many wanted relics one run hands over, ignoring what a run costs |
-| `score` | what a run is worth towards your list *once the relics are opened* |
-
-`score` is the one the review calls "score per run", and it is a different question
-from `perRun` — the split of 2026-08-14 exists precisely because one number could
-not answer both (`PROJECT.md §7`). Offering `rate` and `perRun` is a change of
-*unit*; offering `score` is a change of *question*, and it belongs on the heading,
-not just on the number.
-
-Also follows: the `+N more places` tooltip spells the unit (`/min` or `/obj`) and
-must follow; the fold is keyed on the relic table, not on the rate, so it is
-unaffected.
 
 ### Baro's actual stock is published, and never read
 

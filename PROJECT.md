@@ -1605,6 +1605,27 @@ Two consequences worth knowing:
   stays the raw number DE's chances imply; the headline is adjusted and the row
   says `halved`. A judgement may move the ranking, never the fact.
 
+**Which of the two you are ranked on is now a control**, added 2026-08-24. Both
+count wanted relics and differ only in what they divide by — per objective (or per
+minute once effort weights are given) against per run, cost ignored. They disagree
+whenever a long run is worth going on with, and the reordering is not subtle: on a
+four-Prime list, Stribog and Tiwaz top the per-objective list at 0.63 and leave the
+top five entirely per run, while Ani goes from fourth to first at 2.25.
+
+Three rules the toggle has to keep, all of them `STYLE.md §5`. The number it ranks
+on becomes the **big** one and the other drops to the faint line beneath — a sort
+that changed the order without moving the numbers would leave every row claiming an
+order it is not in. The **heading follows**, which also fixed a older lapse: it read
+*ranked on relics per objective* even after minutes were given and the rows had
+switched to per minute. And the `+N more` tooltip follows too — it had been
+rendering the ranked count through the percentage formatter since the split, so the
+hidden rows showed `38%` where the visible ones showed `0.38`.
+
+**What is deliberately not offered is a sort on value.** `score` is on the row and
+in the hover, and ranking the left list by it would answer the right list's
+question — which is the thing this whole section exists to prevent. A unit is a
+change of scale; value is a change of subject.
+
 **How to crack them** used to sort on hit rate, which answered neither question:
 a relic you are one common away from finishing sat above one holding a rare you
 are blocked on, because the common is likelier. Openings put the blocked one
