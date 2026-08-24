@@ -21,6 +21,13 @@ relics, Profit-Taker, and the reachability rule. Keeping a shipped entry "for th
 argument it settles" is exactly what the rule above forbids, and the argument is
 worth more in the document people read to understand the code.
 
+**Added 2026-08-24.** Fifteen entries from two outside reviews, each checked against
+the code before being written down — they have their own section below, kept
+together because the corrections only make sense beside the claims they correct.
+The first of them, *four Primes whose second sub-weapon cannot be recorded*, is the
+most serious defect on this list; it sits where it does only so the group it arrived
+with stays intact.
+
 ---
 
 ## Defects found by the documentation sweep of 2026-08-15
@@ -131,6 +138,444 @@ Cheap, and each one will mislead somebody:
   most useful line of the lot"*, which was about a per-tier strip that no longer
   exists. The reason to keep Omnia now is simply that a node with an Omnia fissure
   is a node with a fissure.
+
+---
+
+## Brought in by two outside reviews, 2026-08-24
+
+Two documents arrived on 2026-08-24: a **code review** of four points, and a
+**logic and model roadmap** of eleven. Every claim in both was checked against the
+code and the live dataset before being written down here, because several of them
+were wrong about what this app currently does — and a proposal argued from a
+misreading needs re-arguing, not implementing. Where that happened the correction
+is kept with the entry rather than quietly dropped.
+
+Two of the fifteen turned out to be defects with symptoms you can see on screen,
+and the first of them is the worst thing in this file. Three were already covered
+by entries elsewhere here. Two are settled against, one of them by measurement
+taken while checking it.
+
+| Source | Asked for | Verdict |
+|---|---|---|
+| roadmap 6 | compound weapons track sub-weapons as parts | **defect, worse than described** — see below |
+| roadmap 4 | a filter should not hide an item with a second source | **defect**, on 3 items, and backwards from the example given |
+| review 4 | catch the clocks up on `visibilitychange` | **defect**, and the interval is 60s not 30s |
+| review 1 | update rows in place instead of rebuilding | **partly already done** — the drawer is the one that is not |
+| roadmap 2 | a toggle between score per objective and per run | open, and `STYLE.md §5` says what it obliges |
+| roadmap 5 | read Baro's live stock from `/pc/voidTrader` | open, with a trap in the "disable the box" half |
+| roadmap 3 | reorder the availability precedence | **the stated goal is already true**; the order as written empties the Founder bucket |
+| review 2 | one `State` controller in `shared.js` | open, and the two pages have already drifted twice |
+| review 3 | a priority flag on the farm list | open, but not via `stillNeed` |
+| roadmap 10 | Ducat value of the non-wanted drops | open; measured at a 1.9× spread |
+| roadmap 7 | expected openings for *all* parts, not the worst one | **measured: changes 5.4% of live cases, for 4.5% fewer openings at double the trace price** |
+| roadmap 8 | restrict squad refinements to Intact/Radiant | **misreads the option**; the missing case is public radshare |
+| roadmap 11 | reward concentrated farms over diluted ones | open, and the only one here nothing observable can check |
+| roadmap 9 | score Void Traces on ESO and Void Storms | already an entry above; one correction to it |
+| roadmap 1 | condition the fissure bonus on a live fissure | **[settled] against** — the observation behind it is already an entry above |
+
+### Four Primes need two of a sub-weapon, and the store cannot count to two
+
+**The worst defect currently known, and it is a data-shape problem wearing a UI
+problem's clothes.** Four akimbo Primes are built from two copies of the
+single-handed Prime, and DE's item database says so by listing that component
+**twice**, `itemCount: 1` each — confirmed in the warm cache (`.cache/api_items.gz`):
+
+```
+Aklex Prime     Blueprint · Lex Prime · Lex Prime · Link
+Akbronco Prime  Blueprint · Bronco Prime · Bronco Prime · Link
+Akmagnus Prime  Blueprint · Link · Magnus Prime · Magnus Prime
+Akvasto Prime   Blueprint · Link · Vasto Prime · Vasto Prime
+```
+
+`tools/build_data.py` copies that faithfully, so four items in `data/prime-data.json`
+carry two parts with the same name. **Part ownership is keyed by part name** —
+`{ itemId: { partName: count } }`, `assets/app.js` — so the two entries share one
+slot and there is nowhere to record that you have one of the two.
+
+Verified against the live data, simulating the collection view's own arithmetic:
+
+| Action | Card reads | `partsComplete` |
+|---|---|---|
+| start | 0/4 | false |
+| click either **Lex Prime** counter once | **2/4** | false |
+| then Blueprint and Link | **4/4** | **true** |
+
+So three clicks complete a four-part item, one tick moves the counter by two, and
+Aklex Prime is marked collected while you hold one of the two Lex Primes it needs.
+`test_build.py` already asserts part names are normalised *"since saved progress is
+keyed on them"* — nothing asserts they are **unique within an item**, which is the
+invariant that assumption actually rests on.
+
+**It is worse in the farm advice, because those pseudo-parts carry no odds.** The
+chance lookup at `tools/build_data.py:793` matches reward rows that start with the
+item's name, so for Aklex Prime it looks for `Aklex Prime …` and the relic pays
+`Lex Prime Barrel`. It never matches, and the row is written with `relic`, `rarity`
+and `farmable` and **no `chances` map at all**. The model skips any entry without
+one, so those relics are inert everywhere — nothing is double-counted, the
+requirement is simply invisible. Consequences, all verified:
+
+| Item | Filed as | "farmable relics" | …carrying odds |
+|---|---|---|---|
+| Aklex Prime | **Farmable** | 8 | **0** |
+| Akbronco Prime | Farmable | 8 | 3 (its own Blueprint and Link) |
+| Akmagnus Prime | Baro Ki'Teer | 0 | 0 |
+| Akvasto Prime | Baro Ki'Teer | 0 | 0 |
+
+Aklex Prime is in the **Farmable** bucket *because of* the pseudo-part:
+`"farmable": bool(farmable_relics)` (`tools/build_data.py:871`) and every one of
+those eight relics reached the union through `Lex Prime`. Open its card and the
+*Best places to farm its relics* section is **absent entirely** — `bestSpots` drops
+every relic worth zero, and all eight are — so the app files it under "you can farm
+this" and then has nowhere to send you. The `rarity` left on those rows is a
+leftover from the union and disagrees with the real part: the Lex Prime row for
+`Lith A2` says Uncommon, where `Lex Prime Barrel` is Common.
+
+On the planner it shows as duplication: `wantedIndex` pushes one *Still needed* row
+per part, so a wishlisted Aklex Prime produces **two identical rows** reading
+*Aklex Prime — Lex Prime*, two identical buttons in the farm-list panel, and
+clicking either clears both.
+
+**Three things to fix, and they are separable.** (1) Give the pipeline a rule for
+a component that is itself a Prime: collapse the duplicate to one part with
+`itemCount: 2`, which the store already handles — Ivara Prime needs two of some of
+hers and the counter cycles correctly. (2) Decide what such a part's relics mean.
+Either resolve them to the sub-weapon's own parts, which makes the requirement
+farmable and rankable and is a real change to what an "item" is, or mark them
+non-scoring and stop them feeding `item_relics`, `farmableRelics` and therefore the
+`farmable` flag. The second is much smaller and would already stop the app claiming
+Aklex Prime is farmable. (3) Add the test: **no item has two parts with the same
+name.** It is one line and it would have caught this before any of the rest.
+
+The review's own suggestion — a `dependencies` array, and marking Lex Prime as
+collected credits the Aklex parent — is a third option and the largest, because it
+makes one item's ownership state depend on another's. Worth noting that the
+dependency is *already in the data*; it is the storage key that cannot express it.
+
+### Unticking one availability box hides items that have a second source
+
+`statusOf` gives each item exactly one bucket and `matches()` tests
+`state.avail[it._status]`, so an item vanishes when its **primary** bucket is
+unticked even if a ticked bucket also applies. Three items in the current 167 carry
+more than one bucket-bearing flag:
+
+| Item | Flags | Files under | Disappears when you untick |
+|---|---|---|---|
+| Aklex Prime | baro + farmable | Farmable | **Farmable** |
+| Lex Prime | baro + farmable + permanent | Farmable | **Farmable** |
+| Gotva Prime | baro + special | Baro | **Baro** |
+
+**Backwards from the review's example**, which assumed Baro won and Farmable was
+the hidden fallback. Farmable is checked first, so unticking *Baro* hides nothing
+at all today except Gotva Prime, and unticking *Farmable* takes two Baro items with
+it. The shape of the bug is real; the direction in the write-up is not.
+
+Two things the review did not know. There is a **seventh bucket**: `railjack`, taken
+out of `farmable` in `assets/app.js` for the six Primes with no non-Railjack route
+(`PROJECT.md §7`), so any fallback rule has to say whether Railjack-only falls back
+to Farmable or stands alone. And the counts beside each box come from `updateCounts`,
+which also groups on `it._status` — a fallback rule that only touches `matches()`
+leaves the numbers no longer adding up to what is on screen.
+
+The bucket itself is a deliberate design (`PROJECT.md §7`, *"exactly one bucket so
+the sidebar toggles stay unambiguous"*), so this is not "make it multi-valued" —
+it is "keep one bucket for display and let the *filter* read the flags". Three
+items is small enough that doing nothing is defensible; it is written down because
+the failure is silent, and a silently missing item in a collection tracker is the
+one kind of wrong this app cannot afford.
+
+### Both clocks stop dead in a background tab, and nothing catches up on return
+
+Two timers keep the planner honest, and neither survives a tab switch well:
+
+- `setInterval(paintFissures, 60000)` (`assets/plan.js:1155`) — **one minute, not
+  the 30 seconds the review states**. Browsers throttle background intervals to
+  roughly once a minute or worse, so the badges are stale on return.
+- the bounty clock, a separate 30-second interval (`assets/plan.js:1384`), whose
+  body opens `if (document.hidden) return;`. So while the tab is hidden it does
+  **nothing by design** — and nothing runs on becoming visible either. Come back
+  after an hour and the countdown reads what it read when you left, for up to
+  thirty seconds.
+
+The second is the one that matters, and the code says why in its own comment: once
+the letter turns over *"the ranking behind it is wrong, not merely old"*. A hidden
+tab can miss several changeovers, and the first thing you see on returning is a
+ranking built for a letter that is no longer up.
+
+**The fix is one listener** — `document.addEventListener("visibilitychange", …)`
+calling the same two functions when `document.hidden` goes false. The `document.hidden`
+guard already in the interval becomes correct rather than merely cheap, because
+something else now covers the gap it leaves.
+
+The fissure badges are the safe half either way: every entry carries its own expiry
+and `ROT.fissuresAt` filters against the clock, so a stale paint can only *omit* a
+fissure, never invent one (`PROJECT.md §7`).
+
+### Banking a part from the drawer rebuilds the drawer and drops the focus
+
+Clicking a `.part-own` counter runs `render()` — refilter, resort and rewrite the
+whole of `#grid` — and then `openItem()`, which replaces `#drawerBody.innerHTML`
+wholesale (`assets/app.js:942`). `drawer.scrollTop` is saved and restored by hand;
+**focus is not**, so the button you just pressed is destroyed and `document.activeElement`
+falls back to `<body>`. Tick three parts with the keyboard and you tab from the top
+of the page three times.
+
+**Two corrections to the review, both in the app's favour.** The card tick is
+already granular: `toggle()` replaces the single `.card` via `outerHTML` and calls
+`updateProgress`/`updateCounts`/`refreshHeadings`, falling back to a full `render()`
+only when the item no longer passes the filter and must disappear
+(`assets/app.js:965`). And `renderMaterials()` does **not** run while you type — the
+`input` handler writes the model and toggles one class on the row
+(`assets/app.js:1256`); it rebuilds only on the edit toggle, add and delete, where
+the row's shape genuinely changes. The general claim that "every interaction
+rebuilds a container" is not true of this code.
+
+So the work is narrow and worth doing: on a part click, update the counter's own
+text and class, the card's `x/y`, the progress bar and the counts, and re-rank only
+the farm-spot section — leaving the element that holds focus alone. The full
+`render()` on every part click is the other half: it re-filters and re-sorts 167
+items and rewrites the grid to change one badge.
+
+### The planner can only be ranked one way
+
+`n.rate = (n.perRun / n.cost)` and the sort is on `rate` alone
+(`assets/plan.js:539`). `scoreBlock` puts `rate` in `.spot-score b` and `perRun` in
+`.spot-alt` beneath it, so the ordering and the largest number agree — which is the
+rule, not an accident: `STYLE.md §5`, *"The biggest number in a row is the one the
+row is sorted by"*. It follows that a sort toggle is not a one-line sort swap. It
+has to move the two numbers, relabel the big one, and change the heading that says
+what the list ranks on.
+
+There are **three** candidate keys, not the two the review names in one breath:
+
+| Key | Answers |
+|---|---|
+| `rate` | how fast this fills the relic stack, per objective or per minute — today's ranking |
+| `perRun` | how many wanted relics one run hands over, ignoring what a run costs |
+| `score` | what a run is worth towards your list *once the relics are opened* |
+
+`score` is the one the review calls "score per run", and it is a different question
+from `perRun` — the split of 2026-08-14 exists precisely because one number could
+not answer both (`PROJECT.md §7`). Offering `rate` and `perRun` is a change of
+*unit*; offering `score` is a change of *question*, and it belongs on the heading,
+not just on the number.
+
+Also follows: the `+N more places` tooltip spells the unit (`/min` or `/obj`) and
+must follow; the fold is keyed on the relic table, not on the rate, so it is
+unaffected.
+
+### Baro's actual stock is published, and never read
+
+`flags.baro` comes from a wiki marker — `[[Baro Ki'Teer|B]]`, `tools/catalogue.py:159`
+— and it means *he sells this sometimes*, not *he is here now*. Eight items carry
+it. `/pc/vaultTrader` is fetched for Resurgence (`tools/sources.py:46`);
+`/pc/voidTrader`, which carries his arrival, departure and current inventory, is not
+fetched at all.
+
+**The proposal has two halves and only one is safe.** Disabling the checkbox while
+he is away changes what the flag means, and he is present roughly two days in
+fourteen: a box that is dead twelve days out of every fourteen is a filter that
+mostly does nothing, and eight items would move between buckets twice a fortnight
+under a reader who has not touched anything. That is the same instability the
+fissure decision rejects for the ranking (`PROJECT.md §7`).
+
+The half that is clearly worth having is the one the bounty clock already
+demonstrates: **say when**. *Baro Ki'Teer (B) — back in 6 days* on the label, and
+while he is actually here, mark the items he is really selling — which is the only
+thing on this list that today's static flag genuinely cannot tell you. That is a
+live fact stated where it is read, not a live fact moving things around.
+
+See also the worldstate entry below: the responses already cached carry more than
+is read, and this would be a third endpoint rather than a third use of one.
+
+### The availability precedence, and what reordering it would actually cost
+
+Today: `founder → resurgence → farmable → baro → special → vaulted`
+(`assets/model.js:118`, argued in `PROJECT.md §7`, pinned by a test in
+`tests/test_model.mjs`).
+
+The roadmap asks for `farmable → resurgence → baro → vaulted → special → founder`,
+to *"move Other Sources to the second-to-last position"*. **It is already there** —
+`special` is fifth of six, with `vaulted` last as the fallback. The stated goal
+needs no change.
+
+The order as literally written does change something, and it is not good. `vaulted`
+is not a fallback in that list, it is a **check**, placed fourth — and all three
+Founder items carry `flags.vaulted`. Simulated over the current 167:
+
+| Order | Founder bucket | Items moved |
+|---|---|---|
+| current | 3 | — |
+| as written | **0** | Excalibur, Lato and Skana Prime → Vaulted |
+| `farmable → resurgence → baro → founder → special → vaulted` | 3 | **none** |
+
+So the intended reading is a no-op on today's data — no item is both farmable and
+resurgent, or both founder and anything else — and the literal reading silently
+empties a bucket whose whole point is that those three can never come back. If the
+order is changed at all, change it to the third row, update `PROJECT.md §7` and the
+test with it, and know that nothing on screen will move.
+
+### The two pages own the same state, and have already drifted twice
+
+The maths is properly shared — `assets/model.js` and `assets/rotation.js` exist so
+the two pages cannot disagree about a number — but the **state** is not. Both files
+read and write the same keys directly, both mutate `wishlist` in their own way, both
+wire their own backup dialog, and both redefine `needOf` and `haveOf` locally while
+`M.needOf` sits exported and unused.
+
+It has cost two real behaviours already:
+
+- **`plan.js` listens for `storage`; `app.js` does not** (`assets/plan.js:1296`).
+  Tick a part on the planner with the collection view open in another tab and the
+  collection view keeps its old count until reloaded. The other direction updates
+  instantly. Nothing says this is deliberate.
+- **The same click means two things.** `.part-own` on the collection page cycles
+  `0 → 1 → … → need → 0` (`assets/app.js:943`); `[data-got]` on the planner only
+  increments and clamps at `need` (`assets/plan.js:1189`). There is no way to undo
+  a mis-click on the planner.
+
+A `State` in `shared.js` owning parts, collected, wishlist and the backup dialog,
+with one change notification both pages subscribe to, is the review's suggestion and
+it is right. Two things it must preserve: the import paths are **deliberately**
+different — `app.js` merges in place and re-derives `collected` per part, `plan.js`
+writes the keys and reloads so that the careful per-part merging stays a single
+implementation (its own comment says so) — and `shared.js` currently touches the DOM
+only for the tooltip and the banner, which is worth keeping true.
+
+### A priority flag on the farm list
+
+Nothing distinguishes a vaulted part you may never see again from a permanently
+farmable one: `bestRefinement` weighs each wanted reward by `Math.min(e.qty, e.stillNeed)`
+and nothing else, so the scarcest thing sets the bottleneck whether or not it is the
+thing you care about.
+
+**Not via `stillNeed`, though**, which is what the review proposes. That number
+feeds two different things in `model.js` — the value of an opening, *and* the
+`openings` count that the crack list ranks on ("openings per part cleared"). Inflate
+it and the app starts claiming you need three of a part you need one of, and the
+second list becomes a lie. A separate multiplier applied to **value only**, leaving
+`openings` honest, is the shape that does not corrupt anything.
+
+The control is the other half. The crosshair is a two-state `role="checkbox"`
+(`STYLE.md §6`: green owned, teal queued), and a third state needs either a
+different control or a modifier — plus a line in `STYLE.md`, since a new colour with
+a new meaning is exactly what that document exists to arbitrate.
+
+### What the misses are worth, in Ducats
+
+The data is already here and already tested: `ducats` on **582 of 590** parts, all
+in `{15, 25, 45, 65, 100}`, pinned by `test_build.py`. Nothing reads it.
+
+Measured across the 34 currently-dropping relics, the expected Ducats of one Intact
+opening runs **17.3 to 33.4, mean 21.4** — a 1.9× spread. Real, and small. Two notes
+for whoever implements it:
+
+- the join needs the same `normalise_part` the pipeline already applies. Reward rows
+  are named `Nyx Prime Chassis Blueprint` while the part is `Chassis`; without that
+  step 38 of 180 live reward rows miss and the numbers come out ~20% low.
+- **the tie-break framing is the weak half of the proposal.** Nodes that are the
+  same bet are already folded into one row by `ROT.signature`, so exact ties between
+  *different* relic tables are not the common case. The strong half is the one the
+  review states second: this is the value of the **misses**, and the misses are most
+  of what a run hands you.
+
+It is not free of the argument that keeps traces out of the score, either: Ducats
+buy from Baro, and what a Ducat is worth depends on whether you want anything he is
+selling.
+
+### Expected openings for everything, not for the worst one — measured, and it costs traces
+
+The review is mathematically right. `bestRefinement` minimises the **worst single**
+expected-openings figure among the wanted rewards, and the expectation of getting
+*all* of them is strictly greater than the largest individual expectation. The
+correct quantity is the unequal-coupon-collector expectation, exactly computable by
+inclusion–exclusion over the wanted rewards.
+
+**So it was computed, and compared against what ships.** Over the 34 live relics and
+1,145 (relic, wishlist) combinations:
+
+| | |
+|---|---|
+| cases where the advice differs | **62 of 1,145 — 5.4%** |
+| what the change always is | **Flawless → Radiant**, every single time |
+| improvement where it differs | median **0.46 openings, 4.5%** (e.g. Lith C7, 10.3 → 9.8) |
+| what it costs | **50 more Void Traces** per relic — Flawless is 50, Radiant is 100 |
+
+Over all 763 relics including vaulted, the disagreement rate is the same, 4.4%, and
+the direction never varies. Squad odds do not change it either, since `squadOdds` is
+monotone in `p`.
+
+**So the honest summary is: correct, and worth about half an opening at double the
+trace price, on one relic in twenty.** Which makes it the same trade as the entry
+above — what 100 traces are worth to this player — and it should not be implemented
+before that question has an answer, because the answer decides its sign.
+
+### Radiant or Intact is all a recruiting-chat squad can agree on
+
+**The review misreads the option.** The box is labelled **4-man premade** and its
+tooltip says so; a coordinated group *can* all run Exceptional, and the option
+already unlocks Disruption's rotation A, which needs the squad to under-defend
+conduits on a schedule. Restricting it to Intact and Radiant would make it describe
+something it does not claim to be.
+
+The gap it is pointing at is real, and it is a **missing option, not a restriction
+of this one**: a public radshare from recruiting chat, where you get four rolls but
+the refinement is not yours to choose — squad odds *forced to Radiant*. That is the
+common case for anyone without a premade, and the app currently has no way to say
+it. Whether the sidebar has room for a third state of one question is the design
+call; `PROJECT.md §7` is deliberately hostile to options that change two rows.
+
+It also overlaps with the pre-refined nodes: a relic handed over Radiant by ESO or a
+Void Storm is already at the radshare refinement, and `sourceValue` already values
+those at the refinement given rather than the one chosen.
+
+### A concentrated farm finishes a relic sooner than a diluted one
+
+Measured, because the size of the effect decides whether it is worth pricing. Across
+the **274** live relic-dropping nodes, the number of currently-dropping relics a node
+carries runs from **1 to 28** — two nodes drop one, 58 drop seven, 54 drop fifteen,
+and Elite Sanctuary Onslaught drops 28. The spread the proposal wants to reward is
+real and large.
+
+But most of it is already priced: a node is scored on the relics **you want**, so a
+28-relic table gets no credit for the 24 you do not. What is left is genuinely
+second-order — variance, and the option value of finishing one relic, crossing it
+off and re-optimising against a shorter list.
+
+Which makes this the **one proposal here that nothing observable can check**. It
+would move the ranking by an amount chosen by hand, in a direction no measurement
+confirms. If it is wanted it needs a stated size and a paragraph in `PROJECT.md §7`
+beside the Railjack cache penalty — which is described there as *the one deliberate
+thumb on the scale*, and that sentence would have to stop being true.
+
+### Void Traces on ESO and the Void Storms — one correction to the entry above
+
+Already covered by *Void Traces: the exchange rate that would let them be scored*.
+What this review adds is **where to inject it**, and the plumbing is in place:
+`sourceValue` already computes the traces a pre-refined node saves you, per node, and
+deliberately leaves the figure out of the score.
+
+One correction. The review says the calculation needs nothing from the player. It
+needs exactly one binary answer — *are you trace-limited?* — because a player sitting
+on 8,000 traces values the saving at zero, and that is the whole reason the number is
+shown rather than scored (`PROJECT.md §7`). The formula in the entry above is the
+same one the review derives.
+
+### Conditioning the fissure bonus on a live fissure **[settled]**
+
+**The observation is right and is already two entries in this file** — the
+`+relic if fissure` tooltip and `RUN_BLURB.bonus` still say *"nothing here knows
+that"* while a fissure badge sits on the same row, and `plan.js` does import
+`DATA.fissures` and does call `ROT.fissuresAt`.
+
+**The proposed fix is settled against**, in `PROJECT.md §7`. The flat bonus is safe
+precisely *because* it is node-independent: it cannot reorder endless nodes against
+each other, so the only comparison it moves is endless-versus-short, which holds
+whatever the fissure map looks like. Feed the live list into `runValue()` and the
+ranking reshuffles hourly on a fact with an hour left to live — which is the exact
+outcome the fissures-are-shown-never-scored decision exists to prevent.
+
+What is open is the **sentence**, not the score, and it is written up at the top of
+this file.
 
 ---
 
