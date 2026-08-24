@@ -30,6 +30,99 @@ with stays intact.
 
 ---
 
+## What is open, at a glance
+
+**Swept against the code on 2026-08-24.** Every row below was checked to still be
+true; two entries had shipped and were rewritten to what is actually left of them.
+Titles are given verbatim so they can be grepped — each one is a `###` heading
+further down, where the reasoning lives.
+
+*Size* is honest rather than optimistic: **small** is a few lines and one file,
+**session** is an afternoon including the test, **large** touches the pipeline, the
+payload and both pages.
+
+### Wrong on screen — do these first
+
+| Entry | Where | Size |
+|---|---|---|
+| Four Primes need two of a sub-weapon, and the store cannot count to two | `build_data.py`, `app.js`, `tests/` | large |
+| Unticking one availability box hides items that have a second source | `app.js` | session |
+| Banking a part from the drawer rebuilds the drawer and drops the focus | `app.js` | session |
+| A Profit-Taker phase is costed at four bounty stages | `rotation.js` | session — do with the worldstate sweep |
+| Choosing *Stay for the fissure bonus* leaves the collection page blank | `index.html` | small |
+| The two pages can name different nodes for the same folded group | `app.js` — one argument | small |
+| Both clocks stop dead in a background tab, and nothing catches up on return | `plan.js` | small |
+
+### Sentences that are no longer true
+
+| Entry | Where | Size |
+|---|---|---|
+| The page says it cannot see fissures, on a row showing a fissure | `plan.js`, three places | small |
+| Three comments describe things that no longer exist | `schedule.ps1`, `index.html`, `build_data.py` | small |
+
+### The worldstate is already cached, and barely read
+
+| Entry | What it unlocks | Size |
+|---|---|---|
+| The worldstate publishes far more than the two fields we read | stage counts, bounty levels, `minMR`, real bounty names | large — parent of the two below |
+| Read each bounty's rotation letter directly — the worldstate already says it | one node's Aya today, correctness always | session |
+| Baro's actual stock is published, and never read | *back in 6 days* on the label; what he is really selling | session |
+
+One more sits under **Settled** and should not be read as closed: *Enemy levels are
+missing for 31% of live-relic nodes* is marked **[partly reopened]**, and the
+reopened half is free — all 13 bounty nodes still carry `lvl: null` (verified
+2026-08-24) while both the worldstate and our own node names give the numbers, so
+bounties lose every level tie-break by default. Same sweep, same sitting.
+
+### Model and ranking
+
+| Entry | Size |
+|---|---|
+| Several of those modes are not round-based at all | session |
+| Our four invented "mission types" leak into the ranking | session |
+| What the misses are worth, in Ducats | session |
+| A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
+
+### Interface
+
+| Entry | Size |
+|---|---|
+| The planner can only be ranked one way | session |
+| A Mastery Rank field in the header | session |
+| A priority flag on the farm list | session |
+| A part you cannot reach still reads as one you can | session — hypothetical on today's data |
+| The endless-fissure bonus is only stated on the collecting side | small |
+| The Railjack opt-in gate stands in front of your only option | small |
+| The node list is the top eight and a hover, not a table | small |
+| The meta line is now 6.68:1, and the floor is 7:1 | small — a decision, not a fix |
+
+### One refactor
+
+| Entry | Size |
+|---|---|
+| The two pages own the same state, and have already drifted twice | large |
+
+### Cannot be finished today — and why
+
+| Entry | Waiting on |
+|---|---|
+| Plague Star and Profit-Taker are the same shape, modelled two ways | Plague Star to run |
+| The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
+| Void Traces: the exchange rate that would let them be scored | one answer from the player: *are you trace-limited?* |
+| Expected openings for everything, not for the worst one | the line above — the same trade decides its sign |
+| Radiant or Intact is all a recruiting-chat squad can agree on | a decision about a third sidebar option |
+| Nine rotation-bearing mission types are still unverified | wiki checking; tedious, not blocked |
+
+### Not work
+
+The availability precedence asks for something that is **already true** — see its
+entry. *Conditioning the fissure bonus on a live fissure* is **[settled]** against.
+Six answered questions sit under **Settled**, five of them closed and the sixth
+partly reopened as noted above. Four wiki edits sit under **Should be fixed on the
+wiki, not here** — those are edits to `wiki.warframe.com`, not to this repository.
+
+---
+
 ## Defects found by the documentation sweep of 2026-08-15
 
 Four of these were introduced on 2026-08-14 by changes that were themselves right;
@@ -797,35 +890,20 @@ the ranking by two duplicate rows and asked a question for nothing
 belongs in it as a *fact* — feeding badges, not filters — rather than back in the
 sidebar as an option. Same shape as this field, same reasoning.
 
-### How Railjack should be presented — decision 9
+### The Railjack opt-in gate stands in front of your only option
 
-The badges landed on 2026-08-14 and they are the floor, not the answer: a node row
-says `RAILJACK`, and a card whose every route is Railjack says `RAILJACK ONLY`.
-Two things are still presented awkwardly, and both are judgement calls.
+**What is left of *decision 9*.** That entry asked three questions and two of them
+have been answered in code: the badges landed on 2026-08-14, the **seventh bucket**
+shipped — `Railjack only`, six items, `assets/app.js` takes them out of `farmable`
+and `index.html` gives them their own checkbox with a tooltip saying it is not the
+planner's *Include Railjack* box (`PROJECT.md §7`) — and node folding shipped the
+same day. Only this one is still open, so the rest has been deleted rather than
+ticked.
 
-**a. Those six Primes sit in the *Farmable now* bucket, which is true and unhelpful.**
-The sidebar sorts by availability, one bucket per item, precedence
-`founder → resurgence → farmable → baro → special → vaulted`. Cernos, Hikou, Nyx,
-Scindo, Valkyr and Venka land in *Farmable now* alongside 100-odd star-chart
-Primes, and only the badge distinguishes them. There is no way to ask "what needs
-a ship?" or to exclude them from a list you are shopping from.
-
-- (i) leave it — one badge, no new bucket, and the availability filter keeps
-  meaning exactly one thing
-- (ii) a **seventh bucket**, `Railjack only`, ranked just above `farmable` — the
-  six leave *Farmable now*, which is arguably more honest than it sounds: they are
-  not farmable on the star chart at all
-- (iii) not a bucket but a **cross-cutting filter**, the way *Hide vaulted* works —
-  buckets stay as they are and a `Needs a Railjack` toggle hides or isolates them
-
-(iii) is the most flexible and the least disruptive to a rule the project has kept
-carefully. (ii) is the most honest and the most likely to surprise someone.
-
-**b. The planner makes you opt in to your only option.** Put one of the six on
-the farm list with *Include Railjack* off and the ranking is empty. It now names
-the switch and counts what is behind it, which is a large improvement on silence —
-but an opt-in gate in front of a thing with no alternative is still a strange
-shape. Options:
+Put one of the six on the farm list with *Include Railjack* off and the ranking is
+empty. It now names the switch and counts what is behind it, which is a large
+improvement on silence — but an opt-in gate in front of a thing with no alternative
+is still a strange shape. Options:
 
 - (i) leave it — the message is clear, and the checkbox means one thing
 - (ii) **auto-include a Railjack node when it is the only route to something on
@@ -835,18 +913,15 @@ shape. Options:
   route / always
 
 (ii) reads best and is the smallest change: the information to do it already
-exists, since `railjackOnly` answers exactly that question per item.
+exists, since `ROT.railjackOnly` answers exactly that question per item and the
+collection view already calls it to build the bucket.
 
-**c. Nodes that are the same choice — shipped 2026-08-14.** Folding is built and
-documented in `PROJECT.md §7`; what remains of it is the divergence bug at the top
-of this file. Ranking Railjack `Caches` lower than ordinary star-chart nodes was
-answered separately with "yes, but lower" — the flat 50% penalty, also in
-`PROJECT.md §7`.
-
-One caveat from that argument is worth keeping here, because it constrains anything
-further: **any rule that sinks caches has to leave them reachable for people with no
-alternative.** Four of the six Railjack-only Primes come from `Caches` specifically.
-For their owners the worst rows in the list are the only rows in the list.
+One caveat carried over from the cache-penalty argument, because it constrains
+anything further here: **any rule that sinks caches has to leave them reachable for
+people with no alternative.** Four of the six Railjack-only Primes come from
+`Caches` specifically, which is the one mission type carrying a deliberate 50%
+penalty (`PROJECT.md §7`). For their owners the worst rows in the list are the only
+rows in the list.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 
@@ -971,34 +1046,60 @@ DE's table gives `Level 30 - 40 Cambion Drift Bounty` rotations A and B only;
 `Level 40 - 60` and `Level 100 - 100` publish A alone and are handled correctly, one
 table with nothing to wait for.
 
-### The meta line sits at 1.97:1, not 3.48:1 — decision 5
+### The meta line is now 6.68:1, and the floor is 7:1 — what is left of decision 5
 
-**Corrected 2026-08-14, and it is twice as bad as this entry had claimed since
-2026-08-10.** The original measurement took `--txt-faint` as `#667080` and
-ignored the alpha. The token is `#66708090` — the same colour at 56% — so what
-reaches the eye is a blend with the panel behind it:
+**Option (b) shipped, and this entry is what remains of it.** `.spot-meta` was
+raised from `--txt-faint` to `--txt-dim`, and `--odd` was raised with it from
+`#684321` to `#d29455` so the amber keeps sitting at the same brightness as the
+line it annotates rather than reading as a highlight (`STYLE.md §1`). Re-measured
+2026-08-24 against `--panel`:
 
-| | On `--panel` | |
+| | Was | Now |
 |---|---|---|
-| `#667080`, alpha ignored | **3.48:1** | what this entry said |
-| `#66708090`, as shipped | **1.97:1** | what it actually is |
-| `--txt-dim` `#96a1b3` | 6.68:1 | option (b) |
-| `--odd` amber `#684321` | 2.00:1 | tracks the line, so shares the problem |
+| `.spot-meta` | **1.98:1** | **6.68:1** |
+| `.est` amber, `--odd` | 2.00:1 | **6.73:1** |
+| `.spot-score` label — *relics / min* | 1.98:1 | **1.98:1**, unchanged |
 
-Confirmed against a rendered `.spot-meta` with `getComputedStyle`, not read off
-the stylesheet — which is what `STYLE.md §3` says to do, and the reason the first
-measurement went wrong. **That rule now has a second half: measure the element,
-not the token, because a token can carry an alpha.**
+So the big correction landed and two things are left, both small.
 
-The design argument is unchanged: the line is deliberately dimmed as secondary
-information, so raising it changes the hierarchy on both pages. But 1.97:1 is a
-weaker position to defend than 3.48:1 was.
+**The line is still under the floor.** `STYLE.md §3` asks for WCAG AAA, 7:1, and
+6.68 is not 7. The gap is a rounding error rather than a legibility problem, so the
+honest options are to nudge the two tokens the last 5% or to write the exception
+into `STYLE.md` and stop calling it a debt.
 
-**Mocked up in `temp_mockup.html`** — the same real row rendered three ways, with
-every ratio measured live. Options as before: (a) leave it, (b) raise the whole
-line to `--txt-dim`, (c) raise only the rotation label, which is the one part of
-the line that is a control rather than context — but the amber has to move with
-it or stop matching (`STYLE.md §1`).
+**`.spot-score`'s own text was never in scope and is now the worst thing on the
+row.** The gold number reads at 8.82:1 and `.spot-alt` beneath it at 6.68:1, but
+the unit label between them — *relics / min*, the words that say what the biggest
+number on the row actually measures — is still `--txt-faint` at 1.98:1. That is a
+stronger case than the meta line ever was, because it is the label on the ranked
+quantity.
+
+Every figure above was measured on the rendered element rather than read off the
+stylesheet, which is what `STYLE.md §3` requires and the reason the original
+measurement was out by half. **`temp_mockup.html` argued the decision that has now
+been taken and can go.**
+
+### The node list is the top eight and a hover, not a table
+
+`#planNodes` renders `ranked.slice(0, 8)` and folds everything after it into a
+single `+N more places` chip whose tooltip lists the next twenty as plain text —
+node, planet, mode, rounds and rate, one line each (`assets/plan.js`). Beyond
+twenty-eight there is no way to see a place at all.
+
+Eight is the right default and should stay: `STYLE.md §5` is emphatic that a long
+list condenses to a count with the detail on hover, and the whole point of the
+ranking is that the top of it is the answer. What is missing is the way *out* of
+the default — somewhere to see the ranking whole when you want to plan around a
+planet you can actually reach, or to check that something you expected is in there
+at all.
+
+A tooltip is the wrong container for that: it cannot be scrolled, sorted or
+searched, and it is already carrying twenty rows of tabular text through a control
+that exists to hold a sentence. Expanding in place — the chip becoming *show all N*
+— keeps one list and one ranking, and needs no new page.
+
+Worth doing after the sort toggle rather than before it, since a browsable list
+whose order cannot be changed is half a feature.
 
 ## Settled — answered, kept so the answer is not lost
 
@@ -1010,8 +1111,9 @@ node. It is a probability, not a plan: the number would be an expectation with a
 wide spread, and reading it as "this many runs" would mislead more than it helps. Low
 value, kept only so nobody proposes it again without a better idea.
 
-Separately and still worth doing: the node list shows the top 8 with the next 20 on
-hover, rather than a full browsable table.
+The node list being a top eight rather than a table used to be a sentence at the
+foot of this entry, which was the wrong place for it — it is open work, not a
+settled answer. It has its own entry above.
 
 ### Collection does not sync between devices **[settled]**
 
