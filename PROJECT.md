@@ -517,11 +517,25 @@ entry whenever its key missed, and that key misses by construction. Left as it w
 the ten-minute run would have written a fresh copy of `.cache` 144 times a day and
 evicted everything else the repository keeps.
 
-**Two things to know before changing that number.** GitHub schedules are best
+**Three things to know before changing that number.** GitHub schedules are best
 effort — five minutes is the documented floor, and runs are queued, delayed, and
 dropped entirely under load, so ten minutes is a target rather than a guarantee.
-And Pages allows on the order of ten deployments an hour; six is comfortably inside
+Pages allows on the order of ten deployments an hour; six is comfortably inside
 that, three-minute polling would not be.
+
+And **a cancelled refresh is normal.** Every run shares one concurrency group,
+because deployments to Pages have to serialise, and GitHub keeps only one run
+pending per group — so a refresh still waiting for a runner is cancelled when a
+newer run queues behind it, and a cancelled run is reported as `failure`. A red
+mark against a scheduled run in the Actions tab usually means this. It is the
+right outcome: the run that replaced it publishes fresher fissures than the one
+that was dropped. Observed on 2026-08-24, a 13:41 refresh waited thirteen minutes
+for a runner, never ran a step, and was cancelled when a 13:54 push arrived.
+
+If that noise ever becomes a problem, the fix is not `cancel-in-progress` — it
+would let a ten-minute refresh kill the daily build that fills the cache. It is to
+give the refresh its own concurrency group and accept that two deploys can then
+race, where the loser is simply an older set of fissures.
 
 A cold cache falls through to a full build, which is the right failure: slower,
 never thinner.
