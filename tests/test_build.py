@@ -68,6 +68,9 @@ def read_json(path: str):
 
 FAILURES: list[tuple[str, str]] = []
 PASSED = 0
+# Set when something skipped itself, so the run's total is not the suite's
+# total. Only a complete run can be compared against the figure in README.
+PARTIAL = False
 
 
 def check(name: str, got, want, why: str = "") -> None:
@@ -1702,6 +1705,8 @@ def test_browser_assets() -> None:
         reason = re.search(r"#\s*SKIP\s*(.*)$", name)
         if reason and status == "ok":
             skipped += 1
+            global PARTIAL
+            PARTIAL = True        # the total below is not the whole suite
             if skipped == 1:      # one line, not one per test
                 print(f"  skip page tests ({reason.group(1).strip() or 'skipped'})")
             continue
@@ -1795,7 +1800,14 @@ def main() -> int:
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]
+    # What the suite counts on a machine that can run all of it offline, which
+    # is the figure README quotes and the only one that is the same everywhere.
+    # Snapshotted rather than taken at the end, because --online adds work and
+    # a number that changes with a flag cannot be written down.
+    complete = None
     for title, tests in groups:
+        if title == "online":
+            complete = PASSED
         print(f"\n{title}")
         for t in tests:
             try:
@@ -1819,17 +1831,24 @@ def main() -> int:
     # because a test cannot know the final count while it is still one of the
     # things being counted.
     #
-    # Only overstating fails. The real total moves with whether Playwright is
-    # installed and whether --online ran, so an exact match is not a property
-    # any machine can hold - but claiming more tests than passed is a claim
-    # about trustworthiness, and that one is always wrong.
+    # **Only on a complete run.** The first version of this checked "the README
+    # must not claim more than passed", which sounded safe and took CI down
+    # within the hour: the runner has no Playwright, so it legitimately passes
+    # 245 of 299 and the README was "overstating" on every machine that is not
+    # a developer's. A figure describing the whole suite can only be compared
+    # against the whole suite.
     stated = re.search(r"(\d[\d,]*) automated tests",
                        read_text(os.path.join(ROOT, "README.md")))
-    if stated and int(stated.group(1).replace(",", "")) > PASSED:
-        print(f"\n  FAIL README claims {stated.group(1)} automated tests and "
-              f"{PASSED} passed here.\n       Lower the figure in README.md, or "
-              f"find out which tests stopped running.")
-        return 1
+    if stated and not PARTIAL and complete is not None:
+        claimed = int(stated.group(1).replace(",", ""))
+        if claimed != complete:
+            print(f"\n  FAIL README claims {stated.group(1)} automated tests and "
+                  f"this complete run passed {complete}.\n"
+                  f"       Update the figure in README.md — the wiki republishes it.")
+            return 1
+    elif stated:
+        print(f"  (README's {stated.group(1)}-test figure unchecked here: "
+              f"some tests skipped, so this run is not the whole suite)")
 
     if not online:
         print("(clone-and-build skipped — re-run with --online for the full set)")
