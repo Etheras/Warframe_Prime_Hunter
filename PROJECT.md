@@ -428,7 +428,8 @@ node --test tests/test_assets.mjs
 python tests/test_build.py
 ```
 
-It needs no network and takes about a second, and that one command covers the
+It needs no network and takes about half a minute — the Playwright page tests are
+most of it, so without them it is a second or two — and that one command covers the
 JavaScript too: the `.mjs` suites run under Node's test runner and their results are
 folded into the same output. `--online` adds a real clone-and-build into a temp
 directory, which is the only check covering the new-user path. Every test is there

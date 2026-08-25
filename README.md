@@ -761,9 +761,10 @@ If you change anything under `tools/` or `assets/`:
 python tests/test_build.py
 ```
 
-No network needed, about a second. That one command runs everything, including
-the browser tests. Add `--online` to also clone the repo into a temporary folder
-and build it from scratch — the path a new user takes.
+No network needed, about half a minute — most of it the browser tests, so without
+Playwright installed it finishes in a second or two. That one command runs
+everything. Add `--online` to also clone the repo into a temporary folder and build
+it from scratch — the path a new user takes.
 
 **Node.js is recommended, not required.** The tests that cover the JavaScript —
 the rotation model, the bounty clock, the saved-progress keys — run under Node's
@@ -792,7 +793,7 @@ npm install
 npx playwright install chromium
 ```
 
-That adds nineteen tests that open the collection and the planner in Chromium and
+That adds tests that open the collection and the planner in Chromium and
 check what a person would: the grid renders without console errors, ticking a
 part survives a reload, tooltips appear, the backup dialog carries your
 collection, filters and materials stick, the two pages agree about the farm
@@ -836,7 +837,7 @@ run the site or refresh the data.
 | Tool | What it adds | Without it |
 |---|---|---|
 | **Node.js** | The tests covering the JavaScript — rotation model, bounty clock, storage keys, backup validation | Those tests skip; the Python suite still runs |
-| **Playwright** | Nineteen tests that drive the real pages in Chromium | Those skip too, with a reason |
+| **Playwright** | The tests that drive the real pages in Chromium | Those skip too, with a reason |
 | **GitHub CLI** (`gh`) | Watching CI, reading failures, and managing the repo from the terminal | Use the Actions tab in a browser instead |
 
 ### Installing them

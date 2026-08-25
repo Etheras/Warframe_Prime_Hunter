@@ -68,9 +68,6 @@ def read_json(path: str):
 
 FAILURES: list[tuple[str, str]] = []
 PASSED = 0
-# Set when something skipped itself, so the run's total is not the suite's
-# total. Only a complete run can be compared against the figure in README.
-PARTIAL = False
 
 
 def check(name: str, got, want, why: str = "") -> None:
@@ -1740,8 +1737,6 @@ def test_browser_assets() -> None:
         reason = re.search(r"#\s*SKIP\s*(.*)$", name)
         if reason and status == "ok":
             skipped += 1
-            global PARTIAL
-            PARTIAL = True        # the total below is not the whole suite
             if skipped == 1:      # one line, not one per test
                 print(f"  skip page tests ({reason.group(1).strip() or 'skipped'})")
             continue
@@ -1835,14 +1830,7 @@ def main() -> int:
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]
-    # What the suite counts on a machine that can run all of it offline, which
-    # is the figure README quotes and the only one that is the same everywhere.
-    # Snapshotted rather than taken at the end, because --online adds work and
-    # a number that changes with a flag cannot be written down.
-    complete = None
     for title, tests in groups:
-        if title == "online":
-            complete = PASSED
         print(f"\n{title}")
         for t in tests:
             try:
