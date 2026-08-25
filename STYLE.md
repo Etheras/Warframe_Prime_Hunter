@@ -47,7 +47,7 @@ VAULTED` teal it would otherwise wear. Two badges, one colour, one meaning —
 *you will need a ship*. Choosing a different colour for the card would have made
 them look like two unrelated facts.
 
-**A rule that does not apply everywhere gets `--odd` amber** (`#d69f66`).
+**A rule that does not apply everywhere gets `--odd` amber** (`#e4bf9a`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and
 not a rarity. Anything given this colour must carry a tooltip explaining the
@@ -65,12 +65,14 @@ as a highlight rather than as an annotation and made the row look like it had an
 error in it. Matching the surrounding text and changing only the hue is the quieter
 and more accurate signal.
 
-That rule is why `--odd` has moved twice: `#684321` → `#d29455` when the meta line
-went to `--txt-dim`, and `#d29455` → `#d69f66` on 2026-08-25 when `--txt-dim` was
-raised to clear the §3 floor. It tracks the line rather than holding a value —
-7.48:1 against `--panel` where `--txt-dim` is 7.45:1, a gap of 0.02. **This no
-longer sits below the §3 floor**; it did until that change, and this paragraph
-said so.
+That rule is why `--odd` has moved three times and never on its own account:
+`#684321` → `#d29455` when the meta line went to `--txt-dim`, then `#d29455` →
+`#d69f66` and `#d69f66` → `#e4bf9a` as `--txt-dim` was raised twice on 2026-08-25.
+**It tracks the line by ratio rather than holding a value** — 10.14:1 against
+`--panel` where `--txt-dim` is 10.13:1, a gap of 0.003. Anyone changing
+`--txt-dim` has to move this with it, or the amber starts reading as a highlight
+again. It used to sit below the §3 floor and this paragraph said so; it does not
+any more.
 
 **The data banner is deliberately the loudest thing on the page.** Solid amber for
 "behind", solid red for "incomplete" — not a tinted panel with a coloured edge, which
@@ -112,40 +114,56 @@ const cs = getComputedStyle(el); [cs.color, cs.backgroundColor]
 ```
 
 **Measure the element, never the token** — a token can carry an alpha, and then
-the colour that reaches the eye is a blend with whatever is behind it. This is
-not hypothetical: `--txt-faint` is `#66708090`, and reading it as `#667080` put
-the meta line's contrast in `TODO.md` at **3.48:1** for four days when the real
-figure is **1.97:1**. The line above returns `rgba(...)` with the alpha included,
-which is exactly why it is the instruction rather than "look up the hex".
+the colour that reaches the eye is a blend with whatever is behind it. This is not
+hypothetical: `--txt-faint` used to be `#66708090`, and reading it as `#667080`
+put the meta line's contrast in `TODO.md` at **3.48:1** for four days when the
+composited figure was **1.97:1**. No token carries an alpha today — that one was
+made opaque on 2026-08-25 precisely so it could not lie again — but the
+instruction stands, because the next one to be added will.
 
 The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
 
 ### Where the tokens actually stand
 
-Audited on both rendered pages on 2026-08-25 — every element carrying text, each
-measured against the surface behind it rather than against the page.
+**Every text colour in the app clears AAA, as of 2026-08-25.** Audited on both
+rendered pages — every element carrying text, each measured against the surface
+behind it rather than against the page. `index.html` has 20 colour-on-background
+pairs and `plan.html` 21, with the ranked rows populated; **none is below 7:1**,
+and the lowest is 7.00.
 
-| Token | Worst surface | Ratio | |
+| Token | Worst surface | Ratio | Was |
 |---|---|---|---|
-| `--txt` `#e6ebf2` | `--panel-2` | **13.67:1** | passes |
-| `--txt-dim` `#a1aabb` | `--panel-2` | **7.00:1** | passes — raised from `#96a1b3` |
-| `--odd` `#d69f66` | `--panel` | **7.48:1** | passes — tracks `--txt-dim`, §1 |
-| `--txt-faint` `#66708090` | `--panel-2` | **1.92:1** | **fails, on ~220 elements** |
+| `--txt` `#e6ebf2` | `--panel-2` | 13.67:1 | unchanged |
+| `--txt-dim` `#bfc6d1` | `--panel-2` | 9.52:1 | `#96a1b3`, 6.27:1 |
+| `--txt-faint` `#a4aab3` | `--panel-2` | 7.00:1 | `#66708090`, **1.92:1** |
+| `--odd` `#e4bf9a` | `--panel` | 10.14:1 | `#684321`, then `#d29455` |
+| `--violet` `#b49aef` | badge fill | 7.02:1 | `#9d7bea`, 5.14:1 |
+| `--blue` `#65afe8` | badge fill | 7.02:1 | `#5aa9e6`, 6.55:1 |
+| `--red` `#e7899a` | `--panel` | 7.01:1 | `#e0637a`, 5.17:1 |
+| `--gold` · `--teal` · `--green` | — | 8.29 · 7.48 · 8.35 | already passed |
 
-`--txt-dim` was `#96a1b3`, which cleared the floor on the dark surfaces and missed
-it on the light ones — 6.27:1 on `--panel-2`. So whether the rule held depended on
-which row you landed on, which is not a rule. The replacement is solved against all
-five surfaces at once.
+Three rules came out of doing it, and each cost something to learn.
 
-**Solve on the rounded value.** A float that clears 7:1 can round to a hex that does
-not: `#a0aaba` was the first answer here and measures 6.98:1 on `--panel-2`.
+**Solve on the rounded value.** A float that clears 7:1 can round to a hex that
+does not — `#a0aaba` was an intermediate answer for `--txt-dim` and measures
+6.98:1 on `--panel-2`.
 
-`--txt-faint` is the one that remains, and it is not a nudge — it is the section
-headings, `.cat-heading`, `.hint`, `.mini` and `.cnt`, around 220 elements at ~2:1.
-Raising it to the floor lands on `#a4aab3`, which is within a hair of `--txt-dim`'s
-own minimum `#a1aabb` — so the three-level hierarchy collapses into two unless
-`--txt-dim` moves up with it. `TODO.md` carries the worked palette that keeps all
-three distinct and all three above 7:1.
+**Solve against every surface, not the one in front of you.** `--txt-dim` at
+`#96a1b3` cleared the floor on the dark surfaces and missed it on the light ones,
+so whether the rule held depended on which row you happened to look at.
+
+**Drop alpha rather than tune it.** `--txt-faint` was `#66708090` — a mid grey at
+56% opacity. The bare hex reads 3.48:1 and the composited truth was 1.92:1, and
+that gap is exactly why the instruction above is *measure the element*. It is
+opaque now, which is one less thing the stylesheet cannot be reasoned about.
+
+**The hierarchy is carried by separation, not by illegibility.** The three levels
+sit 1.47× and 1.41× apart in luminance. Raising `--txt-faint` alone would have
+landed it within a hair of `--txt-dim`'s own minimum and collapsed three levels
+into two, so `--txt-dim` was pushed to 9.5:1 rather than to its floor.
+
+`--odd` tracks `--txt-dim` by ratio rather than by target, per §1 — 10.14:1
+against 10.13:1.
 
 ---
 

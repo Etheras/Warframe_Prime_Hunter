@@ -7,29 +7,42 @@
   --panel-2:#1a2029;
   --line:#242c3a;
   --line-soft:#1d2430;
-  --txt:#e6ebf2;
-  /* Raised from #96a1b3 on 2026-08-25. That value cleared 7:1 on the darker
-     surfaces and missed it on the lighter ones — 6.27:1 on --panel-2 — so the
-     floor in STYLE.md 3 held or not depending on which row you landed on. This
-     one is solved against every surface it is drawn on and clears on all five:
-     8.27 on --bg, 7.82 on --bg-2, 7.45 on --panel, 7.30 on the badge fill,
-     7.00 on --panel-2. Solved on the ROUNDED value, because a float that clears
-     7:1 can round to a hex that does not. */
-  --txt-dim:#a1aabb;
-  --txt-faint:#66708090;
-  --gold:#d9b45b;
-  --gold-dim:#8a7133;
-  --teal:#4fd1c5;
-  --violet:#9d7bea;
-  --red:#e0637a;
-  --green:#5fce8f;
-  --blue:#5aa9e6;
-  /* Non-standard rule, read the tooltip. Raised from #684321 when the meta line
-     went to --txt-dim, and again from #d29455 when --txt-dim cleared the floor:
-     the rule is that this sits at the SAME brightness as the line it lives on,
-     so hue carries the signal and luminance does not. 7.48:1 against --panel,
-     where --txt-dim is 7.45:1 — a gap of 0.03, which is the rule holding. */
-  --odd:#d69f66;
+  /* ── the three text levels, all of them AAA ─────────────────────────────
+     Every colour below is solved against ALL FIVE surfaces it can be drawn on
+     — --bg, --bg-2, --panel, the badge fill #171c26 and --panel-2 — and the
+     worst case is the one quoted. Two rules were learned the hard way and are
+     worth keeping:
+
+       * Solve on the ROUNDED value. A float that clears 7:1 can round to a hex
+         that does not: #a0aaba was an earlier answer for --txt-dim and measures
+         6.98:1 on --panel-2.
+       * Measure the ELEMENT, not the token, wherever alpha is involved. That is
+         what --txt-faint used to be about — see below.
+
+     The levels are spaced 1.47x and 1.41x in luminance, so the hierarchy is
+     carried by real separation rather than by the bottom one being unreadable. */
+  --txt:#e6ebf2;                /* 13.67:1 worst */
+  --txt-dim:#bfc6d1;            /* 9.52:1 worst — was #96a1b3, then #a1aabb */
+  /* Was #66708090: a mid grey at 56% opacity, which composited down to
+     1.92-2.01:1 depending on the surface and failed even AA on roughly 220
+     elements — every section heading, category heading, hint and count on both
+     pages. The alpha was the whole problem, and it is gone rather than tuned:
+     an opaque token is one the stylesheet can be reasoned about. 7.00:1 worst. */
+  --txt-faint:#a4aab3;
+  --gold:#d9b45b;               /* 8.29:1 worst */
+  --gold-dim:#8a7133;           /* borders and shadows only, never text */
+  --teal:#4fd1c5;               /* 7.48:1 on the chip fill */
+  --violet:#b49aef;             /* 7.02:1 on .badge.resurgence — was #9d7bea */
+  --red:#e7899a;                /* 7.01:1 on --panel — was #e0637a */
+  --green:#5fce8f;              /* 8.35:1 worst */
+  --blue:#65afe8;               /* 7.02:1 on .badge.baro — was #5aa9e6 */
+  /* Non-standard rule, read the tooltip. It has moved three times — #684321,
+     #d29455, #d69f66 — and never on its own account: the rule (STYLE.md 1) is
+     that it sits at the SAME brightness as the line it lives on, so it tracks
+     --txt-dim and hue carries the signal instead of luminance. Matched to the
+     ratio rather than to a target: 10.14:1 against --panel where --txt-dim is
+     10.13:1, a gap of 0.003. */
+  --odd:#e4bf9a;
   --radius:10px;
   --shadow:0 8px 28px rgba(0,0,0,.45);
 }
@@ -230,9 +243,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .src-note .attrib{
   display:block;margin-top:12px;padding-top:11px;
   border-top:1px solid var(--line-soft);
-  font-size:10.5px;line-height:1.6;color:#5b6474;
+  /* The two hardcoded greys down here predate the tokens and were the darkest
+     text in the app — 3.06:1 and 4.21:1. Attribution is the one thing on the
+     page that is not ours to make hard to read. 7.03:1 and 7.01:1. */
+  font-size:10.5px;line-height:1.6;color:#9ba1aa;
 }
-.src-note .attrib a{color:#6f7a8c;text-decoration:underline}
+.src-note .attrib a{color:#99a1ad;text-decoration:underline}
 .src-note .attrib a:hover{color:var(--gold)}
 
 /* ── content ─────────────────────────────── */

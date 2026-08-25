@@ -110,7 +110,6 @@ What is left of the entry is two fields and a warning about one of them.
 | The endless-fissure bonus is only stated on the collecting side | small |
 | The Railjack opt-in gate stands in front of your only option | small |
 | The node list is the top eight and a hover, not a table | small |
-| `--txt-faint` fails the contrast floor on about 220 elements | session — a palette decision, measured |
 
 ### One refactor
 
@@ -1057,48 +1056,6 @@ worldstate does not publish at all: The Steel Path must be unlocked.
 So this is not a candidate for the exclusion rule. It is a candidate for a **demand
 badge**, and it would need the player's own rank — the first thing this project
 would have to ask about itself rather than derive.
-
-### `--txt-faint` fails the contrast floor on about 220 elements
-
-**What is left of decision 5, after the ranked row was fixed on 2026-08-25.**
-`.spot-score`'s unit label — *relics / objective*, the words saying what the
-biggest number on the row measures — was `--txt-faint` at 1.97:1 and is now
-`--txt-dim`. `--txt-dim` itself went `#96a1b3` → `#a1aabb` and `--odd` followed it
-to `#d69f66`, so both clear 7:1 on every surface they are drawn on. `STYLE.md §3`
-has the table.
-
-**`--txt-faint` was not in that change and is now the whole of the problem.** It is
-`#66708090` — 56% opaque, so it composites down to **1.92–2.01:1** depending on the
-surface, well under AA. Audited on both rendered pages, it is roughly **220
-elements**: every `h2` section heading, `.cat-heading`, `.cat-prog`, `.card-cat`,
-`.hint`, `.mini` and `.cnt`.
-
-**It is not a nudge, and that is the decision.** Raising it to the floor gives
-`#a4aab3`. `--txt-dim`'s own minimum is `#a1aabb`. Those are the same colour to the
-eye, so the three-level hierarchy — text, dim, faint — collapses into two. Keeping
-three distinct levels means moving `--txt-dim` up as well:
-
-| Token | Value | Worst ratio | Note |
-|---|---|---|---|
-| `--txt` | `#e6ebf2` | 13.67:1 | unchanged |
-| `--txt-dim` | `#bfc6d1` | 9.52:1 | up from `#a1aabb` |
-| `--txt-faint` | `#a4aab3` | 7.00:1 | **alpha dropped** |
-
-That keeps a 1.41× luminance gap between dim and faint, against 2.21× today
-(comparing the raw hexes, before alpha). Narrower, still legible as a hierarchy.
-`--odd` tracks `--txt-dim` per `STYLE.md §1`, so it moves a third time with it.
-
-Four accent colours also miss the floor and are ordinary nudges:
-`--violet` `#9d7bea` → `#b49aef` (5.14 → 7.02, on `.badge.resurgence`), `--blue`
-`#5aa9e6` → `#65afe8` (6.55 → 7.02, `.badge.baro` and `.badge.railjack`), `--red`
-`#e0637a` → `#e7899a` (5.17 → 7.01), and the two hardcoded footer greys `#5b6474`
-→ `#9ba1aa` (3.06) and `#6f7a8c` → `#99a1ae` (4.21). `--gold`, `--teal` and
-`--green` already pass.
-
-**Solve on the rounded value.** `#a0aaba` was the first answer for `--txt-dim` and
-measures 6.98:1 on `--panel-2` — a float that clears 7:1 can round to a hex that
-does not. Every figure above was measured on the rendered element, per `STYLE.md
-§3`, which is why the alpha in `--txt-faint` is in them.
 
 ### The node list is the top eight and a hover, not a table
 
