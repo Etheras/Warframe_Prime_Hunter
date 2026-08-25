@@ -148,19 +148,28 @@ Chromium through Playwright, which is the only way to cover `app.js` and
 `plan.js` without stubbing a browser badly. That one **is** an npm dependency,
 so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
 the same version, `node_modules/` is not, and the tests skip with a reason when
-it is missing. **287 checks without it, 316 with** — the browser layer is
+it is missing. **288 checks without it, 317 with** — the browser layer is
 deliberately the smaller half, because a test that needs a browser is a test
 that will eventually be skipped. Without Node at all it is 224: the Python suite
 on its own.
 
 Those three are measured, not estimated, and only the last is enforced: the
-runner compares **316** against the figure `README.md` states, and only on a run
+runner compares **317** against the figure `README.md` states, and only on a run
 that skipped nothing (§*Verifying a change*). The other two are prose and will
 drift, so re-measure rather than adjusting them by hand — move `node_modules`
 aside for the middle one, and read the `browser` group's own total for the
-difference the whole Node layer makes. They were last taken on 2026-08-24, when
-that group was 92 of the 316: five `node --check` parses, 58 from
-`test_assets.mjs` and `test_model.mjs` together, and 29 from `test_pages.mjs`.
+difference the whole Node layer makes. They were last taken on 2026-08-25.
+
+**None of those three is the number CI prints, and that caught a reader out on
+2026-08-25.** All three are figures for *this* machine: Windows, with the data
+already built. A GitHub runner is Linux and runs the suite *before* the build
+step, so two more groups skip there — `built payload`, which needs `data/` to
+exist, and `task registration`, which is a Windows-only feature — on top of the
+page tests. **CI passes 248**, and the runner says so plainly in its own output
+rather than pretending otherwise: *"README's 317-test figure unchecked here: some
+tests skipped, so this run is not the whole suite"*. A green CI is therefore not
+evidence the full suite passes; it is evidence that everything reachable on a cold
+Linux box passes, which is a different and still useful claim.
 
 The GitHub CLI is a third recommendation, and answers a different question
 from the tests: whether the *published* build agrees, on a clean Linux machine
@@ -430,9 +439,16 @@ a wrong number in the README.
 
 `gh run list` afterwards answers what no local run can — whether a clean Linux
 runner with no cache agrees. It has earned its place: the local suite passed while
-CI was red for two commits. Note CI has Node but **not** Playwright, so it runs 287
-of the 317; `app.js` and `plan.js` get `node --check` there and nothing else, which
-makes the local Playwright run the only evidence those two files work.
+CI was red for two commits.
+
+**Expect CI to print 248, not 317**, and do not read the gap as a failure — four
+groups skip there for four different reasons: `built payload` (the suite runs before
+the build step, so `data/` does not exist yet), `task registration` (a Windows
+feature), `page tests` (no Playwright on the runner) and `clone-and-build` (needs
+`--online`). So `app.js` and `plan.js` get `node --check` on CI and nothing else,
+which makes the **local** Playwright run the only evidence those two files work.
+This paragraph claimed 287 until 2026-08-25, which was this machine's figure wearing
+CI's name.
 
 What is left in `app.js` and `plan.js` is rendering and event wiring. The logic
 worth asserting was moved out of them — `assets/model.js` and
