@@ -848,3 +848,29 @@ test("esc closes every hole the templates could open", () => {
   assert.equal(S.esc(null), "");
   assert.equal(S.esc(0), "0", "zero is a value, not an absence");
 });
+
+test("both pages name a run's cost with the same words", () => {
+  /* The two pages built this string separately and diverged the moment Faceoff
+     became a one-run mission: the planner said "one run", the collection page
+     "1 run". The phrasing lives in rotation.js now, and this is the assertion
+     that it stays there -- app.js and plan.js both call objectivesText, so a
+     divergence has to go through this function to happen. */
+  const ROT = loadRotation();
+  const cost = (mission, rot) => {
+    const r = ROT.runValue(rot, mission, false, null, rot, false);
+    return ROT.objectivesText({ ...r, mode: mission });
+  };
+  assert.equal(cost("Spy", { A: 0.2, B: 0.2, C: 0.2 }), "3 vaults");
+  assert.equal(cost("Caches", { A: 0.3, B: 0.19 }), "2 caches");
+  assert.equal(cost("Defense", { A: 0.2, B: 0.2, C: 0.2 }), "6 rounds");
+  assert.equal(cost("Sanctuary Onslaught", { A: 0.2, B: 0.2, C: 0.2 }), "12 zones");
+
+  /* A single whole mission reads as words, not as "1 run" -- that is the case
+     that diverged, and Faceoff is the live instance of it. */
+  assert.equal(cost("Special", { A: 0.1, B: 0.1 }), "one run");
+  assert.equal(ROT.objectivesText({ mode: "Capture", rounds: null }), "one run");
+
+  // and a count of one that is NOT a run keeps its unit and stays singular
+  assert.equal(ROT.objectivesText({ mode: "Defense", rounds: 1, counts: { A: 1 } }),
+               "1 round");
+});

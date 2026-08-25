@@ -1059,7 +1059,7 @@
             s.kind === "bounty" ? bountyRotTag(s)
               : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)
               : "no rotation"}${
-            s.rounds ? ` · <span class="rounds">${esc(s.objectives + " " + s.unit + (s.objectives === 1 ? "" : "s"))}</span>` : ""}${
+            s.rounds ? ` · <span class="rounds">${esc(ROT.objectivesText(s))}</span>` : ""}${
             s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
             s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
             s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>

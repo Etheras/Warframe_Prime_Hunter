@@ -541,6 +541,19 @@
     return { count: 1, unit: "run" };
   }
 
+  /* How a run's cost READS: "4 rounds", "3 vaults", "12 zones", "one run".
+
+     Shared because the two pages must name a cost the same way, and they stopped
+     doing so the moment Faceoff became a one-run mission: the planner said "one
+     run" and the collection page, building the string inline, said "1 run". The
+     phrasing lives here now so there is one of it. */
+  function objectivesText(n) {
+    const o = objectivesOf(n);
+    return o.count === 1 && o.unit === "run"
+      ? "one run"
+      : o.count + " " + o.unit + (o.count === 1 ? "" : "s");
+  }
+
   /* ── nodes that are the same choice ───────────────────────────────
      Digital Extremes do not write a relic table per node. They write one per
      tier and rotation shape and hang it on every node that fits, so eight
@@ -853,7 +866,7 @@
   assertCoverage();
 
   window.WFPrimeRotation = {
-    RUN_MODES, RUN_OVERHEAD, ROT_PATTERN, runValue, objectivesOf,
+    RUN_MODES, RUN_OVERHEAD, ROT_PATTERN, runValue, objectivesOf, objectivesText,
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,

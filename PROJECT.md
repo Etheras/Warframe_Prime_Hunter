@@ -1544,6 +1544,32 @@ bonus, which would stop being a nudge. Its real obstacle is cost — rotation C 
 Onslaught is twelve zones — and `TODO.md` records that the fix is a browsable
 ranking, not a bigger number.
 
+### One place names a run's cost, because two of them diverged
+
+`app.js` and `plan.js` each built the string — *"4 rounds"*, *"3 vaults"*,
+*"12 zones"* — and they agreed only by coincidence. The moment Faceoff became a
+one-run mission the planner said *"one run"* and the collection page said
+*"1 run"*, because the planner had a `count === 1 && unit === "run"` case and the
+inline version in `app.js` did not.
+
+`ROT.objectivesText` is now the only place that phrasing exists and both pages
+call it. That is the same rule the rest of this file follows and the same reason:
+these two pages drifted over a bounty's fourth reward once already.
+
+### The development server sends `no-store`
+
+`serve.py` sent `Last-Modified` and no `Cache-Control`, so browsers applied
+heuristic freshness and served a stale `styles.css` or `rotation.js` without
+revalidating. `STYLE.md §8` existed almost entirely to document a cache-bust
+incantation for it, and it has cost more than one session a long hunt for a
+change that had already applied.
+
+Nothing served here is worth caching — it is localhost, the files are small, and
+being wrong about which build you are looking at is expensive. The published site
+never sees this file; GitHub Pages sends its own headers. The dataset branch had
+been sending its own `no-store` and now does not, since `end_headers` covers
+every response and the browser was seeing two.
+
 ### Both thumbs reach every ranked figure, including the per-run one
 
 There are two deliberate adjustments in the model — `CACHE_PENALTY` and the

@@ -867,10 +867,7 @@
      relics or short of the right ones. */
   /* "4 rounds", "3 vaults", "one run" - how a run's cost reads when nobody has
      put a minute figure on it. */
-  const objectivesText = (n) =>
-    n.objectives === 1 && n.unit === "run"
-      ? "one run"
-      : n.objectives + " " + n.unit + (n.objectives === 1 ? "" : "s");
+  const objectivesText = ROT.objectivesText;
 
   /* Two numbers on the row and three lines on the hover.
 

@@ -294,11 +294,22 @@ against 10.13:1.
 
 ## 8. Verifying
 
-The browser caches `styles.css` aggressively. If a change appears not to apply,
-bust the cache before assuming the CSS is wrong:
+**`tools/serve.py` sends `Cache-Control: no-store` on every response**, as of
+2026-08-25, so an edit is live on the next reload and the incantation that used
+to live here is no longer needed. It sent `Last-Modified` and nothing else, which
+let browsers apply heuristic freshness and serve a stale `styles.css` or
+`rotation.js` without revalidating — the cause of more than one long hunt for a
+change that had in fact applied.
+
+If a change still appears not to have taken, the cache is no longer the first
+suspect. Check that the server is the one you think — `serve.py` on 8777, not
+`vorframe-plain` on 8781, which sends no such header — and that the tab has been
+reloaded since the edit. A tab that cached a file *before* this change will keep
+it until forced, since `no-store` only governs responses it was sent with:
 
 ```js
-document.querySelector('link[rel=stylesheet]').href = 'assets/styles.css?v=' + Date.now();
+// only for an entry cached before 2026-08-25; forces a fresh copy into the cache
+await fetch('assets/styles.css', { cache: 'reload' });
 ```
 
 Then check the computed style, not the screenshot — a screenshot cannot tell you

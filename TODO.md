@@ -53,9 +53,9 @@ nodes ranked at exactly twice their true rate — was found and **fixed** the sa
 day; `PROJECT.md §7` has the reasoning.
 
 - ~~The planner runs an endless-mission optimiser over missions that are not
-  endless.~~ **Fixed 2026-08-25** — `FIXED_LENGTH`, `PROJECT.md §7`. What is left
-  is a browser pass and one consequence: entry *What is left of the fixed-length
-  fix*.
+  endless.~~ **Fixed 2026-08-25** and verified in the browser — `FIXED_LENGTH`,
+  `PROJECT.md §7`. What is left is that Spy nodes are never on screen to be
+  looked at: entry *Spy and Caches nodes never appear on either page*.
 - The *Still needed* panel counts relics the reader's own switches have turned off.
   Live today on all three **Lex Prime** parts. Entry: *A part you cannot reach
   still reads as one you can*, whose own correction claimed the opposite.
@@ -461,6 +461,16 @@ paying one reward per four objectives would be charged an eight-objective restar
 
 ### A run's fixed cost is not priced, so Capture wins everything
 
+**Faceoff now sits at #1 for exactly this reason, and the owner has ruled it
+stays — 2026-08-25.** Correcting its length moved it from #14 to the top: a match
+pays one each of rotation A and B, 22 relics at 8.33%, so 1.83 wanted relics for
+one objective. It is a one-objective mission ranked against one-objective
+missions, which is what Capture already is, and singling Faceoff out would be
+patching the symptom on one row. **Do not special-case it.** If the fixed cost of
+entering a mission is ever priced, Faceoff and Capture move together or not at
+all.
+
+
 **Measured by the owner from their own runs, 2026-08-24, and it is the largest
 known distortion in the per-minute ranking.** Effort is collected per *objective*
 and the cost of a run is `minutes-per-objective × objectives` — nothing else. So a
@@ -563,35 +573,21 @@ is a rule here and this is a case where they legitimately differ. And the row's
 `relics / min` label stays honest: the minutes it divides by become the true cost
 of a run, which is what the label already claims.
 
-### What is left of the fixed-length fix — a browser pass and one consequence
+### Spy and Caches nodes never appear on either page
 
-**Shipped 2026-08-25.** `FIXED_LENGTH` in `rotation.js` states the length and the
-rotations for `Spy` (3 vaults, A/B/C), `Caches` (2 caches, A/B) and `Special`
-(1 run, A+B), the missing mission-type test is in `runValue`, and `PROJECT.md §7`
-carries the reasoning and the measured effect. `CACHE_PENALTY` was re-derived in
-the same commit and stays at 0.5. Two things are outstanding.
+Not a defect in the fix — a discovery from verifying it, 2026-08-25. The
+collection drawer shows **eight spots and has no overflow**; the planner shows
+eight rows and twenty more in a tooltip. A Spy node reaches neither, on any item,
+because **no live relic drops only at Spy**: the highest share is Meso V15 at 13
+Spy sources out of 147. Every Spy relic has around a hundred other places to get
+it, so Spy is always outranked.
 
-**1 — `app.js` has not been driven in a browser.** It calls the same `runValue`,
-so it inherits the value correction without an edit, but that is exactly why it
-needs looking at rather than reasoning about: the collection page's spot meta
-prints `objectives` and `unit` from the shared function, and no automated test
-covers what those now read on a Spy or Caches row. Serve the pages and check one
-of each. The Playwright suite passes, but it asserts nothing about these types.
-
-**2 — Faceoff is now #1 to #4, and that is the Capture problem showing.** The four
-tables went 6 rounds → 1 run, +140% per objective, straight to the top of the
-list. The arithmetic is right: a match pays one each of rotation A and B, 22
-relics at 8.33%, so 1.83 wanted relics for one run. What is wrong is the
-comparison — a match is costed at one objective the same way a Capture is, and
-*A run's fixed cost is not priced, so Capture wins everything* is the entry that
-already describes this. Faceoff is now its loudest instance rather than its
-fourteenth, which makes that entry more urgent than it was.
-
-Nothing here says the fix was wrong. It says the fix removed a distortion that
-was masking a bigger one.
-
-
-## Everything else
+So the corrected costing is right and unobservable for that mission type. The
+wording was verified against the shared function instead, with the exact shape
+`app.js` builds — `3 vaults`, and `2 caches` where the rotation-bearing Proxima
+nodes do surface (Nyx Prime is 100% Caches and shows them). It is the same
+family as the pre-refined nodes nobody can see, and the same entry fixes it:
+*The node list is the top eight and a hover, not a table*.
 
 ### Our four invented "mission types" leak into the ranking
 

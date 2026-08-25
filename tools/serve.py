@@ -339,6 +339,17 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")
+        # This is a development server, and it sent `Last-Modified` with no
+        # `Cache-Control` -- so browsers applied heuristic freshness and served
+        # styles.css and the asset scripts from cache without revalidating, for
+        # minutes after an edit. That is the whole reason STYLE.md 8 documents a
+        # cache-bust incantation, and it has cost more than one session an hour
+        # of chasing a change that had in fact applied. Nothing served here is
+        # worth caching: it is localhost, the files are small, and being wrong
+        # about which build you are looking at is expensive. The published site
+        # is unaffected -- GitHub Pages sends its own headers and never sees
+        # this file.
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         super().end_headers()
 
     def _reject(self):
@@ -401,7 +412,9 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/javascript")
                 self.send_header("Content-Length", str(len(blob)))
-                self.send_header("Cache-Control", "no-store")
+                # Cache-Control comes from end_headers now, which sends no-store
+                # on every response. This line sent a second one and the browser
+                # saw them merged.
                 self.end_headers()
                 STATS["served"] += 1
                 self.wfile.write(blob)
