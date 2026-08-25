@@ -414,10 +414,42 @@
      during evaluation - the pages call it while rendering, long after. */
   const BOUNTY_STAGES = 4;
   const OBJECTIVE_UNIT = { Spy: "vault", Caches: "cache" };
+
+  /* ── how many objectives buy one reward ───────────────────────────
+     One, nearly everywhere: a Defense round pays a reward, a Spy vault pays a
+     reward. Onslaught does not. From `wiki.warframe.com/w/Sanctuary_Onslaught`,
+     *Rewards*: "Rewards are given per two successful zones in an AABC rotation
+     in both Sanctuary Onslaught and Elite Sanctuary Onslaught". The page maps
+     zones 2 and 10 to rotation A, 4 and 12 to A, 6 and 14 to B, 8 and 16 to C.
+
+     The letters were already right without this, and that is worth saying
+     because it is what makes the fix a divisor and not a rewrite: `scorePlan`
+     takes exactly one reward per iteration, so its count is a reward index, and
+     rewards 1-6 come out A,A,B,C,A,A - exactly what those zones pay. What was
+     wrong was the price. That same reward count was then charged as the
+     objective count, so a twelve-zone run was costed at six and both Onslaught
+     nodes ranked at exactly twice their true rate, across the two nodes that
+     carry 29 of the 34 live relics.
+
+     DE cannot supply this and never could. Their table publishes three rotation
+     headings per node and nothing else - the word "zone" does not appear in the
+     whole of it - so the cadence is ours to declare, the way the Disruption
+     pattern above is. Both Onslaught nodes share this mode string and the wiki
+     gives Elite no separate cadence, so one entry is right for both.
+
+     Deliberately not folded into OBJECTIVE_UNIT above: that table renames an
+     objective, this one says how many of them you buy. Two different facts, and
+     a mission can need either without the other. */
+  const PER_REWARD = { "Sanctuary Onslaught": { count: 2, unit: "zone" } };
+
   function objectivesOf(n) {
     if (isHeist(n)) return { count: 1, unit: "run" };
     if (n.bounty) return { count: n.bounty.stages || BOUNTY_STAGES, unit: "stage" };
-    if (n.rounds) return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
+    if (n.rounds) {
+      const per = PER_REWARD[n.mode];
+      if (per) return { count: n.rounds * per.count, unit: per.unit };
+      return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
+    }
     return { count: 1, unit: "run" };
   }
 

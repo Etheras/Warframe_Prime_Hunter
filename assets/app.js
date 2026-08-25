@@ -516,6 +516,13 @@
       e.rounds = r.rounds; e.counts = r.counts;
       e.stranded = r.stranded; e.nonStandard = r.nonStandard;
       e.planName = r.planName; e.bounty = r.bounty; e.runMode = r.mode;
+      /* Both pages have to name a run's cost the same way, and `rounds` is not
+         that name - it counts *rewards*, and Onslaught pays one per two zones.
+         So ask the shared function rather than printing `rounds` here, which is
+         what the planner does. This page still ranks per run and has no effort
+         panel; it only needs the words. */
+      const o = ROT.objectivesOf(e);
+      e.objectives = o.count; e.unit = o.unit;
     });
 
     const ranked = Array.from(map.values())
@@ -1052,7 +1059,7 @@
             s.kind === "bounty" ? bountyRotTag(s)
               : s.rotations.length ? rotListTag(s.rotations, s.nonStandard)
               : "no rotation"}${
-            s.rounds ? ` · <span class="rounds">${s.rounds} rounds</span>` : ""}${
+            s.rounds ? ` · <span class="rounds">${esc(s.objectives + " " + s.unit + (s.objectives === 1 ? "" : "s"))}</span>` : ""}${
             s.kind !== "mission" ? " · " + esc(s.planet) : ""}${
             s.lvl ? ` · level ${s.lvl[0]}–${s.lvl[1]}` : ""}${
             s.event ? " · event node" : ""} · <span class="relic-count" data-tip="${esc("Relics you still need here:" + "\n" + s.relicList.join("\n"))}">${s.count} of ${openCount} relics</span></div>

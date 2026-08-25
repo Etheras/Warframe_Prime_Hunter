@@ -764,9 +764,14 @@
        is only what is true of THIS node. */
     const lines = [];
     if (n.rounds) {
+      /* The cost is read off `objectivesText`, never off `n.rounds`. They are
+         not the same number: `rounds` counts *rewards*, and Onslaught pays one
+         per two zones, so a six-reward run there is twelve objectives. Saying
+         "over 6 rounds" on a mission that has no rounds was half of that
+         defect - see `rotation.js` PER_REWARD. */
       lines.push(Object.keys(n.counts)
         .map((r) => "rot " + r + " ×" + n.counts[r]).join(", ") +
-        " over " + n.rounds + " round" + (n.rounds === 1 ? "" : "s") + ".");
+        " over " + objectivesText(n) + ".");
     }
     /* Why this many rounds and not some other number. The choice is the
        model's now rather than the reader's, and an automatic decision that
@@ -783,7 +788,7 @@
       const most = Object.keys(n.counts || {})
         .filter((r) => (n.rot[r] || 0) > 0)
         .sort((a, b) => n.counts[b] - n.counts[a])[0];
-      lines.push("Worth staying six rounds" +
+      lines.push("Worth staying " + objectivesText(n) +
                  (most ? " for rot " + most + " ×" + n.counts[most] : "") +
                  " — one fewer trip in and out than leaving sooner.");
     } else if (n.rounds) {
@@ -803,7 +808,7 @@
       : "no rotation";
     const cls = "rot" + (n.nonStandard ? " rot-odd" : "");
     return `<abbr class="${cls}" data-tip="${esc(lines.join("\n"))}">${esc(label)}</abbr>` +
-      (n.rounds ? ` · <span class="rounds">${n.rounds} rounds</span>` : "");
+      (n.rounds ? ` · <span class="rounds">${esc(objectivesText(n))}</span>` : "");
   }
 
   function rotTag(rot) {

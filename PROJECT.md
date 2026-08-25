@@ -392,17 +392,47 @@ to `main` and every daily cron actually publishes rather than building and stopp
 
 ### Verifying a change
 
-Run the tests before pushing anything that touches the pipeline:
+**Two different runs, for two different moments.** Decided 2026-08-25, after a
+stretch of work in which the full suite was run after every small edit — 317 green
+lines say nothing about the four you just changed, and the habit trains you to skim
+the one output that should never be skimmed.
+
+**While building, run only what covers what you touched.** The Node suites are
+addressed directly; there is no filter flag on `test_build.py`.
+
+```bash
+node --test tests/test_assets.mjs
+```
+
+| Touched | Run |
+|---|---|
+| `assets/rotation.js`, `assets/shared.js` | `node --test tests/test_assets.mjs` |
+| `assets/model.js` | `node --test tests/test_model.mjs` |
+| `assets/plan.js`, `assets/app.js`, either page | `node --test tests/test_pages.mjs` |
+| `tools/*.py`, the data pipeline | `python tests/test_build.py` — no finer split |
+
+**Before pushing, the full run, every time — and then check CI.**
 
 ```bash
 python tests/test_build.py
 ```
 
-They need no network and take about a second, and that one command covers the
-JavaScript too: `tests/test_assets.mjs` runs under Node's test runner and its
-results are folded into the same output. `--online` adds a real clone-and-build into
-a temp directory, which is the only check covering the new-user path. Every test is
-there because of a bug that actually happened, and says which in its docstring.
+It needs no network and takes about a second, and that one command covers the
+JavaScript too: the `.mjs` suites run under Node's test runner and their results are
+folded into the same output. `--online` adds a real clone-and-build into a temp
+directory, which is the only check covering the new-user path. Every test is there
+because of a bug that actually happened, and says which in its docstring.
+
+The full run is the gate for a reason beyond breadth: it **enforces the test count
+printed in `README.md`**, failing a complete pass whose total disagrees. A selective
+run cannot do that, so a commit that adds a test and never runs the full suite ships
+a wrong number in the README.
+
+`gh run list` afterwards answers what no local run can — whether a clean Linux
+runner with no cache agrees. It has earned its place: the local suite passed while
+CI was red for two commits. Note CI has Node but **not** Playwright, so it runs 287
+of the 317; `app.js` and `plan.js` get `node --check` there and nothing else, which
+makes the local Playwright run the only evidence those two files work.
 
 What is left in `app.js` and `plan.js` is rendering and event wiring. The logic
 worth asserting was moved out of them — `assets/model.js` and
@@ -1879,12 +1909,54 @@ rise for the same reason.
 Three decisions inside it are worth keeping:
 
 - **The unit is one objective, never one run.** A Defense round, a Spy vault, a
-  bounty stage. How far you take an endless mission is your own choice, and the *How
-  far you run* option directly above changes it — a question whose unit moves cannot
-  be answered once. Spy and Caches need no special case: their rotation *is* the
-  count of vaults opened or caches found, so the rounds the model already picked are
-  the objectives, and only the word for them differs. Bounties are not on the round
-  cycle at all and are costed at four stages.
+  bounty stage. How far you take an endless mission is your own choice — a question
+  whose unit moves cannot be answered once. Bounties are not on the round cycle at
+  all and are costed at four stages. This bullet used to add that Spy and Caches
+  need no special case, "their rotation *is* the count of vaults opened or caches
+  found". That is true of the unit and false of the count, measured on 2026-08-25;
+  `TODO.md` carries the entry and the two wiki questions it waits on.
+- **How many objectives buy one reward is a second fact, and it is not always
+  one.** Added 2026-08-25, and it is the fix for the worst mis-costing found that
+  day. `rounds` counts *rewards* — `scorePlan` takes exactly one per iteration — and
+  for almost every mission that is also the objective count, because a Defense round
+  pays a reward and a Spy vault pays a reward. Onslaught does not.
+  `wiki.warframe.com/w/Sanctuary_Onslaught` states it outright: "Rewards are given
+  per two successful zones in an AABC rotation in both Sanctuary Onslaught and Elite
+  Sanctuary Onslaught", mapping zones 2 and 10 to rotation A, 4 and 12 to A, 6 and
+  14 to B, 8 and 16 to C.
+
+  The *letters* were already right, and that is what made this a divisor rather than
+  a rewrite: rewards 1–6 come out `A,A,B,C,A,A`, which is exactly what zones 2, 4,
+  6, 8, 10 and 12 pay — checked against the wiki's own mapping, not assumed. What
+  was wrong was the price. That same reward count was republished by `objectivesOf`
+  as the objective count, so a twelve-zone run was costed at six and **both
+  Onslaught nodes ranked at exactly twice their true rate** — Elite at 0.6835 where
+  it should be 0.3418, ordinary at 0.5344 where it should be 0.2672. Between them
+  those two nodes carry 29 of the 34 live relics, so it was not a corner of the list.
+
+  It lives in `PER_REWARD` in `rotation.js`, beside `OBJECTIVE_UNIT` and
+  deliberately not merged into it: that table renames an objective, this one says
+  how many of them you buy, and a mission can need either without the other. Keyed
+  on mode, which is right rather than lucky — both Onslaught nodes share the mode
+  string and the wiki gives Elite no separate cadence, so one entry serves both.
+
+  **It has to be a hand-written constant, and that was the uncomfortable part.**
+  DE's table publishes three rotation headings per node and nothing else; the word
+  *zone* does not appear anywhere in the whole 4.4 MB of it, so the source the
+  pipeline parses cannot express cadence at all. The per-round assumption was ours,
+  inherited from the AABC fallback. Nothing machine-readable publishes the real
+  figure either, so this is a declared fact in the same class as the Disruption
+  conduit table — which is the precedent that made it acceptable rather than a new
+  kind of exception.
+
+  Two things followed it. Both pages had to stop printing `rounds` as the cost:
+  `plan.js` and `app.js` now read the shared `objectivesOf`, so an Onslaught row
+  says *12 zones* on the planner and *12 zones* on the collection page instead of
+  *6 rounds* on both. And the effort panel relabels itself for free — the box now
+  asks for *min / zone* rather than *min / round*, which matters because a player
+  timing themselves has only one countable unit and it is the zone. Typing a zone's
+  minutes into a box that meant two zones would have halved the run a second time,
+  in the per-minute ranking.
 - **A blank type is costed at the average of the ones you filled in**, not at zero,
   which would sort it straight to the top of a list it was never measured against.
   The borrowed number is drawn in `--odd` amber on the row so it is a guess you can

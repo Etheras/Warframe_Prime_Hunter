@@ -319,6 +319,35 @@ test("a run is costed in objectives, and each type has its own word for one", ()
                    "a bounty is not on the round cycle, so it is costed in stages");
 });
 
+test("an Onslaught reward costs two zones, so the run is twice the objectives", () => {
+  /* The bug this guards: `rounds` counts *rewards*, and Onslaught pays one per
+     two zones, so charging the reward count as the objective count priced a
+     twelve-zone run at six and ranked both Onslaught nodes at exactly twice
+     their true rate. The letters were never wrong - only the price.
+
+     Driven through `runValue` rather than handing `objectivesOf` a rounds
+     figure by hand: the point is what the model actually produces. The spread
+     comes first because `runValue` returns its own `mode` - the run mode - and
+     the mission type has to win. */
+  const ROT = loadRotation();
+  const rot = { A: 1, B: 0, C: 0, none: 0 };
+
+  const eso = ROT.runValue(rot, "Sanctuary Onslaught", false, null);
+  assert.equal(eso.rounds, 6, "six rewards, the same AABC run any endless node gets");
+  assert.deepEqual(plain(ROT.objectivesOf({ ...eso, mode: "Sanctuary Onslaught" })),
+                   { count: 12, unit: "zone" },
+                   "six rewards is twelve zones - the wiki gives one reward per two");
+
+  /* The control. Same rot map, same reward count, a mission that really does
+     pay per round: the two numbers stay equal, so the test above is about the
+     mission type and not about the arithmetic. */
+  const def = ROT.runValue(rot, "Defense", false, null);
+  assert.equal(def.rounds, 6);
+  assert.deepEqual(plain(ROT.objectivesOf({ ...def, mode: "Defense" })),
+                   { count: 6, unit: "round" },
+                   "a Defense round pays a reward, so rewards and objectives agree");
+});
+
 test("a Profit-Taker phase is one run, not four bounty stages", () => {
   /* DE file the heist's rewards inside the bounty table, so it arrived here as
      a four-stage bounty: its rate was divided by four and it sank down the list
