@@ -46,10 +46,15 @@ further down, where the reasoning lives.
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
 
-**Two things are currently wrong on screen**, both found on 2026-08-25 and both
-measured against the build of the day before. This paragraph said *"Nothing is
-currently wrong on screen"* until they were checked.
+**Three things are currently wrong on screen**, all found on 2026-08-25 and all
+measured against that day's build or the one before. This paragraph said *"Nothing
+is currently wrong on screen"* until they were checked.
 
+- **Both Onslaught nodes are ranked at exactly twice their true rate.** A reward
+  costs two zones and we charge for one, so the cost of a run is half what it
+  should be. Between them these two nodes carry **29 of the 34 live relics**, which
+  makes this the largest of the three. Entry: *An Onslaught reward costs two zones,
+  and we charge for one* — and unlike the other two it is **not blocked**.
 - The planner runs an **endless-mission optimiser over missions that are not
   endless**: 28 of the 38 live `Caches` nodes are costed at six caches and 6 of the
   21 live `Spy` nodes at four vaults, against three of each. The row then prints
@@ -58,6 +63,10 @@ currently wrong on screen"* until they were checked.
 - The *Still needed* panel counts relics the reader's own switches have turned off.
   Live today on all three **Lex Prime** parts. Entry: *A part you cannot reach
   still reads as one you can*, whose own correction claimed the opposite.
+
+All three are the same family: **a round is not a universal unit of effort**, which
+is the heading two of them sit under. The unit the ranking divides by is assumed in
+three different ways and checked in none.
 
 The seven entries this list opened with were genuinely wrong on screen; they
 shipped later the same day and have been deleted rather than ticked, with the
@@ -88,6 +97,7 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
+| An Onslaught reward costs two zones, and we charge for one | session — **measured, wrong on screen, and unblocked**: exactly 2× on 29 of 34 live relics |
 | A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest known distortion |
 | Our four invented "mission types" leak into the ranking | session |
 | What the misses are worth, in Ducats | session |
@@ -435,6 +445,89 @@ As of 2026-08-25 the gap has a concrete cost, and two of the nine are what
 
 Answer those two and a measured, already-designed correction ships. The other seven
 can wait.
+
+**Amended 2026-08-25: the sweep above verified the wrong axis.** The eleven
+"confirmed A→A→B→C against the wiki" were confirmed on the **letter sequence** and
+never on the **cadence** — how many objectives buy one reward. At least two of the
+eleven are not one-for-one, both checked on the wiki the same day:
+
+- **Sanctuary Onslaught** pays one reward per **two zones**. See the entry below.
+- **Void Cascade** — *"Retiring 4 purged Exolizers counts for one rotation"*, order
+  AABC (`wiki.warframe.com/w/Void_Cascade`). Four objectives per reward, and we
+  charge one.
+
+So the paragraph above understates it a second time: the objective counts are
+unchecked for the **confirmed eleven** as well as for the unverified nine.
+Re-sweeping the eleven for cadence is the smaller half of this entry and is worth
+doing first — it needs no code, only the wiki, and it has already turned up two.
+
+### An Onslaught reward costs two zones, and we charge for one
+
+**Measured 2026-08-25 against that morning's build, confirmed on the wiki, and it
+is wrong on screen today.** Both Onslaught nodes are ranked at exactly **twice**
+their true rate, and between them they carry **29 of the 34 live relics** — so this
+is not a corner of the list.
+
+Sanctuary Onslaught and Elite Sanctuary Onslaught pay a reward every **two** zones,
+not every zone. `wiki.warframe.com/w/Sanctuary_Onslaught`, *Rewards*: *"Rewards are
+given per two successful zones in an AABC rotation in both Sanctuary Onslaught and
+Elite Sanctuary Onslaught"*. The page maps zones 2 and 10 to rotation A, 4 and 12
+to A, 6 and 14 to B, 8 and 16 to C, and gives Elite no separate cadence.
+
+**The letters we assign are right. Only the price is wrong.** `scorePlan`
+(`rotation.js:126`) takes exactly one reward per iteration, so its `n` is a reward
+index, and rewards 1–6 come out `A,A,B,C,A,A`. The wiki's zones 2, 4, 6, 8, 10, 12
+pay `A,A,B,C,A,A`. Identical — checked, not assumed. The defect is that
+`objectivesOf` (`rotation.js:420`) republishes that same 6 as the **objective
+count**, `plan.js:587` makes it the cost and `plan.js:597` divides by it. A number
+meaning *six rewards* is charged as *six objectives*. The run is twelve zones.
+
+| Node | live rows | relics a run | costed at | ranked rate | true cost | true rate |
+|---|---|---|---|---|---|---|
+| Elite Sanctuary Onslaught | 28 (all Radiant) | 4.1013 | **6 rounds** | 0.6835 | 12 zones | 0.3418 |
+| Sanctuary Onslaught | 22 | 3.2067 | **6 rounds** | 0.5344 | 12 zones | 0.2672 |
+
+**DE's drop table cannot settle this and never could.** It publishes three headings
+per node — `Rotation A`, `Rotation B`, `Rotation C` — and nothing else. Searched
+the whole 4.4 MB cached table: the word *zone* appears **zero** times, in either
+case. The per-round assumption came from us, not from DE: `Sanctuary Onslaught` is
+not named in `ROT_PATTERN`, so it falls through to the AABC default at
+`rotation.js:79`, which pays one reward per round. **It cannot come from the
+pipeline either** — the cadence exists as one sentence and four bullets of prose,
+and nothing machine-readable publishes it, so it has to be a hand-written constant.
+That is exactly what the Disruption conduit table at `rotation.js:86` already is,
+so there is precedent and a place to put it.
+
+**The effort panel makes it worse rather than better.** `renderEffort` labels the
+box `min / round`, with an aria-label reading *minutes per round of Sanctuary
+Onslaught* (`plan.js:993`). Onslaught has no rounds — the mission counts zones, the
+HUD counts zones, and so does everyone playing it. A player who times one zone and
+types it halves the run a second time, now in the per-minute ranking. A player who
+happens to type two zones' worth gets the right total only by guessing our private
+meaning, and their number is then incomparable with the `Defense` box beside it.
+The same shape as the `Bounty` label doing two jobs, already noted at `plan.js:970`.
+
+**Two nodes, one mode string, and that is correct rather than lucky.** Both come
+from `official.py:229` as `node="Sanctuary Onslaught"` / `node="Elite Sanctuary
+Onslaught"` under `mode="Sanctuary Onslaught"`. `ROT_PATTERN` and `OBJECTIVE_UNIT`
+are keyed on **mode**, so one entry reaches both — and per the wiki the cadence is
+the same for both, so one entry is what is wanted. They stay separate rows because
+`signature()` (`rotation.js:439`) keys on mode plus the relic set, and their sets
+differ.
+
+**Not the same defect as *Several of those modes are not round-based at all*.**
+There, the chooser picks lengths the mission cannot reach, so the model banks
+rewards that do not exist. Onslaught is genuinely endless, twelve zones is a length
+it can have, and every reward counted is real. There the rewards are too many; here
+the price is too low. A cap fixes one, a divisor the other.
+
+**And unlike that entry, this one is not blocked.** The cadence is stated outright
+and both nodes are covered by it, so the arithmetic is settled. One design question
+is open and can be decided on its merits: `ROT.RUN_OVERHEAD`, two *rounds*
+(`rotation.js:323`), prices a mission start, so on this node it is arguably two
+zones rather than two rewards. Worth checking when it lands whether doubling the
+cost changes which run mode wins — if `aabcaa` still beats `reset` on both nodes,
+this is purely a cost-and-label defect and stays small.
 
 ### A run's fixed cost is not priced, so Capture wins everything
 
