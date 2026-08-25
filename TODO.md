@@ -776,55 +776,64 @@ roll currently assumed. Getting that right is arithmetic; getting it *checked*
 needs the event live, which is the same blocker as the detection below. Do both
 in the same sitting.
 
-### The Void Traces toggle is wired but lands where nobody looks
+### The Void Traces bonus is multiplied by zero, then hidden
 
-**Shipped on 2026-08-25 and immediately found half-useful.** The sidebar now
-carries *Void Traces are tight — under 500*, the threshold the owner set at five
-Radiant refinements. `model.js` gained `traceValue`, which prices one trace off
-the player's own plan, and `plan.js` folds `traces × traceRate` into a node's
-value when the box is ticked. That part is right and unit-tested.
+**Shipped 2026-08-25 and demonstrated broken the same day**, against the live
+build. The sidebar carries *Void Traces are tight — under 500*, `model.js` prices
+a trace off the player's own plan, and `plan.js` folds `traces × rate` into a
+node's value. Two things sit between that and anything the reader sees, and the
+first is an ordinary bug.
 
-**Two things about where it lands, both measured rather than assumed.**
+**1 — `sourceValue` measures overshoot, not saving, and it is always zero.**
+`traces` is `max(0, cost(given) − cost(chosen))`: how far the node *exceeds* the
+refinement the plan picked. All eleven pre-refined nodes hand over **Radiant**,
+and `bestRefinement` picks **Radiant for all 34 live relics**, so the subtraction
+is `100 − 100 = 0` — on every node, always. The bonus is multiplied by zero before
+it reaches a score, so the toggle cannot change anything whatever the rate is.
 
-First, traces go into `n.rot` — the *value* — and not into `n.cnt`, the count of
-wanted relics. That is deliberate and it matches Forma and Aya, which are also
-worth something and are also not relics. But the list is ordered on `rate` and
-`perRun`, and **both are derived from the count**. So the toggle moves what a run
-is *worth* and cannot move the order.
+The same zero explains a second thing nobody had noticed: the pre-refined row's
+tooltip says *"saving N Void Traces"* only `if (n.tracesSaved)`, so **that clause
+has never printed**.
 
-Second, and worse: the bonus only ever lands on a node that hands relics over
-already refined, and there are eleven of those. **None of them reaches the visible
-eight rows under either sort.** Ranked per run with a wishlist covering all 28 of
-its relics, Elite Sanctuary Onslaught still loses to Olympus, Ur, Ani, Belenus,
-Apollo, Io, Mithra and Mot — it pays rotation C only, at 6.32% a relic. The Void
-Storms are 2.5% and the four Profit-Taker phases carry two relics each.
+What a trace-limited player saves is the refinement bill the node *picks up*, not
+the amount it overshoots by: `min(cost(given), cost(chosen))`. Radiant given
+against Radiant wanted saves the full 100 — you were going to spend it and now you
+are not. Measured on the live build, all eleven then report 100.
 
-So a reader can tick the box and see nothing change. A page test written for it
-failed on exactly this and was removed rather than weakened — there is no subject
-on screen to assert against.
+**2 — even corrected, none of the eleven is on screen.** Ranked per objective with
+the default switches, they sit **#75 to #154 of 158** and the planner shows eight:
+
+| Node | Rank |
+|---|---|
+| Elite Sanctuary Onslaught | #75 |
+| the four Profit-Taker phases | #126, #135, #136, #137 |
+| the six Void Storms | #149–#154 |
+
+So fixing the arithmetic makes the toggle correct and still silent.
 
 **Three ways out, and it is a modelling call.**
 
-- **Leave it in the value and say so on the cracking side.** The relic list is
-  where refinement is decided, and it is the honest home for *this relic arrives
-  Radiant, which saves you 100 traces you do not have*. Nothing about the ranking
-  changes. Smallest, and it makes the toggle visible where the decision is made.
-- **Let traces reach `perRun`.** They would then reorder the list. But `perRun`
-  counts wanted relics, and a trace is not one — the big number would stop being
-  the thing its own label says it is, which `STYLE.md §5` forbids.
-- **Show the eleven regardless of rank.** A pre-refined node is a different kind
-  of offer; surfacing it outside the top eight is really the *node list is the top
-  eight and a hover* entry wearing another hat.
+- **Say it on the cracking side.** The relic list is where refinement is chosen and
+  is the honest home for *this one arrives Radiant, which is 100 traces you do not
+  have to find*. Nothing about the ranking changes. Smallest, and it puts the fact
+  where the decision is made.
+- **Let traces reach `perRun`.** They would reorder the list — but `perRun` counts
+  wanted relics and a trace is not one, so the big number would stop being what its
+  own label says, which `STYLE.md §5` forbids.
+- **Surface the eleven regardless of rank.** A pre-refined node is a different kind
+  of offer; this is really *the node list is the top eight and a hover* wearing
+  another hat.
 
-**A correction worth keeping.** The formula this file recorded — the uplift buyable
-*above* the chosen refinement, over `cost(Radiant) − cost(chosen)` — is wrong for
-the only case the toggle exists for. `bestRefinement` picks Radiant for every one
-of the 34 live relics, so `chosen` is already Radiant, every uplift is zero, and a
-trace is valued at nothing for the player most short of them. The counterfactual
-when you are rationing is being forced to run the relic **Intact**, not upgrading
-it further, so the rate is `(value(chosen) − value(Intact)) / cost(chosen)`.
-`model.js` carries the reasoning; a test asserts a fully-Radiant plan still values
-a trace.
+`temp_mockup.html` demonstrates both problems against the live dataset — the two
+trace columns side by side, and the eleven with their ranks. **Clear it once this
+is decided.**
+
+**A correction already taken.** The exchange rate this file used to record — the
+uplift buyable *above* the chosen refinement, over `cost(Radiant) − cost(chosen)` —
+has the same shape of error and was fixed when the toggle shipped: it reads zero
+for a fully-Radiant plan, which is every live plan. The rate is now what a trace
+stops you losing, `(value(chosen) − value(Intact)) / cost(chosen)`, and a test pins
+the fully-Radiant case. `model.js` carries the derivation.
 
 ### The endless-fissure bonus is only stated on the collecting side
 
