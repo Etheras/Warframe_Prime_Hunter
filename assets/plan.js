@@ -1211,9 +1211,16 @@
       // needed. A highlight had to pick a winner even when two parts were
       // equally scarce, and that choice was arbitrary.
       const RAR_ORDER = { Rare: 0, Uncommon: 1, Common: 2 };
+      /* `qty` is how many of that part you STILL need, not how many the recipe
+         asks for. The two differ the moment you bank one of a pair, and it is
+         the still-needed figure the rest of the row is already built on — the
+         openings number beside it prices exactly this many. Showing the recipe
+         figure instead would put "×2" next to the cost of fetching one. The
+         *Still needed* panel below uses the same rule and the same `×N`. */
       const parts = p.entries
         .filter((e) => !e.bonus)
-        .map((e) => ({ label: e.label, rar: rarityOf(e.chances) }))
+        .map((e) => ({ label: e.label, rar: rarityOf(e.chances),
+                       qty: e.stillNeed || 1 }))
         .sort((a, b) => (RAR_ORDER[a.rar] ?? 9) - (RAR_ORDER[b.rar] ?? 9) ||
                         a.label.localeCompare(b.label));
       return `<div class="relic-row ref-row-${esc(p.refinement)}">
@@ -1237,7 +1244,9 @@
         }</span></span>
       </div>
       <div class="relic-parts">${
-        parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}</span>`).join("")
+        parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}${
+          x.qty > 1 ? `<span class="qty">×${x.qty}</span>` : ""
+        }</span>`).join("")
       }</div>`;
     }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
 

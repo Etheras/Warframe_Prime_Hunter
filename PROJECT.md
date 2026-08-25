@@ -148,28 +148,30 @@ Chromium through Playwright, which is the only way to cover `app.js` and
 `plan.js` without stubbing a browser badly. That one **is** an npm dependency,
 so it is strictly opt-in: `package.json` is tracked so anyone who wants it gets
 the same version, `node_modules/` is not, and the tests skip with a reason when
-it is missing. **288 checks without it, 317 with** — the browser layer is
-deliberately the smaller half, because a test that needs a browser is a test
-that will eventually be skipped. Without Node at all it is 224: the Python suite
-on its own.
+it is missing. The browser layer is deliberately the smaller half, because a
+test that needs a browser is a test that will eventually be skipped.
 
-Those three are measured, not estimated, and only the last is enforced: the
-runner compares **317** against the figure `README.md` states, and only on a run
-that skipped nothing (§*Verifying a change*). The other two are prose and will
-drift, so re-measure rather than adjusting them by hand — move `node_modules`
-aside for the middle one, and read the `browser` group's own total for the
-difference the whole Node layer makes. They were last taken on 2026-08-25.
+**How many tests there are is not written down anywhere, and that is a decision
+rather than an omission.** Three figures used to live in this section — Python
+alone, plus Node, plus Playwright — the README carried a fourth, and the runner
+failed a complete run whose total disagreed with it. All of that went on
+2026-08-25. A count answers no question a reader actually has: it says how finely
+the suite was sliced, never what is covered. It went stale on every commit that
+added a test, so a one-line test meant re-editing several documents and
+re-measuring a number nobody acts on — and twice it was written down wrong in the
+same commit that documented it. **Do not reintroduce one.** The run passes or it
+does not; that is the signal.
 
-**None of those three is the number CI prints, and that caught a reader out on
-2026-08-25.** All three are figures for *this* machine: Windows, with the data
-already built. A GitHub runner is Linux and runs the suite *before* the build
-step, so two more groups skip there — `built payload`, which needs `data/` to
-exist, and `task registration`, which is a Windows-only feature — on top of the
-page tests. **CI passes 248**, and the runner says so plainly in its own output
-rather than pretending otherwise: *"README's 317-test figure unchecked here: some
-tests skipped, so this run is not the whole suite"*. A green CI is therefore not
-evidence the full suite passes; it is evidence that everything reachable on a cold
-Linux box passes, which is a different and still useful claim.
+**A green CI is not evidence that the whole suite passed**, and the gap is worth
+knowing as a shape rather than as a number. A GitHub runner is Linux and runs the
+suite *before* the build step, so four groups skip there for four different
+reasons: `built payload` (`data/` does not exist yet), `task registration` (a
+Windows-only feature), `page tests` (Playwright is not installed on the runner)
+and `clone-and-build` (needs `--online`). The runner names every skip and its
+reason in its own output, so nothing is hidden — it just has to be read rather
+than inferred from an exit code. A green CI means everything reachable on a cold
+Linux box passed, which is a different and still useful claim, and it is why the
+complete local run stays the gate.
 
 The GitHub CLI is a third recommendation, and answers a different question
 from the tests: whether the *published* build agrees, on a clean Linux machine
@@ -402,9 +404,9 @@ to `main` and every daily cron actually publishes rather than building and stopp
 ### Verifying a change
 
 **Two different runs, for two different moments.** Decided 2026-08-25, after a
-stretch of work in which the full suite was run after every small edit — 317 green
-lines say nothing about the four you just changed, and the habit trains you to skim
-the one output that should never be skimmed.
+stretch of work in which the full suite was run after every small edit — a wall of
+green says nothing about the four lines you just changed, and the habit trains you
+to skim the one output that should never be skimmed.
 
 **While building, run only what covers what you touched.** The Node suites are
 addressed directly; there is no filter flag on `test_build.py`.
@@ -432,23 +434,17 @@ folded into the same output. `--online` adds a real clone-and-build into a temp
 directory, which is the only check covering the new-user path. Every test is there
 because of a bug that actually happened, and says which in its docstring.
 
-The full run is the gate for a reason beyond breadth: it **enforces the test count
-printed in `README.md`**, failing a complete pass whose total disagrees. A selective
-run cannot do that, so a commit that adds a test and never runs the full suite ships
-a wrong number in the README.
-
 `gh run list` afterwards answers what no local run can — whether a clean Linux
 runner with no cache agrees. It has earned its place: the local suite passed while
 CI was red for two commits.
 
-**Expect CI to print 248, not 317**, and do not read the gap as a failure — four
-groups skip there for four different reasons: `built payload` (the suite runs before
-the build step, so `data/` does not exist yet), `task registration` (a Windows
-feature), `page tests` (no Playwright on the runner) and `clone-and-build` (needs
-`--online`). So `app.js` and `plan.js` get `node --check` on CI and nothing else,
-which makes the **local** Playwright run the only evidence those two files work.
-This paragraph claimed 287 until 2026-08-25, which was this machine's figure wearing
-CI's name.
+**Expect CI to pass fewer checks than a local run, and do not read the gap as a
+failure** — four groups skip there for four different reasons: `built payload` (the
+suite runs before the build step, so `data/` does not exist yet), `task
+registration` (a Windows feature), `page tests` (no Playwright on the runner) and
+`clone-and-build` (needs `--online`). Each one prints its own reason. So `app.js`
+and `plan.js` get `node --check` on CI and nothing else, which makes the **local**
+Playwright run the only evidence those two files work.
 
 What is left in `app.js` and `plan.js` is rendering and event wiring. The logic
 worth asserting was moved out of them — `assets/model.js` and
@@ -2131,6 +2127,18 @@ Both pages share one visual vocabulary so a habit learned on either carries over
 row background encodes the **action** (which refinement), chips encode **rarity**,
 vaulted fades to violet, long lists condense with the detail on hover, and
 tooltips explain rather than repeat.
+
+A part chip also carries **`×N` when you need more than one of it**, added
+2026-08-25. 53 parts in the catalogue ask for two — the akimbo barrels and
+receivers, and blades like Kestrel Prime's — and until then farming for a pair
+looked exactly like farming for one. The only thing that moved was the openings
+figure on the row above, which is not where anyone looks to find out *what* they
+are collecting. The count is what you **still need**, not what the recipe asks
+for: bank one of a pair and the chip drops the marker, because the openings figure
+beside it has always been priced on the shortfall, and a chip saying `×2` next to
+the cost of fetching one would be the row contradicting itself. The *Still needed*
+panel had used exactly this rule and this `×N` since it was written; the crack
+list simply had not.
 
 **The rules live in [STYLE.md](STYLE.md)** — read it before adding UI. Each rule
 records why it exists, so it is clear when one does not apply.

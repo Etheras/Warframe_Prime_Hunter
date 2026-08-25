@@ -980,6 +980,15 @@ abbr.rot-odd:hover{color:#c07a3c;text-decoration-color:#c07a3c}
 .part-chip.Common  {color:#d8965c;border-color:#5a3a20}
 .part-chip.Uncommon{color:#d3dae6;border-color:#454f60}
 .part-chip.Rare    {color:#ffce40;border-color:#6b5320}
+/* A part you need two of read as one you need one of: the openings figure on
+   the row already prices the pair, but the chip named the part and stopped.
+   `currentColor` on purpose — the chip's colour is its rarity (STYLE.md §1),
+   so the divider and the count stay inside that meaning instead of inventing a
+   second one, and the contrast is whatever the chip already passed at. */
+.part-chip .qty{
+  font-weight:700;margin-left:5px;padding-left:5px;
+  border-left:1px solid currentColor;
+}
 
 /* Explanatory prose lives at the foot of the page, collapsed, so it never
    pushes the at-a-glance data down. STYLE.md §5. */

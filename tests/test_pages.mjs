@@ -310,6 +310,62 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("a part you need two of says so on its chip in the crack list", async () => {
+  /* The chip named the part and stopped, so farming for a pair looked exactly
+     like farming for one — the only thing that moved was the openings figure
+     above it, which is not where a reader looks to find out what they are
+     collecting. 53 parts in the catalogue ask for more than one.
+
+     The subject is chosen from the raw payload, never from the code under
+     test: any part whose `itemCount` is above one and whose relic is still
+     dropping. Which items qualify changes every time DE vault something, so
+     picking one by name here would rot. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    for (const it of D.items) {
+      for (const p of it.parts || []) {
+        if ((p.itemCount || 1) <= 1) continue;
+        const live = (p.relics || [])
+          .map((r) => r.relic)
+          .filter((n) => D.relics[n] && !D.relics[n].vaulted);
+        if (!live.length) continue;
+        localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+        return { label: `${it.name} ${p.name}`, want: p.itemCount, relic: live[0] };
+      }
+    }
+    return null;
+  });
+  assert.ok(subject, "no live relic drops a part that is needed more than once — " +
+                     "pick a different subject rather than letting this pass vacuously");
+  await page.reload({ waitUntil: "load" });
+
+  const chip = page.locator(".part-chip").filter({ hasText: subject.label }).first();
+  assert.ok(await chip.count() > 0,
+            `the crack list has to carry a chip for ${subject.label}`);
+  assert.equal((await chip.locator(".qty").innerText()).trim(), `×${subject.want}`,
+               `${subject.label} takes ${subject.want} to build, and nothing is ` +
+               `banked, so the chip has to say so`);
+
+  /* And the count is what you still need, not what the recipe asks for: bank
+     one of the pair and the chip has to come down to match the openings figure
+     beside it, which has always been priced on the shortfall. */
+  await page.evaluate((s) => {
+    const D = window.WFPRIME_DATA;
+    const it = D.items.find((i) => `${i.name} ` === s.label.slice(0, i.name.length + 1));
+    const part = s.label.slice((it ? it.name.length : 0) + 1);
+    localStorage.setItem("wfprimes.parts.v1", JSON.stringify({ [it.id]: { [part]: 1 } }));
+  }, subject);
+  await page.reload({ waitUntil: "load" });
+
+  const after = page.locator(".part-chip").filter({ hasText: subject.label }).first();
+  assert.ok(await after.count() > 0, "the part is still wanted with one of two banked");
+  assert.equal(await after.locator(".qty").count(), 0,
+               "one still needed is not a quantity worth printing - the chip " +
+               "must not keep saying ×2 once half the pair is banked");
+  assert.deepEqual(errors, []);
+});
+
 page_test("the never-vaulted badge splits, because it means two things", async () => {
   /* The wiki's "Never Vaulted" marker covers 14 Primes, and six of them carry
      Digital Extremes' vaulted flag at the same time. Both are true: those six
