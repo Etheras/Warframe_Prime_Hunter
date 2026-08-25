@@ -319,63 +319,126 @@ test("an already-parsed object is accepted, so callers need not stringify", () =
  * against figures written down in the test.
  */
 
-/* Relic values are sums of floating-point chances, so an exact === on a derived
-   rate fails on the last bit: (0.35 - 0.30) / 25 is 0.0019999999999999996. */
-const close = (got, want, msg) =>
-  assert.ok(Math.abs(got - want) < 1e-12, `${msg}: got ${got}, wanted ${want}`);
+/* ── a relic handed over already Radiant ─────────────────────────────────
+ * Two attempts to price this collapsed to zero on the live data and neither had
+ * a test that could catch it, because both were exercised only through the page.
+ * sourceValue lives in model.js now so the arithmetic is checked here. Subjects
+ * are hand-built plans with stated numbers, never anything read back out of the
+ * model.
+ */
 
-test("a trace is worth what it stops you losing, per trace spent", () => {
+test("a Radiant source is flagged for the bonus while traces are tight", () => {
   const M = load();
-  /* Short of traces you run the relic Intact, so a trace buys the distance from
-     Intact back up to the refinement the plan actually wanted. */
-  const radiant = { refinement: "Radiant", value: 0.50,
-                    byRefinement: { Intact: 0.30, Radiant: 0.50 } };
-  close(M.traceValue([radiant]), 0.20 / 100, "Radiant: 0.20 of value for 100 traces");
+  const rp = { value: 0.40, refinement: "Radiant",
+               byRefinement: { Intact: 0.30, Radiant: 0.40 } };
 
-  // a cheaper refinement can be the better rate: less uplift, far fewer traces
-  const exceptional = { refinement: "Exceptional", value: 0.35,
-                        byRefinement: { Intact: 0.30, Exceptional: 0.35 } };
-  close(M.traceValue([exceptional]), 0.05 / 25, "Exceptional: 0.05 for 25 traces");
+  const tight = M.sourceValue({ refinement: "Radiant" }, rp, { traces: true });
+  assert.equal(tight.bonus, true);
+  assert.equal(tight.pre, true);
+  /* The value stays the honest one. The uplift is NOT applied here: the ranked
+     number is a count taken from the drop chances and never sees `value`, so a
+     multiplier at this point moves the tooltip and leaves the ORDER alone --
+     measured at +0.0% on all eleven nodes before it was moved. plan.js applies
+     `radiantMultiplier` to the score and the rate, where CACHE_PENALTY goes. */
+  assert.equal(tight.value, 0.40, "sourceValue reports the bonus, it does not apply it");
 
-  // the marginal trace goes where it buys most, so the plan takes the best rate
-  close(M.traceValue([radiant, exceptional]), 0.05 / 25,
-        "a plan is worth its best opportunity, not its average");
+  const loose = M.sourceValue({ refinement: "Radiant" }, rp, { traces: false });
+  assert.equal(loose.bonus, false, "no bonus when traces are not a constraint");
+  assert.equal(loose.value, 0.40);
+
+  assert.equal(M.RADIANT_BONUS, 0.25, "the judgement is one named constant");
 });
 
-test("a plan that already wants Radiant everywhere still values a trace", () => {
+test("the multiplier is weighted by how much of the node arrives Radiant", () => {
   const M = load();
-  /* The regression this function was rewritten for. Measuring the uplift left
-     ABOVE the chosen refinement reads zero here - every relic is already Radiant
-     - which valued a trace at nothing for the player most short of them. */
-  const allRadiant = [
-    { refinement: "Radiant", value: 0.50, byRefinement: { Intact: 0.30, Radiant: 0.50 } },
-    { refinement: "Radiant", value: 0.44, byRefinement: { Intact: 0.28, Radiant: 0.44 } },
-  ];
-  assert.ok(M.traceValue(allRadiant) > 0,
-            "a fully-Radiant plan must still value the traces that buy it");
-  close(M.traceValue(allRadiant), 0.20 / 100, "the best of the two rates");
+  assert.equal(M.radiantMultiplier(1), 1.25, "a wholly pre-refined node -- all eleven are");
+  assert.equal(M.radiantMultiplier(0), 1, "an ordinary node is untouched");
+  assert.equal(M.radiantMultiplier(0.5), 1.125,
+               "half pre-refined earns half the bonus, not all of it");
+  // a share outside 0..1 must not become a wild multiplier
+  assert.equal(M.radiantMultiplier(2), 1.25);
+  assert.equal(M.radiantMultiplier(-1), 1);
+  assert.equal(M.radiantMultiplier(null), 1);
+  assert.equal(M.radiantMultiplier(undefined), 1);
 });
 
-test("a trace is worth nothing when the plan wants no refining", () => {
+test("the bonus cannot collapse to zero the way both previous attempts did", () => {
+  /* They added a term derived from `cost(given) - cost(chosen)`. Every
+     pre-refined node gives Radiant and bestRefinement picks Radiant for every
+     live relic, so the term was 100 - 100 = 0 and the bonus never existed. A
+     multiplier on the ranked figure cannot do that -- it does not depend on the
+     plan's chosen refinement at all, which is the point of the shape. */
   const M = load();
-  // the plan's own answer is Intact: it costs nothing, so a trace buys nothing
-  assert.equal(M.traceValue([{ refinement: "Intact", value: 0.40,
-                               byRefinement: { Intact: 0.40, Radiant: 0.25 } }]), 0);
-  // refinement that gains nothing cannot be worth paying for
-  assert.equal(M.traceValue([{ refinement: "Radiant", value: 0.30,
-                               byRefinement: { Intact: 0.30, Radiant: 0.30 } }]), 0,
-               "a zero uplift must not become a positive trace value");
-  assert.equal(M.traceValue([]), 0, "an empty plan");
-  assert.equal(M.traceValue(null), 0, "no plan at all");
+  for (const chosen of ["Intact", "Exceptional", "Flawless", "Radiant"]) {
+    const rp = { value: 0.4, refinement: chosen,
+                 byRefinement: { Intact: 0.3, Exceptional: 0.34,
+                                 Flawless: 0.37, Radiant: 0.4 } };
+    const w = M.sourceValue({ refinement: "Radiant" }, rp, { traces: true });
+    assert.equal(w.bonus, true,
+                 `a Radiant source stopped earning it when the plan chose ${chosen}`);
+  }
+  assert.ok(M.radiantMultiplier(1) > 1, "and the multiplier is never 1x");
 });
 
-test("traceValue is denominated in score units, so the ranking can add it", () => {
+test("an ordinary source is untouched, whatever the traces setting", () => {
   const M = load();
-  // 0.20 of relic value for the 100 traces a Radiant costs; a node saving 100
-  // traces is worth exactly one such uplift, which is what plan.js relies on
-  const rate = M.traceValue([{ refinement: "Radiant", value: 0.50,
-                               byRefinement: { Intact: 0.30, Radiant: 0.50 } }]);
-  close(rate * 100, 0.20, "100 traces buys exactly one Radiant uplift");
+  const rp = { value: 0.40, refinement: "Radiant",
+               byRefinement: { Intact: 0.30, Radiant: 0.40 } };
+  for (const traces of [true, false]) {
+    const out = M.sourceValue({ planet: "Earth", node: "Cambria" }, rp, { traces });
+    assert.equal(out.value, 0.40);
+    assert.equal(out.pre, false);
+    assert.equal(out.traces, 0);
+  }
+});
+
+test("only Radiant earns the bonus, and a worse refinement still scores honestly", () => {
+  const M = load();
+  // wanted Radiant, given Exceptional: worth what you were actually handed
+  const rp = { value: 0.40, refinement: "Radiant",
+               byRefinement: { Intact: 0.30, Exceptional: 0.34, Radiant: 0.40 } };
+  const given = M.sourceValue({ refinement: "Exceptional" }, rp, { traces: true });
+  assert.equal(given.value, 0.34, "worth what you were actually handed");
+  assert.equal(given.bonus, false, "no bonus below Radiant");
+
+  /* Wanted Intact, given Radiant: still flagged, but what the multiplier acts on
+     is the LOWER value, because refinement moved the common you were chasing
+     away from you. 0.20 x 1.25 is 0.25, still well short of the 0.50 you wanted
+     -- so the bonus cannot turn a worse relic into a better one. */
+  const wantsCommon = { value: 0.50, refinement: "Intact",
+                        byRefinement: { Intact: 0.50, Radiant: 0.20 } };
+  const over = M.sourceValue({ refinement: "Radiant" }, wantsCommon, { traces: true });
+  assert.equal(over.value, 0.20);
+  assert.ok(over.value * M.radiantMultiplier(1) < wantsCommon.value,
+            "a bonus on a worse relic must not make it better than what you wanted");
+});
+
+test("traces saved is the bill the node picks up, not the amount it overshoots", () => {
+  /* This is why the row's "saving N Void Traces" clause had never printed: it
+     was max(0, given - chosen), which is 0 whenever they match, which is always
+     on the live data. */
+  const M = load();
+  const wantsRadiant = { value: 0.4, refinement: "Radiant",
+                         byRefinement: { Intact: 0.3, Radiant: 0.4 } };
+  assert.equal(M.sourceValue({ refinement: "Radiant" }, wantsRadiant, {}).traces, 100,
+               "given exactly what the plan wanted still saves the whole bill");
+
+  const wantsIntact = { value: 0.5, refinement: "Intact",
+                        byRefinement: { Intact: 0.5, Radiant: 0.2 } };
+  assert.equal(M.sourceValue({ refinement: "Radiant" }, wantsIntact, {}).traces, 0,
+               "a plan spending nothing has no bill to pick up");
+
+  const wantsRadiantGivenLess = { value: 0.4, refinement: "Radiant",
+                                  byRefinement: { Exceptional: 0.34, Radiant: 0.4 } };
+  assert.equal(M.sourceValue({ refinement: "Exceptional" }, wantsRadiantGivenLess, {}).traces,
+               25, "capped at what you were given - you still top the rest up");
+});
+
+test("sourceValue survives being handed nothing", () => {
+  const M = load();
+  assert.equal(M.sourceValue(null, null, null).value, 0);
+  assert.equal(M.sourceValue({ refinement: "Radiant" }, { value: 0.3 }, {}).value, 0.3,
+               "a plan entry with no byRefinement map falls back to its own value");
 });
 
 test("the traces option survives a backup round trip", () => {

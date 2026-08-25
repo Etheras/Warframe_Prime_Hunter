@@ -1147,3 +1147,71 @@ page_test("the sidebar does not push the grid off screen on a phone", async () =
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(overflow <= 1, `the page scrolls sideways by ${overflow}px at 375px wide`);
 });
+
+page_test("the four Faceoff tables are one bet and rank as one row", async () => {
+  /* DE publish four Faceoff tables — Single Squad and Squad VS Squad, each with
+     a Steel Path twin — and all four carry the SAME 22 relics at the SAME
+     8.33%. `ROT.signature` folds nodes that are the same bet, so they should
+     occupy one row rather than the top four.
+
+     Worth a test of its own because the fold is the only thing standing between
+     the ranking and four identical rows at the top: correcting Faceoff's length
+     moved it from #14 to #1, so what used to be an invisible duplication is now
+     the most visible thing on the page.
+
+     The subject is chosen on the raw drop tables, never by asking the code under
+     test what it thinks is foldable. */
+  const { page, errors } = await open("/plan.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA, R = D.relics || {};
+    const tables = new Map();
+    Object.keys(R).forEach((n) => {
+      if (R[n].vaulted) return;
+      (R[n].sources || []).forEach((s) => {
+        if (!/^Faceoff\b/.test(s.node || "")) return;
+        if (!tables.has(s.node)) tables.set(s.node, []);
+        tables.get(s.node).push(n + ":" + s.chance + "@" + (s.rotation || "-"));
+      });
+    });
+    const sigs = new Set();
+    tables.forEach((rows) => sigs.add(rows.sort().join(",")));
+    // wishlist everything those relics can pay, so Faceoff actually ranks
+    const wanted = new Set();
+    tables.forEach((rows) => rows.forEach((r) => wanted.add(r.split(":")[0])));
+    const ids = (D.items || []).filter((it) =>
+      (it.parts || []).some((p) => (p.relics || []).some((r) => wanted.has(r.relic))))
+      .map((it) => it.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+    return { tableCount: tables.size, distinctTables: sigs.size,
+             names: [...tables.keys()] };
+  });
+
+  assert.equal(subject.tableCount, 4, "DE publish four Faceoff tables");
+  assert.equal(subject.distinctTables, 1,
+               "all four must be the same bet, or folding them would hide a choice");
+
+  await page.reload({ waitUntil: "load" });
+
+  const rows = await page.evaluate(() => [...document.querySelectorAll("#planNodes .spot")]
+    .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim()));
+  const faceoff = rows.filter((r) => /^Faceoff/.test(r));
+  assert.equal(faceoff.length, 1,
+               `four identical tables must fold to one row, got ${faceoff.length}: ` +
+               rows.join(" | "));
+
+  // and the row has to say it stands for the others, or the fold hides them
+  const same = await page.evaluate(() => {
+    const el = [...document.querySelectorAll("#planNodes .spot")]
+      .find((x) => /^Faceoff/.test(x.querySelector(".spot-where").childNodes[0].textContent.trim()));
+    const chip = el && el.querySelector(".same");
+    return chip ? { text: chip.textContent.trim(), tip: chip.getAttribute("data-tip") } : null;
+  });
+  assert.ok(same, "a folded row must carry the +N same chip");
+  assert.match(same.text, /\+3 same/, "three others folded into it");
+  for (const n of subject.names.slice(1)) {
+    assert.ok(same.tip.includes(n.split(" (")[0]),
+              `the tooltip must name what was folded away, missing ${n}`);
+  }
+  assert.deepEqual(errors, []);
+});

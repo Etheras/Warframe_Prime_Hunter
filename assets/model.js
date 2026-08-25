@@ -110,59 +110,83 @@
              openings: bestCost, blocker: bestBlocker };
   }
 
-  /* ── what one Void Trace is worth, when you are short of them ────
-     Traces are shown on the row and left out of the score, because what 100 of
-     them are worth depends on how many you have - a fact about the player. Once
-     the player says they are short, it can be answered, and the answer comes
-     from their own plan rather than from a number we invent.
+  /* ── a relic handed over already Radiant ─────────────────────────
+     Eleven nodes do it — Elite Sanctuary Onslaught, the six Void Storms and the
+     four Profit-Taker phases — and DE name the refinement on those reward rows
+     and on no others.
 
-     A trace buys refinement, so its value is the rate at which it does so at the
-     best place in the plan to spend it - that being where a marginal trace
-     actually goes.
+     **Worth more than the same relic off the star chart, and the model has to
+     say so.** Two attempts got this wrong before this one, both by trying to
+     price the traces:
 
-     **The counterfactual is downgrading, not upgrading**, and getting that
-     backwards makes the whole thing read zero. `TODO.md` carried this as
+       * `traces` was `cost(given) − cost(chosen)`, how far the node *overshoots*
+         the refinement the plan picked. Every one of the eleven gives Radiant
+         and `bestRefinement` picks Radiant for all 34 live relics, so it was
+         `100 − 100 = 0` everywhere and the bonus was multiplied by zero.
+       * A per-trace exchange rate derived from the plan then priced a trace at
+         the uplift it could buy — near zero for the same reason, and negative
+         on three relics.
 
-         max over r of ( value(r, Radiant) - value(r, r.chosen) )
-                       / ( cost(Radiant) - cost(r.chosen) )
+     Both were answering *"what are the traces worth?"* when the planner's job is
+     *"where should I go?"*. The owner's ruling, 2026-08-25: traces are almost
+     always tight, the planner should not talk anyone into a lower-efficiency
+     crack to save them, and a source that hands the relic over Radiant simply
+     gets **a flat 25% on the relic's value**. Point the player at Radiant and
+     they will find the traces.
 
-     - what buying *more* refinement would add. That is the right question for a
-     player who is not short: they would simply buy it. It is the wrong question
-     here, and it fails in exactly the case the option exists for. Over the live
-     set `bestRefinement` picks Radiant for every relic, so `r.chosen` is already
-     Radiant, every uplift is 0, and the formula values a trace at nothing for
-     the player who is most short of them. A page test caught it.
+     A judgement, not a measurement — the second one in the model, beside
+     `CACHE_PENALTY`, and written as one named constant in one place so it can be
+     argued with. It is deliberately blunt: no trace count, no exchange rate, no
+     dependence on what else is in the plan. The two things that made the
+     previous attempts collapse to zero were both *derived* quantities. */
+  const RADIANT_BONUS = 0.25;
 
-     What a trace is really worth to someone rationing them is what it stops them
-     losing. Short of traces you run the relic **Intact**, because that is what
-     costs nothing. So a trace buys the distance back up to the refinement the
-     plan wanted:
+  /* What one reward drop at a given source is worth to this plan.
 
-         value per trace = max over relics r in the plan of
-                           ( value(r, r.chosen) - value(r, Intact) )
-                           / cost(r.chosen)
+     Ordinarily the relic's value at the refinement the plan chose. Where DE
+     hand it over already refined the honest figure is its value at the
+     refinement you were actually *given*, which cuts both ways: wanted Radiant
+     anyway is a straight gain, but wanted Intact and given Radiant means the
+     common you were chasing has gone from 25.33% to 16.67%, and this copy is
+     worth less to this plan than one off the star chart.
 
-     It is zero exactly when it should be: when the plan wants Intact everywhere
-     there is nothing to buy, and a relic whose own best answer is Intact
-     contributes nothing. And it is denominated in the same units as the node
-     score - the numerator is a relic value - so traces-saved times this rate is
-     something the ranking can add without a conversion nobody can check.
+     `bonus` FLAGS the uplift rather than applying it, and that is deliberate.
+     The obvious thing is to multiply `value` here, and it does not work: the
+     ranked number is `perRun`, a count of wanted relics taken from the plain
+     drop chances, and `value` never reaches it — so a bonus applied here moves
+     the tooltip and leaves the order untouched. Measured at +0.0% on all eleven
+     nodes before this was moved.
 
-     Divided by what the chosen refinement actually costs, not by a flat 100: a
-     relic the plan takes to Exceptional is 25 traces, so a trace spent there can
-     buy a better rate than one spent on a Radiant. */
-  function traceValue(plan) {
-    let best = 0;
-    (plan || []).forEach((rp) => {
-      if (!rp || !rp.byRefinement) return;
-      const spend = TRACE_COST[rp.refinement] || 0;
-      if (spend <= 0) return;                    // Intact costs nothing to reach
-      const uplift = (rp.value || 0) - (rp.byRefinement.Intact || 0);
-      if (uplift <= 0) return;                   // refinement buys this relic nothing
-      best = Math.max(best, uplift / spend);
-    });
-    return best;
+     So the uplift is applied where `CACHE_PENALTY` is applied, as a multiplier
+     on the node's score and rate, and `plan.js` weights it by how much of the
+     node's value actually arrived pre-refined. Inflating the counts instead
+     would have been the other option and is worse: `cnt` feeds *"% of runs that
+     drop at least one"*, which is a probability, and multiplying it by 1.25
+     makes that figure wrong rather than generous.
+
+     `traces` is what the node saves you — the part of the plan's own refinement
+     bill it picks up, `min(given, chosen)`, NOT the amount it overshoots by.
+     That distinction is the first bug above, and it is why the row's "saving N
+     Void Traces" clause had never once printed. */
+  function sourceValue(s, rp, opts) {
+    const given = s && s.refinement;
+    if (!given || !rp || !rp.byRefinement || rp.byRefinement[given] == null) {
+      return { value: rp ? rp.value : 0, pre: false, traces: 0, bonus: false };
+    }
+    return {
+      value: rp.byRefinement[given],
+      pre: true,
+      bonus: !!(opts && opts.traces) && given === "Radiant",
+      traces: Math.min(TRACE_COST[given] || 0, TRACE_COST[rp.refinement] || 0),
+    };
   }
+
+  /* The multiplier a node earns for handing relics over Radiant, weighted by
+     how much of what you want there actually arrives that way. All eleven live
+     pre-refined nodes are wholly Radiant, so `share` is 1 and this is a flat
+     1.25 — the weighting is for the day one of them is mixed, where a quarter
+     bonus on the three-quarters that arrive ordinary would be a lie. */
+  const radiantMultiplier = (share) => 1 + RADIANT_BONUS * Math.min(1, Math.max(0, share || 0));
 
   /* ── which bucket an item is in ──────────────────────────────────
      Order matters and is not alphabetical. Founder first because it can never
@@ -291,6 +315,7 @@
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
-    relicValue, bestRefinement, traceValue, parseBackup,
+    relicValue, bestRefinement, sourceValue, parseBackup,
+    RADIANT_BONUS, radiantMultiplier,
   };
 })();

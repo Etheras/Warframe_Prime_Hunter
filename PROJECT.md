@@ -1495,33 +1495,54 @@ in the "one refinement per relic" rule, which holds only while you cannot hold t
 same relic two ways — and you can, once one node gives you a Radiant copy and
 another an Intact one.
 
-**Void Traces are counted, and scored only if you say they are scarce.** Refining
-costs 25 / 50 / 100 traces for Exceptional / Flawless / Radiant, less whatever has
-already been spent on that relic, so a node handing over a Radiant is worth up to
-100 traces on top of the relic. That is real — traces come in at 6–30 a fissure
-run against 100 for a Radiant, so **refining never pays for itself**; it always
-comes out of a pile you already had.
+**A relic handed over Radiant is worth 25% more, and that is the second thumb on
+the scale.** Refining costs 25 / 50 / 100 traces, and a fissure run returns 6–30,
+so **refining never pays for itself** — it always comes out of a pile you already
+had. Eleven nodes hand the relic over already Radiant and save you the whole bill.
 
-It stayed off the score until 2026-08-25 because what 100 traces are worth depends
-on how many you have, which is a fact about the player. The owner supplied it: the
-line is **500**, five Radiant refinements, and the sidebar carries *Void Traces are
-tight — under 500* with the number on the label rather than buried in the tooltip.
-Off by default, because an assumption nobody has made should not be made for them.
+Two attempts to price that failed, both silently, and both are worth recording
+because they failed the same way:
 
-Ticked, `M.traceValue` prices one trace off the player's own plan and `plan.js`
-adds `traces × rate` to a node's value. **The rate is what a trace stops you
-losing, not what more of it would buy.** Short of traces you run the relic Intact,
-so the rate is `(value(chosen) − value(Intact)) / cost(chosen)`, taken at the best
-place in the plan to spend it. `TODO.md` carried the other form — the uplift above
-the chosen refinement — and it reads zero exactly when it matters, because
-`bestRefinement` picks Radiant for all 34 live relics, so there is no upgrade left
-to price. `model.js` has the derivation and a test pins the fully-Radiant case.
+* `sourceValue`'s `traces` was `cost(given) − cost(chosen)` — how far the node
+  *overshoots* the refinement the plan picked. All eleven give Radiant and
+  `bestRefinement` picks Radiant for all 34 live relics, so it was `100 − 100 = 0`
+  everywhere. The bonus was multiplied by zero. The same zero is why the row's
+  *"saving N Void Traces"* clause had never once printed.
+* A per-trace exchange rate derived from the plan replaced it, and collapsed for
+  the same reason: it priced the uplift *above* the chosen refinement, which is
+  zero when the plan already wants Radiant, and negative on three relics.
 
-Traces enter the **value** and not the count, which puts them with Forma and Aya:
-all three are worth something and none is a relic, and the ranked number counts
-wanted relics. So the toggle changes what a run is worth without reordering the
-list — and `TODO.md` records the consequence that this makes it hard to see, since
-no pre-refined node reaches the visible eight rows.
+Both were answering *"what are the traces worth?"* when the planner's question is
+*"where should I go?"*. The owner's ruling, 2026-08-25: traces are almost always
+tight, the planner must **never** talk anyone into a lower-efficiency crack to
+save them — *point them at Radiant and they will find the traces* — and a Radiant
+source simply earns a flat **25%**.
+
+**Where it is applied is the whole lesson.** The obvious place is the relic's
+value, and it does nothing: the ranked figure is `perRun / cost`, and `perRun` is
+a count taken from the plain drop chances, so it never sees `value`. Measured at
+**+0.0% on all eleven nodes** before it was moved. It now goes exactly where
+`CACHE_PENALTY` goes — a multiplier on `score` and `rate` — and `M.sourceValue`
+deliberately *flags* the bonus rather than applying it, so the two cannot drift.
+
+Inflating the counts instead was the other option and is worse: `cnt` feeds
+*"% of runs that drop at least one"*, and 1.25× a probability is a wrong
+probability rather than a generous one.
+
+`M.radiantMultiplier` weights the lift by how much of a node's wanted value
+actually arrives pre-refined. All eleven are wholly Radiant so the share is 1 and
+it is a flat 1.25; the weighting is for the day one of them is mixed.
+
+The toggle is **on by default**, alone among the assumptions, because the owner's
+ruling is that this is the common case. Leaving it off would make the app almost
+always understate a Radiant source.
+
+All eleven gain exactly 25% and climb — ESO #41 → #33 of 86 folded rows. **They
+are still not visible**: the interface exposes 28 places, eight rows and twenty in
+the overflow tooltip. Surfacing ESO by thumb alone would need 2.37×, a +137%
+bonus, which would stop being a nudge. Its real obstacle is cost — rotation C on
+Onslaught is twelve zones — and `TODO.md` records that the fix is a browsable
+ranking, not a bigger number.
 
 ### One deliberate thumb on the scale, and only one
 

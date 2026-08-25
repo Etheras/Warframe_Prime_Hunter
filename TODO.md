@@ -649,109 +649,46 @@ roll currently assumed. Getting that right is arithmetic; getting it *checked*
 needs the event live, which is the same blocker as the detection below. Do both
 in the same sitting.
 
-### The Void Traces bonus is multiplied by zero, then hidden
+### A Radiant node is worth 25% more, and still nobody can see it
 
-**Shipped 2026-08-25 and demonstrated broken the same day**, against the live
-build. The sidebar carries *Void Traces are tight — under 500*, `model.js` prices
-a trace off the player's own plan, and `plan.js` folds `traces × rate` into a
-node's value. Two things sit between that and anything the reader sees, and the
-first is an ordinary bug.
+**Shipped 2026-08-25.** The owner's ruling replaced two failed attempts at
+pricing Void Traces: traces are almost always tight, the planner must never talk
+anyone into a lower-efficiency crack to save them, and a node handing the relic
+over Radiant simply gets a flat **25%** on its ranked figure.
+`M.RADIANT_BONUS`, applied by `M.radiantMultiplier` exactly where `CACHE_PENALTY`
+is applied — to `score` and `rate`, never to `perRun` or `anyRun`. The toggle is
+now **on by default**, because that is the common case. `PROJECT.md §7` has the
+reasoning and both dead ends.
 
-**1 — `sourceValue` measures overshoot, not saving, and it is always zero.**
-`traces` is `max(0, cost(given) − cost(chosen))`: how far the node *exceeds* the
-refinement the plan picked. All eleven pre-refined nodes hand over **Radiant**,
-and `bestRefinement` picks **Radiant for all 34 live relics**, so the subtraction
-is `100 − 100 = 0` — on every node, always. The bonus is multiplied by zero before
-it reaches a score, so the toggle cannot change anything whatever the rate is.
+Measured over the live build, all eleven pre-refined nodes gain exactly 25% and
+climb: **ESO #41 → #33**, Profit-Taker Phase 4 #62 → #58, the Void Storms #69–75
+→ #62–68.
 
-The same zero explains a second thing nobody had noticed: the pre-refined row's
-tooltip says *"saving N Void Traces"* only `if (n.tracesSaved)`, so **that clause
-has never printed**.
+**And it is still invisible, for the third time.** The planner shows eight rows
+and twenty more in the overflow tooltip — **28 places**. ESO is at #33. So no
+pre-refined node is reachable through the interface at all, under either sort,
+for any wishlist tried. Three separate page tests have now been written for this
+family of change and all three were deleted for having no subject on screen.
 
-What a trace-limited player saves is the refinement bill the node *picks up*, not
-the amount it overshoots by: `min(cost(given), cost(chosen))`. Radiant given
-against Radiant wanted saves the full 100 — you were going to spend it and now you
-are not. Measured on the live build, all eleven then report 100.
+**25% cannot fix that, and no sane number can.** The eighth visible row rates
+0.809 against ESO's 0.342, so surfacing it by thumb alone would need **2.37×, a
++137% bonus** — which would no longer be a nudge but a decision to put these
+nodes first regardless of what they pay.
 
-**2 — even corrected, none of the eleven is on screen.** Ranked per objective with
-the default switches, they sit **#75 to #154 of 158** and the planner shows eight:
+**The real obstacle is cost, not value.** ESO pays rotation C only, and rotation
+C on Onslaught is twelve zones. That is why it ranks where it does, and it is
+correct arithmetic. The entry that actually unblocks this is *The node list is
+the top eight and a hover, not a table* — give the ranking a way to be seen
+whole, and #33 stops being invisible. Raising the bonus further is treating the
+symptom.
 
-| Node | Rank |
-|---|---|
-| Elite Sanctuary Onslaught | #75 |
-| the four Profit-Taker phases | #126, #135, #136, #137 |
-| the six Void Storms | #149–#154 |
-
-So fixing the arithmetic makes the toggle correct and still silent.
-
-**3 — and underneath both, the plan assumes refinement is free.** Raised by the
-owner 2026-08-25 and confirmed by measurement. `bestRefinement` picks **Radiant
-for all 34 live relics**. That is a **3,400-trace bill**, against a cap of
-`MR × 50 + 100` — 1,600 at MR30 — and an income of 6–30 a run. The plan is more
-than twice unaffordable, and every node is valued *as if you will refine the relic
-yourself*.
-
-That assumption is what actually answers the owner's question — *why is a node
-that hands me Radiant not preferred over one with slightly better odds?* Because
-both are valued at `value(Radiant)`: the pre-refined one because it arrives that
-way, the other because the plan assumes you will pay for it. So the only thing
-left to distinguish them is drop chance, and 14.29% beats 12%. Every live source
-of **Axi D6** is 14.29% and none is pre-refined, so the comparison is real but the
-principle is general.
-
-The honest correction is not a bigger bonus. It is that **when traces are tight
-the plan itself should change**: at one Radiant per four openings you would plan
-most relics Intact, and then a node handing over Radiant is worth
-`value(Radiant) − value(Intact)` on *every drop it makes*, not a one-off trace
-rebate. That is a large number and it is the one the owner expected.
-
-**4 — `traceValue` measures the metric `bestRefinement` explicitly rejects.**
-Refinement is chosen on the **bottleneck** — expected openings for the worst-off
-wanted reward — and `bestRefinement`'s own comment says total hit rate is the
-wrong objective. `traceValue` then prices a trace on the *total value* delta.
-Measured across the 34 live relics on a want-everything plan:
-
-| | |
-|---|---|
-| median total-value uplift, Intact → chosen | **0.0002** |
-| relics where it is **negative** | Meso V15, Lith K12, Axi T13 at **−0.0898** |
-| openings, Intact → chosen | **50.0 → 10.0 on every one — a 5× speedup** |
-
-So the shipped 0.000868 is the maximum of a quantity that is near zero for most
-relics and negative for some, and Radiant is chosen on several relics *despite*
-lowering the number being used to price it. It happens to land on a sane figure
-by being a maximum. Priced on the bottleneck instead it would be consistent with
-the choice it is pricing, and never negative.
-
-**Also worth knowing about ESO's rank.** It is a cost problem, not a trace
-problem: 4.10 wanted relics a run over **12 zones** is 0.342 per objective, against
-Olympus at 6.00 over 6 rounds for 1.000. No plausible trace bonus closes 3×.
-**Ranked per run it is 4th**, behind Olympus, Ur and Ani — so the sort toggle
-already surfaces it, and that is worth knowing before redesigning anything.
-
-**Three ways out, and it is a modelling call.**
-
-- **Say it on the cracking side.** The relic list is where refinement is chosen and
-  is the honest home for *this one arrives Radiant, which is 100 traces you do not
-  have to find*. Nothing about the ranking changes. Smallest, and it puts the fact
-  where the decision is made.
-- **Let traces reach `perRun`.** They would reorder the list — but `perRun` counts
-  wanted relics and a trace is not one, so the big number would stop being what its
-  own label says, which `STYLE.md §5` forbids.
-- **Surface the eleven regardless of rank.** A pre-refined node is a different kind
-  of offer; this is really *the node list is the top eight and a hover* wearing
-  another hat.
-
-`temp_mockup.html` demonstrates both problems against the live dataset — the two
-trace columns side by side, and the eleven with their ranks. **Clear it once this
-is decided.**
-
-**A correction already taken.** The exchange rate this file used to record — the
-uplift buyable *above* the chosen refinement, over `cost(Radiant) − cost(chosen)` —
-has the same shape of error and was fixed when the toggle shipped: it reads zero
-for a fully-Radiant plan, which is every live plan. The rate is now what a trace
-stops you losing, `(value(chosen) − value(Intact)) / cost(chosen)`, and a test pins
-the fully-Radiant case. `model.js` carries the derivation.
+**One inconsistency found on the way, and it predates this change.** Neither the
+Radiant lift nor `CACHE_PENALTY` is applied to `perRun`, so **the per-run sort
+shows an unadjusted order** — a halved Railjack cache node ranks per run as
+though it were not halved. `plan.js` says the headline figure is the adjusted one
+and the count underneath is not; when the reader sorts per run, the headline
+*becomes* the count, and that sentence stops being true. Worth deciding on its
+own merits rather than folded into a bonus commit.
 
 ### The endless-fissure bonus is only stated on the collecting side
 

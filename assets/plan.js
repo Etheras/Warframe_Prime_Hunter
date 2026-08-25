@@ -108,7 +108,12 @@
   // rather than filtered on every read by whichever page remembered to
   ST.pruneWishlist((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, aya: true, traces: false,
+    /* `traces` defaults ON, unlike every other assumption here. The owner's
+       ruling of 2026-08-25 is that traces are almost always tight, so the
+       common case is the ticked one and leaving it off would make the app
+       almost always understate a Radiant source. Untick it if you are sitting
+       on a pile. */
+    { squad: false, event: false, railjack: false, aya: true, traces: true,
       minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
 
@@ -287,21 +292,10 @@
      that this app does not know. Same call as Mastery Rank: a player fact we
      cannot see annotates the row rather than moving it. See TODO.md for the
      exchange rate that would settle it. */
-  const TRACE_COST = { Intact: 0, Exceptional: 25, Flawless: 50, Radiant: 100 };
-
-  function sourceValue(s, rp) {
-    const given = s.refinement;
-    if (!given || !rp.byRefinement || rp.byRefinement[given] == null) {
-      return { value: rp.value, pre: false, traces: 0 };
-    }
-    return {
-      value: rp.byRefinement[given],
-      pre: true,
-      // what you would have paid to get this relic to the state it arrives in,
-      // net of what the plan was going to spend on it anyway
-      traces: Math.max(0, (TRACE_COST[given] || 0) - (TRACE_COST[rp.refinement] || 0)),
-    };
-  }
+  /* Moved into `model.js` on 2026-08-25 so the Radiant bonus could be tested
+     without a browser — the two attempts before it both failed silently, and
+     neither had a test that could have caught it. See `M.sourceValue`. */
+  const sourceValue = (s, rp) => M.sourceValue(s, rp, opts);
 
   /* ── the free relic for staying in a fissure ──────────────────────
      An endless Void Fissure pays a bonus relic for depth: five rotations gives
@@ -408,13 +402,6 @@
        two duplicate rows and nothing else is a question not worth asking. The
        demand badge on the row says which nodes need it; that is the whole of
        what there is to say. */
-    /* What a saved Void Trace is worth in the same units as the score, or zero
-       when the player has not said they are short. Computed once per render from
-       the whole plan, because a marginal trace goes wherever it buys the most -
-       which is a property of the plan, not of the node being scored. */
-    const traceRate = opts.traces
-      ? M.traceValue(Array.from(relicPlan.values())) : 0;
-
     const nodes = new Map();
     const blocked = { railjack: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
@@ -447,13 +434,18 @@
           n.tracesSaved = Math.max(n.tracesSaved || 0, worth.traces);
           n.overshot = n.overshot || worth.value < rp.value - 1e-12;
         }
-        /* Traces enter the score here and nowhere else. `worth.traces` is what
-           this source saves you by handing the relic over already refined; at
-           `traceRate` = 0 -- the default, and whenever nothing in the plan wants
-           refining -- this is exactly the old expression. */
-        n.rot[slot] += ((s.chance || 0) / 100) *
-                       (worth.value + worth.traces * traceRate);
+        /* `worth.value` already carries the Radiant bonus when the player has
+           said traces are tight - see `M.sourceValue`. It is a multiplier on the
+           relic's value rather than a term added beside it, which is what keeps
+           it from being the zero the two previous attempts produced. */
+        n.rot[slot] += ((s.chance || 0) / 100) * worth.value;
         n.cnt[slot] += (s.chance || 0) / 100;   // rolls counted, never valued
+        /* How much of what you want here arrives already Radiant. Kept as a
+           share rather than a flag so a node that is only partly pre-refined
+           earns only part of the bonus - none is today, all eleven are wholly
+           Radiant, so this is 1 on each of them. */
+        n.wantCnt = (n.wantCnt || 0) + (s.chance || 0) / 100;
+        if (worth.bonus) n.radCnt = (n.radCnt || 0) + (s.chance || 0) / 100;
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev.chance) {
           n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
@@ -561,6 +553,14 @@
          run hands you is a fact, this is only what we think it is worth going
          for. */
       n.halved = ROT.isRailjackCache(n);
+      /* The Radiant uplift, applied the way the cache penalty is: a multiplier
+         on the ranked figure, never on `perRun` or `anyRun` underneath it. Those
+         two are facts about what a run hands over - one is a count and the other
+         a probability - and 1.25x a probability is simply a wrong probability.
+         Applying it inside the value instead left the order untouched, measured
+         at +0.0% on all eleven, because the ranked number comes from the counts. */
+      n.radiantShare = n.wantCnt ? (n.radCnt || 0) / n.wantCnt : 0;
+      n.radiantLift = M.radiantMultiplier(n.radiantShare);
       /* The free relic for staying, once per run, and only where the run
          actually reaches it. `r.mode` is now the answer to "did this node
          choose to stay for it", which only a live fissure makes it do. */
@@ -570,7 +570,7 @@
       // kept as the second number on the row: what a run is worth once the
       // relics are opened, which is a different question from how many arrive
       n.score = (r.total + (n.bonus ? n.bonus.value : 0)) *
-                (n.halved ? 1 - ROT.cachePenalty : 1);
+                (n.halved ? 1 - ROT.cachePenalty : 1) * n.radiantLift;
       n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
@@ -606,7 +606,8 @@
          The cache penalty applies here rather than to `perRun`, which stays the
          raw count DE's numbers imply. So the headline is an adjusted figure and
          says so on the row; the fact underneath it is not adjusted. */
-      n.rate = (n.perRun / n.cost) * (n.halved ? 1 - ROT.cachePenalty : 1);
+      n.rate = (n.perRun / n.cost) * (n.halved ? 1 - ROT.cachePenalty : 1) *
+               n.radiantLift;
     });
 
     // Whichever number the reader asked for, then a lower enemy level (faster
@@ -1163,15 +1164,15 @@
           }">+free relic</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant" +
-            (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces" : "") + ".\n" +
+            (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces a relic" : "") +
+            ".\n" +
             (n.overshot
               ? "Scored lower: this plan wanted them less refined."
-              : "This plan wanted Radiant anyway.") +
-            (n.tracesSaved
-              ? "\n" + (opts.traces
-                  ? "Those traces are in the score — you said you are under 500."
-                  : "Not scored. Tick Void Traces are tight to count them.")
-              : ""))
+              : "This plan wanted Radiant anyway.") + "\n" +
+            (opts.traces
+              ? "Scored " + Math.round(M.RADIANT_BONUS * 100) +
+                "% higher for it — you said Void Traces are tight."
+              : "No bonus: you have said traces are not a constraint."))
           }">${n.overshot ? "pre-refined" : "radiant"}</span>` : ""}${
           n.halved ? ` · <span class="est" data-tip="${esc(
             "Scored at half on purpose — nobody runs Railjack for caches.\n" +
