@@ -811,6 +811,51 @@ the default switches, they sit **#75 to #154 of 158** and the planner shows eigh
 
 So fixing the arithmetic makes the toggle correct and still silent.
 
+**3 — and underneath both, the plan assumes refinement is free.** Raised by the
+owner 2026-08-25 and confirmed by measurement. `bestRefinement` picks **Radiant
+for all 34 live relics**. That is a **3,400-trace bill**, against a cap of
+`MR × 50 + 100` — 1,600 at MR30 — and an income of 6–30 a run. The plan is more
+than twice unaffordable, and every node is valued *as if you will refine the relic
+yourself*.
+
+That assumption is what actually answers the owner's question — *why is a node
+that hands me Radiant not preferred over one with slightly better odds?* Because
+both are valued at `value(Radiant)`: the pre-refined one because it arrives that
+way, the other because the plan assumes you will pay for it. So the only thing
+left to distinguish them is drop chance, and 14.29% beats 12%. Every live source
+of **Axi D6** is 14.29% and none is pre-refined, so the comparison is real but the
+principle is general.
+
+The honest correction is not a bigger bonus. It is that **when traces are tight
+the plan itself should change**: at one Radiant per four openings you would plan
+most relics Intact, and then a node handing over Radiant is worth
+`value(Radiant) − value(Intact)` on *every drop it makes*, not a one-off trace
+rebate. That is a large number and it is the one the owner expected.
+
+**4 — `traceValue` measures the metric `bestRefinement` explicitly rejects.**
+Refinement is chosen on the **bottleneck** — expected openings for the worst-off
+wanted reward — and `bestRefinement`'s own comment says total hit rate is the
+wrong objective. `traceValue` then prices a trace on the *total value* delta.
+Measured across the 34 live relics on a want-everything plan:
+
+| | |
+|---|---|
+| median total-value uplift, Intact → chosen | **0.0002** |
+| relics where it is **negative** | Meso V15, Lith K12, Axi T13 at **−0.0898** |
+| openings, Intact → chosen | **50.0 → 10.0 on every one — a 5× speedup** |
+
+So the shipped 0.000868 is the maximum of a quantity that is near zero for most
+relics and negative for some, and Radiant is chosen on several relics *despite*
+lowering the number being used to price it. It happens to land on a sane figure
+by being a maximum. Priced on the bottleneck instead it would be consistent with
+the choice it is pricing, and never negative.
+
+**Also worth knowing about ESO's rank.** It is a cost problem, not a trace
+problem: 4.10 wanted relics a run over **12 zones** is 0.342 per objective, against
+Olympus at 6.00 over 6 rounds for 1.000. No plausible trace bonus closes 3×.
+**Ranked per run it is 4th**, behind Olympus, Ur and Ani — so the sort toggle
+already surfaces it, and that is worth knowing before redesigning anything.
+
 **Three ways out, and it is a modelling call.**
 
 - **Say it on the cracking side.** The relic list is where refinement is chosen and
