@@ -52,7 +52,11 @@
 
      Five rotations, then restart: the second bonus is twice as far away for a
      reward one refinement step better, which is a worse trade every time. */
-  const RUN_MODES = ["reset", "full", "aabcaa", "bonus"];
+  /* `fixed` is not a choice the player makes and never competes with the other
+     three. It is for missions that HAVE no length to choose - three Spy vaults,
+     two Railjack caches, one Faceoff match - where the run-length optimiser was
+     picking a number the mission cannot have. See FIXED_LENGTH. */
+  const RUN_MODES = ["reset", "full", "aabcaa", "bonus", "fixed"];
   const BONUS_ROTATIONS = 5;
 
   /* Rotation pattern, by mission type.
@@ -113,7 +117,17 @@
   const plansFor = (mission, squad) =>
     (ROT_PATTERN[mission] || [AABC]).filter((p) => !p.squadOnly || squad);
 
-  function scorePlan(rot, runMode, p) {
+  function scorePlan(rot, runMode, p, fixed) {
+    /* A fixed-length mission does not walk the cycle: it pays a stated set of
+       rotations once each, and there is nothing to decide. Taken before the
+       round count is worked out, because there is no round count to work out. */
+    if (runMode === "fixed") {
+      const counts = {};
+      fixed.pays.forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
+      let total = 0;
+      Object.keys(counts).forEach((t) => { total += counts[t] * (rot[t] || 0); });
+      return { total, counts, rounds: fixed.pays.length, plan: p };
+    }
     let n;
     if (runMode === "full") n = 4;
     else if (runMode === "aabcaa") n = 6;
@@ -353,11 +367,22 @@
       // a plan flagged onlyChanceAt owns the sole route to that rotation, so
       // when something wanted sits there it is used outright, not compared
       const forced = avail.find((p) => p.onlyChanceAt && (rot[p.onlyChanceAt] || 0) > 0);
-      const modes = isFissure ? ["bonus"] : ["reset", "aabcaa"];
+      /* The mission-type test that was missing. Without it every mission was
+         offered "reset" and "aabcaa" - lengths a Spy or a Railjack cache run
+         cannot have - and the optimiser picked whichever scored best, so 28
+         Caches nodes were costed at six caches and six Spy nodes at four vaults.
+
+         It drops `bonus` in the same expression, and that half was dormant only
+         because the shipped build has no live fissures: a Spy node that is a
+         fissure right now was run to FIVE vaults with a free endless-fissure
+         relic attached. The free relic is for staying in an endless fissure and
+         a Spy mission has nothing to stay in. */
+      const fixed = FIXED_LENGTH[mission] || null;
+      const modes = fixed ? ["fixed"] : (isFissure ? ["bonus"] : ["reset", "aabcaa"]);
       const runs = [];
       (forced ? [forced] : avail).forEach((p) => {
         modes.forEach((mode) => {
-          const r = scorePlan(rot, mode, p);
+          const r = scorePlan(rot, mode, p, fixed);
           const rounds = r.rounds || 1;
           runs.push({ r: Object.assign({}, r, { mode }), rounds,
                       rate: r.total / (rounds + RUN_OVERHEAD) });
@@ -390,9 +415,11 @@
      vault and a bounty stage each stay the same thing however long you stay.
      So the unit the player is asked about is the one that holds still.
 
-     Spy and Caches need no special case: their rotation *is* the count of
-     vaults opened or caches found, so the rounds the model already picked are
-     the objectives. Only the word for them differs.
+     Spy and Caches DO need a special case, and this comment asserted the
+     opposite until 2026-08-25. Their rotation is indeed the count of vaults
+     opened or caches found — but that count is fixed by the mission, and the
+     model was choosing it with an optimiser that assumes you may stay longer.
+     True of the unit, false of the number. See FIXED_LENGTH below.
 
      Bounties are not on the round cycle at all, so the model has no round count
      for them - every bounty in the game runs a fixed set of stages, and four is
@@ -413,7 +440,51 @@
      `isHeist` is declared further down this file. Safe: nothing calls this
      during evaluation - the pages call it while rendering, long after. */
   const BOUNTY_STAGES = 4;
-  const OBJECTIVE_UNIT = { Spy: "vault", Caches: "cache" };
+
+  /* ── missions that are not endless, and the letters they pay ──────
+     `OBJECTIVE_UNIT` used to live here and renamed the unit while keeping the
+     arithmetic: a Spy run was still handed to the endless run-length optimiser,
+     which would decide to "stay" for four vaults in a mission that has three.
+     This table states the length AND the rotations, because on the live data
+     the two cannot be separated — see the Spy note below.
+
+     From `wiki.warframe.com`, checked 2026-08-25:
+
+     * **Spy** — three vaults, and *"reward rotations will be determined only by
+       the number of Vaults successfully hacked"*, with vault names explicitly
+       not corresponding to rotation. So 1/2/3 pays A/B/C, not the AABC cycle's
+       A/A/B. The wiki also files Spy under Standard rather than Endless, which
+       is the same split this table is drawing.
+
+       That mapping is load-bearing. Six live nodes — Pago, Bode, Valac,
+       Aegaeon, Amalthea and Dione — publish rotation **C only**. Capping the
+       length while the letters stayed A,A,B would have deleted the only
+       rotation they pay from, which is why this change waited for the wiki
+       rather than shipping the cap on its own.
+
+     * **Caches** — a Railjack mission pays *two* cache rewards, not three: the
+       first for completing a Point of Interest (rotation A), the second for
+       hacking an Abandoned Derelict Cache (rotation B), from separate tables
+       rolled independently. Not a cycle. Our own data agrees exactly: all 38
+       live Caches nodes are Proxima and the 28 rotation-bearing ones publish
+       precisely A and B. The other 10 are Earth and Saturn Proxima, which carry
+       no rotation at all, never reach this table, and stay at "one run".
+
+     * **Special** — the bucket holding Void Storms and Faceoff. Faceoff pays
+       *"one each of rotation A and rotation B"* at the end of a match, win or
+       lose, so it is one run paying two rewards. Void Storms carry no rotation,
+       so they never reach the `fixed` branch and the unit here reads correctly
+       for them anyway.
+
+     `pays` is a list rather than a set on purpose: it is the multiset of reward
+     draws, so a mission paying the same rotation twice would say so. `count` is
+     what the PLAYER does — vaults, caches, one match — which is not always the
+     number of rewards, exactly as `PER_REWARD` handles for Onslaught. */
+  const FIXED_LENGTH = {
+    Spy:     { count: 3, unit: "vault", pays: ["A", "B", "C"] },
+    Caches:  { count: 2, unit: "cache", pays: ["A", "B"] },
+    Special: { count: 1, unit: "run",   pays: ["A", "B"] },
+  };
 
   /* ── how many objectives buy one reward ───────────────────────────
      One, nearly everywhere: a Defense round pays a reward, a Spy vault pays a
@@ -437,18 +508,35 @@
      pattern above is. Both Onslaught nodes share this mode string and the wiki
      gives Elite no separate cadence, so one entry is right for both.
 
-     Deliberately not folded into OBJECTIVE_UNIT above: that table renames an
-     objective, this one says how many of them you buy. Two different facts, and
-     a mission can need either without the other. */
+     Deliberately not folded into FIXED_LENGTH above: that table says how many
+     objectives a run HAS, this one says how many of them buy one reward. Two
+     different facts, and a mission can need either without the other —
+     Onslaught has no fixed length and a cadence of two; Spy has a fixed length
+     of three and a cadence of one. */
   const PER_REWARD = { "Sanctuary Onslaught": { count: 2, unit: "zone" } };
 
   function objectivesOf(n) {
     if (isHeist(n)) return { count: 1, unit: "run" };
     if (n.bounty) return { count: n.bounty.stages || BOUNTY_STAGES, unit: "stage" };
+    /* Before the `n.rounds` test, not after it: `rounds` counts reward draws
+       and these missions pay a different number of them than the player
+       performs objectives — two rewards in one Faceoff match, three vaults for
+       three.
+
+       Conditioned on the node actually paying by rotation, which is what
+       separates the two halves of `Caches`. The 28 Proxima nodes that publish A
+       and B are two caches. The 10 Earth and Saturn Proxima nodes publish no
+       rotation at all — the wiki gives those regions a single undifferentiated
+       cache table — so they are not two of anything and stay at "one run".
+       Costing them as two caches was this change's own first regression. */
+    const fixed = FIXED_LENGTH[n.mode];
+    if (fixed && n.counts && Object.keys(n.counts).length) {
+      return { count: fixed.count, unit: fixed.unit };
+    }
     if (n.rounds) {
       const per = PER_REWARD[n.mode];
       if (per) return { count: n.rounds * per.count, unit: per.unit };
-      return { count: n.rounds, unit: OBJECTIVE_UNIT[n.mode] || "round" };
+      return { count: n.rounds, unit: "round" };
     }
     return { count: 1, unit: "run" };
   }
@@ -540,12 +628,22 @@
     RAILJACK_NODES.has(s.node) || /Proxima/i.test(s.planet || "");
 
   /* ── the one deliberate thumb on the scale ────────────────────────
-     A Railjack `Caches` run is three hidden caches inside a boarded base, and
-     it is the worst relics-per-run in the whole list. Nobody runs Railjack for
-     them - you run a Skirmish and open what you pass. Ranking them beside
-     ordinary star-chart nodes puts them somewhere they do not belong, which the
-     owner put more bluntly: "caches on a Railjack is insanely out-of-order and
-     out-of-place".
+     A Railjack `Caches` run pays two cache rewards - one for a Point of
+     Interest, one for an Abandoned Derelict Cache - and it is the worst
+     relics-per-run in the whole list. Nobody runs Railjack for them: you run a
+     Skirmish and open what you pass. Ranking them beside ordinary star-chart
+     nodes puts them somewhere they do not belong, which the owner put more
+     bluntly: "caches on a Railjack is insanely out-of-order and out-of-place".
+
+     **Re-derived when the length was corrected, 2026-08-25, and it stays at
+     0.5.** The worry was that costing a run at two caches instead of six would
+     inflate these rows past what the halving could hold. Measured over the live
+     build it did not: the rates move by -4% to +6% depending on how a node
+     splits between rotation A and B, and because everything around them rose
+     more, the best Caches node fell from #144 to **#160 of 234**. Unpenalised it
+     would sit at #78, so the constant is still doing the work it was written
+     for, and doing slightly less of it than before - which is what `TODO.md`
+     predicted.
 
      So they are halved. This is a judgement, not a measurement, and it is the
      only one of its kind in the model - everything else here is arithmetic on
@@ -733,9 +831,18 @@
         if (s.mode && s.kind !== "bounty") seen.add(s.mode);
       }));
     const odd = Object.keys(ROT_PATTERN).filter((m) => seen.has(m));
-    const aabc = Array.from(seen).filter((m) => !ROT_PATTERN[m]).sort();
+    const fixed = Object.keys(FIXED_LENGTH).filter((m) => seen.has(m)).sort();
+    /* Fixed-length types are no longer assumed anything: their length and their
+       letters are both stated, from the wiki. Leaving them in the assumed line
+       would be the very mistake this function exists to make visible. */
+    const aabc = Array.from(seen)
+      .filter((m) => !ROT_PATTERN[m] && !FIXED_LENGTH[m]).sort();
     console.info("[prime-hunter] rotation model: " + seen.size + " mission types in the data");
     console.info("  non-standard : " + (odd.length ? odd.join(", ") : "(none)"));
+    console.info("  fixed length : " + (fixed.length
+      ? fixed.map((m) => m + " (" + FIXED_LENGTH[m].count + " " +
+          FIXED_LENGTH[m].unit + ", pays " + FIXED_LENGTH[m].pays.join("+") + ")").join(", ")
+      : "(none)"));
     console.info("  assumed AABC : " + aabc.join(", "));
     Object.keys(ROT_PATTERN).forEach((m) => {
       if (!seen.has(m)) {

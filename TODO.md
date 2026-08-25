@@ -52,11 +52,10 @@ is currently wrong on screen"* until they were checked. A third — both Onslaug
 nodes ranked at exactly twice their true rate — was found and **fixed** the same
 day; `PROJECT.md §7` has the reasoning.
 
-- The planner runs an **endless-mission optimiser over missions that are not
-  endless**: 28 of the 38 live `Caches` nodes are costed at six caches and 6 of the
-  21 live `Spy` nodes at four vaults, against three of each. The row then prints
-  *"Worth staying six rounds"* for a run that ends after three. Entry: *Several of
-  those modes are not round-based at all*.
+- ~~The planner runs an endless-mission optimiser over missions that are not
+  endless.~~ **Fixed 2026-08-25** — `FIXED_LENGTH`, `PROJECT.md §7`. What is left
+  is a browser pass and one consequence: entry *What is left of the fixed-length
+  fix*.
 - The *Still needed* panel counts relics the reader's own switches have turned off.
   Live today on all three **Lex Prime** parts. Entry: *A part you cannot reach
   still reads as one you can*, whose own correction claimed the opposite.
@@ -128,7 +127,6 @@ of a worklist, not of the click, and worth deciding on its own merits.
 | The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
 | Expected openings for everything, not for the worst one | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
 | Nine rotation-bearing mission types are still unverified | wiki checking; tedious, not blocked |
-| Several of those modes are not round-based at all | the two mapping questions in the row above — **measured, and wrong on screen** in the meantime: 59 of 242 live nodes |
 
 ### Not work
 
@@ -565,158 +563,33 @@ is a rule here and this is a case where they legitimately differ. And the row's
 `relics / min` label stays honest: the minutes it divides by become the true cost
 of a run, which is what the label already claims.
 
-### Several of those modes are not round-based at all
+### What is left of the fixed-length fix — a browser pass and one consequence
 
-`Spy`, `Caches` and `Key` carry rotations, but the rotation does not advance per
-*round* — a Spy mission has three vaults, Caches counts what you found. You collect
-several tiers inside a **single mission**.
+**Shipped 2026-08-25.** `FIXED_LENGTH` in `rotation.js` states the length and the
+rotations for `Spy` (3 vaults, A/B/C), `Caches` (2 caches, A/B) and `Special`
+(1 run, A+B), the missing mission-type test is in `runValue`, and `PROJECT.md §7`
+carries the reasoning and the measured effect. `CACHE_PENALTY` was re-derived in
+the same commit and stays at 0.5. Two things are outstanding.
 
-**Measured 2026-08-25 by driving the shipped model over the 2026-08-24 build, and
-it is worse than this entry used to say** (*"we cost a three-vault Spy run as three
-rounds of Defense"* — we do not; we cost some of them as four, and Caches as six).
-There is no mission-type test anywhere in the run-length chooser: `rotation.js:356`
-picks `["reset", "aabcaa"]` for everything, so a plan optimiser that assumes you
-may choose to stay picks lengths these missions cannot have.
+**1 — `app.js` has not been driven in a browser.** It calls the same `runValue`,
+so it inherits the value correction without an edit, but that is exactly why it
+needs looking at rather than reasoning about: the collection page's spot meta
+prints `objectives` and `unit` from the shared function, and no automated test
+covers what those now read on a Spy or Caches row. Serve the pages and check one
+of each. The Playwright suite passes, but it asserts nothing about these types.
 
-| Mission type | live nodes | costed at | reality |
-|---|---|---|---|
-| `Caches` | 28 of 38 | **6 caches** | 3 |
-| `Spy` | 6 of 21 | **4 vaults** | 3 |
+**2 — Faceoff is now #1 to #4, and that is the Capture problem showing.** The four
+tables went 6 rounds → 1 run, +140% per objective, straight to the top of the
+list. The arithmetic is right: a match pays one each of rotation A and B, 22
+relics at 8.33%, so 1.83 wanted relics for one run. What is wrong is the
+comparison — a match is costed at one objective the same way a Capture is, and
+*A run's fixed cost is not priced, so Capture wins everything* is the entry that
+already describes this. Faceoff is now its loudest instance rather than its
+fourteenth, which makes that entry more urgent than it was.
 
-59 of the 242 live mission nodes are priced as endless when they are not. Two
-consequences beyond the cost. On a real three-objective run the AABC cycle never
-reaches rotation C, so the model banks a reward the run cannot collect. And
-`plan.js:786` pushes the hardcoded string *"Worth staying six rounds"* whenever the
-chosen mode is `aabcaa`, so a three-cache Railjack run is told to stay for six —
-while the line above it (`plan.js:766`) says "over N **rounds**" even for a vault
-mission.
+Nothing here says the fix was wrong. It says the fix removed a distortion that
+was masking a bigger one.
 
-**`Key` and `Special` were recorded here as dormant — *"neither has a live relic
-source on today's build"* — and both halves of that are false.** Measured
-2026-08-25 by driving the shipped predicates over the build:
-
-- **`Key` has 8 live nodes**, each carrying 22 relics. They are absent from the
-  ranking because every one is `access=quest`, so `notADestination` drops them —
-  excluded by a rule, not by having nothing to exclude. Genuinely invisible, but
-  for a different reason than the one written down.
-- **`Special` has 10 live nodes and none of them is gated at all.** The four
-  Faceoff tables publish A+B and are being run to **six rounds** by `aabcaa` right
-  now, in the ranked list. `isPvPvE` only hangs a badge on them; it gates nothing.
-  The six Void Storm nodes carry no rotation and are costed *one run*, correctly.
-
-So the count is **38 mis-costed live nodes, not 34**, and `Special` belongs in the
-fix rather than in a footnote about dormancy. The wiki answer above says Faceoff
-pays one each of rotation A and B per match, so it is the same fixed shape: one
-run, both letters, once.
-
-The comment at `rotation.js:392` asserts the opposite of what the code does —
-*"Spy and Caches need no special case: their rotation is the count of vaults opened
-or caches found"*. True of the unit, false of the count: `objectivesOf`
-(`rotation.js:420`) renames the unit and keeps the arithmetic.
-
-**Cap the length; do not touch the mapping.** Whether Spy's vaults 1/2/3 yield
-A/B/C rather than the AABC cycle's A/A/B belongs to *Nine rotation-bearing mission
-types are still unverified*, and under the wiki rule that answer comes from
-`wiki.warframe.com` rather than from us. Three vaults and three caches are numbers
-this file already states; the mapping is not.
-
-**Held for the wiki, by the owner's decision of 2026-08-25 — and the reason is
-that the two cannot be separated after all.** The length and the letters are two
-different expressions in `rotation.js`, so capping the length looked like the safe
-half. It is not, because of what the live data turns out to be:
-
-| Live nodes | What they publish | Reached by a capped 3-objective A,A,B run? |
-|---|---|---|
-| 28 `Caches` | rotations A and B | yes — ranked rate **rises** 9–14% |
-| 15 `Spy` | rotation B only | yes — already costed at 3, unchanged |
-| 6 `Spy` | **rotation C only** | **no — they would score zero** |
-| 10 `Caches` | no rotation at all | n/a — costed "one run", leave them |
-
-The six are **Pago** (Kuva Fortress), **Bode** (Ceres), **Valac** (Europa),
-**Aegaeon** (Event: Saturn), **Amalthea** (Jupiter) and **Dione** (Saturn). They
-hold *all* of their value in rotation C, so capping the length while the letter map
-still yields A, A, B deletes the only rotation they pay from: Pago falls from 128th
-to 230th of 234, and the row prints *"rot C has 61.92% you want, out of reach
-here"* about a mission whose third vault is exactly where that reward lives. That
-is worse than the defect. **Capping `Caches` alone was offered and declined**: it
-would have fixed 28 of the 34 mis-costed rows today, but it splits one arithmetic
-correction across two commits and two mental models.
-
-**What the wiki has to answer**, and it is two questions, not one:
-
-1. Which rotation does each **Spy vault** pay — 1/2/3 = A/B/C, or the AABC cycle's
-   A/A/B? The six C-only nodes are the whole of what is blocked on this.
-2. The same for a **Railjack cache** run: does each of the three caches roll its own
-   rotation, and do the 10 un-rotated `Caches` tables roll once per run or once per
-   cache? The second half decides whether those ten stay at "one run".
-
-Until both are answered, `rotation.js` is not touched. Anything that makes the six
-Spy nodes keep their value without an answer — collecting each published rotation
-once, for instance — **is** the mapping decision wearing a different hat, because
-value depends only on the multiset of letters. Taking it is allowed; recording it
-as having avoided the question is not.
-
-**Also found while measuring, and it must be covered by the same fix.** A `Spy`
-node that is a fissure right now takes the `bonus` branch at `rotation.js:356` and
-is run to **five vaults** with a free endless-fissure relic attached. It is dormant
-only because the shipped build has zero live fissures; a Spy fissure is ordinary
-and it is one refresh away. The free relic is for staying in an *endless* fissure,
-and a Spy mission has nothing to stay in.
-
-**`CACHE_PENALTY` is re-derived in the same commit as the cap** — owner's decision,
-2026-08-25 — rather than left to a follow-up, because the constant was calibrated
-while these same nodes were being costed at six caches instead of three. Note which
-way it actually moves before re-deriving it: per *run* the two corrections compound
-(Beacon Shield Ring 1.4116 → 0.8026 → 0.4013 after halving), but per *objective*,
-which is what the list is ordered on, the cap **raises** these rows — the cost falls
-faster than the value, so Beacon Shield Ring goes 0.2353 → 0.2675 and moves up from
-217th to 208th. The penalty does less work after the fix, not more. For any node
-with rotation C empty — all 28 — the rate multiplier is `2(2a+b)/(4a+b)`, which is
-1.0 when the value is all in rotation A and 2.0 when it is all in B. It cannot
-lower a Caches node's per-objective rate; it can double it. `PROJECT.md §7` quotes
-a live worked example that will move whatever is decided, so it is re-measured in
-that commit rather than left.
-
-**The design is worked out, so it is not re-derived when the answer arrives.**
-Declare the objective count beside the unit — one table, `{ Spy: {count: 3, unit:
-"vault"}, Caches: {count: 3, unit: "cache"} }` — replacing the unit-only
-`OBJECTIVE_UNIT` at `rotation.js:416`, and read it in three places: the mode list at
-`rotation.js:356` (which is where the missing mission-type test goes, and it drops
-`bonus` for these types in the same expression), a `"fixed"` branch in `scorePlan`,
-and a new first case in `objectivesOf` *before* the `n.rounds` test so a node whose
-plan banked nothing is still three vaults rather than "one run". Two shapes were
-considered and rejected: a `Math.min` clamp after plan selection (it divorces the
-cost from the draws, so `counts` keeps naming rotations the run no longer reaches,
-and it cannot stop the `bonus` branch), and an entry in `ROT_PATTERN` (`runValue`
-returns `nonStandard: !!ROT_PATTERN[mission]`, which both pages read as *"this is
-Disruption"* — a Spy row would start explaining conduits). `ROT_PATTERN` answers
-what an objective pays; this answers how many objectives there are.
-
-Consequences to carry into that commit: `RUN_MODES` gains `"fixed"`;
-`assertCoverage` gains a `fixed length` line and drops those types from `assumed
-AABC`; `plan.js:766` must stop saying "over N **rounds**" for a vault mission and
-use `objectivesText`, as must the meta chip at `plan.js:806` — which today
-contradicts the tooltip on its own row; the `aabcaa` branch's hardcoded *"Worth
-staying six rounds"* becomes unreachable for these types but should be read off
-`n.rounds` anyway; and `app.js:1055` hardcodes `${s.rounds} rounds`, so the
-collection page would say rounds where the planner says vaults — the one place this
-change touches **both pages**, which the "both pages agree" rule makes mandatory.
-`app.js` inherits the value correction automatically since it calls the same
-`runValue`, so it needs a browser pass, not an edit to its arithmetic.
-
-The test that currently covers this hands the function its answer —
-`tests/test_assets.mjs:312` passes `{ mode: "Spy", rounds: 3 }` by hand, so it has
-never seen the 4 the model actually produces. Repair that first, by driving
-`runValue` and handing its *result* to `objectivesOf`; spread the result first, or
-`runValue`'s own `mode` (the run mode) silently overwrites the mission type.
-
-Useful find while checking: the wiki splits missions into **Endless** (Defense,
-Survival, Interception, Excavation, Defection, Disruption, Alchemy, Infested
-Salvage, Legacyte Harvest, Void Cascade/Flood/Armageddon) and **Standard**
-(Assassination, Capture, Exterminate, Hijack, Mobile Defense, Rescue, Sabotage,
-**Spy**). That is exactly the round-based-or-not split the model has been
-reverse-engineering, from a source, and it independently confirms Spy is not
-endless.
 
 ## Everything else
 

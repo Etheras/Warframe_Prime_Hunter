@@ -1545,6 +1545,63 @@ All 38 live `Caches` nodes are Railjack today, so the mode alone would identify
 them; the Railjack test is kept anyway, because a `Caches` mode somewhere else
 would not have earned this.
 
+### Some missions have no length to choose, and three of them were guessing
+
+The run-length optimiser was applied to every mission type. `rotation.js` offered
+`reset` and `aabcaa` unconditionally, so a plan that assumes you *may* stay longer
+picked lengths these missions cannot have: **28 Railjack `Caches` nodes costed at
+six caches, six `Spy` nodes at four vaults, four Faceoff tables at six rounds** —
+38 of 242 live nodes priced as endless when they are not. The row then printed
+*"Worth staying six rounds"* for a run that ends after three.
+
+`OBJECTIVE_UNIT` was the near-miss: it renamed the unit — vault, cache — and kept
+the arithmetic, so the count was still whatever staying happened to score best.
+A comment beside it asserted no special case was needed.
+
+**It was held for the wiki, and correctly so.** Capping the length alone would
+have made things worse: six live Spy nodes publish rotation **C only**, and the
+AABC cycle's first three rounds are A, A, B. Pago would have fallen from 128th to
+230th of 234 while the row explained that rot C was out of reach — in a mission
+whose third vault is exactly where that reward lives. The length and the letters
+turned out to be inseparable, which is why `TODO.md` carried the design for a day
+rather than shipping half of it.
+
+`FIXED_LENGTH` now states both, from `wiki.warframe.com`:
+
+| Mission | Objectives | Pays |
+|---|---|---|
+| `Spy` | 3 vaults | A, B, C — *rotations are determined by the number of vaults hacked*, and vault names do not correspond to rotation |
+| `Caches` | 2 caches | A, B — a Point of Interest cache and an Abandoned Derelict Cache, separate tables rolled independently |
+| `Special` | 1 run | A, B — Faceoff pays one each at the end of a match, win or lose |
+
+Read in three places: the mode list in `runValue` (which is where the missing
+mission-type test goes, and it drops `bonus` in the same expression), a `fixed`
+branch in `scorePlan`, and a case in `objectivesOf` before the `n.rounds` test.
+
+Two details that are easy to get wrong. The `objectivesOf` case is conditioned on
+the node **paying by rotation**: 10 of the 38 `Caches` nodes are Earth and Saturn
+Proxima, which the wiki gives a single undifferentiated cache table and which
+publish no rotation, so they are not two of anything and stay at *one run*.
+Costing them as two caches was this change's own first regression. And `rounds`
+is a count of **reward draws**, not objectives — a Faceoff match is one run paying
+two — which is the same split `PER_REWARD` handles for Onslaught.
+
+**What it moved, measured over the live build.** Spy: five reachable nodes 4 → 3
+vaults, +33% per objective, Pago #124 → #83, and the C-only nodes keep their value
+because the letters came with the cap. Caches: 24 of 38 rose and 14 fell, −4% to
++6% depending on how a node splits between A and B. Faceoff: 6 rounds → 1 run,
+**+140%, to #1–#4**.
+
+That last one is not a new fault but an old one made visible, and `TODO.md`
+records it: *a run's fixed cost is not priced*, which is why Capture already wins
+everything. Faceoff is now the loudest instance of it rather than the fourteenth.
+
+`CACHE_PENALTY` was re-derived in the same commit, at the owner's instruction,
+because it had been calibrated while these nodes were costed at six caches. It
+stays at **0.5**: the best Caches node fell from #144 to #160 of 234, and would
+sit at #78 unpenalised, so the constant is doing slightly less work than before
+rather than more.
+
 ### Only recommend what can actually be run today
 
 A source belongs in the ranking only if it can be run **now**. Permanent content is

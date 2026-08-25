@@ -309,14 +309,80 @@ test("a run is costed in objectives, and each type has its own word for one", ()
   const ROT = loadRotation();
   const o = (n) => plain(ROT.objectivesOf(n));
   assert.deepEqual(o({ mode: "Defense", rounds: 4 }), { count: 4, unit: "round" });
-  assert.deepEqual(o({ mode: "Spy", rounds: 3 }), { count: 3, unit: "vault" },
-                   "a Spy rotation IS the vault count, so the rounds are the objectives");
-  assert.deepEqual(o({ mode: "Caches", rounds: 2 }), { count: 2, unit: "cache" });
   assert.deepEqual(o({ mode: "Capture", rounds: null }), { count: 1, unit: "run" },
                    "nothing to count inside a single-reward mission");
   assert.deepEqual(o({ mode: "Bounty", rounds: null, bounty: { letter: "A" } }),
                    { count: 4, unit: "stage" },
                    "a bounty is not on the round cycle, so it is costed in stages");
+});
+
+test("a fixed-length mission is costed at its real length, not a chosen one", () => {
+  /* This test used to hand objectivesOf its own answer -- it passed
+     `{ mode: "Spy", rounds: 3 }` and asserted 3 came back, so it had never seen
+     the 4 the model actually produced. The length is now driven out of
+     runValue, which is where the wrong number was being invented.
+
+     `runValue`'s result carries its own `mode` -- the RUN mode, "fixed" -- so
+     the spread has to come first or it silently overwrites the mission type and
+     the assertion measures nothing. */
+  const ROT = loadRotation();
+  const cost = (mission, rot) => {
+    const r = ROT.runValue(rot, mission, false, null, rot, false);
+    return { ...plain(ROT.objectivesOf({ ...r, mode: mission })), runMode: r.mode,
+             rewards: r.rounds, counts: plain(r.counts) };
+  };
+
+  // Spy: three vaults, and the wiki says vault 1/2/3 pays A/B/C
+  const spy = cost("Spy", { A: 0.2, B: 0.2, C: 0.2 });
+  assert.deepEqual({ count: spy.count, unit: spy.unit }, { count: 3, unit: "vault" });
+  assert.equal(spy.runMode, "fixed", "a Spy run has no length to choose");
+  assert.deepEqual(spy.counts, { A: 1, B: 1, C: 1 },
+                   "each vault pays its own rotation, once");
+
+  /* The six live nodes this was held for. Value ONLY in rotation C, which the
+     AABC cycle never reaches in three rounds -- capping the length without the
+     letters would have scored these zero. */
+  const cOnly = cost("Spy", { A: 0, B: 0, C: 0.62 });
+  assert.ok(cOnly.count === 3 && cOnly.counts.C === 1,
+            "a C-only Spy node must still reach C on its third vault");
+  assert.ok(ROT.runValue({ A: 0, B: 0, C: 0.62 }, "Spy", false, null,
+                         { A: 0, B: 0, C: 0.62 }, false).total > 0,
+            "Pago, Bode, Valac, Aegaeon, Amalthea and Dione hold all their value here");
+
+  // Caches: two cache rewards, rotation A then rotation B -- not three, not a cycle
+  const caches = cost("Caches", { A: 0.3, B: 0.19 });
+  assert.deepEqual({ count: caches.count, unit: caches.unit }, { count: 2, unit: "cache" });
+  assert.deepEqual(caches.counts, { A: 1, B: 1 });
+
+  // Faceoff: one match paying one each of A and B
+  const faceoff = cost("Special", { A: 0.1, B: 0.1 });
+  assert.deepEqual({ count: faceoff.count, unit: faceoff.unit }, { count: 1, unit: "run" });
+  assert.deepEqual(faceoff.counts, { A: 1, B: 1 },
+                   "a match pays both letters, so it is two rewards in one run");
+
+  // and none of them may be talked into the endless optimiser's lengths
+  for (const m of ["Spy", "Caches", "Special"]) {
+    const r = ROT.runValue({ A: 0.3, B: 0.3, C: 0.3 }, m, false, null,
+                           { A: 0.3, B: 0.3, C: 0.3 }, false);
+    assert.equal(r.mode, "fixed", `${m} was offered a run length it cannot have`);
+    assert.ok(r.rounds <= 3, `${m} banked ${r.rounds} rewards`);
+  }
+});
+
+test("a fissure cannot talk a fixed-length mission into staying", () => {
+  /* Dormant only because the shipped build has no live fissures: a Spy node
+     that is a fissure took the `bonus` branch and was run to FIVE vaults with a
+     free endless-fissure relic attached. The free relic is for staying in an
+     endless fissure; a Spy mission has nothing to stay in. */
+  const ROT = loadRotation();
+  const rot = { A: 0.2, B: 0.2, C: 0.2 };
+  const asFissure = ROT.runValue(rot, "Spy", false, null, rot, true);
+  assert.equal(asFissure.mode, "fixed", "a Spy fissure is still three vaults");
+  assert.equal(ROT.objectivesOf({ ...asFissure, mode: "Spy" }).count, 3);
+
+  // the endless types keep the bonus, so this narrowed nothing it should not
+  const defense = ROT.runValue(rot, "Defense", false, null, rot, true);
+  assert.equal(defense.mode, "bonus", "an endless fissure still pays for depth");
 });
 
 test("an Onslaught reward costs two zones, so the run is twice the objectives", () => {
