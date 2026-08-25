@@ -46,20 +46,32 @@ further down, where the reasoning lives.
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
 
-**Nothing is currently wrong on screen.** This list opened with seven entries that
-were; they shipped later the same day and have been deleted rather than ticked,
-with the reasoning in `PROJECT.md §7` — *A part can be a whole Prime*,
-*Availability buckets*, *Profit-Taker is four places*, *Nodes that are the same bet
-are one row*, the run-mode table and the fissure section — plus a new focus rule in
-`STYLE.md §6`. What is left below is work that makes the app better rather than
-work that makes it correct.
+**Two things are currently wrong on screen**, both found on 2026-08-25 and both
+measured against the build of the day before. This paragraph said *"Nothing is
+currently wrong on screen"* until they were checked.
+
+- The planner runs an **endless-mission optimiser over missions that are not
+  endless**: 28 of the 38 live `Caches` nodes are costed at six caches and 6 of the
+  21 live `Spy` nodes at four vaults, against three of each. The row then prints
+  *"Worth staying six rounds"* for a run that ends after three. Entry: *Several of
+  those modes are not round-based at all*.
+- The *Still needed* panel counts relics the reader's own switches have turned off.
+  Live today on all three **Lex Prime** parts. Entry: *A part you cannot reach
+  still reads as one you can*, whose own correction claimed the opposite.
+
+The seven entries this list opened with were genuinely wrong on screen; they
+shipped later the same day and have been deleted rather than ticked, with the
+reasoning in `PROJECT.md §7` — *A part can be a whole Prime*, *Availability
+buckets*, *Profit-Taker is four places*, *Nodes that are the same bet are one row*,
+the run-mode table and the fissure section — plus a new focus rule in `STYLE.md §6`.
 
 ### Sentences that are no longer true
 
 | Entry | Where | Size |
 |---|---|---|
-| Three comments describe things that no longer exist | `schedule.ps1`, `index.html`, `build_data.py` | small |
-| The mockup mechanism is documented but cannot run under its own server | `serve.py`, `PROJECT.md §2` | small — a decision, not a fix |
+| Two comments describe things that no longer exist | `index.html`, `build_data.py` | small |
+| The mockup mechanism is documented but cannot run under its own server | `serve.py`, `README.md` | small — a decision, not a fix |
+| `npm test` silently drops a whole suite | `package.json` | small |
 
 ### The worldstate is already cached, and barely read
 
@@ -77,7 +89,7 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | Size |
 |---|---|
 | A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest known distortion |
-| Several of those modes are not round-based at all | session |
+| Several of those modes are not round-based at all | session — **measured, and wrong on screen**: 59 of 242 live nodes |
 | Our four invented "mission types" leak into the ranking | session |
 | What the misses are worth, in Ducats | session |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -88,7 +100,7 @@ What is left of the entry is two fields and a warning about one of them.
 |---|---|
 | A Mastery Rank field in the header | session |
 | A priority flag on the farm list | session |
-| A part you cannot reach still reads as one you can | session — hypothetical on today's data |
+| A part you cannot reach still reads as one you can | session — **live on three Lex Prime parts today**, not hypothetical |
 | The endless-fissure bonus is only stated on the collecting side | small |
 | The Railjack opt-in gate stands in front of your only option | small |
 | The node list is the top eight and a hover, not a table | small |
@@ -143,13 +155,13 @@ The one below is what is left of the group, and it is the cause the group was ma
 for: a capability landed and the sentences explaining why it was absent stayed where
 they were.
 
-### Three comments describe things that no longer exist
+### Two comments describe things that no longer exist
 
-Cheap, and each one will mislead somebody:
+Cheap, and each one will mislead somebody. **This entry named three until
+2026-08-25**; the `tools/schedule.ps1` one has since been repaired on its own —
+`.DESCRIPTION` no longer mentions a strip or the planner, so that bullet has been
+deleted rather than left to send the next reader looking for a defect that is gone.
 
-- `tools/schedule.ps1`, `.DESCRIPTION` — *"the fissure **strip** on the planner"*.
-  The strip was replaced by per-row badges six hours before that file was last
-  touched. This one is user-facing: it is what `Get-Help` prints.
 - `index.html`, the materials hint — *"nothing here feeds the farm advice. Forma
   will, once the planner lands."* The planner landed, and the Forma row **is** what
   the planner reads.
@@ -157,6 +169,21 @@ Cheap, and each one will mislead somebody:
   most useful line of the lot"*, which was about a per-tier strip that no longer
   exists. The reason to keep Omnia now is simply that a node with an Omnia fissure
   is a node with a fissure.
+
+### `npm test` silently drops a whole suite
+
+Found 2026-08-25. `package.json`'s `test` script names two of the three `.mjs`
+suites:
+
+```
+"test": "node --test tests/test_assets.mjs tests/test_pages.mjs"
+```
+
+`tests/test_model.mjs` is missing, so `npm test` runs 19 fewer tests than it looks
+like it does and says nothing about it. Drift rather than a hole — `python
+tests/test_build.py` is the documented command and it runs all three, which is why
+the count still reaches 316 — but the failure mode is the bad one: a green run that
+quietly checked less than the reader believes. One line.
 
 ---
 
@@ -180,10 +207,10 @@ one of them by measurement taken while checking it. What is below is the rest.
 
 | Source | Asked for | Verdict |
 |---|---|---|
-| roadmap 2 | a toggle between score per objective and per run | open, and `STYLE.md §5` says what it obliges |
+| roadmap 2 | a toggle between score per objective and per run | **shipped** — `#p-sort` at `plan.html:111`, wired at `plan.js:1424`. Row kept only because it was the stated blocker on *The node list is the top eight*, which is now unblocked |
 | roadmap 5 | read Baro's live stock from `/pc/voidTrader` | open, with a trap in the "disable the box" half |
 | roadmap 3 | reorder the availability precedence | **the stated goal is already true**; the order as written empties the Founder bucket |
-| review 2 | one `State` controller in `shared.js` | open, and the two pages have already drifted twice |
+| review 2 | one `State` controller in `shared.js` | **shipped** on 2026-08-24 — `makeState()` at `shared.js:92`, exported at `:466`. The *One refactor* section above already said so; this row did not |
 | review 3 | a priority flag on the farm list | open, but not via `stillNeed` |
 | roadmap 10 | Ducat value of the non-wanted drops | open; measured at a 1.9× spread |
 | roadmap 7 | expected openings for *all* parts, not the worst one | **measured: changes 5.4% of live cases, for 4.5% fewer openings at double the trace price** |
@@ -265,7 +292,10 @@ a new meaning is exactly what that document exists to arbitrate.
 ### What the misses are worth, in Ducats
 
 The data is already here and already tested: `ducats` on **582 of 590** parts, all
-in `{15, 25, 45, 65, 100}`, pinned by `test_build.py`. Nothing reads it.
+in `{15, 25, 45, 65, 100}`, pinned by `test_build.py`. **Nothing in the ranking
+reads it** — this entry said "nothing reads it" until 2026-08-25, but the
+collection drawer has shown a per-part Ducat badge since 2026-08-11
+(`assets/app.js:863`). It is the scoring side that is untouched.
 
 Measured across the 34 currently-dropping relics, the expected Ducats of one Intact
 opening runs **17.3 to 33.4, mean 21.4** — a 1.9× spread. Real, and small. Two notes
@@ -456,7 +486,38 @@ how much they disturb:
    one number with one meaning. Most honest, most work, and it still has to answer
    what the collection view does.
 
-Start at (1) and only move if the ranking is visibly wrong.
+**Decided by the owner, 2026-08-25: (1), and it is not a starting point.** Add the
+two fields, charge a **flat overhead once per run**, and keep the objective-count
+ranking **agnostic to it** — the overhead is the player's own number and lives on
+the player's side of the model. Options (2) and (3) are closed, not deferred.
+
+The reasoning, which is stronger than *"simplest"*: the two overheads are not two
+units for one quantity, they are **two different quantities**.
+
+- `RUN_OVERHEAD` is **comparative**. It exists only at `rotation.js:363`, where each
+  candidate way of playing a node is scored `value / (rounds + 2)`, and it is
+  discarded the moment a plan wins — nothing consumes it afterwards, and the export
+  at `rotation.js:717` is read by no caller, only by a test asserting its value. Its
+  absolute size barely matters; only the ratio between two plans at the same node
+  does, which is why its own comment can admit it "over-charges the long ones and
+  under-charges the short ones" without that being a defect.
+- The start/end minutes are **absolute**. They are the real price of one run, and
+  they are charged once, to the cost the ranking divides by.
+
+So 35 seconds is not two rounds, and was never meant to be. `rotation.js:311`
+already gives the reason the constant is kept in rounds: a minutes figure "could
+only be applied where minutes have been given — and then the two pages would
+disagree about how long a run is the moment somebody typed into the effort panel. A
+choice about how to play a node should be a fact about the node."
+
+**Rejected in the same decision:** folding `RUN_OVERHEAD` into `n.cost`
+(`plan.js:587`) to price restarts in the default objective view "for free". It was
+raised on 2026-08-25 on the grounds that two rounds *does* have meaning in
+objectives where 35 seconds does not. It pushes a comparative constant into an
+absolute price, and it makes the objective ranking silently change cost basis the
+moment anyone types a minute into the effort panel. The paragraph above stands as
+written: the objective view stays overhead-free, **by choice rather than by
+impossibility**, and that is the correction this entry needed.
 
 **What to check when it lands.** The collection view ranks per *run* and has no
 effort panel, so it should be untouched — worth asserting, since "both pages agree"
@@ -468,8 +529,42 @@ of a run, which is what the label already claims.
 
 `Spy`, `Caches` and `Key` carry rotations, but the rotation does not advance per
 *round* — a Spy mission has three vaults, Caches counts what you found. You collect
-several tiers inside a **single mission**. We cost a three-vault Spy run as three
-rounds of Defense.
+several tiers inside a **single mission**.
+
+**Measured 2026-08-25 by driving the shipped model over the 2026-08-24 build, and
+it is worse than this entry used to say** (*"we cost a three-vault Spy run as three
+rounds of Defense"* — we do not; we cost some of them as four, and Caches as six).
+There is no mission-type test anywhere in the run-length chooser: `rotation.js:356`
+picks `["reset", "aabcaa"]` for everything, so a plan optimiser that assumes you
+may choose to stay picks lengths these missions cannot have.
+
+| Mission type | live nodes | costed at | reality |
+|---|---|---|---|
+| `Caches` | 28 of 38 | **6 caches** | 3 |
+| `Spy` | 6 of 21 | **4 vaults** | 3 |
+
+59 of the 242 live mission nodes are priced as endless when they are not. Two
+consequences beyond the cost. On a real three-objective run the AABC cycle never
+reaches rotation C, so the model banks a reward the run cannot collect. And
+`plan.js:786` pushes the hardcoded string *"Worth staying six rounds"* whenever the
+chosen mode is `aabcaa`, so a three-cache Railjack run is told to stay for six —
+while the line above it (`plan.js:766`) says "over N **rounds**" even for a vault
+mission.
+
+`Key` and `Special` are the same defect but **dormant**: neither has a live relic
+source on today's build, so nothing in the ranking shows it. That is a property of
+today's data, not a fix.
+
+The comment at `rotation.js:392` asserts the opposite of what the code does —
+*"Spy and Caches need no special case: their rotation is the count of vaults opened
+or caches found"*. True of the unit, false of the count: `objectivesOf`
+(`rotation.js:420`) renames the unit and keeps the arithmetic.
+
+**Cap the length; do not touch the mapping.** Whether Spy's vaults 1/2/3 yield
+A/B/C rather than the AABC cycle's A/A/B belongs to *Nine rotation-bearing mission
+types are still unverified*, and under the wiki rule that answer comes from
+`wiki.warframe.com` rather than from us. Three vaults and three caches are numbers
+this file already states; the mapping is not.
 
 Useful find while checking: the wiki splits missions into **Endless** (Defense,
 Survival, Interception, Excavation, Defection, Disruption, Alchemy, Infested
@@ -518,9 +613,15 @@ Three ways out, and the choice is a judgement about what the CSP is *for*:
   being a single action.
 
 **Not decided here.** The first is the obvious one and is what a carve-out that
-already exists is for, but it is a security policy and the call is the owner's. Note
-that whichever wins, `PROJECT.md §2`'s instruction is wrong as written today and
-should say what actually works.
+already exists is for, but it is a security policy and the call is the owner's.
+
+**The wrong instruction has moved, checked 2026-08-25.** `PROJECT.md §2` has since
+been repaired: it gives `python -m http.server 8781 --bind 127.0.0.1` and says why
+it is deliberately not `serve.py`. The same broken instruction still stands in
+`README.md:816` — *"Open it at `/temp_mockup.html` while `serve.cmd` is running"*,
+and `serve.cmd` runs `tools/serve.py`. This entry never named README, so acting on
+it as written would have left the wrong copy standing, and it is the more-read
+document of the two.
 
 ### Our four invented "mission types" leak into the ranking
 
@@ -643,10 +744,24 @@ case. They are not, and the reason matters:
 > is the legacy route, and it is not a route. Railjack is not one source among
 > several; it has been the **only** current source for years.
 
-So there is no mix to display. Whichever of the six you look at, every reachable
-route is Railjack, and the badge says so. The mixed case this entry describes is
-real but hypothetical — nothing in today's data is in it. Written down anyway,
-because the display question is the same either way and the data can change.
+So there is no mix to display **for those six**. Whichever of them you look at,
+every reachable route is Railjack, and the badge says so.
+
+**The mixed case is not hypothetical, though, and this entry claimed it was until
+2026-08-25.** Running the shipped predicates (`notADestination`, `isRailjack`,
+`isEventNode`) over every part of the 2026-08-24 build, with the two opt-in boxes
+off, puts three parts in it right now — all on **Lex Prime**:
+
+| Part | Row says | Reachable | The one that is not |
+|---|---|---|---|
+| `Blueprint` | 2 relics dropping | 1 | Neo V9 |
+| `Barrel` | 3 relics dropping | 2 | Meso N11 |
+| `Receiver` | 3 relics dropping | 2 | Axi V10 |
+
+22 further parts are the all-blocked case already described above. The cause is
+one filter disagreeing with another: the *Still needed* count at `plan.js:1243`
+tests `!vaulted` alone, while the node loop at `plan.js:415-417` applies all three
+of `notADestination`, `opts.railjack` and `opts.event`.
 
 **And it is tolerable by design.** A handful of very legacy relics sitting vaulted
 behind a current Railjack source is exactly the shape this project is happy with:
