@@ -1544,6 +1544,32 @@ bonus, which would stop being a nudge. Its real obstacle is cost — rotation C 
 Onslaught is twelve zones — and `TODO.md` records that the fix is a browsable
 ranking, not a bigger number.
 
+### Both thumbs reach every ranked figure, including the per-run one
+
+There are two deliberate adjustments in the model — `CACHE_PENALTY` and the
+Radiant bonus — and until 2026-08-25 both were applied to `score` and `rate` and
+to nothing else. `perRun` escaped, and `perRun` is what the *per run* sort orders
+on. So a halved Railjack cache node ranked per run exactly where it would have
+sat unhalved, and a node handing relics over Radiant got no credit at all in that
+view. The two sorts disagreed for reasons that had nothing to do with the sort.
+
+`STYLE.md §5` is what makes that a defect rather than a quirk: the biggest number
+on a row is the one the list is ordered by. If the order is adjusted and the
+number is not — or the reverse — the row is claiming something untrue about
+itself.
+
+Both adjustments now compose into one multiplier, `n.adj`, applied to `score`,
+`rate` and `perRunAdj`; the per-run sort orders on `perRunAdj`. **`n.perRun`
+itself is untouched** and remains the raw count DE's tables imply. That is the
+figure the tooltip quotes — *"N wanted relics a run"* — so the fact stays
+available underneath the adjusted headline, and the tooltip names which thumbs
+are on the row: *"Ranked figures halved"* and *"Ranked figures +25%"*.
+
+Both row figures are adjusted now, rather than the headline only. Showing the raw
+count as the second line while the headline was adjusted meant the same quantity
+read as two different numbers depending on which way the list happened to be
+sorted, which is the same defect one level down.
+
 ### One deliberate thumb on the scale, and only one
 
 A Railjack `Caches` run is three hidden caches inside a boarded base, and it is the

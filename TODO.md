@@ -682,13 +682,14 @@ the top eight and a hover, not a table* — give the ranking a way to be seen
 whole, and #33 stops being invisible. Raising the bonus further is treating the
 symptom.
 
-**One inconsistency found on the way, and it predates this change.** Neither the
-Radiant lift nor `CACHE_PENALTY` is applied to `perRun`, so **the per-run sort
-shows an unadjusted order** — a halved Railjack cache node ranks per run as
-though it were not halved. `plan.js` says the headline figure is the adjusted one
-and the count underneath is not; when the reader sorts per run, the headline
-*becomes* the count, and that sentence stops being true. Worth deciding on its
-own merits rather than folded into a bonus commit.
+**The per-run sort no longer undoes the thumbs.** Fixed 2026-08-25. Neither the
+Radiant lift nor `CACHE_PENALTY` reached `perRun`, so ranking per run put a
+halved Railjack cache node exactly where it would have sat unhalved. Both now go
+through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
+`perRunAdj` — and `perRunAdj` is the key the per-run sort orders on.
+`PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
+and is what the tooltip quotes, so the row's figures are adjusted and say which
+thumbs are on them, while the fact underneath is not.
 
 ### The endless-fissure bonus is only stated on the collecting side
 

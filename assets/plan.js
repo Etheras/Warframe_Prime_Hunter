@@ -138,7 +138,10 @@
     rate: { key: "rate", unit: (perMin) => "relics / " + (perMin ? "min" : "objective"),
             heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "objective"),
             option: (perMin) => "per " + (perMin ? "minute" : "objective") },
-    run: { key: "perRun", unit: () => "relics / run",
+    /* `perRunAdj`, not `perRun`: the key the list SORTS on has to be the one
+       carrying the cache penalty and the Radiant lift, or ranking per run quietly
+       undoes both. See `n.adj`. */
+    run: { key: "perRunAdj", unit: () => "relics / run",
            heading: () => "ranked on relics per run",
            option: () => "per run" },
   };
@@ -561,6 +564,14 @@
          at +0.0% on all eleven, because the ranked number comes from the counts. */
       n.radiantShare = n.wantCnt ? (n.radCnt || 0) / n.wantCnt : 0;
       n.radiantLift = M.radiantMultiplier(n.radiantShare);
+      /* Both thumbs, in one place, applied to every ranked figure rather than
+         to some of them. `perRun` used to escape: the cache penalty and the
+         Radiant lift went to `score` and `rate` only, so ranking per run put a
+         halved Railjack cache node exactly where it would have sat unhalved.
+         The rule the row promises (`STYLE.md §5`) is that the biggest number is
+         the one the list is ordered by — so whichever figure that is has to
+         carry the adjustment, or the order and the number disagree. */
+      n.adj = (n.halved ? 1 - ROT.cachePenalty : 1) * n.radiantLift;
       /* The free relic for staying, once per run, and only where the run
          actually reaches it. `r.mode` is now the answer to "did this node
          choose to stay for it", which only a live fissure makes it do. */
@@ -569,8 +580,7 @@
       n.runMode = r.mode;         // how the model decided to run it
       // kept as the second number on the row: what a run is worth once the
       // relics are opened, which is a different question from how many arrive
-      n.score = (r.total + (n.bonus ? n.bonus.value : 0)) *
-                (n.halved ? 1 - ROT.cachePenalty : 1) * n.radiantLift;
+      n.score = (r.total + (n.bonus ? n.bonus.value : 0)) * n.adj;
       n.perRound = r.perRound;
       n.rounds = r.rounds; n.counts = r.counts;
       n.stranded = r.stranded; n.nonStandard = r.nonStandard;
@@ -603,11 +613,15 @@
          opened. That is the other list's question, and answering both with one
          number was why "runs to finish" could never be labelled honestly.
 
-         The cache penalty applies here rather than to `perRun`, which stays the
-         raw count DE's numbers imply. So the headline is an adjusted figure and
-         says so on the row; the fact underneath it is not adjusted. */
-      n.rate = (n.perRun / n.cost) * (n.halved ? 1 - ROT.cachePenalty : 1) *
-               n.radiantLift;
+         Both thumbs on the scale live in `n.adj` and reach every ranked figure:
+         `score`, `rate` and `perRunAdj`. `perRun` itself stays the raw count DE's
+         numbers imply and is what the tooltip quotes, so the row's figures are
+         adjusted and say so, while the fact underneath them is not. */
+      n.rate = (n.perRun / n.cost) * n.adj;
+      /* The per-run figure the list can be ordered by, adjusted like every other
+         ranked number. `n.perRun` itself stays the raw count DE's tables imply
+         and is what the tooltip quotes — the fact underneath is not adjusted. */
+      n.perRunAdj = n.perRun * n.adj;
     });
 
     // Whichever number the reader asked for, then a lower enemy level (faster
@@ -876,19 +890,27 @@
       pct(n.anyRun) + " of runs drop at least one.",
       "Worth " + pct(n.score) + " towards your list once opened.",
     ];
-    if (n.halved) lines.push("Ranked figure halved — see the row.");
+    /* The row shows adjusted figures; this line is the unadjusted fact, so say
+       which thumbs are on it rather than leaving the two to disagree silently. */
+    if (n.halved) lines.push("Ranked figures halved — see the row.");
+    if (n.radiantLift > 1) {
+      lines.push("Ranked figures +" + Math.round((n.radiantLift - 1) * 100) +
+                 "%: it hands relics over Radiant and traces are tight.");
+    }
     if (perMin && n.minutesAssumed) lines.push("Minutes assumed from the ones you set.");
 
     /* Both numbers stay on the row and they swap places: the one the list is
        ordered by is the big one, always, and the other goes underneath it. A
        toggle that changed the order without moving them would leave the row
        claiming to be sorted by a number it is not. */
-    const big = by.key === "perRun"
-      ? { value: n.perRun, unit: by.unit(perMin) }
-      : { value: n.rate, unit: by.unit(perMin) };
-    const alt = by.key === "perRun"
+    const big = { value: n[by.key], unit: by.unit(perMin) };
+    /* Both figures on the row are adjusted, so swapping the sort swaps their
+       places and nothing else. Showing the raw count here while the headline was
+       adjusted made the same quantity read as two different numbers depending on
+       which way the list happened to be sorted. */
+    const alt = by.key === "perRunAdj"
       ? n2(n.rate) + " / " + (perMin ? "min" : "objective")
-      : n2(n.perRun) + " a run";
+      : n2(n.perRunAdj) + " a run";
 
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
       <b>${n2(big.value)}</b>${esc(big.unit)}
@@ -1194,8 +1216,8 @@
       ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
           `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${
             // the same number these rows are ordered by, in the same unit
-            sortBy().key === "perRun"
-              ? n2(n.perRun) + "/run"
+            sortBy().key === "perRunAdj"
+              ? n2(n.perRunAdj) + "/run"
               : n2(n.rate) + (n.minutes != null ? "/min" : "/obj")}`
         ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
       : "");

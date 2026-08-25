@@ -1215,3 +1215,109 @@ page_test("the four Faceoff tables are one bet and rank as one row", async () =>
   }
   assert.deepEqual(errors, []);
 });
+
+page_test("ranking per run does not undo the thumbs on the scale", async () => {
+  /* The bug: the cache penalty and the Radiant lift were applied to `score` and
+     `rate` and not to `perRun`, so switching the sort to *per run* ranked a node
+     exactly where it would have sat with no thumb on it at all. The row promises
+     (`STYLE.md §5`) that the biggest number is the one the list is ordered by —
+     so whichever figure that is has to carry the adjustment.
+
+     The subject is a node that hands relics over Radiant, picked on the raw
+     `refinement` field rather than by asking the code under test. It is also the
+     first end-to-end check that the 25% reaches a ranked number at all: none of
+     these nodes appears in the eight rows ranked per objective, but ESO does
+     appear ranked per run, which is the only view that can see it. */
+  const { page, errors } = await open("/plan.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA, R = D.relics || {};
+    const byNode = new Map();
+    Object.keys(R).forEach((n) => {
+      if (R[n].vaulted) return;
+      (R[n].sources || []).forEach((s) => {
+        if (s.refinement !== "Radiant") return;
+        if (!byNode.has(s.node)) byNode.set(s.node, new Set());
+        byNode.get(s.node).add(n);
+      });
+    });
+    const best = [...byNode.entries()].sort((a, b) => b[1].size - a[1].size)[0];
+    if (!best) return { node: null };
+    const wanted = best[1];
+    const ids = (D.items || []).filter((it) =>
+      (it.parts || []).some((p) => (p.relics || []).some((r) => wanted.has(r.relic))))
+      .map((it) => it.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+    return { node: best[0], relics: wanted.size };
+  });
+  assert.ok(subject.node, "no live relic is handed over Radiant — subject gone");
+
+  await page.reload({ waitUntil: "load" });
+  await page.evaluate(() => {
+    const s = document.querySelector("#p-sort");
+    s.value = "run"; s.dispatchEvent(new Event("change"));
+  });
+
+  /* The headline figure and the raw count the tooltip quotes, off the same row.
+     The tooltip is deliberately the UNADJUSTED fact, so the gap between the two
+     is exactly the thumb. */
+  const readRow = (node) => page.evaluate((name) => {
+    const el = [...document.querySelectorAll("#planNodes .spot")]
+      .find((x) => x.querySelector(".spot-where").childNodes[0].textContent.trim() === name);
+    if (!el) return null;
+    const tip = el.querySelector(".spot-score").getAttribute("data-tip") || "";
+    const m = tip.match(/([\d.]+) wanted relics a run/);
+    return { headline: Number(el.querySelector(".spot-score b").textContent),
+             raw: m ? Number(m[1]) : null,
+             saysLift: /Ranked figures \+(\d+)%/.test(tip),
+             lift: (tip.match(/Ranked figures \+(\d+)%/) || [])[1] };
+  }, node);
+
+  const on = await readRow(subject.node);
+  assert.ok(on, `${subject.node} is not among the rows ranked per run`);
+  assert.ok(on.raw, "could not read the raw count out of the tooltip");
+  assert.ok(on.saysLift, "a row carrying the bonus must say so");
+  assert.equal(on.lift, "25");
+
+  // the headline per-run figure IS the lifted one — this is the fix
+  assert.ok(Math.abs(on.headline / on.raw - 1.25) < 0.02,
+            `per-run headline ${on.headline} should be 1.25x the raw ${on.raw}; ` +
+            `got ${(on.headline / on.raw).toFixed(3)}x — the thumb is not reaching ` +
+            `the sort key`);
+
+  /* Untick the assumption and the node must fall. Its POSITION is what is
+     asserted rather than its number, because losing the bonus drops it out of
+     the eight visible rows entirely — which is itself the proof that the thumb
+     was moving the order, and not merely a label. */
+  const order = () => page.evaluate(() => {
+    const names = [...document.querySelectorAll("#planNodes .spot")]
+      .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim());
+    const more = document.querySelector(".more-nodes");
+    if (more) {
+      (more.getAttribute("data-tip") || "").split(/\r?\n/).forEach((line) => {
+        const m = line.match(/^(.+?) \(/);
+        if (m) names.push(m[1]);
+      });
+    }
+    return names;
+  });
+
+  const rankedWith = (await order()).indexOf(subject.node);
+  await page.locator("label:has(#p-traces)").click();
+  assert.equal(await page.locator("#p-traces").isChecked(), false);
+  const rankedWithout = (await order()).indexOf(subject.node);
+
+  assert.ok(rankedWith >= 0, "subject was not in the ranking to begin with");
+  assert.ok(rankedWithout > rankedWith,
+            `${subject.node} must fall when the bonus is taken away: ` +
+            `#${rankedWith + 1} -> #${rankedWithout + 1}`);
+
+  // if it is still on screen, its headline must be back to the raw count
+  const off = await readRow(subject.node);
+  if (off && off.raw) {
+    assert.ok(Math.abs(off.headline - off.raw) < 0.02,
+              `with no thumb the headline ${off.headline} must equal the raw ${off.raw}`);
+  }
+
+  assert.deepEqual(errors, []);
+});
