@@ -187,11 +187,11 @@ suites:
 "test": "node --test tests/test_assets.mjs tests/test_pages.mjs"
 ```
 
-`tests/test_model.mjs` is missing, so `npm test` runs 19 fewer tests than it looks
-like it does and says nothing about it. Drift rather than a hole — `python
-tests/test_build.py` is the documented command and it runs all three, which is why
-the count still reaches 316 — but the failure mode is the bad one: a green run that
-quietly checked less than the reader believes. One line.
+`tests/test_model.mjs` is missing, so `npm test` runs a whole suite fewer than it
+looks like it does, and says nothing about it. Drift rather than a hole — `python
+tests/test_build.py` is the documented command and it runs all three — but the
+failure mode is the bad one: a green run that quietly checked less than the reader
+believes, with no skip line to give it away. One line.
 
 ---
 

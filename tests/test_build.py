@@ -1860,30 +1860,18 @@ def main() -> int:
         return 1
     print(f"{PASSED} passed")
 
-    # The README states this number, and the wiki republishes it. It said 272
-    # for as long as it took someone to read it, which is the whole reason the
-    # wiki is generated rather than written. Checked here rather than as a test,
-    # because a test cannot know the final count while it is still one of the
-    # things being counted.
+    # There is deliberately no check that the documentation agrees with this
+    # number, because the documentation no longer states one. It used to: the
+    # README carried a figure, the wiki republished it, and this compared the
+    # two on any complete run. That was removed on 2026-08-25 along with every
+    # written count.
     #
-    # **Only on a complete run.** The first version of this checked "the README
-    # must not claim more than passed", which sounded safe and took CI down
-    # within the hour: the runner has no Playwright, so it legitimately passes
-    # 245 of 299 and the README was "overstating" on every machine that is not
-    # a developer's. A figure describing the whole suite can only be compared
-    # against the whole suite.
-    stated = re.search(r"(\d[\d,]*) automated tests",
-                       read_text(os.path.join(ROOT, "README.md")))
-    if stated and not PARTIAL and complete is not None:
-        claimed = int(stated.group(1).replace(",", ""))
-        if claimed != complete:
-            print(f"\n  FAIL README claims {stated.group(1)} automated tests and "
-                  f"this complete run passed {complete}.\n"
-                  f"       Update the figure in README.md — the wiki republishes it.")
-            return 1
-    elif stated:
-        print(f"  (README's {stated.group(1)}-test figure unchecked here: "
-              f"some tests skipped, so this run is not the whole suite)")
+    # The reason is that the figure was never load-bearing and the upkeep was.
+    # A count answers no question a reader actually has - it does not say what
+    # is covered, only how finely it was sliced - and it went stale on every
+    # commit that added a test, which meant three documents to re-edit for a
+    # number nobody acts on. What matters is the line above: everything passed,
+    # or something did not. Do not reintroduce a count here or in the docs.
 
     if not online:
         print("(clone-and-build skipped — re-run with --online for the full set)")

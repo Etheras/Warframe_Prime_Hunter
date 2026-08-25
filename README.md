@@ -10,7 +10,7 @@
 > Read it with that in mind. What follows is what the project actually does about
 > it, rather than a disclaimer that ends the sentence:
 >
-> - **Everything is checked by running it.** 317 automated tests, including
+> - **Everything is checked by running it.** An automated suite, including
 >   browser tests against the real pages, and the reasoning behind each design
 >   decision is written down in [`PROJECT.md`](PROJECT.md) rather than left in a
 >   chat log. Where a rule exists, the incident that caused it is recorded.
