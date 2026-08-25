@@ -77,7 +77,6 @@ the run-mode table and the fissure section — plus a new focus rule in `STYLE.m
 | Entry | Where | Size |
 |---|---|---|
 | Two comments describe things that no longer exist | `index.html`, `build_data.py` | small |
-| The mockup mechanism is documented but cannot run under its own server | `serve.py`, `README.md` | small — a decision, not a fix |
 | `npm test` silently drops a whole suite | `package.json` | small |
 
 ### The worldstate is already cached, and barely read
@@ -721,53 +720,6 @@ reverse-engineering, from a source, and it independently confirms Spy is not
 endless.
 
 ## Everything else
-
-### The mockup mechanism is documented but cannot run under its own server
-
-**Found 2026-08-24, while repairing a stale reference in the mockup.** `PROJECT.md
-§2` tells whoever picks this up — and an AI assistant especially — to reach for
-`temp_mockup.html`, serve it with `python tools/serve.py`, and show the result. That
-does not work, and has not since the CSP landed.
-
-`serve.py` sends one strict policy to every response (`serve.py`, line ~304), and it
-is the policy the app earns by having no inline anything: `script-src 'self'`,
-`style-src 'self'`, no `unsafe-inline`, no `unsafe-eval`. A mockup is a single file
-with an inline `<style>` and an inline `<script>` — that is the whole point of it
-being one file you overwrite — so the browser blocks both and the page sits on
-*Loading…* forever. Nothing says why unless you open the console.
-
-It is a real gap rather than a cosmetic one: the documented way to show a proposal
-against live data silently produces a blank page, and the instruction to use it is
-given to exactly the audience least likely to question the tooling.
-
-Confirmed with the mockup fully repaired: served from a plain `http.server` it
-renders all four sections against the live 167-item dataset with no errors, so the
-mockup's own code is sound and the CSP is the only thing stopping it.
-
-Three ways out, and the choice is a judgement about what the CSP is *for*:
-
-- **Relax the policy for `LOCAL_ONLY_FILES` only.** The carve-out already exists and
-  is already enforced by peer address, so the blast radius is one gitignored file
-  that is never part of the site and never reaches a non-loopback client. Smallest
-  change; costs the ability to say "one policy, no exceptions".
-- **Serve the mockup a hash or a nonce.** Keeps the policy strict and honest, at the
-  price of `serve.py` reading and hashing the file on every request — real work for
-  a scratchpad, and it breaks the moment the file is edited without a reload.
-- **Say mockups are three files, not one.** Keeps `serve.py` untouched and makes the
-  mechanism heavier exactly where it was meant to be light. `PROJECT.md §2` would
-  need rewriting, and "delete the draft or overwrite it with the next one" stops
-  being a single action.
-
-**Not decided here.** The first is the obvious one and is what a carve-out that
-already exists is for, but it is a security policy and the call is the owner's.
-
-**The wrong instruction has moved, checked 2026-08-25.** `PROJECT.md §2` has since
-been repaired: it gives `python -m http.server 8781 --bind 127.0.0.1` and says why
-it is deliberately not `serve.py`. The same broken instruction still stands in
-`README.md:816` — *"Open it at `/temp_mockup.html` while `serve.cmd` is running"*,
-and `serve.cmd` runs `tools/serve.py`. This entry never named README, so acting on
-it as written would have left the wrong copy standing, and it is the more-read
-document of the two.
 
 ### Our four invented "mission types" leak into the ranking
 

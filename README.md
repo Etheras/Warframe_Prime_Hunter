@@ -818,6 +818,15 @@ at `/temp_mockup.html` while `serve.cmd` is running.
 
 It is **gitignored and served only to this machine**: `serve.py` refuses it to
 any other address, so sharing the LAN server never shares a half-finished idea.
+It is never tracked and has never been pushed, so there is no empty copy of it on
+GitHub to keep in step.
+
+That one file is also the **only** thing served a relaxed policy: a mockup is one
+file with an inline `<style>` and an inline `<script>`, which the app's own strict
+CSP blocks outright. Since 2026-08-25 `temp_mockup.html` — and nothing else — is
+sent `'unsafe-inline'` for scripts and styles. Every other response, both pages
+included, still gets the strict policy, and the exception is asserted directive by
+directive in the suite so it cannot widen unnoticed.
 
 **Clear it once you have decided.** Delete the file, or overwrite it with the next
 idea — nothing depends on it, and a mockup left in place goes stale silently. It

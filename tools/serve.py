@@ -198,6 +198,31 @@ def build_csp() -> str:
 CSP = build_csp()
 
 
+# The one exception, and it is one file wide.
+#
+# A mockup is a single file with an inline <style> and an inline <script> --
+# that is the whole point of a scratchpad you overwrite in place -- so the
+# policy above blocks both, the page sits on "Loading..." forever, and the
+# reason appears only in the console. That made the documented way to show a
+# proposal against real data (PROJECT.md section 2) silently produce a blank
+# page, for the audience least likely to suspect the tooling.
+#
+# Relaxing it *here* rather than in build_csp keeps the blast radius at exactly
+# one file: gitignored, never tracked, never part of the site, and already
+# refused to any non-loopback peer by `allowed()`. Everything else in the policy
+# is kept -- default-src 'none', connect-src 'self', frame-ancestors 'none' --
+# so a mockup still cannot reach off-site or be framed. The app's own pages
+# never see this header, so "the site has no inline anything" stays a true
+# statement the browser enforces.
+def build_local_csp() -> str:
+    return (CSP
+            .replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+            .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'"))
+
+
+CSP_LOCAL_ONLY = build_local_csp()
+
+
 # Served to this machine and to nothing else, whatever the server is bound to.
 #
 # temp_mockup.html is a scratchpad for showing a proposed change against real
@@ -300,8 +325,17 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
         page head, and the CDN because a build without --with-images points
         artwork there. With local artwork nothing off-site
         is ever requested and the extra source simply goes unused.
+
+        Exactly one file gets a looser policy -- see CSP_LOCAL_ONLY. The test is
+        repeated here rather than trusted from `allowed()`, because end_headers
+        also runs on error responses: the peer check has to hold on this line
+        whatever path reached it.
         """
-        self.send_header("Content-Security-Policy", CSP)
+        rel = self._relative()
+        local_only = (rel in LOCAL_ONLY_FILES
+                      and is_loopback(self.client_address[0]))
+        self.send_header("Content-Security-Policy",
+                         CSP_LOCAL_ONLY if local_only else CSP)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Frame-Options", "DENY")

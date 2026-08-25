@@ -1426,6 +1426,45 @@ def test_server_serves_only_the_site() -> None:
     check_true("CSP has no unsafe-inline", "unsafe-inline" not in serve.CSP)
     check_true("CSP has no unsafe-eval", "unsafe-eval" not in serve.CSP)
     check_true("CSP denies framing", "frame-ancestors 'none'" in serve.CSP)
+
+    # ── the one inline exception, and it has to stay one file wide ──────────
+    # A mockup is a single file with an inline <style> and an inline <script>,
+    # which is exactly what the policy above blocks - so the documented way to
+    # show a proposal against real data produced a blank page (PROJECT.md §2).
+    # The relaxation is scoped to the file that was already local-only by peer
+    # address, asserted directly above. Both halves are checked here rather
+    # than trusted, because a security exception that widens quietly - one more
+    # filename, one more directive - is the failure mode that would not show up
+    # on screen. Every directive is compared by name, so a policy that gains or
+    # loses one fails rather than passing on a substring.
+    def directives(policy: str) -> dict:
+        out = {}
+        for part in policy.split(";"):
+            name, _, value = part.strip().partition(" ")
+            if name:
+                out[name] = value.strip()
+        return out
+
+    strict, loose = directives(serve.CSP), directives(serve.CSP_LOCAL_ONLY)
+    check("mockup CSP: the carve-out is one file wide",
+          sorted(serve.LOCAL_ONLY_FILES), ["temp_mockup.html"],
+          "every name in this set is served 'unsafe-inline'")
+    check("mockup CSP: the same directives, no more", sorted(loose), sorted(strict))
+    check("mockup CSP: only script-src and style-src are relaxed",
+          sorted(k for k in strict if strict[k] != loose.get(k)),
+          ["script-src", "style-src"],
+          "anything else differing means the exception has widened")
+    check("mockup CSP: the relaxation is exactly 'unsafe-inline'",
+          [k for k in ("script-src", "style-src")
+           if loose[k] != strict[k] + " 'unsafe-inline'"], [])
+    check_true("mockup CSP: still no unsafe-eval",
+               "unsafe-eval" not in serve.CSP_LOCAL_ONLY)
+    check_true("mockup CSP: still denies framing",
+               loose.get("frame-ancestors") == "'none'")
+    check_true("mockup CSP: still default-src 'none'",
+               loose.get("default-src") == "'none'")
+    check_true("mockup CSP: a mockup still cannot reach off-site",
+               loose.get("connect-src") == "'self'")
     # With artwork local the CDN is not merely unused, it is disallowed - so a
     # visitor's address cannot reach a third party even by accident.
     import artwork as art

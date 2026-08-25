@@ -232,15 +232,16 @@ numbers by hand in a side script and paste them into static HTML — wire the pa
 to the real dataset so what the owner sees is what the data actually says.
 
 ```bash
-python -m http.server 8781 --bind 127.0.0.1     # then open /temp_mockup.html
+python tools/serve.py                           # then open /temp_mockup.html
 ```
 
-**That is deliberately not `serve.py`, for now.** `serve.py` sends the app's
-strict CSP to every response, and a mockup is one file with an inline `<style>`
-and an inline `<script>` — so it is blocked, the page sits on *Loading…*, and the
-reason appears only in the console. `TODO.md` carries the entry and the three ways
-out; until one is chosen, use the plain server above and remember it gives you
-none of `serve.py`'s protections, so do not bind it to anything but loopback.
+**Use `serve.py`, and since 2026-08-25 that works.** It used not to: `serve.py`
+sends the app's strict CSP to every response, a mockup is one file with an inline
+`<style>` and an inline `<script>`, so both were blocked — the page sat on
+*Loading…* with the reason only in the console, and the documented way to show a
+proposal silently produced a blank page. The policy now carries exactly one
+exception, scoped to the one file that already had a local-only carve-out. See
+*One inline exception, one file wide* in §5 for what it does and does not relax.
 
 Three rules, all enforced rather than remembered:
 
@@ -821,6 +822,36 @@ no inline event handlers and no `style=` attributes. Two `onerror` attributes on
 artwork were the last obstacle, and became one capture-phase listener; four
 `style=` attributes became utility classes. `img-src` allows `data:` for the
 inline SVG favicon and the CDN for builds without local artwork.
+
+**One inline exception, one file wide.** That strict policy had a cost nobody had
+priced: a mockup is deliberately *one* file with an inline `<style>` and an inline
+`<script>`, so the browser blocked both, the page sat on *Loading…*, and the reason
+appeared only in the console. The mechanism §2 tells every newcomer — and an AI
+assistant especially — to reach for silently produced a blank page, for the reader
+least likely to suspect the tooling.
+
+Since 2026-08-25, `temp_mockup.html` alone is served a second policy that adds
+`'unsafe-inline'` to `script-src` and `style-src` **and changes nothing else**:
+`default-src 'none'`, `connect-src 'self'`, `frame-ancestors 'none'` and the rest
+are the same string. Three things make that proportionate rather than a hole in
+the wall. The file was **already** local-only by peer address, so the looser policy
+cannot reach a LAN guest. It is gitignored and has never been tracked, so it cannot
+be published. And the app's own responses never carry it, so *"the site has no
+inline anything"* stays a claim the browser enforces rather than one we make.
+
+Three ways out were weighed. **Hashing or a nonce** keeps one policy, at the price
+of reading and hashing the file on every request and breaking the moment it is
+edited without a reload — real work for a scratchpad. **Making mockups three files**
+keeps `serve.py` untouched and makes the mechanism heavy exactly where it was meant
+to be light, and "overwrite it with the next idea" stops being one action. The
+carve-out was taken because the carve-out already existed: `LOCAL_ONLY_FILES` was
+enforcing the *same* judgement about the *same* file, by peer address, and this
+adds a second consequence to a decision already made rather than a new one.
+
+The obvious failure mode is that it widens quietly — one more filename, one more
+directive — and nothing on screen would show it. So the suite compares the two
+policies **directive by directive** and asserts the set of exempt files by name;
+relaxing `connect-src` as an experiment turned two assertions red and named it.
 
 The server is threaded. Single-threaded, one client opening a socket and never
 finishing its request blocked every other client for the full timeout — measured
