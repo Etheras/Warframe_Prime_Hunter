@@ -47,7 +47,7 @@ VAULTED` teal it would otherwise wear. Two badges, one colour, one meaning —
 *you will need a ship*. Choosing a different colour for the card would have made
 them look like two unrelated facts.
 
-**A rule that does not apply everywhere gets `--odd` amber** (`#684321`).
+**A rule that does not apply everywhere gets `--odd` amber** (`#d69f66`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and
 not a rarity. Anything given this colour must carry a tooltip explaining the
@@ -63,8 +63,14 @@ It sits at the **same brightness as the meta line it lives on** — hue carries 
 signal, not luminance. A first attempt used a bright `#e8944a` at 7.27:1, which read
 as a highlight rather than as an annotation and made the row look like it had an
 error in it. Matching the surrounding text and changing only the hue is the quieter
-and more accurate signal. Note this puts it below the §3 contrast floor, which the
-whole meta line already is — see `TODO.md`.
+and more accurate signal.
+
+That rule is why `--odd` has moved twice: `#684321` → `#d29455` when the meta line
+went to `--txt-dim`, and `#d29455` → `#d69f66` on 2026-08-25 when `--txt-dim` was
+raised to clear the §3 floor. It tracks the line rather than holding a value —
+7.48:1 against `--panel` where `--txt-dim` is 7.45:1, a gap of 0.02. **This no
+longer sits below the §3 floor**; it did until that change, and this paragraph
+said so.
 
 **The data banner is deliberately the loudest thing on the page.** Solid amber for
 "behind", solid red for "incomplete" — not a tinted panel with a coloured edge, which
@@ -113,6 +119,33 @@ figure is **1.97:1**. The line above returns `rgba(...)` with the alpha included
 which is exactly why it is the instruction rather than "look up the hex".
 
 The state chips run 8.3:1 and 10.2:1. Anything visibly below that is a bug.
+
+### Where the tokens actually stand
+
+Audited on both rendered pages on 2026-08-25 — every element carrying text, each
+measured against the surface behind it rather than against the page.
+
+| Token | Worst surface | Ratio | |
+|---|---|---|---|
+| `--txt` `#e6ebf2` | `--panel-2` | **13.67:1** | passes |
+| `--txt-dim` `#a1aabb` | `--panel-2` | **7.00:1** | passes — raised from `#96a1b3` |
+| `--odd` `#d69f66` | `--panel` | **7.48:1** | passes — tracks `--txt-dim`, §1 |
+| `--txt-faint` `#66708090` | `--panel-2` | **1.92:1** | **fails, on ~220 elements** |
+
+`--txt-dim` was `#96a1b3`, which cleared the floor on the dark surfaces and missed
+it on the light ones — 6.27:1 on `--panel-2`. So whether the rule held depended on
+which row you landed on, which is not a rule. The replacement is solved against all
+five surfaces at once.
+
+**Solve on the rounded value.** A float that clears 7:1 can round to a hex that does
+not: `#a0aaba` was the first answer here and measures 6.98:1 on `--panel-2`.
+
+`--txt-faint` is the one that remains, and it is not a nudge — it is the section
+headings, `.cat-heading`, `.hint`, `.mini` and `.cnt`, around 220 elements at ~2:1.
+Raising it to the floor lands on `#a4aab3`, which is within a hair of `--txt-dim`'s
+own minimum `#a1aabb` — so the three-level hierarchy collapses into two unless
+`--txt-dim` moves up with it. `TODO.md` carries the worked palette that keeps all
+three distinct and all three above 7:1.
 
 ---
 

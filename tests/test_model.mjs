@@ -309,3 +309,80 @@ test("an already-parsed object is accepted, so callers need not stringify", () =
   const out = M.parseBackup({ collected: ["warframe-xaku-prime"] }, CATALOGUE);
   assert.deepEqual(plain(out.collected), ["warframe-xaku-prime"]);
 });
+
+/* ── what a Void Trace is worth ───────────────────────────────────────────
+ * traceValue answers the one question the ranking cannot see for itself: given
+ * the player says they are short of traces, what is one worth? It is the rate
+ * at which a marginal trace buys refinement uplift, taken at the best place in
+ * the plan to spend it. Subjects here are hand-built plans with stated numbers
+ * rather than anything read back out of the model, so the arithmetic is checked
+ * against figures written down in the test.
+ */
+
+/* Relic values are sums of floating-point chances, so an exact === on a derived
+   rate fails on the last bit: (0.35 - 0.30) / 25 is 0.0019999999999999996. */
+const close = (got, want, msg) =>
+  assert.ok(Math.abs(got - want) < 1e-12, `${msg}: got ${got}, wanted ${want}`);
+
+test("a trace is worth what it stops you losing, per trace spent", () => {
+  const M = load();
+  /* Short of traces you run the relic Intact, so a trace buys the distance from
+     Intact back up to the refinement the plan actually wanted. */
+  const radiant = { refinement: "Radiant", value: 0.50,
+                    byRefinement: { Intact: 0.30, Radiant: 0.50 } };
+  close(M.traceValue([radiant]), 0.20 / 100, "Radiant: 0.20 of value for 100 traces");
+
+  // a cheaper refinement can be the better rate: less uplift, far fewer traces
+  const exceptional = { refinement: "Exceptional", value: 0.35,
+                        byRefinement: { Intact: 0.30, Exceptional: 0.35 } };
+  close(M.traceValue([exceptional]), 0.05 / 25, "Exceptional: 0.05 for 25 traces");
+
+  // the marginal trace goes where it buys most, so the plan takes the best rate
+  close(M.traceValue([radiant, exceptional]), 0.05 / 25,
+        "a plan is worth its best opportunity, not its average");
+});
+
+test("a plan that already wants Radiant everywhere still values a trace", () => {
+  const M = load();
+  /* The regression this function was rewritten for. Measuring the uplift left
+     ABOVE the chosen refinement reads zero here - every relic is already Radiant
+     - which valued a trace at nothing for the player most short of them. */
+  const allRadiant = [
+    { refinement: "Radiant", value: 0.50, byRefinement: { Intact: 0.30, Radiant: 0.50 } },
+    { refinement: "Radiant", value: 0.44, byRefinement: { Intact: 0.28, Radiant: 0.44 } },
+  ];
+  assert.ok(M.traceValue(allRadiant) > 0,
+            "a fully-Radiant plan must still value the traces that buy it");
+  close(M.traceValue(allRadiant), 0.20 / 100, "the best of the two rates");
+});
+
+test("a trace is worth nothing when the plan wants no refining", () => {
+  const M = load();
+  // the plan's own answer is Intact: it costs nothing, so a trace buys nothing
+  assert.equal(M.traceValue([{ refinement: "Intact", value: 0.40,
+                               byRefinement: { Intact: 0.40, Radiant: 0.25 } }]), 0);
+  // refinement that gains nothing cannot be worth paying for
+  assert.equal(M.traceValue([{ refinement: "Radiant", value: 0.30,
+                               byRefinement: { Intact: 0.30, Radiant: 0.30 } }]), 0,
+               "a zero uplift must not become a positive trace value");
+  assert.equal(M.traceValue([]), 0, "an empty plan");
+  assert.equal(M.traceValue(null), 0, "no plan at all");
+});
+
+test("traceValue is denominated in score units, so the ranking can add it", () => {
+  const M = load();
+  // 0.20 of relic value for the 100 traces a Radiant costs; a node saving 100
+  // traces is worth exactly one such uplift, which is what plan.js relies on
+  const rate = M.traceValue([{ refinement: "Radiant", value: 0.50,
+                               byRefinement: { Intact: 0.30, Radiant: 0.50 } }]);
+  close(rate * 100, 0.20, "100 traces buys exactly one Radiant uplift");
+});
+
+test("the traces option survives a backup round trip", () => {
+  const M = load();
+  assert.ok(M.PLAN_OPTIONS.includes("traces"),
+            "an option missing from PLAN_OPTIONS is silently dropped on restore");
+  const out = M.parseBackup({ collected: [], plan: { traces: true, squad: false } },
+                            CATALOGUE);
+  assert.equal(out.plan.traces, true);
+});

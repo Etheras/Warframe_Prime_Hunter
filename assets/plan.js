@@ -108,7 +108,7 @@
   // rather than filtered on every read by whichever page remembered to
   ST.pruneWishlist((id) => BY_ID.has(id));
   const opts = Object.assign(
-    { squad: false, event: false, railjack: false, aya: true,
+    { squad: false, event: false, railjack: false, aya: true, traces: false,
       minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
 
@@ -408,6 +408,13 @@
        two duplicate rows and nothing else is a question not worth asking. The
        demand badge on the row says which nodes need it; that is the whole of
        what there is to say. */
+    /* What a saved Void Trace is worth in the same units as the score, or zero
+       when the player has not said they are short. Computed once per render from
+       the whole plan, because a marginal trace goes wherever it buys the most -
+       which is a property of the plan, not of the node being scored. */
+    const traceRate = opts.traces
+      ? M.traceValue(Array.from(relicPlan.values())) : 0;
+
     const nodes = new Map();
     const blocked = { railjack: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
@@ -440,8 +447,13 @@
           n.tracesSaved = Math.max(n.tracesSaved || 0, worth.traces);
           n.overshot = n.overshot || worth.value < rp.value - 1e-12;
         }
-        n.rot[slot] += ((s.chance || 0) / 100) * worth.value;
-        n.cnt[slot] += (s.chance || 0) / 100;
+        /* Traces enter the score here and nowhere else. `worth.traces` is what
+           this source saves you by handing the relic over already refined; at
+           `traceRate` = 0 -- the default, and whenever nothing in the plan wants
+           refining -- this is exactly the old expression. */
+        n.rot[slot] += ((s.chance || 0) / 100) *
+                       (worth.value + worth.traces * traceRate);
+        n.cnt[slot] += (s.chance || 0) / 100;   // rolls counted, never valued
         const prev = n.relics.get(rname);
         if (prev == null || (s.chance || 0) > prev.chance) {
           n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
@@ -1154,7 +1166,12 @@
             (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces" : "") + ".\n" +
             (n.overshot
               ? "Scored lower: this plan wanted them less refined."
-              : "This plan wanted Radiant anyway."))
+              : "This plan wanted Radiant anyway.") +
+            (n.tracesSaved
+              ? "\n" + (opts.traces
+                  ? "Those traces are in the score — you said you are under 500."
+                  : "Not scored. Tick Void Traces are tight to count them.")
+              : ""))
           }">${n.overshot ? "pre-refined" : "radiant"}</span>` : ""}${
           n.halved ? ` · <span class="est" data-tip="${esc(
             "Scored at half on purpose — nobody runs Railjack for caches.\n" +
@@ -1443,7 +1460,7 @@
     });
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
-   ["p-railjack", "railjack"]].forEach(([id, key]) => {
+   ["p-railjack", "railjack"], ["p-traces", "traces"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });

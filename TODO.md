@@ -110,7 +110,7 @@ What is left of the entry is two fields and a warning about one of them.
 | The endless-fissure bonus is only stated on the collecting side | small |
 | The Railjack opt-in gate stands in front of your only option | small |
 | The node list is the top eight and a hover, not a table | small |
-| The meta line is now 6.68:1, and the floor is 7:1 | small — a decision, not a fix |
+| `--txt-faint` fails the contrast floor on about 220 elements | session — a palette decision, measured |
 
 ### One refactor
 
@@ -127,9 +127,7 @@ of a worklist, not of the click, and worth deciding on its own merits.
 |---|---|
 | Plague Star and Profit-Taker are the same shape, modelled two ways | Plague Star to run |
 | The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
-| Void Traces: the exchange rate that would let them be scored | one answer from the player: *are you trace-limited?* |
-| Expected openings for everything, not for the worst one | the line above — the same trade decides its sign |
-| Radiant or Intact is all a recruiting-chat squad can agree on | a decision about a third sidebar option |
+| Expected openings for everything, not for the worst one | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
 | Nine rotation-bearing mission types are still unverified | wiki checking; tedious, not blocked |
 | Several of those modes are not round-based at all | the two mapping questions in the row above — **measured, and wrong on screen** in the meantime: 59 of 242 live nodes |
 
@@ -348,25 +346,6 @@ trace price, on one relic in twenty.** Which makes it the same trade as the entr
 above — what 100 traces are worth to this player — and it should not be implemented
 before that question has an answer, because the answer decides its sign.
 
-### Radiant or Intact is all a recruiting-chat squad can agree on
-
-**The review misreads the option.** The box is labelled **4-man premade** and its
-tooltip says so; a coordinated group *can* all run Exceptional, and the option
-already unlocks Disruption's rotation A, which needs the squad to under-defend
-conduits on a schedule. Restricting it to Intact and Radiant would make it describe
-something it does not claim to be.
-
-The gap it is pointing at is real, and it is a **missing option, not a restriction
-of this one**: a public radshare from recruiting chat, where you get four rolls but
-the refinement is not yours to choose — squad odds *forced to Radiant*. That is the
-common case for anyone without a premade, and the app currently has no way to say
-it. Whether the sidebar has room for a third state of one question is the design
-call; `PROJECT.md §7` is deliberately hostile to options that change two rows.
-
-It also overlaps with the pre-refined nodes: a relic handed over Radiant by ESO or a
-Void Storm is already at the radshare refinement, and `sourceValue` already values
-those at the refinement given rather than the one chosen.
-
 ### A concentrated farm finishes a relic sooner than a diluted one
 
 Measured, because the size of the effect decides whether it is worth pricing. Across
@@ -385,19 +364,6 @@ would move the ranking by an amount chosen by hand, in a direction no measuremen
 confirms. If it is wanted it needs a stated size and a paragraph in `PROJECT.md §7`
 beside the Railjack cache penalty — which is described there as *the one deliberate
 thumb on the scale*, and that sentence would have to stop being true.
-
-### Void Traces on ESO and the Void Storms — one correction to the entry above
-
-Already covered by *Void Traces: the exchange rate that would let them be scored*.
-What this review adds is **where to inject it**, and the plumbing is in place:
-`sourceValue` already computes the traces a pre-refined node saves you, per node, and
-deliberately leaves the figure out of the score.
-
-One correction. The review says the calculation needs nothing from the player. It
-needs exactly one binary answer — *are you trace-limited?* — because a player sitting
-on 8,000 traces values the saving at zero, and that is the whole reason the number is
-shown rather than scored (`PROJECT.md §7`). The formula in the entry above is the
-same one the review derives.
 
 ## A round is not a universal unit of effort
 
@@ -430,18 +396,38 @@ that until 2026-08-25, and it is too kind. They are not inherited from anywhere:
 they are chosen per node by a run-length optimiser that assumes the mission is
 endless, so the count is whatever staying happened to score best.
 
-As of 2026-08-25 the gap has a concrete cost, and two of the nine are what
-*Several of those modes are not round-based at all* is blocked on:
+**Both blocking questions were answered from the wiki on 2026-08-25**, and a third
+was added and answered with them. The seven that remain are still unverified.
 
-- **`Spy`** — do vaults 1/2/3 pay A/B/C, or the assumed A/A/B? Six live nodes —
-  Pago, Bode, Valac, Aegaeon, Amalthea, Dione — publish rotation **C only**, so
-  this answer alone decides whether capping a Spy run at its real three vaults
-  preserves their value or zeroes it.
-- **`Caches`** — does each of the three caches roll its own rotation, and do the
-  ten un-rotated tables roll once per run or once per cache?
+- **`Spy` — vault 1/2/3 pays rotation A/B/C.** Not the AABC cycle. The wiki's
+  *Mission Rewards* page is explicit that vault *names* do not correspond to
+  rotation and that what counts is how many vaults you have hacked so far; the
+  *Spy* page says the same, that rotations are determined only by the number of
+  vaults successfully hacked. It also files Spy under **Standard**, not Endless,
+  which is the round-based-or-not split the model had been reverse-engineering.
+  **This is what unblocks the cap**: on a capped three-vault run the third vault
+  *is* rotation C, so Pago, Bode, Valac, Aegaeon, Amalthea and Dione keep the
+  rotation they hold all their value in. The fear that capping would zero them
+  came from assuming A, A, B, and it was the right fear for that assumption.
+- **`Caches` — a Railjack mission pays two cache rewards, not three.** The first
+  is for completing a Point of Interest and pays **rotation A**; the second is for
+  hacking an Abandoned Derelict Cache and pays **rotation B**. Separate tables,
+  rolled independently — not a cycle at all. Our own data agrees exactly: all 38
+  live `Caches` nodes are Proxima, and the 28 rotation-bearing ones publish
+  precisely A and B and nothing else. **So the recorded design is wrong on the
+  count** — it says `{Caches: {count: 3}}` and it should be 2.
+- **The 10 un-rotated `Caches` nodes are Earth and Saturn Proxima**, which the
+  wiki shows with a single undifferentiated cache table and no A/B labelling.
+  Their `rot -` in our data matches. Costing them *one run* is already right and
+  they need no change.
+- **`Special` — Faceoff pays one each of rotation A and B at the end of a match**,
+  win or lose. So it is the same fixed-length, fixed-letters shape, and it is
+  **not dormant**: see the correction in the entry below.
 
-Answer those two and a measured, already-designed correction ships. The other seven
-can wait.
+What this changes about the design: the table needs the **letters**, not just a
+count, because the letters are what rescue the six Spy nodes. Three shapes, not
+two: `Spy` 3 objectives paying A,B,C; `Caches` 2 objectives paying A,B; Faceoff
+one match paying A+B.
 
 **Amended 2026-08-25: the sweep above verified the wrong axis.** The eleven
 "confirmed A→A→B→C against the wiki" were confirmed on the **letter sequence** and
@@ -606,9 +592,23 @@ chosen mode is `aabcaa`, so a three-cache Railjack run is told to stay for six �
 while the line above it (`plan.js:766`) says "over N **rounds**" even for a vault
 mission.
 
-`Key` and `Special` are the same defect but **dormant**: neither has a live relic
-source on today's build, so nothing in the ranking shows it. That is a property of
-today's data, not a fix.
+**`Key` and `Special` were recorded here as dormant — *"neither has a live relic
+source on today's build"* — and both halves of that are false.** Measured
+2026-08-25 by driving the shipped predicates over the build:
+
+- **`Key` has 8 live nodes**, each carrying 22 relics. They are absent from the
+  ranking because every one is `access=quest`, so `notADestination` drops them —
+  excluded by a rule, not by having nothing to exclude. Genuinely invisible, but
+  for a different reason than the one written down.
+- **`Special` has 10 live nodes and none of them is gated at all.** The four
+  Faceoff tables publish A+B and are being run to **six rounds** by `aabcaa` right
+  now, in the ranked list. `isPvPvE` only hangs a badge on them; it gates nothing.
+  The six Void Storm nodes carry no rotation and are costed *one run*, correctly.
+
+So the count is **38 mis-costed live nodes, not 34**, and `Special` belongs in the
+fix rather than in a footnote about dormancy. The wiki answer above says Faceoff
+pays one each of rotation A and B per match, so it is the same fixed shape: one
+run, both letters, once.
 
 The comment at `rotation.js:392` asserts the opposite of what the code does —
 *"Spy and Caches need no special case: their rotation is the count of vaults opened
@@ -777,25 +777,55 @@ roll currently assumed. Getting that right is arithmetic; getting it *checked*
 needs the event live, which is the same blocker as the detection below. Do both
 in the same sitting.
 
-### Void Traces: the exchange rate that would let them be scored
+### The Void Traces toggle is wired but lands where nobody looks
 
-The refinement model is built and the traces are shown on the row and left out of
-the score, for a reason `PROJECT.md §7` records: what 100 traces are worth depends
-on how many you have, and that is a fact about the player this app cannot see.
+**Shipped on 2026-08-25 and immediately found half-useful.** The sidebar now
+carries *Void Traces are tight — under 500*, the threshold the owner set at five
+Radiant refinements. `model.js` gained `traceValue`, which prices one trace off
+the player's own plan, and `plan.js` folds `traces × traceRate` into a node's
+value when the box is ticked. That part is right and unit-tested.
 
-**What would settle it, if a trace count is ever collected.** Traces buy refinement,
-so their value is the refinement uplift they buy on the relic you would have spent
-them on next:
+**Two things about where it lands, both measured rather than assumed.**
 
-```
-value of 100 traces  ≈  best over relics r in the plan of
-                        ( value(r, Radiant) − value(r, r.chosenRefinement) )
-```
+First, traces go into `n.rot` — the *value* — and not into `n.cnt`, the count of
+wanted relics. That is deliberate and it matches Forma and Aya, which are also
+worth something and are also not relics. But the list is ordered on `rate` and
+`perRun`, and **both are derived from the count**. So the toggle moves what a run
+is *worth* and cannot move the order.
 
-That is derived from the player's own plan rather than invented, and it goes to
-zero exactly when it should — when nothing in the plan wants refining. It needs
-one number from the player: **are you trace-limited?** Which is the same header
-slot the Mastery Rank field wants, below.
+Second, and worse: the bonus only ever lands on a node that hands relics over
+already refined, and there are eleven of those. **None of them reaches the visible
+eight rows under either sort.** Ranked per run with a wishlist covering all 28 of
+its relics, Elite Sanctuary Onslaught still loses to Olympus, Ur, Ani, Belenus,
+Apollo, Io, Mithra and Mot — it pays rotation C only, at 6.32% a relic. The Void
+Storms are 2.5% and the four Profit-Taker phases carry two relics each.
+
+So a reader can tick the box and see nothing change. A page test written for it
+failed on exactly this and was removed rather than weakened — there is no subject
+on screen to assert against.
+
+**Three ways out, and it is a modelling call.**
+
+- **Leave it in the value and say so on the cracking side.** The relic list is
+  where refinement is decided, and it is the honest home for *this relic arrives
+  Radiant, which saves you 100 traces you do not have*. Nothing about the ranking
+  changes. Smallest, and it makes the toggle visible where the decision is made.
+- **Let traces reach `perRun`.** They would then reorder the list. But `perRun`
+  counts wanted relics, and a trace is not one — the big number would stop being
+  the thing its own label says it is, which `STYLE.md §5` forbids.
+- **Show the eleven regardless of rank.** A pre-refined node is a different kind
+  of offer; surfacing it outside the top eight is really the *node list is the top
+  eight and a hover* entry wearing another hat.
+
+**A correction worth keeping.** The formula this file recorded — the uplift buyable
+*above* the chosen refinement, over `cost(Radiant) − cost(chosen)` — is wrong for
+the only case the toggle exists for. `bestRefinement` picks Radiant for every one
+of the 34 live relics, so `chosen` is already Radiant, every uplift is zero, and a
+trace is valued at nothing for the player most short of them. The counterfactual
+when you are rationing is being forced to run the relic **Intact**, not upgrading
+it further, so the rate is `(value(chosen) − value(Intact)) / cost(chosen)`.
+`model.js` carries the reasoning; a test asserts a fully-Radiant plan still values
+a trace.
 
 ### The endless-fissure bonus is only stated on the collecting side
 
@@ -1028,38 +1058,47 @@ So this is not a candidate for the exclusion rule. It is a candidate for a **dem
 badge**, and it would need the player's own rank — the first thing this project
 would have to ask about itself rather than derive.
 
-### The meta line is now 6.68:1, and the floor is 7:1 — what is left of decision 5
+### `--txt-faint` fails the contrast floor on about 220 elements
 
-**Option (b) shipped, and this entry is what remains of it.** `.spot-meta` was
-raised from `--txt-faint` to `--txt-dim`, and `--odd` was raised with it from
-`#684321` to `#d29455` so the amber keeps sitting at the same brightness as the
-line it annotates rather than reading as a highlight (`STYLE.md §1`). Re-measured
-2026-08-24 against `--panel`:
+**What is left of decision 5, after the ranked row was fixed on 2026-08-25.**
+`.spot-score`'s unit label — *relics / objective*, the words saying what the
+biggest number on the row measures — was `--txt-faint` at 1.97:1 and is now
+`--txt-dim`. `--txt-dim` itself went `#96a1b3` → `#a1aabb` and `--odd` followed it
+to `#d69f66`, so both clear 7:1 on every surface they are drawn on. `STYLE.md §3`
+has the table.
 
-| | Was | Now |
-|---|---|---|
-| `.spot-meta` | **1.98:1** | **6.68:1** |
-| `.est` amber, `--odd` | 2.00:1 | **6.73:1** |
-| `.spot-score` label — *relics / min* | 1.98:1 | **1.98:1**, unchanged |
+**`--txt-faint` was not in that change and is now the whole of the problem.** It is
+`#66708090` — 56% opaque, so it composites down to **1.92–2.01:1** depending on the
+surface, well under AA. Audited on both rendered pages, it is roughly **220
+elements**: every `h2` section heading, `.cat-heading`, `.cat-prog`, `.card-cat`,
+`.hint`, `.mini` and `.cnt`.
 
-So the big correction landed and two things are left, both small.
+**It is not a nudge, and that is the decision.** Raising it to the floor gives
+`#a4aab3`. `--txt-dim`'s own minimum is `#a1aabb`. Those are the same colour to the
+eye, so the three-level hierarchy — text, dim, faint — collapses into two. Keeping
+three distinct levels means moving `--txt-dim` up as well:
 
-**The line is still under the floor.** `STYLE.md §3` asks for WCAG AAA, 7:1, and
-6.68 is not 7. The gap is a rounding error rather than a legibility problem, so the
-honest options are to nudge the two tokens the last 5% or to write the exception
-into `STYLE.md` and stop calling it a debt.
+| Token | Value | Worst ratio | Note |
+|---|---|---|---|
+| `--txt` | `#e6ebf2` | 13.67:1 | unchanged |
+| `--txt-dim` | `#bfc6d1` | 9.52:1 | up from `#a1aabb` |
+| `--txt-faint` | `#a4aab3` | 7.00:1 | **alpha dropped** |
 
-**`.spot-score`'s own text was never in scope and is now the worst thing on the
-row.** The gold number reads at 8.82:1 and `.spot-alt` beneath it at 6.68:1, but
-the unit label between them — *relics / min*, the words that say what the biggest
-number on the row actually measures — is still `--txt-faint` at 1.98:1. That is a
-stronger case than the meta line ever was, because it is the label on the ranked
-quantity.
+That keeps a 1.41× luminance gap between dim and faint, against 2.21× today
+(comparing the raw hexes, before alpha). Narrower, still legible as a hierarchy.
+`--odd` tracks `--txt-dim` per `STYLE.md §1`, so it moves a third time with it.
 
-Every figure above was measured on the rendered element rather than read off the
-stylesheet, which is what `STYLE.md §3` requires and the reason the original
-measurement was out by half. **`temp_mockup.html` argued the decision that has now
-been taken and can go.**
+Four accent colours also miss the floor and are ordinary nudges:
+`--violet` `#9d7bea` → `#b49aef` (5.14 → 7.02, on `.badge.resurgence`), `--blue`
+`#5aa9e6` → `#65afe8` (6.55 → 7.02, `.badge.baro` and `.badge.railjack`), `--red`
+`#e0637a` → `#e7899a` (5.17 → 7.01), and the two hardcoded footer greys `#5b6474`
+→ `#9ba1aa` (3.06) and `#6f7a8c` → `#99a1ae` (4.21). `--gold`, `--teal` and
+`--green` already pass.
+
+**Solve on the rounded value.** `#a0aaba` was the first answer for `--txt-dim` and
+measures 6.98:1 on `--panel-2` — a float that clears 7:1 can round to a hex that
+does not. Every figure above was measured on the rendered element, per `STYLE.md
+§3`, which is why the alpha in `--txt-faint` is in them.
 
 ### The node list is the top eight and a hover, not a table
 
@@ -1156,6 +1195,35 @@ of them vaulted and irrelevant.
 What would unblock it: only the **currently-live relics** can affect a plan, so a
 future attempt should ask about those alone — one screen of counters, re-asked when
 the drop tables change. Any design that needs the vaulted ones is the wrong design.
+
+### A third squad state for public radshares **[settled — declined]**
+
+Raised by an outside review as *"Radiant or Intact is all a recruiting-chat squad
+can agree on"*, and **declined by the owner on 2026-08-25**: the public-radshare
+case is a niche this app will not model. Do not re-propose it.
+
+The review itself misread the existing option. The box is **4-man premade** and says
+so; a coordinated group can run any refinement, and it already unlocks Disruption's
+rotation A, which needs the squad to under-defend conduits on a schedule.
+Restricting it to Intact and Radiant would make it describe something it does not
+claim to be.
+
+What a third state *would* have modelled is narrower than it sounds — not the squad
+odds, which the existing box already covers, but the loss of **refinement choice**:
+a radshare gives you four rolls at a refinement that is not yours to pick. Measured
+over the live set before the call was made, so the size of what is being given up
+is on the record:
+
+- Wanting **everything** from a relic: the model picks Radiant on **all 34** live
+  relics, squad on or off. Forcing Radiant changes **nothing** — this is exactly
+  the *"an option nobody's answer changes"* case `PROJECT.md §7` rejects.
+- Wanting **one specific part**: it picks Intact on **88 of 180** combinations,
+  because a common reward is likeliest Intact. There, forced Radiant costs 0.5
+  openings with a premade and 2.1 without, plus 100 traces each.
+
+So the effect is real but confined to single-part farming in public squads, and it
+would add a third state to a sidebar question to say it. The trade was judged not
+worth the control.
 
 ---
 

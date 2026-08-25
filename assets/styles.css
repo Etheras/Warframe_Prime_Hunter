@@ -8,7 +8,14 @@
   --line:#242c3a;
   --line-soft:#1d2430;
   --txt:#e6ebf2;
-  --txt-dim:#96a1b3;
+  /* Raised from #96a1b3 on 2026-08-25. That value cleared 7:1 on the darker
+     surfaces and missed it on the lighter ones — 6.27:1 on --panel-2 — so the
+     floor in STYLE.md 3 held or not depending on which row you landed on. This
+     one is solved against every surface it is drawn on and clears on all five:
+     8.27 on --bg, 7.82 on --bg-2, 7.45 on --panel, 7.30 on the badge fill,
+     7.00 on --panel-2. Solved on the ROUNDED value, because a float that clears
+     7:1 can round to a hex that does not. */
+  --txt-dim:#a1aabb;
   --txt-faint:#66708090;
   --gold:#d9b45b;
   --gold-dim:#8a7133;
@@ -18,10 +25,11 @@
   --green:#5fce8f;
   --blue:#5aa9e6;
   /* Non-standard rule, read the tooltip. Raised from #684321 when the meta line
-     went to --txt-dim: the rule is that this sits at the SAME brightness as the
-     line it lives on, so hue carries the signal and luminance does not. 6.73:1
-     against --panel, where --txt-dim is 6.68:1. */
-  --odd:#d29455;
+     went to --txt-dim, and again from #d29455 when --txt-dim cleared the floor:
+     the rule is that this sits at the SAME brightness as the line it lives on,
+     so hue carries the signal and luminance does not. 7.48:1 against --panel,
+     where --txt-dim is 7.45:1 — a gap of 0.03, which is the rule holding. */
+  --odd:#d69f66;
   --radius:10px;
   --shadow:0 8px 28px rgba(0,0,0,.45);
 }
@@ -105,7 +113,10 @@ button,input,select,textarea{font:inherit;color:inherit}
   padding:6px 15px;
   border-radius:999px;
   font-size:12px;font-weight:500;letter-spacing:.7px;text-transform:uppercase;
-  color:#9ca7b9;text-decoration:none;white-space:nowrap;   /* 7.17:1 — --txt-dim is 6.68 here */
+  /* Was a hardcoded #9ca7b9 at 7.17:1, chosen only because --txt-dim was 6.68
+     here and missed the floor. --txt-dim now clears it on every surface, so the
+     magic number has no job left and the token does it instead. */
+  color:var(--txt-dim);text-decoration:none;white-space:nowrap;
   transition:color .15s, background .15s;
 }
 .viewtab:hover{color:var(--txt)}
@@ -383,9 +394,15 @@ button,input,select,textarea{font:inherit;color:inherit}
    TODO.md had recorded. It stays smaller than the node name above it, so the
    hierarchy survives on size rather than on being hard to read. */
 .spot-meta{grid-column:1/2;grid-row:2/3;font-size:11.5px;color:var(--txt-dim)}
+/* The unit label — *relics / objective* — is a bare text node in here, and it
+   says what the biggest number on the row measures. On --txt-faint it was the
+   faintest thing on the row at 1.97:1: a stronger case than the meta line above
+   ever was, because it is the label on the ranked quantity itself. It joins the
+   line it annotates rather than sitting below it. The gold number and .spot-alt
+   set their own colour, so only the label moves. */
 .spot-score{
   grid-column:2/3;grid-row:1/3;align-self:center;text-align:right;
-  font-size:11.5px;color:var(--txt-faint);font-variant-numeric:tabular-nums;line-height:1.25;
+  font-size:11.5px;color:var(--txt-dim);font-variant-numeric:tabular-nums;line-height:1.25;
 }
 .spot-score b{display:block;font-size:16px;color:var(--gold);font-weight:700}
 /* Everything derived from the ranked number goes underneath it, smaller — the
@@ -698,10 +715,11 @@ select.rank-by{
   flex:0 0 auto;
   padding:4px 8px;
   background:var(--panel-2);
-  /* Not --txt-dim, which measures 6.27:1 on --panel-2 and misses the 7:1 floor
-     in STYLE.md 3. This is a control rather than context - it is meant to be
-     read and pressed - so it takes the brightness that goes with that, and the
-     quiet comes from its size and its border instead. 13.67:1. */
+  /* Not --txt-dim. That used to be because --txt-dim measured 6.27:1 here and
+     missed the 7:1 floor; it now clears it at 7.00:1, so the reason is no longer
+     the floor but the role. This is a control rather than context — it is meant
+     to be read and pressed — so it takes the brightness that goes with that, and
+     the quiet comes from its size and its border instead. 13.67:1. */
   color:var(--txt);
   border:1px solid var(--line);
   border-radius:6px;

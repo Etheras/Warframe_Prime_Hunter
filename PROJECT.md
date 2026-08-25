@@ -1495,14 +1495,33 @@ in the "one refinement per relic" rule, which holds only while you cannot hold t
 same relic two ways — and you can, once one node gives you a Radiant copy and
 another an Intact one.
 
-**Void Traces are counted and never scored.** Refining costs 25 / 50 / 100 traces
-for Exceptional / Flawless / Radiant, less whatever has already been spent on that
-relic, so a node handing over a Radiant is worth up to 100 traces on top of the
-relic. That is real — traces come in at 6–30 a fissure run — and it stays off the
-score because **what 100 traces are worth depends on how many you have**, which is
-a fact about the player this app cannot see. Same call as Mastery Rank: a player
-fact we do not know annotates the row rather than moving the ranking. `TODO.md`
-holds the exchange rate that would settle it if a trace count were ever collected.
+**Void Traces are counted, and scored only if you say they are scarce.** Refining
+costs 25 / 50 / 100 traces for Exceptional / Flawless / Radiant, less whatever has
+already been spent on that relic, so a node handing over a Radiant is worth up to
+100 traces on top of the relic. That is real — traces come in at 6–30 a fissure
+run against 100 for a Radiant, so **refining never pays for itself**; it always
+comes out of a pile you already had.
+
+It stayed off the score until 2026-08-25 because what 100 traces are worth depends
+on how many you have, which is a fact about the player. The owner supplied it: the
+line is **500**, five Radiant refinements, and the sidebar carries *Void Traces are
+tight — under 500* with the number on the label rather than buried in the tooltip.
+Off by default, because an assumption nobody has made should not be made for them.
+
+Ticked, `M.traceValue` prices one trace off the player's own plan and `plan.js`
+adds `traces × rate` to a node's value. **The rate is what a trace stops you
+losing, not what more of it would buy.** Short of traces you run the relic Intact,
+so the rate is `(value(chosen) − value(Intact)) / cost(chosen)`, taken at the best
+place in the plan to spend it. `TODO.md` carried the other form — the uplift above
+the chosen refinement — and it reads zero exactly when it matters, because
+`bestRefinement` picks Radiant for all 34 live relics, so there is no upgrade left
+to price. `model.js` has the derivation and a test pins the fully-Radiant case.
+
+Traces enter the **value** and not the count, which puts them with Forma and Aya:
+all three are worth something and none is a relic, and the ranked number counts
+wanted relics. So the toggle changes what a run is worth without reordering the
+list — and `TODO.md` records the consequence that this makes it hard to see, since
+no pre-refined node reaches the visible eight rows.
 
 ### One deliberate thumb on the scale, and only one
 

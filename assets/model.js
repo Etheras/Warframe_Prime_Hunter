@@ -110,6 +110,60 @@
              openings: bestCost, blocker: bestBlocker };
   }
 
+  /* ── what one Void Trace is worth, when you are short of them ────
+     Traces are shown on the row and left out of the score, because what 100 of
+     them are worth depends on how many you have - a fact about the player. Once
+     the player says they are short, it can be answered, and the answer comes
+     from their own plan rather than from a number we invent.
+
+     A trace buys refinement, so its value is the rate at which it does so at the
+     best place in the plan to spend it - that being where a marginal trace
+     actually goes.
+
+     **The counterfactual is downgrading, not upgrading**, and getting that
+     backwards makes the whole thing read zero. `TODO.md` carried this as
+
+         max over r of ( value(r, Radiant) - value(r, r.chosen) )
+                       / ( cost(Radiant) - cost(r.chosen) )
+
+     - what buying *more* refinement would add. That is the right question for a
+     player who is not short: they would simply buy it. It is the wrong question
+     here, and it fails in exactly the case the option exists for. Over the live
+     set `bestRefinement` picks Radiant for every relic, so `r.chosen` is already
+     Radiant, every uplift is 0, and the formula values a trace at nothing for
+     the player who is most short of them. A page test caught it.
+
+     What a trace is really worth to someone rationing them is what it stops them
+     losing. Short of traces you run the relic **Intact**, because that is what
+     costs nothing. So a trace buys the distance back up to the refinement the
+     plan wanted:
+
+         value per trace = max over relics r in the plan of
+                           ( value(r, r.chosen) - value(r, Intact) )
+                           / cost(r.chosen)
+
+     It is zero exactly when it should be: when the plan wants Intact everywhere
+     there is nothing to buy, and a relic whose own best answer is Intact
+     contributes nothing. And it is denominated in the same units as the node
+     score - the numerator is a relic value - so traces-saved times this rate is
+     something the ranking can add without a conversion nobody can check.
+
+     Divided by what the chosen refinement actually costs, not by a flat 100: a
+     relic the plan takes to Exceptional is 25 traces, so a trace spent there can
+     buy a better rate than one spent on a Radiant. */
+  function traceValue(plan) {
+    let best = 0;
+    (plan || []).forEach((rp) => {
+      if (!rp || !rp.byRefinement) return;
+      const spend = TRACE_COST[rp.refinement] || 0;
+      if (spend <= 0) return;                    // Intact costs nothing to reach
+      const uplift = (rp.value || 0) - (rp.byRefinement.Intact || 0);
+      if (uplift <= 0) return;                   // refinement buys this relic nothing
+      best = Math.max(best, uplift / spend);
+    });
+    return best;
+  }
+
   /* ── which bucket an item is in ──────────────────────────────────
      Order matters and is not alphabetical. Founder first because it can never
      come back; Resurgence next because it is the one with a deadline; Baro
@@ -158,7 +212,7 @@
      carrying an answer to it would be restoring a setting nothing reads. Old
      files still list it and are still valid - anything not named here is simply
      dropped, which is what this list is for. */
-  const PLAN_OPTIONS = ["squad", "event", "railjack", "aya",
+  const PLAN_OPTIONS = ["squad", "event", "railjack", "aya", "traces",
                         "minutes", "sort", "formaHave", "formaNeed"];
 
   function parseBackup(text, items) {
@@ -237,6 +291,6 @@
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
-    relicValue, bestRefinement, parseBackup,
+    relicValue, bestRefinement, traceValue, parseBackup,
   };
 })();
