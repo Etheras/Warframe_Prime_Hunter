@@ -632,9 +632,10 @@ never thinner.
 second place a fact can live, and the failure this project keeps having is a fact
 that was true in one place and stale in another — a tooltip that claimed the app
 could not see fissures for ten days after it could, a comment describing a UI
-element that had been replaced, and a README that said *272 automated tests* long
-after there were 299. A hand-written wiki would be the worst version of that,
-because nothing in the suite would ever look at it.
+element that had been replaced, and a README test count that was wrong for most of
+its life. That last one was eventually answered by deleting the count rather than
+by fixing it again (§*Verifying a change*). A hand-written wiki would be the worst
+version of the same failure, because nothing in the suite would ever look at it.
 
 So `tools/wiki.py` assembles every page out of **named sections of `README.md`,
 `PROJECT.md` and `TODO.md`**, rewrites repo-relative links to `github.com`, shifts
