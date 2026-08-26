@@ -62,9 +62,8 @@ either page rendered**. The planner's ranking can now be expanded in place, whic
 puts all 92 places on screen — Elite Sanctuary Onslaught at #38, and Pago and Bode
 the first Spy nodes either page has ever shown.
 
-**The collection drawer still caps at eight with no way out**, which is the same
-defect one page over. Entry: *The collection drawer has no way past its eight
-spots*.
+**Both lists can now be seen whole** — the drawer got the same treatment the same
+day, so Spy nodes and the pre-refined eleven are reachable on either page.
 
 ### The worldstate is already cached, and barely read
 
@@ -93,8 +92,6 @@ What is left of the entry is two fields and a warning about one of them.
 |---|---|
 | A Mastery Rank field in the header | session |
 | A priority flag on the farm list | session |
-| The endless-fissure bonus is only stated on the collecting side | small |
-| The collection drawer has no way past its eight spots | small — the planner's half shipped 2026-08-25 |
 
 ### One refactor
 
@@ -495,21 +492,6 @@ is a rule here and this is a case where they legitimately differ. And the row's
 `relics / min` label stays honest: the minutes it divides by become the true cost
 of a run, which is what the label already claims.
 
-### The collection drawer has no way past its eight spots
-
-The planner's ranking can be expanded in place now, which is what finally put Spy
-nodes and the eleven pre-refined nodes on screen. **The collection page's drawer
-was the other half of that and did not move**: it renders `spots(...).slice(0, 8)`
-in `app.js` and offers nothing after it — not even the tooltip the planner used to
-have, so there is no route to a ninth place at all.
-
-That is why Spy could not be seen there while the fix was being verified: no live
-relic drops **only** at Spy — the highest share is Meso V15 at 13 sources out of
-147 — so a Spy node is outranked on every item, on a list that stops at eight.
-
-Same shape as the planner's, and the same answer: keep eight as the default and
-give the reader a way out of it. `STYLE.md §5` now carries the rule.
-
 ### Our four invented "mission types" leak into the ranking
 
 `Bounty`, `Key`, `Special` and `Enemy` are ours, not DE's — one bucket per
@@ -607,29 +589,6 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 `PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
-
-### The endless-fissure bonus is only stated on the collecting side
-
-The bonus itself shipped as a fourth run mode (`PROJECT.md §7`). What is still owed
-is where it is *said*.
-
-It is a reward for **cracking** relics, and it currently appears only as a modifier
-on *Where to go*, because that is where the run modes live. It should also be stated
-on the cracking side — *given you are opening these relics anyway, is it worth
-staying to rotation 5?*
-
-The row half of this is done. The bonus is only applied to nodes carrying a
-fissure now, so the marker says *+free relic* rather than *+relic if fissure*, and
-it sits beside the badge that says why. What is still owed is the *cracking* side:
-nothing in the relic list mentions the bonus at all, so a reader deciding what to
-crack has no reason to stay.
-
-**The scoring stays as it is.** Feeding the live fissure list into the score is the
-obvious next move and is the wrong one — it would reorder the ranking hourly on a
-fact that has expired by the time anyone acts on it. The flat constant is safe
-precisely because it is node-independent: it cannot reorder endless nodes against
-each other, so the only comparison it moves is *endless versus short*, which holds
-whatever the fissure map looks like.
 
 ### A Mastery Rank field in the header
 

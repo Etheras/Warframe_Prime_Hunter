@@ -1482,3 +1482,82 @@ page_test("the Void Traces switch names both its ends and puts under 500 on the 
   assert.equal(await box.isChecked(), true, "and it toggles back");
   assert.deepEqual(errors, []);
 });
+
+page_test("the collection drawer can show more than its eight best places", async () => {
+  /* The planner's ranking got a way out of its top eight; this list was the same
+     defect one page over and had no route to a ninth place at all -- not even the
+     tooltip the planner used to have.
+
+     Not hypothetical. No live relic drops ONLY at Spy -- the highest share is
+     Meso V15 at 13 sources of 147 -- so a Spy node is outranked on every item and
+     could not be seen here while its costing was being verified. The subject is
+     chosen on the raw drop tables for that reason. */
+  const { page, errors } = await open("/index.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA, R = D.relics || {};
+    // the item with the most distinct places behind it, so the fold is real
+    let best = null;
+    for (const it of D.items || []) {
+      const nodes = new Set();
+      for (const p of it.parts || []) {
+        for (const r of p.relics || []) {
+          const rec = R[r.relic];
+          if (!rec || rec.vaulted) continue;
+          (rec.sources || []).forEach((s) => nodes.add(s.planet + "|" + s.node));
+        }
+      }
+      if (!best || nodes.size > best.places) best = { id: it.id, name: it.name, places: nodes.size };
+    }
+    return best;
+  });
+  assert.ok(subject && subject.places > 8,
+            `no item has more than eight places behind it (${JSON.stringify(subject)})`);
+
+  await page.evaluate((id) => {
+    document.querySelector(`[data-id="${id}"]`).click();
+  }, subject.id);
+
+  const rows = () => page.evaluate(() => [...document.querySelectorAll(".spots .spot")]
+    .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim()));
+
+  const eight = await rows();
+  assert.equal(eight.length, 8, "the drawer still opens on the top eight");
+
+  const button = page.locator("#moreSpots");
+  assert.equal(await button.count(), 1, "and offers a way past them");
+  assert.equal(await button.getAttribute("aria-expanded"), "false");
+  const label = (await button.innerText()).trim();
+  assert.match(label, /^Show all \d+ places$/,
+               `the control has to say how much is behind it, got "${label}"`);
+
+  await button.click();
+  const all = await rows();
+  assert.ok(all.length > eight.length, "expanding has to show more");
+  assert.equal(all.length, Number(label.match(/\d+/)[0]),
+               "and exactly as many as it promised");
+  assert.deepEqual(all.slice(0, 8), eight,
+                   "the order must not change — this reveals the list, it does not re-rank it");
+  assert.equal(await page.locator("#moreSpots").getAttribute("aria-expanded"), "true");
+
+  // collapses again
+  await page.locator("#moreSpots").click();
+  assert.equal((await rows()).length, 8);
+
+  /* Opening a DIFFERENT item starts folded again: eight is the answer to "where
+     do I farm this", and carrying an expanded view across items would make the
+     default stop meaning that. */
+  await page.locator("#moreSpots").click();
+  assert.equal((await rows()).length > 8, true, "expanded before switching item");
+  const other = await page.evaluate((skip) => {
+    const el = [...document.querySelectorAll("[data-id]")].find((c) => c.dataset.id !== skip);
+    if (!el) return null;
+    el.click();
+    return el.dataset.id;
+  }, subject.id);
+  assert.ok(other, "no second item to open");
+  const after = await page.locator(".spots .spot").count();
+  assert.ok(after <= 8, `a freshly opened item must start folded, got ${after} rows`);
+
+  assert.deepEqual(errors, []);
+});

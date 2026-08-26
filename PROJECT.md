@@ -2125,9 +2125,20 @@ assumptions about the player, and every one of them changes the answer; this
 changes only how much of the answer is on screen. A view that silently stayed
 expanded from last week would make the default stop meaning what it says.
 
-The collection drawer is the same defect one page over and is **not** fixed: it
-slices to eight and offers nothing after it, not even the tooltip. `TODO.md`
-carries it.
+The collection drawer had the same defect and got the same fix the same day: it
+sliced to eight and offered nothing after it, not even a tooltip. The slice moved
+out of `bestSpots` so the total could be counted — it used to be thrown away
+there, which is why the drawer could not say how much it was hiding. It resets to
+eight when a **different** item is opened and keeps its state when the same one
+re-renders, so ticking a part does not fold the list back up.
+
+**And the fissure bonus is now stated on the cracking side.** It is a reward for
+*opening* relics and it only ever appeared as a modifier on *Where to go*, because
+that is where the run modes live. A reader deciding what to crack had no reason to
+stay. It is said once under *How this works* rather than on every row, which is
+what `STYLE.md §5` asks for a rule that is true of all of them. The scoring is
+unchanged — feeding the live fissure list into the score would reorder the ranking
+hourly on a fact that expires before anyone acts on it.
 
 ### An empty ranking has to say what emptied it
 

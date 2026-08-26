@@ -581,8 +581,14 @@
       pick.sameAs = group.length > 1 ? group : null;
       pick.pickedForFissure = !!(pick.sameAs && isFissureNow(pick));
       return pick;
-    }).slice(0, 8);
+    });
   }
+  /* How many of them the drawer shows before asking. Eight, same as the
+     planner's ranking, and for the same reason (`STYLE.md §5`): the top of a
+     ranking is the answer. The slice moved OUT of `bestSpots` so the count of
+     what is behind the fold can be known — it used to be discarded here, which
+     is why the drawer could not even say how much it was hiding. */
+  const SPOTS_SHOWN = 8;
 
   /* ── drawer ───────────────────────────────────────────────── */
   const drawer = $("#drawer"), scrim = $("#scrim"), dbody = $("#drawerBody");
@@ -728,10 +734,17 @@
      the DOM and matching it against an item name, which worked and was one
      rename away from not working. */
   let drawerItem = null;
+  /* Whether the drawer's place list is showing all of itself. Not saved, and
+     reset whenever a DIFFERENT item is opened: eight is the answer to "where do
+     I farm this", and carrying an expanded view from the last Prime would make
+     the default stop meaning that. Re-rendering the same item keeps it, so
+     ticking a part while expanded does not fold the list back up. */
+  let expandSpots = false;
 
   function openItem(id) {
     const it = ITEMS.find((x) => x.id === id);
     if (!it) return;
+    if (drawerItem !== id) expandSpots = false;
     drawerItem = id;
     const has = ST.has(it.id);
     const f = it.flags;
@@ -941,6 +954,21 @@
     drawer.scrollTop = 0;
     document.body.style.overflow = "hidden";
 
+    /* The button is rewritten on every drawer render, so the listener goes on
+       the body that survives. Scroll position is kept and focus returned, or
+       expanding a list would throw the reader back to the top of the drawer. */
+    const spotsBtn = $("#moreSpots");
+    if (spotsBtn) {
+      spotsBtn.addEventListener("click", () => {
+        expandSpots = !expandSpots;
+        const keep = drawer.scrollTop;
+        openItem(it.id);
+        drawer.scrollTop = keep;
+        const again = $("#moreSpots");
+        if (again) again.focus();
+      });
+    }
+
     $("#dCollect").addEventListener("click", () => {
       toggle(it.id);
       openItem(it.id); // re-render with new state
@@ -1033,8 +1061,15 @@
      its caller, which hoisting allows and which keeps `openItem` readable
      top-to-bottom. */
   function spotsHTML(it) {
-    const spots = bestSpots(it);
-    if (!spots.length) return "";
+    const all = bestSpots(it);
+    if (!all.length) return "";
+    /* The planner's ranking got a way out of its top eight; this list is the
+       same defect one page over and did not even have the tooltip the planner
+       used to have, so there was no route to a ninth place at all. That is not
+       hypothetical: no live relic drops ONLY at Spy — the highest share is Meso
+       V15 at 13 sources of 147 — so a Spy node is outranked on every item and
+       could never be seen here while its costing was being checked. */
+    const spots = expandSpots ? all : all.slice(0, SPOTS_SHOWN);
     const stillNeeded = relicsStillNeeded(it);
     const openCount = (it.farmableRelics || []).filter((r) => stillNeeded.has(r)).length
                       || (it.farmableRelics || []).length;
@@ -1066,7 +1101,13 @@
           <div class="spot-score" data-tip="What one whole run here is worth towards a part you still need, at the best refinement for it. Counts every rotation the run reaches, so a longer run can outrank a faster one on volume alone."><b>${
             (s.score * 100).toFixed(1)}%</b>per run</div>
         </div>`).join("") +
-      `</div></section>`;
+      `</div>` + (all.length > SPOTS_SHOWN
+        ? `<button type="button" class="more-nodes" id="moreSpots" aria-expanded="${
+            expandSpots ? "true" : "false"}">${
+            expandSpots
+              ? `Show the top ${SPOTS_SHOWN} only`
+              : `Show all ${all.length} places`}</button>`
+        : "") + `</section>`;
   }
 
   function closeDrawer() {
