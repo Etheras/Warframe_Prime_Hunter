@@ -77,10 +77,14 @@
       <span class="box"></span>
       <span class="lbl" data-tip="Railjack is a different activity with its own setup, so it is left out of the ranking by default. Five live relics drop only there, though.">Include Railjack</span>
     </label>
-    <label class="check">
+    <label class="check check-switch">
       <input type="checkbox" id="p-traces" checked="checked" />
-      <span class="box"></span>
-      <span class="lbl" data-tip="A Radiant costs 100 Void Traces and a fissure run returns roughly 18 to 33, so refining never pays for itself — it always comes out of the pile you have. Under 500 you are rationing: five Radiants and it is empty.&#10;&#10;On by default, because that is almost everyone. While it is ticked, a node that hands the relic over already Radiant is scored 25% higher — it saves you the whole refinement.&#10;&#10;This never tells you to crack something at a lower refinement to save traces. You are pointed at Radiant and expected to find them; this only says where Radiant comes free.&#10;&#10;Untick it if you are sitting on a pile and the saving means nothing to you.">Void Traces are tight <em>under 500</em></span>
+      <span class="lbl" data-tip="A Radiant costs 100 Void Traces and a fissure run returns roughly 18 to 33, so refining never pays for itself — it always comes out of the pile you have. Under 500 you are rationing: five Radiants and it is empty.&#10;&#10;Set to under 500 by default, because that is almost everyone. While it is, a node that hands the relic over already Radiant is scored 25% higher — it saves you the whole refinement.&#10;&#10;This never tells you to crack something at a lower refinement to save traces. You are pointed at Radiant and expected to find them; this only says where Radiant comes free.&#10;&#10;Switch it to over 500 if you are sitting on a pile and the saving means nothing to you.">Short on Void Traces?</span>
+      <span class="switch-group">
+        <span class="switch-end end-tight">under 500</span>
+        <span class="switch" aria-hidden="true"><span class="switch-knob"></span></span>
+        <span class="switch-end end-plenty">over 500</span>
+      </span>
     </label>
 
     <details id="advanced" class="gap-lg">

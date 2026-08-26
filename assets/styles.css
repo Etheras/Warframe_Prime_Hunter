@@ -226,6 +226,58 @@ button,input,select,textarea{font:inherit;color:inherit}
   width:4px;height:8px;border:solid #1a1408;border-width:0 2px 2px 0;transform:rotate(42deg);
 }
 .check input:focus-visible + .box{box-shadow:0 0 0 3px rgba(217,180,91,.25)}
+/* ── a switch, where the question has two named states ──────────────────
+   The other four boxes here are *include X* — a checkbox is exactly right for
+   those, and a tick reads as "yes, count it". This one is not that shape: it
+   asks which of two situations you are in, and both are ordinary. So it gets a
+   switch, and **both ends are labelled**: the knob says which one you picked and
+   the words say what the two are, so nothing depends on reading a colour.
+
+   `under 500` is the LEFT end on purpose — owner's call. That makes the knob sit
+   left in the on state, which is the reverse of the usual off-left convention;
+   it is unambiguous only because both ends carry their own label, and it would
+   not be safe on an unlabelled switch.
+
+   Gold, like every other control here, so the switch borrows no new meaning.
+   `STYLE.md §1` reserves red for *something here is wrong*, and being short of
+   Void Traces is not an error. */
+.check-switch{flex-direction:column;align-items:stretch;gap:7px}
+.check-switch .lbl{flex:none}
+.switch-group{display:flex;align-items:center;gap:9px;font-size:11.5px}
+.switch-end{
+  color:var(--txt-faint);font-variant-numeric:tabular-nums;
+  transition:color .18s;
+}
+.check .switch{
+  flex:0 0 44px;height:24px;border-radius:999px;position:relative;
+  background:linear-gradient(180deg,#0b0e14,#161c26);
+  border:1px solid #3a4456;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04);
+  transition:background .18s, border-color .18s, box-shadow .18s;
+}
+.check .switch-knob{
+  position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:linear-gradient(180deg,#ffffff,#c8d0dc);
+  box-shadow:0 2px 4px rgba(0,0,0,.5), inset 0 -1px 1px rgba(0,0,0,.18),
+             inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .18s cubic-bezier(.3,1.4,.5,1);
+}
+/* checked = short of traces = the LEFT end, so the knob rests left */
+.check input:checked ~ .switch-group .switch{
+  background:linear-gradient(180deg,var(--gold),var(--gold-dim));
+  border-color:var(--gold-dim);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.32), 0 0 10px rgba(217,180,91,.22);
+}
+.check input:not(:checked) ~ .switch-group .switch-knob{transform:translateX(20px)}
+.check input:focus-visible ~ .switch-group .switch{box-shadow:0 0 0 3px rgba(217,180,91,.3)}
+/* whichever end is live is the bright one, and it is a word, not a hue */
+.check input:checked ~ .switch-group .end-tight{color:var(--gold);font-weight:600}
+.check input:not(:checked) ~ .switch-group .end-plenty{color:var(--txt);font-weight:600}
+
+@media (prefers-reduced-motion:reduce){
+  .check .switch,.check .switch-knob{transition:none}
+}
+
 .check .lbl{flex:1}
 .check .lbl em{font-style:normal;color:var(--txt-faint);font-size:12px}
 .check .cnt{font-size:11.5px;color:var(--txt-faint);font-variant-numeric:tabular-nums}

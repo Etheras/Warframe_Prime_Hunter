@@ -1428,3 +1428,57 @@ page_test("the ranking can be seen whole, not just its top eight", async () => {
 
   assert.deepEqual(errors, []);
 });
+
+page_test("the Void Traces switch names both its ends and puts under 500 on the left", async () => {
+  /* It is a two-state question, not an include-X one, so it is a switch rather
+     than a checkbox — and both ends are labelled so the answer never depends on
+     reading a colour.
+
+     Asserted on `matches(selector)` rather than on computed colour. A switch is
+     mostly CSS transitions and the Browser pane does not composite a hidden tab,
+     so getComputedStyle hands back a colour frozen part-way through the fade no
+     matter how long you wait. matches() reads the cascade, which is what the rule
+     actually says. */
+  const { page, errors } = await open("/plan.html");
+
+  const box = page.locator("#p-traces");
+  assert.equal(await box.isChecked(), true, "short-on-traces is the default");
+
+  // the two ends, in document order, with under 500 first
+  const ends = await page.evaluate(() =>
+    [...document.querySelectorAll(".check-switch .switch-group > *")]
+      .map((el) => ({ cls: el.className, text: el.textContent.trim() })));
+  assert.equal(ends.length, 3, "left label, track, right label");
+  assert.match(ends[0].text, /under 500/, "under 500 is the LEFT end");
+  assert.ok(/switch$/.test(ends[1].cls), "the track sits between the two words");
+  assert.match(ends[2].text, /over 500/, "over 500 is the right end");
+
+  const state = () => page.evaluate(() => {
+    const q = (s) => document.querySelector(s);
+    return {
+      tightLit: q(".end-tight").matches(".check input:checked ~ .switch-group .end-tight"),
+      plentyLit: q(".end-plenty")
+        .matches(".check input:not(:checked) ~ .switch-group .end-plenty"),
+      knobRight: q(".switch-knob")
+        .matches(".check input:not(:checked) ~ .switch-group .switch-knob"),
+    };
+  });
+
+  const on = await state();
+  assert.deepEqual(on, { tightLit: true, plentyLit: false, knobRight: false },
+                   "short on traces lights the left word and rests the knob left");
+
+  await page.locator("label:has(#p-traces)").click();
+  assert.equal(await box.isChecked(), false);
+  const off = await state();
+  assert.deepEqual(off, { tightLit: false, plentyLit: true, knobRight: true },
+                   "plenty lights the right word and sends the knob right");
+
+  // the real input still drives it, so keyboard and assistive tech work
+  assert.equal(await page.locator(".check-switch input[type=checkbox]").count(), 1,
+               "the switch has to be a real checkbox underneath, not a div");
+
+  await page.locator("label:has(#p-traces)").click();
+  assert.equal(await box.isChecked(), true, "and it toggles back");
+  assert.deepEqual(errors, []);
+});

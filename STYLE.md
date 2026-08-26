@@ -280,6 +280,35 @@ condensed view; it must not be the only route to it.
 
 ---
 
+**A checkbox for *include this*, a switch for *which of two*.** Four of the
+planner's assumptions are include-X questions and a tick reads correctly as "yes,
+count it". *Short on Void Traces?* is not that shape — it asks which of two
+ordinary situations you are in, and neither is a default the other departs from.
+That gets a pill switch, and **both ends are labelled**: `under 500` and
+`over 500` sit either side of the track, the knob says which one is chosen, and
+the live end is the bright one. Nothing depends on reading a colour.
+
+`under 500` is the **left** end, which puts the knob left in the *on* state — the
+reverse of the usual off-left convention. That is safe only because both ends
+carry their own word; do not do it on a switch with a bare track.
+
+Gold, like every other control here, so it borrows no new meaning. A reference
+sketch used teal and red; §1 reserves red for *something here is wrong*, and being
+short of Void Traces is not an error.
+
+**Do not spread the switch to the include-X boxes.** One control shape per kind of
+question is the point; two shapes chosen at random is what this section exists to
+prevent.
+
+**Verifying one of these is awkward and worth knowing about.** A switch is mostly
+CSS transitions, and the Browser pane does not composite a hidden tab — so
+`getComputedStyle` returns a colour frozen part-way through the transition, no
+matter how long you wait. Assert on `element.matches(selector)` for each state
+instead: that reads the cascade rather than the animation, and it is what the
+rule actually says.
+
+---
+
 ## 7. Layout
 
 - **Peer views get a segmented control, not a link.** `index.html` and `plan.html`
