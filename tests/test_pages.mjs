@@ -600,12 +600,19 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
   assert.deepEqual(errors, []);
 });
 
-page_test("an empty ranking names the switch that emptied it", async () => {
-  /* The one place the planner can strand you. Nyx Prime's four parts all come
-     from relics that exist only on Proxima, so with Railjack off the page finds
-     eight good places, discards every one, and used to print an empty heading -
-     while the list directly beneath went on saying four relics are dropping and
-     every part has one dropping for it. That reads as a fault, not a setting. */
+page_test("Railjack is forced in when it is the only route, and says so", async () => {
+  /* The one place the planner could strand you. Nyx Prime's four parts all come
+     from relics that exist only on Proxima, so with Railjack off the page found
+     eight good places and discarded every one. It printed an empty heading at
+     first, then an empty heading that named the switch — better, but an opt-in
+     gate in front of the ONLY option is still a dead end.
+
+     Owner's decision, 2026-08-25: force them in and mark them. So this now
+     asserts the opposite of what it used to. `noNodes` is still there and still
+     right for event nodes and for the day the data changes; it simply cannot
+     fire for Railjack any more, because nothing is left stranded — measured
+     across the whole catalogue, exactly the six documented Primes take this
+     path and no live relic is stranded at all. */
   const { page, errors } = await open("/plan.html");
   /* Named outright rather than found with isRailjack. Picking the subject with
      the code under test makes the case vacuous - break the classifier, find no
@@ -628,21 +635,48 @@ page_test("an empty ranking names the switch that emptied it", async () => {
   await page.reload({ waitUntil: "load" });
 
   const where = page.locator("#planNodes");
-  assert.equal(await where.locator(".spot").count(), 0,
-               `${stranded} is Railjack-only, so nothing should rank with Railjack off`);
-  const said = await where.innerText();
-  assert.match(said, /Include Railjack/,
-               "an empty ranking has to name the switch, and it is the only clue there is");
-  assert.match(said, /\d+ places/, "and say how much is behind it");
+  assert.equal(await page.locator("#p-railjack").isChecked(), false,
+               "Railjack must still be opt-in — this is an exception, not a default");
+
+  const rows = await where.locator(".spot").count();
+  assert.ok(rows > 0,
+            `${stranded} has no route but Railjack, so its places must be ranked ` +
+            `anyway rather than leaving the reader an empty list and a checkbox`);
+
+  // every one of them says what it needs, and why it is here despite the switch
+  const marks = await page.evaluate(() => [...document.querySelectorAll("#planNodes .spot")]
+    .map((el) => ({
+      demand: [...el.querySelectorAll(".demand")].map((d) => d.textContent.trim()),
+      onlyRoute: [...el.querySelectorAll(".est")].some((e) => /only route/.test(e.textContent)),
+    })));
+  for (const m of marks) {
+    // textContent, so this is the authored casing — the uppercase is CSS
+    assert.ok(m.demand.some((d) => /railjack/i.test(d)),
+              `a forced-in row must still say what it demands, got ${m.demand.join(",")}`);
+    assert.ok(m.onlyRoute,
+              "a row that overrode the reader's switch has to say so on the row");
+  }
+
+  /* The panel underneath must agree with the list. It counted `!vaulted` alone
+     and said four relics were dropping beside an empty ranking; now that these
+     rank, it has to keep counting them. */
+  const needs = await page.locator("#planNeeds").innerText();
+  assert.doesNotMatch(needs, /nowhere you have switched on/,
+                      "nothing is switched off for this item any more");
 
   // the native box is hidden behind a styled span, so click the label a real
   // reader would click, not the input
   await page.locator("label:has(#p-railjack)").click();
   assert.ok(await page.locator("#p-railjack").isChecked());
-  assert.ok(await where.locator(".spot").count() > 0,
-            "ticking the box the message names has to actually produce places");
+  assert.ok(await where.locator(".spot").count() >= rows,
+            "ticking the box cannot take places away");
+  const stillMarked = await page.evaluate(() =>
+    [...document.querySelectorAll("#planNodes .spot .est")]
+      .some((e) => /only route/.test(e.textContent)));
+  assert.equal(stillMarked, false,
+               "with the switch ON nothing is being forced, so the mark must go");
   assert.equal(await where.locator(".spot").first().locator(".demand").innerText(),
-               "RAILJACK", "and every one of them says what it needs");
+               "RAILJACK", "and every one of them still says what it needs");
   assert.deepEqual(errors, []);
 });
 

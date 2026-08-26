@@ -664,7 +664,7 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
 #
 # Requiem is left out. Those fissures take Requiem relics, which come from Kuva
 # Liches and carry no Prime parts, so a Requiem fissure is not somewhere this app
-# can send anyone. Omnia stays and is the most useful line of the lot: the wiki
+# can send anyone. Omnia stays, and is the one tier that fits anything: the wiki
 # is explicit that it opens "Lith, Meso, Neo and Axi Relics (but not Requiem)",
 # so it fits whatever you are holding.
 #

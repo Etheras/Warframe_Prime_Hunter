@@ -791,6 +791,21 @@
   const notADestination = (s) =>
     s.access === "quest" || s.access === "unmodelled";
 
+  /* Can this source be reached, given the switches the reader has set?
+
+     One predicate because there used to be two, and they disagreed. The planner's
+     node loop applied all three tests while the *Still needed* panel counted on
+     `!vaulted` alone — so the panel said "3 relics dropping" against a part with
+     two reachable routes, and the third was behind a checkbox the reader had
+     turned off. Live on three Lex Prime parts when it was found.
+
+     `opts` is the planner's options object; a missing one means no opt-ins, which
+     is what both pages default to. */
+  const reachableSource = (s, opts) =>
+    !notADestination(s) &&
+    ((opts && opts.railjack) || !isRailjack(s)) &&
+    ((opts && opts.event) || !isEventNode(s));
+
   /* ── the Primes you cannot get without a ship ─────────────────────
      Six items are marked "Never Vaulted" by the wiki and vaulted by Digital
      Extremes at the same time, and both are true: Cernos, Hikou, Nyx, Scindo,
@@ -874,7 +889,7 @@
     fissuresAt, minutesLeft,
     isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
     isRailjackCache, cachePenalty: CACHE_PENALTY,
-    isEventNode, notADestination,
+    isEventNode, notADestination, reachableSource,
     bountyEvent, eventRunning,
   };
 })();

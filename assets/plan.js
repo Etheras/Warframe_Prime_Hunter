@@ -408,11 +408,36 @@
     const nodes = new Map();
     const blocked = { railjack: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
-      (RELICS[rname].sources || []).forEach((s) => {
+      const srcs = RELICS[rname].sources || [];
+      /* ── an opt-in gate in front of your only option ─────────────────
+         Railjack is left out by default because it is a different activity
+         with its own setup. For six Primes it is the ONLY activity: their
+         original relics are vaulted and Railjack has been the sole current
+         source for years. Excluding those is not a filter, it is a dead end —
+         the ranking came back empty and named a switch, which is better than
+         silence but still asks the reader to opt in to the only thing there is.
+
+         So a relic with nothing reachable under the switches as set has its
+         Railjack routes let through anyway, and every row built from one is
+         marked. The checkbox keeps meaning what it says for everything else:
+         this fires only when the alternative is nowhere at all. Owner's
+         decision, 2026-08-25 — option (ii) of three. */
+      const stranded = !srcs.some((s) => ROT.reachableSource(s, opts));
+      srcs.forEach((s) => {
         if (notADestination(s)) return;      // quest, or not modelled yet
         const skip = `${s.planet}|${s.node}|${s.mode}`;
-        if (!opts.railjack && isRailjack(s)) { blocked.railjack.add(skip); return; }
-        if (!opts.event && isEvent(s)) { blocked.event.add(skip); return; }
+        let onlyRoute = false;
+        if (!ROT.reachableSource(s, opts)) {
+          /* Event nodes are never forced: an event that is not running does not
+             exist on the star chart, so there is nothing to send anyone to. A
+             Railjack node is always there — the reader simply has to want it. */
+          if (stranded && isRailjack(s) && !isEvent(s)) onlyRoute = true;
+          else {
+            if (isRailjack(s)) blocked.railjack.add(skip);
+            else blocked.event.add(skip);
+            return;
+          }
+        }
         const key = `${s.planet}|${s.node}|${s.mode}`;
         let n = nodes.get(key);
         if (!n) {
@@ -431,6 +456,8 @@
           nodes.set(key, n);
         }
         const slot = { A: "A", B: "B", C: "C" }[String(s.rotation || "").toUpperCase()] || "none";
+        // this row exists despite the switch, and has to say so
+        if (onlyRoute) n.onlyRoute = true;
         const worth = sourceValue(s, rp);
         if (worth.pre) {
           n.preRefined = true;
@@ -1197,6 +1224,15 @@
             "Scored at half on purpose — nobody runs Railjack for caches.\n" +
             "The relic count is untouched.")
           }">halved</span>` : ""}${
+          /* Shown despite *Include Railjack* being off, because for this relic
+             there is nowhere else. Amber for the same reason `.est` is amber:
+             the app made a call the reader did not. */
+          n.onlyRoute ? ` · <span class="est" data-tip="${esc(
+            "Listed even though Include Railjack is off: every current source for\n" +
+            "what you want here is a Railjack mission, so leaving it out would\n" +
+            "leave you nowhere at all.\n\n" +
+            "Tick Include Railjack on the left to see the rest of them too.")
+          }">only route</span>` : ""}${
           /* A borrowed number stays visible even after the corner was cut back:
              a guess you can see beats a guess you cannot. */
           n.minutesAssumed ? ` · <span class="est" data-tip="${esc(
@@ -1291,11 +1327,29 @@
 
     // what's left
     $("#planNeeds").innerHTML = needs.map((n) => {
+      /* ── dropping, and dropping somewhere you will actually be sent ──
+         This counted `!vaulted` alone while the node loop above applied three
+         tests, so the panel said "3 relics dropping" against a part with two
+         reachable routes and a third behind a checkbox the reader had turned
+         off. Live on all three Lex Prime parts when it was found — Neo V9,
+         Meso N11 and Axi V10.
+
+         Both sides ask `ROT.reachableSource` now, with the same `opts`, so they
+         cannot answer differently. The `stranded` rule is repeated here for the
+         same reason: a relic reachable ONLY on Railjack is listed by the loop
+         despite the switch, so it has to be counted as reachable here too. */
+      const relicReachable = (rname) => {
+        const srcs = (RELICS[rname] || {}).sources || [];
+        if (srcs.some((s) => ROT.reachableSource(s, opts))) return true;
+        return srcs.some((s) => !notADestination(s) && isRailjack(s) && !isEvent(s));
+      };
       const liveRelics = n.item.id
         ? (BY_ID.get(n.item.id).parts.find((p) => p.name === n.part) || { relics: [] })
             .relics.filter((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted).map((r) => r.relic)
         : Array.from(relicPlan.keys());
-      const live = liveRelics.length;
+      const openRelics = liveRelics.filter(relicReachable);
+      const live = openRelics.length;
+      const shut = liveRelics.length - live;
       const rar = n.item.id
         ? (() => { const pp = BY_ID.get(n.item.id).parts.find((x) => x.name === n.part);
                    const best = pp && pp.relics.find((r) => RELICS[r.relic] && !RELICS[r.relic].vaulted);
@@ -1314,10 +1368,22 @@
                   " on its own\nand come back when you have " + n.short + ".")
                 }">build ${n.short} × ${esc(n.builtFrom)}</span>`
               : (live
-                  ? `<span class="relic-count" data-tip="${esc("Dropping from:" + "\n" +
-                      liveRelics.map((r) => "  " + r).join("\n"))}">${live} relic${
-                      live === 1 ? "" : "s"} dropping</span>`
-                  : "vaulted — trade or wait for Resurgence")}</span>
+                  ? `<span class="relic-count" data-tip="${esc(
+                      "Dropping where you can reach it:\n" +
+                      openRelics.map((r) => "  " + r).join("\n") +
+                      (shut ? "\n\nAnother " + shut + " drop" + (shut === 1 ? "s" : "") +
+                        " only behind a switch you have off:\n" +
+                        liveRelics.filter((r) => !openRelics.includes(r))
+                          .map((r) => "  " + r).join("\n") : ""))
+                    }">${live} relic${live === 1 ? "" : "s"} dropping</span>`
+                  : liveRelics.length
+                    ? `<span class="relic-count est" data-tip="${esc(
+                        liveRelics.length + " relic" + (liveRelics.length === 1 ? "" : "s") +
+                        " still drop" + (liveRelics.length === 1 ? "s" : "") + ", and every\n" +
+                        "one is behind a switch you have turned off:\n" +
+                        liveRelics.map((r) => "  " + r).join("\n"))
+                      }">nowhere you have switched on</span>`
+                    : "vaulted — trade or wait for Resurgence")}</span>
       </div>`;
     }).join("");
   }

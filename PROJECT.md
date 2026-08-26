@@ -2058,6 +2058,44 @@ excludes it; a gate on *starting* it only annotates it** — and a gate that
 excludes only duplicates of things you can already reach annotates too, because
 an option nobody's answer changes is worse than no option.
 
+### Railjack is forced in when it is the only route
+
+`Include Railjack` is off by default because Railjack is a different activity
+with its own setup. For **six Primes it is the only activity**: Nyx, Valkyr,
+Cernos, Hikou, Scindo and Venka left the ordinary drop tables and their relics
+went to Railjack rather than into the vault. Excluding those is not a filter, it
+is a dead end — the planner found eight perfectly good places and discarded every
+one.
+
+That produced an empty heading, then an empty heading naming the switch (below),
+which is a large improvement on silence. It is still an opt-in gate in front of
+the only thing there is. **Owner's decision, 2026-08-25**, of three options on
+file — leave it, force it in, or a three-state checkbox: force it in and mark it.
+
+A relic with **nothing reachable under the switches as set** has its Railjack
+routes let through anyway, and every row built from one carries an amber `only
+route` chip beside the `Railjack` demand badge, explaining that it is listed
+despite the setting. The checkbox keeps meaning exactly what it says for
+everything else: this fires only when the alternative is nowhere at all.
+
+**Event nodes are never forced.** An event that is not running does not exist on
+the star chart, so there is nothing to send anyone to. A Railjack node is always
+there; the reader simply has to want it.
+
+Two consequences worth knowing. Measured across the catalogue with both boxes
+off, exactly those six take this path and **no live relic is stranded** — so
+`noNodes` can no longer fire for Railjack. It stays for event nodes and for the
+day the data changes, and its test now asserts the opposite of what it used to.
+
+And it settled the *Still needed* over-count on its own. That panel counted
+`!vaulted` while the node loop applied three tests, so it claimed relics the
+reader was not being sent for — live on three Lex Prime parts, whose blocked
+relics turned out to be **Neo V9, Meso N11 and Axi V10, every one of them
+Railjack-only**. Forcing them in makes them genuinely reachable rather than
+merely counted. Both sides now ask `ROT.reachableSource` with the same options,
+so they cannot drift apart again, and today **no part is mixed and none has
+nothing reachable**.
+
 ### An empty ranking has to say what emptied it
 
 Put one of those six on the farm list with *Include Railjack* off and the planner

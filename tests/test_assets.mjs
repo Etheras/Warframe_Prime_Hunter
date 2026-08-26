@@ -874,3 +874,48 @@ test("both pages name a run's cost with the same words", () => {
   assert.equal(ROT.objectivesText({ mode: "Defense", rounds: 1, counts: { A: 1 } }),
                "1 round");
 });
+
+/* ── one predicate for "can the reader get there" ────────────────────────
+ * There used to be two. The planner's node loop applied three tests while the
+ * *Still needed* panel counted on `!vaulted` alone, so the panel claimed relics
+ * the reader was not being sent for -- live on three Lex Prime parts. Both sides
+ * call reachableSource now, and these are the cases that would let them drift
+ * apart again.
+ */
+
+test("a source is reachable only when nothing the reader set excludes it", () => {
+  const ROT = loadRotation();
+  const OFF = { railjack: false, event: false };
+  const ON = { railjack: true, event: true };
+  const plain = { planet: "Earth", node: "Cambria", mode: "Spy" };
+
+  assert.equal(ROT.reachableSource(plain, OFF), true, "an ordinary star-chart node");
+  assert.equal(ROT.reachableSource(plain, ON), true);
+  assert.equal(ROT.reachableSource(plain), true, "a missing opts means no opt-ins");
+  assert.equal(ROT.reachableSource(plain, {}), true);
+
+  // quest and unmodelled are not switches -- no option brings them back
+  for (const access of ["quest", "unmodelled"]) {
+    assert.equal(ROT.reachableSource({ ...plain, access }, ON), false,
+                 `${access} is not something a checkbox can reach`);
+  }
+});
+
+test("the two opt-ins each gate their own kind of source, and only their own", () => {
+  const ROT = loadRotation();
+  const rj = { planet: "Veil Proxima", node: "Flexa", mode: "Caches" };
+  const ev = { planet: "Event: Saturn", node: "Aegaeon", mode: "Spy" };
+
+  assert.equal(ROT.isRailjack(rj), true, "subject check: this must be a Railjack node");
+  assert.equal(ROT.isEventNode(ev), true, "subject check: this must be an event node");
+
+  assert.equal(ROT.reachableSource(rj, { railjack: false, event: false }), false);
+  assert.equal(ROT.reachableSource(rj, { railjack: true, event: false }), true);
+  assert.equal(ROT.reachableSource(rj, { railjack: false, event: true }), false,
+               "the event box must not let a Railjack node through");
+
+  assert.equal(ROT.reachableSource(ev, { railjack: false, event: false }), false);
+  assert.equal(ROT.reachableSource(ev, { railjack: false, event: true }), true);
+  assert.equal(ROT.reachableSource(ev, { railjack: true, event: false }), false,
+               "the Railjack box must not let an event node through");
+});

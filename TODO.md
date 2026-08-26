@@ -46,37 +46,20 @@ further down, where the reasoning lives.
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
 
-**Two things are currently wrong on screen**, both found on 2026-08-25 and both
-measured against that day's build or the one before. This paragraph said *"Nothing
-is currently wrong on screen"* until they were checked. A third — both Onslaught
-nodes ranked at exactly twice their true rate — was found and **fixed** the same
-day; `PROJECT.md §7` has the reasoning.
+**Nothing is currently wrong on screen**, as of 2026-08-25 — but treat that as a
+claim to re-check rather than one to trust. It read exactly this on 2026-08-24 and
+a sweep the next day found two things that were, one of them live on three parts.
 
-- ~~The planner runs an endless-mission optimiser over missions that are not
-  endless.~~ **Fixed 2026-08-25** and verified in the browser — `FIXED_LENGTH`,
-  `PROJECT.md §7`. What is left is that Spy nodes are never on screen to be
-  looked at: entry *Spy and Caches nodes never appear on either page*.
-- The *Still needed* panel counts relics the reader's own switches have turned off.
-  Live today on all three **Lex Prime** parts. Entry: *A part you cannot reach
-  still reads as one you can*, whose own correction claimed the opposite.
+Four defects shipped that day and their entries are gone, with the reasoning in
+`PROJECT.md §7`: both Onslaught nodes ranked at twice their true rate; 38 live
+nodes costed as endless when they are not; the *Still needed* panel counting
+relics the reader's own switches had turned off; and an opt-in gate standing in
+front of the only route six Primes have.
 
-All three were the same family: **a round is not a universal unit of effort**, the
-heading two of them sit under. The unit the ranking divides by was assumed in three
-different ways and checked in none — one is now checked, and the two below are the
-rest of it.
-
-The seven entries this list opened with were genuinely wrong on screen; they
-shipped later the same day and have been deleted rather than ticked, with the
-reasoning in `PROJECT.md §7` — *A part can be a whole Prime*, *Availability
-buckets*, *Profit-Taker is four places*, *Nodes that are the same bet are one row*,
-the run-mode table and the fissure section — plus a new focus rule in `STYLE.md §6`.
-
-### Sentences that are no longer true
-
-| Entry | Where | Size |
-|---|---|---|
-| Two comments describe things that no longer exist | `index.html`, `build_data.py` | small |
-| `npm test` silently drops a whole suite | `package.json` | small |
+What is left of that family is not wrong, only invisible: **Spy nodes and the
+eleven pre-refined nodes never reach the rows either page renders**. Both are
+waiting on the same thing — *The node list is the top eight and a hover, not a
+table*.
 
 ### The worldstate is already cached, and barely read
 
@@ -105,9 +88,7 @@ What is left of the entry is two fields and a warning about one of them.
 |---|---|
 | A Mastery Rank field in the header | session |
 | A priority flag on the farm list | session |
-| A part you cannot reach still reads as one you can | session — **live on three Lex Prime parts today**, not hypothetical |
 | The endless-fissure bonus is only stated on the collecting side | small |
-| The Railjack opt-in gate stands in front of your only option | small |
 | The node list is the top eight and a hover, not a table | small |
 
 ### One refactor
@@ -156,70 +137,6 @@ actually true — see `PROJECT.md §7`.
 The one below is what is left of the group, and it is the cause the group was made
 for: a capability landed and the sentences explaining why it was absent stayed where
 they were.
-
-### Two comments describe things that no longer exist
-
-Cheap, and each one will mislead somebody. **This entry named three until
-2026-08-25**; the `tools/schedule.ps1` one has since been repaired on its own —
-`.DESCRIPTION` no longer mentions a strip or the planner, so that bullet has been
-deleted rather than left to send the next reader looking for a defect that is gone.
-
-- `index.html`, the materials hint — *"nothing here feeds the farm advice. Forma
-  will, once the planner lands."* The planner landed, and the Forma row **is** what
-  the planner reads.
-- `tools/build_data.py`, above `FISSURE_TIERS` — justifies keeping `Omnia` as *"the
-  most useful line of the lot"*, which was about a per-tier strip that no longer
-  exists. The reason to keep Omnia now is simply that a node with an Omnia fissure
-  is a node with a fissure.
-
-### `npm test` silently drops a whole suite
-
-Found 2026-08-25. `package.json`'s `test` script names two of the three `.mjs`
-suites:
-
-```
-"test": "node --test tests/test_assets.mjs tests/test_pages.mjs"
-```
-
-`tests/test_model.mjs` is missing, so `npm test` runs a whole suite fewer than it
-looks like it does, and says nothing about it. Drift rather than a hole — `python
-tests/test_build.py` is the documented command and it runs all three — but the
-failure mode is the bad one: a green run that quietly checked less than the reader
-believes, with no skip line to give it away. One line.
-
----
-
-## Brought in by two outside reviews, 2026-08-24
-
-Two documents arrived on 2026-08-24: a **code review** of four points, and a
-**logic and model roadmap** of eleven. Every claim in both was checked against the
-code and the live dataset before being written down here, because several of them
-were wrong about what this app currently does — and a proposal argued from a
-misreading needs re-arguing, not implementing. Where that happened the correction
-is kept with the entry rather than quietly dropped.
-
-Two of the fifteen turned out to be defects with symptoms you could see on screen,
-and **those two and two more shipped on 2026-08-24**, so their entries are gone and
-the reasoning is in `PROJECT.md`: compound weapons tracking their sub-weapon
-(*A part can be a whole Prime*), the availability filter reading every bucket
-(*Availability buckets*), the drawer keeping its focus (`STYLE.md §6`), and the
-clocks catching up on `visibilitychange` (the fissure section). Three of the
-fifteen were already covered by entries elsewhere here. Two are settled against,
-one of them by measurement taken while checking it. What is below is the rest.
-
-| Source | Asked for | Verdict |
-|---|---|---|
-| roadmap 2 | a toggle between score per objective and per run | **shipped** — `#p-sort` at `plan.html:111`, wired at `plan.js:1424`. Row kept only because it was the stated blocker on *The node list is the top eight*, which is now unblocked |
-| roadmap 5 | read Baro's live stock from `/pc/voidTrader` | open, with a trap in the "disable the box" half |
-| roadmap 3 | reorder the availability precedence | **the stated goal is already true**; the order as written empties the Founder bucket |
-| review 2 | one `State` controller in `shared.js` | **shipped** on 2026-08-24 — `makeState()` at `shared.js:92`, exported at `:466`. The *One refactor* section above already said so; this row did not |
-| review 3 | a priority flag on the farm list | open, but not via `stillNeed` |
-| roadmap 10 | Ducat value of the non-wanted drops | open; measured at a 1.9× spread |
-| roadmap 7 | expected openings for *all* parts, not the worst one | **measured: changes 5.4% of live cases, for 4.5% fewer openings at double the trace price** |
-| roadmap 8 | restrict squad refinements to Intact/Radiant | **misreads the option**; the missing case is public radshare |
-| roadmap 11 | reward concentrated farms over diluted ones | open, and the only one here nothing observable can check |
-| roadmap 9 | score Void Traces on ESO and Void Storms | already an entry above; one correction to it |
-| roadmap 1 | condition the fissure bonus on a live fissure | **[settled] against** — the observation behind it is already an entry above |
 
 ### Baro's actual stock is published, and never read
 
@@ -710,51 +627,6 @@ precisely because it is node-independent: it cannot reorder endless nodes agains
 each other, so the only comparison it moves is *endless versus short*, which holds
 whatever the fissure map looks like.
 
-### A part you cannot reach still reads as one you can
-
-The *Still needed* panel says **"1 relic dropping"** against a part whose only
-relic drops somewhere the current options exclude — a Railjack node with Railjack
-off, or an event node. It is true and it is misleading in the same breath: the
-relic does drop, and you are not being sent anywhere for it.
-
-The whole-list case is handled — an empty ranking now names the switch and counts
-what is behind it (`PROJECT.md §7`). The **partial** case is not: three parts
-reachable and one only on Railjack still shows four identical-looking rows. The
-count of blocked places is already computed per plan; making it per *part* is the
-work, and the honest wording for the row is the part that needs thought — "1
-relic dropping, nowhere you have switched on" is accurate and clumsy.
-
-**A correction to how this was first written up.** It was described as "three
-parts reachable and one on Railjack", as though those six Primes were a mixed
-case. They are not, and the reason matters:
-
-> Nyx and Valkyr predate Railjack. Their original relics are **vaulted** — that
-> is the legacy route, and it is not a route. Railjack is not one source among
-> several; it has been the **only** current source for years.
-
-So there is no mix to display **for those six**. Whichever of them you look at,
-every reachable route is Railjack, and the badge says so.
-
-**The mixed case is not hypothetical, though, and this entry claimed it was until
-2026-08-25.** Running the shipped predicates (`notADestination`, `isRailjack`,
-`isEventNode`) over every part of the 2026-08-24 build, with the two opt-in boxes
-off, puts three parts in it right now — all on **Lex Prime**:
-
-| Part | Row says | Reachable | The one that is not |
-|---|---|---|---|
-| `Blueprint` | 2 relics dropping | 1 | Neo V9 |
-| `Barrel` | 3 relics dropping | 2 | Meso N11 |
-| `Receiver` | 3 relics dropping | 2 | Axi V10 |
-
-22 further parts are the all-blocked case already described above. The cause is
-one filter disagreeing with another: the *Still needed* count at `plan.js:1243`
-tests `!vaulted` alone, while the node loop at `plan.js:415-417` applies all three
-of `notADestination`, `opts.railjack` and `opts.event`.
-
-**And it is tolerable by design.** A handful of very legacy relics sitting vaulted
-behind a current Railjack source is exactly the shape this project is happy with:
-the app is about what is farmable now, and it says what "now" costs you.
-
 ### A Mastery Rank field in the header
 
 **Specified by the owner 2026-08-14, alongside the decision *not* to gate anything
@@ -802,39 +674,6 @@ the ranking by two duplicate rows and asked a question for nothing
 (`PROJECT.md §7`). If a header of player facts is ever built, the Steel Path
 belongs in it as a *fact* — feeding badges, not filters — rather than back in the
 sidebar as an option. Same shape as this field, same reasoning.
-
-### The Railjack opt-in gate stands in front of your only option
-
-**What is left of *decision 9*.** That entry asked three questions and two of them
-have been answered in code: the badges landed on 2026-08-14, the **seventh bucket**
-shipped — `Railjack only`, six items, `assets/app.js` takes them out of `farmable`
-and `index.html` gives them their own checkbox with a tooltip saying it is not the
-planner's *Include Railjack* box (`PROJECT.md §7`) — and node folding shipped the
-same day. Only this one is still open, so the rest has been deleted rather than
-ticked.
-
-Put one of the six on the farm list with *Include Railjack* off and the ranking is
-empty. It now names the switch and counts what is behind it, which is a large
-improvement on silence — but an opt-in gate in front of a thing with no alternative
-is still a strange shape. Options:
-
-- (i) leave it — the message is clear, and the checkbox means one thing
-- (ii) **auto-include a Railjack node when it is the only route to something on
-  your list**, badged as now, with the summary saying why it appeared despite the
-  setting. Keeps the checkbox honest for everything else
-- (iii) turn the checkbox into three states — off / only when it is the only
-  route / always
-
-(ii) reads best and is the smallest change: the information to do it already
-exists, since `ROT.railjackOnly` answers exactly that question per item and the
-collection view already calls it to build the bucket.
-
-One caveat carried over from the cache-penalty argument, because it constrains
-anything further here: **any rule that sinks caches has to leave them reachable for
-people with no alternative.** Four of the six Railjack-only Primes come from
-`Caches` specifically, which is the one mission type carrying a deliberate 50%
-penalty (`PROJECT.md §7`). For their owners the worst rows in the list are the only
-rows in the list.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 
