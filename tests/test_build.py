@@ -1553,6 +1553,56 @@ def test_server_serves_only_the_site() -> None:
     # the *pre-redirect* URL, so the console accused the one host the policy
     # already allowed, which is why it went unnoticed. Asserted on the pair
     # because allowing one without the other is the broken state.
+    # The pages carry their own policy, because GitHub Pages sends no response
+    # headers and the deployed copy would otherwise have none at all. Asserted
+    # on the tag rather than on a substring: "Content-Security-Policy" appears
+    # in this repo as prose in comments too, so counting the string finds
+    # matches that are not policies.
+    meta_re = re.compile(
+        r'<meta http-equiv="Content-Security-Policy" content="([^"]*)"\s*/?>')
+    metas = {}
+    for page in ("index.html", "plan.html"):
+        found = meta_re.findall(read_text(os.path.join(ROOT, page)))
+        check(f"{page}: exactly one CSP meta tag", len(found), 1,
+              "two policies would both apply, as their intersection")
+        metas[page] = found[0] if found else ""
+
+    check("the two pages carry the identical policy",
+          metas["index.html"] == metas["plan.html"], True,
+          "worded differently they are two policies to keep in step")
+
+    page_csp = metas["index.html"]
+    check_true("page CSP: no unsafe-inline", "unsafe-inline" not in page_csp)
+    check_true("page CSP: scripts are same-origin only",
+               "script-src 'self';" in page_csp + ";")
+    # frame-ancestors is IGNORED when delivered by meta and Chromium logs that
+    # as a console error - so writing it in would fail the page tests while
+    # protecting nothing. Framing is serve.py's header locally, and cannot be
+    # fixed on Pages at all.
+    check_true("page CSP: no frame-ancestors, which meta cannot deliver",
+               "frame-ancestors" not in page_csp,
+               "it is ignored via meta and logged as an error")
+    # The deployed build has no local artwork, so both CDN hosts must be here.
+    for host in ("https://cdn.warframestat.us", "https://raw.githubusercontent.com"):
+        check_true(f"page CSP: allows {host}", host in page_csp,
+                   "the CDN 301s to the second; a policy is checked at every hop")
+
+    # ...and the standalone, where every script is inline, gets the relaxation
+    # and nothing else. sub-string checks would pass on a policy that had been
+    # widened elsewhere, so this compares directive by directive.
+    import bundle as bundle_for_csp
+    relaxed = bundle_for_csp.standalone_csp(page_csp)
+    strict_d = {d.split()[0]: d for d in page_csp.split(";") if d.strip()}
+    loose_d = {d.split()[0]: d for d in relaxed.split(";") if d.strip()}
+    check("standalone CSP: the same directives, no more",
+          sorted(loose_d), sorted(strict_d))
+    check("standalone CSP: only script-src and style-src are relaxed",
+          sorted(k for k in strict_d if strict_d[k] != loose_d[k]),
+          ["script-src", "style-src"])
+    check("standalone CSP: the relaxation is exactly 'unsafe-inline'",
+          [k for k in ("script-src", "style-src")
+           if loose_d[k] != strict_d[k] + " 'unsafe-inline'"], [])
+
     img = next((p.strip() for p in serve.build_csp().split(";")
                 if p.strip().startswith("img-src")), "")
     check("CSP: the CDN and its redirect target stand or fall together",
@@ -1981,6 +2031,23 @@ def test_bundle_is_self_contained() -> None:
     check("bundle: every close tag is one the bundler opened", (opens, closes),
           (opens, opens),
           "an extra close tag ends the block early and the rest is markup")
+
+    # The rewrite ran, rather than the bundler merely exiting 0. bundle.py
+    # raises SystemExit when the tag is missing, so `bundle: exits 0` above
+    # already covers a tag that moved - this covers the opposite mistake, a
+    # rewrite that matched and produced the wrong thing.
+    built = re.findall(
+        r'<meta http-equiv="Content-Security-Policy" content="([^"]*)"\s*/?>', html)
+    check("bundle: exactly one CSP meta tag", len(built), 1)
+    if built:
+        d = {p.split()[0]: p for p in built[0].split(";") if p.strip()}
+        check("bundle CSP: inline scripts and styles are allowed, since all of them are",
+              [k for k in ("script-src", "style-src")
+               if "'unsafe-inline'" not in d.get(k, "")], [],
+              "the standalone is nothing but inline blocks; 'self' alone blanks it")
+        check("bundle CSP: nothing else was widened",
+              [k for k, p in d.items()
+               if k not in ("script-src", "style-src") and "unsafe" in p], [])
     check_true("bundle: carries the collection view", 'id="view-collection"' in html)
     check_true("bundle: carries the planner view", 'id="view-planner"' in html)
     check_true("bundle: planner search came across", 'id="addSearch"' in html)

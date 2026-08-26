@@ -52,6 +52,31 @@ ESCAPED_CLOSE = "<" + chr(92) + "/" + "script>"
 CLOSE_SCRIPT_RE = re.compile(r"</(script)(?=[\s/>])", re.IGNORECASE)
 
 
+CSP_META_RE = re.compile(
+    r'<meta http-equiv="Content-Security-Policy" content="([^"]*)"\s*/?>',
+    re.IGNORECASE)
+
+
+def standalone_csp(policy: str) -> str:
+    """
+    The pages' policy, adjusted for a file that is nothing but inline blocks.
+
+    Character for character the transform serve.py's build_local_csp applies to
+    temp_mockup.html, and for the same reason: every script and the stylesheet
+    are inlined here, so 'self' alone would block the entire document. 'self'
+    is kept beside it because the standalone is also published to _site/ and is
+    served from the Pages origin, where it means something.
+
+    Not idempotent - `script-src 'self'` is a prefix of its own output, so
+    applying this twice yields two 'unsafe-inline' tokens. bundle.py runs it
+    once against a freshly read index.html. serve.py's build_local_csp has the
+    same property today.
+    """
+    return (policy
+            .replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+            .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'"))
+
+
 def guard_text(text: str) -> str:
     """
     Inlined text with anything that would end the script block neutralised.
@@ -112,6 +137,21 @@ def main() -> int:
     shell = re.sub(r'<link rel="stylesheet" href="assets/styles\.css"\s*/?>',
                    lambda _: "<style>" + os.linesep + css + os.linesep + "</style>",
                    shell, count=1)
+
+    # The same rewrite for the policy, and it fails loudly rather than quietly.
+    # A stylesheet that goes missing is visible on the first glance at the page;
+    # a CSP that goes missing looks exactly like a CSP that is working, which is
+    # the more expensive of the two failures. The comment above records that the
+    # link rewrite did silently nothing once - this one is not allowed to.
+    shell, replaced = CSP_META_RE.subn(
+        lambda m: '<meta http-equiv="Content-Security-Policy" content="'
+                  + standalone_csp(m.group(1)) + '" />',
+        shell, count=1)
+    if replaced != 1:
+        raise SystemExit(
+            "bundle: index.html has no Content-Security-Policy meta tag to "
+            "rewrite, so the standalone would ship with no policy at all. "
+            "If the tag moved, move this rewrite with it.")
     # the tabs toggle sections instead of navigating to files that are not here
     shell = shell.replace('href="index.html"', 'href="#collection" data-view="collection"')
     shell = shell.replace('href="plan.html"', 'href="#planner" data-view="planner"')

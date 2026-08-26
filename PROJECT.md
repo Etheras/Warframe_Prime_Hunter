@@ -823,6 +823,40 @@ artwork were the last obstacle, and became one capture-phase listener; four
 `style=` attributes became utility classes. `img-src` allows `data:` for the
 inline SVG favicon and the CDN for builds without local artwork.
 
+**And the pages carry the same policy themselves, because that header reaches
+only the copies this server sends.** GitHub Pages supports no custom response
+headers of any kind — no `_headers` file, no configuration — so until 2026-08-26
+the deployed site and the standalone download ran with **no policy at all**,
+which is the artefact strangers actually read. A
+`<meta http-equiv="Content-Security-Policy">` is the one mechanism Pages honours,
+and both pages now carry an identical one; a test asserts they match, because two
+policies worded differently are two policies to keep in step.
+
+Measured rather than assumed, on a server sending no header — the Pages
+configuration exactly: an `<img onerror>`, an injected `<script>` element and a
+`javascript:` URL all failed to run, reporting `script-src-elem` and
+`script-src-attr`, while the page still rendered all 167 cards. Served through
+`serve.py` the meta and the header both apply and combine as the stricter of the
+two; verified as changing nothing, since the local header is the narrower one.
+
+**Three details are load-bearing and none is obvious.** `frame-ancestors` is
+deliberately *absent* from the meta: delivered that way it is ignored **and**
+logged as a console error, so writing it in for documentation value would fail
+the page tests while protecting nothing — framing stays covered by the header
+locally and is simply not fixable on Pages. The tag must sit after
+`<meta charset>` and before the first thing it governs, since anything parsed
+above it is outside the policy. And `raw.githubusercontent.com` has to be named
+beside the CDN, for the redirect reason recorded in §7.
+
+**The standalone gets the same policy with the two inline directives relaxed**,
+produced by `tools/bundle.py` from the page's own tag — the same transform, to
+the character, that `serve.py` applies to `temp_mockup.html`, and for the same
+reason: every script and the stylesheet are inlined there, so `'self'` alone
+would blank the document. That rewrite **fails loudly** if the tag ever moves. A
+missing stylesheet is obvious on first glance; a missing CSP looks exactly like a
+CSP that is working, which is the more expensive of the two failures — and the
+`<link>` rewrite beside it has silently done nothing once already.
+
 **One inline exception, one file wide.** That strict policy had a cost nobody had
 priced: a mockup is deliberately *one* file with an inline `<style>` and an inline
 `<script>`, so the browser blocked both, the page sat on *Loading…*, and the reason
@@ -2662,6 +2696,19 @@ and closing it, most plausibly a full disk. `os.replace` onto a temporary siblin
 the right shape and is worth doing if that code is being touched for another reason.
 It is not worth a backlog entry standing on its own, which is why it is recorded
 here instead of there.
+
+**The review of 2026-08-26, and what came of it.** An outside review filed ten
+findings against `46ae037`. Every one was re-derived from the source before being
+written down, which is the rule the 2026-08-24 batch was held to and it earned its
+keep again: **three stood as written, seven were inflated, and both worked examples
+for its best finding were duds** — the artwork guard at `artwork.py:80` blocks the
+two files it named, so the case that mattered was one it never wrote down. Its
+citations had also drifted six commits.
+
+Twelve entries came out of it in the end, ten of them repairs and all twelve now
+shipped; two further findings were examined and declined and are recorded below.
+**Four of the twelve were things the review never filed** — they surfaced only
+because checking its findings meant reading the code around them.
 
 **What else was swept — and what that sweep got wrong.** The review covered ten
 things; the areas below were checked afterwards because it had not looked at them.

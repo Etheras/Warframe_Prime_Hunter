@@ -106,21 +106,6 @@ ranking divides by means the same thing on every row.
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
 
-### Build, serving and publishing
-
-**Added 2026-08-26**, from an outside security review re-checked against the code,
-and **almost entirely shipped the same day**. Eleven of the twelve entries are gone
-and their reasoning is in `PROJECT.md §7`, along with two findings that were
-examined and declined.
-
-One is left, and it is the only one of the twelve that is a decision rather than a
-repair — it needs an answer for the standalone bundle as well as for the published
-site, and those are not obviously the same answer.
-
-| Entry | Size |
-|---|---|
-| The published site has no CSP, and a meta tag is the only one Pages will take | small — but decide the standalone's policy at the same time |
-
 ### One refactor
 
 Done on 2026-08-24 — the three slices of state moved into `shared.js` and both
@@ -136,7 +121,7 @@ of a worklist, not of the click, and worth deciding on its own merits.
 |---|---|
 | Plague Star and Profit-Taker are the same shape, modelled two ways | Plague Star to run |
 | The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
-| Expected openings for everything, not for the worst one | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
+| Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
 
 *Nine rotation-bearing mission types* used to sit in this table waiting on "wiki
 checking; tedious, not blocked". **The wiki checking was done on 2026-08-26** and
@@ -157,51 +142,6 @@ on the wiki, not here** — those are edits to `wiki.warframe.com`, not to this
 repository.
 
 ---
-
-## Found by the security review of 2026-08-26
-
-An outside review filed ten findings against commit `46ae037`. Every one was
-re-derived from the source at HEAD before being written down — the same rule the
-2026-08-24 batch was held to, and it earned its keep again: **three stood as
-written, seven were inflated, and one of the two worked examples for the first
-entry below does not fire at all.** Four things the review did not file are in
-here too, because checking its findings is what turned them up.
-
-Two findings were examined and declined. A declined finding is an answer rather
-than outstanding work, so the reasoning is in `PROJECT.md §7` and not here.
-
-The review's own citations had drifted six commits — the footer it quotes from
-`app.js` had already moved to `shared.js` — so every entry below is keyed to what
-the code does now.
-
-**Then the sweep that followed the review was itself re-checked, and that is where
-the worst of it was.** The sweep had cleared seven areas the review never opened.
-Two of those clean verdicts were wrong — both the same defect, `serve.py` checking
-one path and opening another — and four more were true but recorded in words too
-strong for the evidence behind them. The corrections are in `PROJECT.md §7`; the
-defects are entries here. **A "found clean" note is worth less than nothing if it
-was not adversarial**, because it stops the next reader looking.
-
-### The published site has no CSP, and a meta tag is the only one Pages will take
-
-`serve.py` sends a strict policy with no `unsafe-inline`, and the suite asserts it.
-None of that reaches a visitor to the published site: **GitHub Pages supports no
-custom response headers at all** — no `_headers`, no `.htaccess`, no site setting —
-so the only copy of this app that is protected by a CSP is the one served from this
-machine. There is no `http-equiv` meta in either page either, so the deployed copy
-and the standalone run with nothing.
-
-A `<meta http-equiv="Content-Security-Policy">` is the one mitigation Pages will
-honour, and it is worth having: it covers `script-src` and `style-src`, which is
-the half that matters now that no inline handlers remain. It will **not** carry
-`frame-ancestors` — that directive is ignored when a policy arrives by meta — so
-framing stays unaddressed, and the honest options for that are to accept it or to
-leave Pages. `PROJECT.md` already records the header gap as a known consequence of
-choosing Pages; what it does not say is that the meta half was available all along.
-
-The reason this is not simply "add the tag": the two pages are also inlined into the
-standalone bundle, which runs from `file://`, and a policy that is right for one is
-not automatically right for the other. Decide both, then write the tag.
 
 ## Defects found by the documentation sweep of 2026-08-15
 

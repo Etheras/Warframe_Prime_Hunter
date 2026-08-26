@@ -2,6 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<!-- The policy for the copies tools/serve.py does not serve: GitHub Pages sends
+     no custom response headers at all, so a meta tag is the only CSP the
+     deployed site and the standalone can carry, and without it they run with
+     none. Kept byte-identical to plan.html; tools/bundle.py rewrites it for the
+     standalone, where every script is inline. See PROJECT.md section 5.
+
+     Three things here are load-bearing and not obvious:
+       * it must sit after <meta charset> and before the first thing it governs
+         - anything parsed above it is outside the policy;
+       * raw.githubusercontent.com is not optional. cdn.warframestat.us/img/*
+         answers 301 to it, a policy is checked against every hop, and naming
+         only the CDN blocks every image on a build without local artwork;
+       * frame-ancestors is deliberately absent. Delivered by meta it is
+         ignored *and* logged as a console error, so writing it here would fail
+         the page tests while protecting nothing. Framing is covered by
+         serve.py's header locally and is unfixable on Pages. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.warframestat.us https://raw.githubusercontent.com; connect-src 'self'; base-uri 'none'; form-action 'none'" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Warframe Prime Hunter — Prime collection tracker</title>
 <link rel="stylesheet" href="assets/styles.css" />
