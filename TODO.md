@@ -106,6 +106,23 @@ ranking divides by means the same thing on every row.
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
 
+### Build, serving and publishing
+
+**Added 2026-08-26**, from an outside security review re-checked against the code.
+Each row has a `###` entry further down; two further findings were examined and
+declined, and their reasoning is in `PROJECT.md §7`.
+
+| Entry | Size |
+|---|---|
+| An upstream filename is joined to a path with nothing keeping it in the folder | **small, and arguably first** — it can write outside `assets/img/` on every online build here |
+| The bundle's `</script>` guard is case-sensitive | small — a regex, and a fixture that would have caught it |
+| Three upstream numbers are trusted to be numbers | session — coerce at the boundary, escape at the sink, one hostile fixture |
+| The footer promises something two of the three artefacts break | small — the payload already carries the flag that makes it conditional |
+| The stall timeout is set on the class that ignores it | small — one line, and it makes an existing comment true |
+| The build job holds the deploy job's permissions | small — scope `permissions:` per job |
+| `serve.py` describes a check it does not do | small — two GETs, not three HEADs, and it writes to the cache |
+| Imported filters and sort are adopted without validation | small |
+
 ### One refactor
 
 Done on 2026-08-24 — the three slices of state moved into `shared.js` and both
@@ -140,6 +157,176 @@ its open half closed on 2026-08-24, and what remains of it is a note explaining 
 Railjack levels are absent on purpose. Four wiki edits sit under **Should be fixed
 on the wiki, not here** — those are edits to `wiki.warframe.com`, not to this
 repository.
+
+---
+
+## Found by the security review of 2026-08-26
+
+An outside review filed ten findings against commit `46ae037`. Every one was
+re-derived from the source at HEAD before being written down — the same rule the
+2026-08-24 batch was held to, and it earned its keep again: **three stood as
+written, seven were inflated, and one of the two worked examples for the first
+entry below does not fire at all.** Four things the review did not file are in
+here too, because checking its findings is what turned them up.
+
+Two findings were examined and declined. A declined finding is an answer rather
+than outstanding work, so the reasoning is in `PROJECT.md §7` and not here.
+
+The review's own citations had drifted six commits — the footer it quotes from
+`app.js` had already moved to `shared.js` — so every entry below is keyed to what
+the code does now.
+
+### An upstream filename is joined to a path with nothing keeping it in the folder
+
+`tools/build_data.py:1032` takes `imageName` from the items API verbatim, `:1046`
+prefixes the CDN URL, and `tools/artwork.py:69` strips that prefix straight back off
+and treats the remainder as a local filename — `dest = os.path.join(IMG_DIR, fname)`
+at `:77`, then `open(dest, "wb")` at `:98`. Nothing in between rejects a separator,
+a drive letter or a leading slash, and nothing resolves the result to check it is
+still inside `assets/img/`.
+
+Measured on this disk rather than reasoned about: `..\..\.git\hooks\pre-commit`
+resolves into the repository's own hooks directory, and `C:\Windows\Temp\x.txt`
+discards `IMG_DIR` altogether.
+
+**What fires by default is file creation, not overwrite.** `artwork.py:80` skips any
+destination that already exists and is non-empty, so the two obvious targets —
+`assets/app.js`, `serve.cmd` — are not writable without `--refresh-images`. A path
+that does not exist yet is not covered by that guard, and `.git/hooks/` holds
+nothing but `.sample` files, so `pre-commit` would be a new file that runs on the
+next commit. Under a project rule that says *commit freely*, that is the case worth
+closing.
+
+It needs the name from the API and the body from the CDN, which is one operator. It
+is unreachable on CI, which builds without images, and reachable on **every** online
+build here, because `assets/img/` already exists and the module is sticky.
+
+**The fix is already written, one import away.** `tools/sources.py:88-90` does the
+same remote-name-to-local-path conversion correctly, with a character allowlist, for
+the HTTP cache. `artwork.py` is the only build code that calls `urlopen` directly
+instead of going through `sources.py`, which is exactly how it missed the sanitiser
+sitting in the module it imports from. A `..`-only filter would not be enough —
+`C:\Windows\Temp\x.txt` contains no `..`.
+
+**The existing test cannot see this.** `tests/test_build.py:1189` calls
+`os.path.basename` *inside* the filter before checking for illegal characters, so
+every traversal reduces to a legal-looking leaf and passes. Fixing the code without
+fixing the test leaves the same blind spot for the next thing.
+
+### The bundle's `</script>` guard is case-sensitive
+
+`tools/bundle.py:64-66` knows a literal `</script>` inside the inlined dataset would
+close the tag early, and guards it — with `text.replace(CLOSE_SCRIPT, ESCAPED_CLOSE)`
+against the exact lowercase string. HTML ends script data on `</script` matched
+**ASCII case-insensitively**, followed by whitespace, `/` or `>`. `</ScRiPt>` is not
+replaced. Neither is `</script` followed by a space.
+
+This has a weaker precondition than anything else in this section. Item names come
+from `wiki.warframe.com` raw text and reach `catalogue.py:185` with only
+`re.sub(r"\s+", " ", name)` — no character filter — so a public wiki edit is enough,
+with no API compromise anywhere. And the standalone is not a private download:
+`publish.yml:196` copies it into `_site/`, so it is served from the same origin as
+the tracker and shares its `localStorage`.
+
+A case-insensitive regex over the real terminator set, and a fixture with a
+mixed-case close tag in an item name.
+
+### Three upstream numbers are trusted to be numbers
+
+`masteryReq` (`build_data.py:1048`), `ducats` (`:1002`) and `itemCount` (`:998`)
+leave the builder exactly as the API sent them — no `int()`, no schema check. The
+comment at `:999-1001` states the numeric assumption in prose and the next line
+declines to enforce it. All three then reach `dbody.innerHTML` through template
+concatenation while their neighbours in the same template are escaped:
+
+```js
+<p class="d-sub">${esc(it.type || it.category)}${
+  it.masteryReq ? " · MR " + it.masteryReq : ""}
+```
+
+`comp.get("itemCount") or 1` is not a guard — a non-empty string is truthy and
+passes through unchanged. Today's data is clean, 166 integers and one null across
+167 items, so this is a boundary that is not enforced rather than something wrong on
+screen.
+
+Coercion at the build boundary is the real fix; escaping at the sink is the belt.
+Worth knowing while deciding how far to go: **the published site has no CSP at
+all.** There is no `http-equiv` meta in either page, and GitHub Pages cannot set
+response headers, so `serve.py`'s policy protects only the local copy. A meta CSP is
+the only hardening Pages will accept, and it cannot carry `frame-ancestors`.
+
+### The footer promises something two of the three artefacts break
+
+`assets/shared.js:492-493` says *"Artwork and data are served from this site, so no
+third party sees your visit."* On a local `serve.py` copy with `assets/img/` present
+that is true. On the published site it is not — CI builds without `--with-images`,
+so every visitor's browser fetches its artwork from `cdn.warframestat.us`. And
+`bundle.py:68-72` rewrites local paths *back* to the CDN unconditionally, so the
+standalone breaks the promise even when built on a machine that had the artwork.
+
+The same paragraph describes a rate limiter keying IP addresses in memory, which is
+`serve.py` behaviour and means nothing on Pages.
+
+`README.md:47-58` already documents the real behaviour accurately, so this is one
+surface contradicting another rather than something undisclosed. The discriminator
+is already in the payload — `meta.sources.images` (`build_data.py:1226`) — and
+`serve.py:180-186` already reads it. Because the bundle inlines `shared.js`
+verbatim, fixing the sentence once fixes all three artefacts.
+
+### The stall timeout is set on the class that ignores it
+
+`tools/serve.py:466` sets `timeout = 30` on the `Server` class, and the comment two
+lines above says it is there *"so a stalled connection releases its thread rather
+than holding it for ever."* It does not. `BaseServer.serve_forever` says so in its
+own docstring — *"Ignores self.timeout"* — and the attribute that becomes a socket
+timeout is the **handler's**, applied by `StreamRequestHandler.setup`, which is
+never set here. Accepted sockets get `gettimeout() is None`. Checked against this
+machine's Python 3.14.2, not against the docs.
+
+So a LAN peer can hold threads open by never finishing a request line, and the rate
+limiter cannot help because it runs after parsing. The exposure is small — LAN mode
+is opt-in, `daemon_threads` keeps Ctrl+C working, and HTTP/1.0 with no keep-alive
+releases threads from ordinary traffic immediately. **The reason to do it is that
+one line makes an existing comment true**, which is worth more here than the thread
+cap is.
+
+### The build job holds the deploy job's permissions
+
+`permissions:` in `.github/workflows/publish.yml` is declared once at workflow
+level, so the **build** job inherits `pages: write` and `id-token: write` and uses
+neither. That is the job running network fetches against every upstream. Scoping
+both to the deploy job is a two-line change.
+
+Separately, neither `actions/checkout@v7` sets `persist-credentials: false`; in
+`wiki.yml` that leaves a `contents: write` token in `.git/config` for the length of
+the job.
+
+All nine actions are first-party `actions/*` and neither workflow has a
+`pull_request` trigger, so pinning them to commit SHAs — which the review asked for
+— is ordinary hardening rather than a live exposure. Worth doing, worth doing after
+the two above.
+
+### `serve.py` describes a check it does not do
+
+The comment at `tools/serve.py:95` calls the freshness check *"three HEAD requests,
+no downloads"*. `sources.upstream_signature` makes **one HEAD and two GETs**, and
+both GETs write their bodies into `.cache/*.gz` with `.etag` sidecars. So opening
+the app in a browser mutates the cache the build reads from — which is the half
+worth writing down, and neither half of the sentence is true.
+
+The behaviour itself is deliberate and fine: the result is memoised for an hour,
+failures included, so a blackholed network costs one slow load per hour per process
+rather than one per request.
+
+### Imported filters and sort are adopted without validation
+
+`parseBackup` is careful about everything else — legacy detection, catalogue-checked
+ids, part-name membership, counts clamped — but `filters` is returned on a bare
+`typeof` check (`assets/model.js:309-310`) and persisted verbatim, and `saved.sort`
+is then adopted on truthiness into `SORTS[state.sort] || SORTS.cat`
+(`assets/app.js:205, 372`). A small hand-written backup can write persistent state
+that nothing checked. Low value on its own; recorded because it is the one real
+input-validation gap in a function that was reviewed for a different one and cleared.
 
 ---
 

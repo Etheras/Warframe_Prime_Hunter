@@ -2620,6 +2620,83 @@ releases earlier, on the same day, which holds for all 41 vaulted Warframes in t
 current data. The flag is computed from the farmable non-permanent Warframes and
 then applied by release date, so the weapons that shipped alongside are caught too.
 
+### Two security findings examined and declined
+
+An outside review of 2026-08-26 filed ten findings; eight are in `TODO.md` in
+whatever form survived being checked against the code. These two did not survive,
+and are kept here so the questions are not asked again from scratch.
+
+**An unbounded backup import is not a finding.** The claim was that reading a
+user-chosen file with `FileReader` and parsing it as JSON can freeze or crash the
+tab. It can — in the same sense that opening any large file can. There is no
+adversary anywhere in it: the user picks the file from their own disk, both import
+handlers wrap `parseBackup` in `try`/`catch` and report *"Could not read that"*, and
+`reader.onerror` is handled. Every loop in `parseBackup` is linear in input size —
+no recursion, no backtracking regex, no quadratic merge — so a hostile file buys
+nothing that a merely large one does not, which is what makes "huge **or** malicious"
+a false pairing. The file input is not even a distinct surface: the same text pastes
+straight into `#dataArea` with no file at all, so a size cap on the picker would not
+remove the behaviour described. It would add a limit to explain and a way to reject
+a legitimate backup. Declined.
+
+The finding did point at the right function, and looking properly turned up a real
+gap that is *not* the one filed: `filters` and `sort` are adopted from a backup
+without validation. That one is in `TODO.md`.
+
+**"Cache poisoning" is the wrong name for a narrow interrupted-write window.** The
+claim was that fetched bytes are written over the gzip cache before parsing
+validates them, and that several outputs are written straight to their final paths.
+Both are true and neither is poisoning: `.cache/` is local and written only by our
+own fetch, so nobody can plant an entry. The flagship scenario has no impact either
+— a bad body is cached with its ETag, so the next run gets a 304 and identical
+bytes, which is exactly what a fresh fetch would return while upstream is unchanged.
+Two of the cited lines contain the guard the finding says is missing
+(`artwork.py:96-97` raises on an empty body *before* the write), `--refresh-images`
+already detects a truncated image by size and refetches it, and `save_state()` runs
+**after** the emit, so `--if-changed` cannot skip past a torn payload on the next
+run. A torn emit fails loudly rather than persisting as plausible wrong data: the
+built-payload group catches it and the page fails to define `window.WFPRIME_DATA`.
+
+What survives is genuinely narrow — an interruption between opening the gzip file
+and closing it, most plausibly a full disk. `os.replace` onto a temporary sibling is
+the right shape and is worth doing if that code is being touched for another reason.
+It is not worth a backlog entry standing on its own, which is why it is recorded
+here instead of there.
+
+**What else was swept, and found clean.** The review covered ten things; these were
+checked afterwards because it had not looked at them, and only one produced a
+finding (the bundle's close-tag guard, in `TODO.md`). Recorded so the same ground is
+not covered a third time:
+
+- **`serve.py`'s allowlist holds.** `_relative()` unquotes, then `normpath`s against
+  `ROOT`, then `relpath`s and rejects anything starting with `..` — so it normalises
+  *before* the allowlist is consulted, which is the ordering that makes `%2e%2e%2f`
+  and Windows backslashes fail closed rather than fail open. A different-drive path
+  raises `ValueError` and is caught. `ALLOWED_FILES` is exact-match and
+  `ALLOWED_DIRS` refuses any further `/`, so `assets/img/` cannot be walked out of.
+  `translate_path` is not overridden, so the stdlib's own component filter is still
+  the second gate.
+- **The `temp_mockup.html` carve-out is bounded as intended.** Relaxed CSP requires
+  exact membership of `LOCAL_ONLY_FILES` *and* a loopback peer, and `end_headers`
+  deliberately recomputes both rather than trusting `allowed()` — which matters,
+  because it also runs on error responses. Nothing else can reach the relaxed policy.
+- **`wiki.py` cannot carry upstream data into the wiki.** It assembles from
+  `README.md`, `PROJECT.md` and `NOTICE.md`; its one read of `data/prime-data.json`
+  produces integer counts (`sum(1 for ...)`, `len(...)`) and no upstream string ever
+  reaches the Markdown. This was worth checking because that job holds
+  `contents: write`.
+- **The cross-tab handler does not trust the event.** It re-reads through `load()`
+  rather than using `e.newValue`, so a `storage` event cannot inject a value that
+  never passed the store's own parsing.
+- **The live fissure path escapes everything.** `esc()` on the tooltip, the tier and
+  the remaining-time text; the timestamp goes through `toLocaleTimeString`. It comes
+  from the same upstream as the three unescaped numbers in `TODO.md`, and it is the
+  proof that the convention is right and those three are the exception rather than
+  the rule.
+- **`schedule.ps1` quotes the script path** it hands to `New-ScheduledTaskAction`.
+- **Nothing generated is tracked** — `git ls-files` shows no `.cache`, `data/`,
+  `dist/`, `.claude` or credential-shaped file.
+
 ---
 
 ## 8. Gotchas discovered while building
