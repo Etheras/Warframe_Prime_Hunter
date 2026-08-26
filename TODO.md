@@ -114,7 +114,11 @@ declined, and their reasoning is in `PROJECT.md §7`.
 
 | Entry | Size |
 |---|---|
-| An upstream filename is joined to a path with nothing keeping it in the folder | **small, and arguably first** — it can write outside `assets/img/` on every online build here |
+| `serve.py` checks one path and opens another | **small, and first** — any file under the folder is readable in LAN mode today |
+| An upstream filename is joined to a path with nothing keeping it in the folder | **small, and arguably second** — it can write outside `assets/img/` on every online build here |
+| A part count out of a backup reaches `innerHTML` | small — the import-reachable half of the numeric-fields entry |
+| `schedule.sh` single-quotes paths into the cron line | small |
+| `mode` is carried into the payload and read by nothing | small — delete the field or allowlist it |
 | The bundle's `</script>` guard is case-sensitive | small — a regex, and a fixture that would have caught it |
 | Three upstream numbers are trusted to be numbers | session — coerce at the boundary, escape at the sink, one hostile fixture |
 | The footer promises something two of the three artefacts break | small — the payload already carries the flag that makes it conditional |
@@ -175,6 +179,66 @@ than outstanding work, so the reasoning is in `PROJECT.md §7` and not here.
 The review's own citations had drifted six commits — the footer it quotes from
 `app.js` had already moved to `shared.js` — so every entry below is keyed to what
 the code does now.
+
+**Then the sweep that followed the review was itself re-checked, and that is where
+the worst of it was.** The sweep had cleared seven areas the review never opened.
+Two of those clean verdicts were wrong — both the same defect, `serve.py` checking
+one path and opening another — and four more were true but recorded in words too
+strong for the evidence behind them. The corrections are in `PROJECT.md §7`; the
+defects are entries here. **A "found clean" note is worth less than nothing if it
+was not adversarial**, because it stops the next reader looking.
+
+### `serve.py` checks one path and opens another
+
+**Found on 2026-08-26 by re-checking the sweep that had just called this code
+clean.** The allowlist is enforced against a path the server computes itself, and
+the bytes come from a path the standard library computes differently. On Windows the
+two disagree, and the disagreement is one URL-encoded backslash wide.
+
+`_relative()` (`tools/serve.py:366-377`) calls `os.path.normpath`, which on Windows
+is `ntpath.normpath`: it treats `\` as a separator and **resolves** `..` across it.
+`SimpleHTTPRequestHandler.translate_path` is not overridden, and it uses
+`posixpath.normpath` and then **drops** any component where `os.path.dirname(word)`
+is truthy — on Windows, any component containing a backslash.
+
+So `..%5c..%5cindex.html` is three components to the gate and one discarded component
+to the file opener:
+
+```
+GET /.git/config/..%5c..%5cindex.html
+  _relative()    -> "index.html"                 -> allowed() -> True
+  translate_path -> <ROOT>\.git\config           -> 200 OK, served
+```
+
+Measured on this machine, not reasoned about: `/.git/config` on its own is correctly
+denied, and the same file through the form above is served. `tools/serve.py`,
+`.claude/settings.local.json`, `PROJECT.md` and the pack files under `.git/objects/`
+all come back the same way, and `/tools/..%5cindex.html/` returns a browsable
+directory listing. `do_HEAD` behaves identically.
+
+The general form is: any path under the folder, plus `/`, plus `..%5c` once per
+component, plus an allowlisted filename.
+
+**This is precisely the exposure the allowlist was written to remove.**
+`tools/serve.py:154-157` and this document both name it — a whole `.git` directory
+from which the repository can be reconstructed — and `.git` is on disk.
+
+Two bounds worth stating, because they decide how urgent it is. It **cannot escape
+the folder**: `translate_path` builds from `self.directory` and drops `..`, `.` and
+drive-bearing words, so `C:\Windows\win.ini` is not reachable. And a hostile web page
+cannot read the bytes — there are no CORS headers, so a cross-origin `fetch` is
+blocked. **The real exposure is LAN mode**, where any peer on the network can read
+the whole working folder.
+
+The fix is to stop computing the path twice: override `translate_path` to build from
+the same `rel` that `allowed()` approved, so the checked path and the opened path are
+the same string by construction. Anything else leaves two parsers to keep in step.
+
+Note for whoever fixes it: `tests/test_build.py:1362-1370` calls `serve.allowed()`
+with pre-normalised literals only. Nothing in the suite ever calls `_relative()`, and
+no test sends a percent-encoded or backslashed path — which is why this survived both
+the outside review and the sweep. A regression test wants to drive the handler, not
+the predicate.
 
 ### An upstream filename is joined to a path with nothing keeping it in the folder
 
@@ -317,6 +381,62 @@ worth writing down, and neither half of the sentence is true.
 The behaviour itself is deliberate and fine: the result is memoised for an hour,
 failures included, so a blackholed network costs one slow load per hour per process
 rather than one per request.
+
+### A part count out of a backup reaches `innerHTML`
+
+The same shape as the three upstream numbers above, but with a much weaker
+precondition: the value comes out of `localStorage`, and the app invites you to
+import a file into `localStorage`.
+
+`ST.owns` is `(parts[id] || {})[part] || 0` (`assets/shared.js:127`) — whatever was
+stored, uncoerced, with `|| 0` catching only falsy values. `needOf` is
+`(p && p.itemCount) || 1` (`:116`). Both land unescaped in the part chip at
+`assets/app.js:892`:
+
+```js
+${need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;")}
+```
+
+`esc(p.name)` sits two lines below it. The `need > 1` gate means it renders only for
+parts that legitimately need more than one, of which there are 53.
+
+`parseBackup` clamps counts with `Math.min(needOf(part), ...)`, so the ordinary
+import path is covered — this is about a hand-edited backup, which is exactly the
+file a person edits when they want to fix a count by hand. It also crosses tabs: the
+collection listener at `shared.js:218` re-reads through `load()`, which is
+`JSON.parse` and no validation, and the subscriber at `app.js:93-101` re-opens the
+drawer on an external change.
+
+Fix alongside the numeric-fields entry — the sink is the same template — but note the
+input is different, so escaping at the sink is what covers this one; there is no
+upstream boundary to coerce at.
+
+### `schedule.sh` single-quotes paths into the cron line
+
+`tools/schedule.sh:122` builds the cron line by single-quoting `$ROOT` and `$PY`.
+Single quotes cannot escape a single quote, so a project path containing an
+apostrophe emits a line cron cannot parse — measured with a directory named
+`Etheras's stuff`: `bash -n` reports an unterminated string.
+
+No attacker here; it is the owner's own path on the owner's own machine. It is worth
+an entry because the `.ps1` half was checked and found to quote correctly, and the
+two halves of one subsystem should not have different answers.
+
+### `mode` is carried into the payload and read by nothing
+
+`tools/build_data.py:700` emits `mode` on every fissure as
+`str(entry.get("missionType") or "").strip()` — free-form upstream text, no
+allowlist, unlike `tier` on the line above it, which is dropped unless it matches one
+of five exact literals (`:692`). `node` (`:698`) is the same shape.
+
+Nothing renders `mode`. Nothing reads it at all. It is third-party text sitting in
+the shipped payload one template edit away from a sink — and *"a Lith Defense fissure
+is running here"* is a natural thing to want in that badge, with `mode` already
+there for no other reason.
+
+Either delete the field or give it the same treatment `tier` gets. The cost of
+leaving it is that the next person to use it has no reason to check where it came
+from.
 
 ### Imported filters and sort are adopted without validation
 

@@ -2663,39 +2663,66 @@ the right shape and is worth doing if that code is being touched for another rea
 It is not worth a backlog entry standing on its own, which is why it is recorded
 here instead of there.
 
-**What else was swept, and found clean.** The review covered ten things; these were
-checked afterwards because it had not looked at them, and only one produced a
-finding (the bundle's close-tag guard, in `TODO.md`). Recorded so the same ground is
-not covered a third time:
+**What else was swept — and what that sweep got wrong.** The review covered ten
+things; the areas below were checked afterwards because it had not looked at them.
 
-- **`serve.py`'s allowlist holds.** `_relative()` unquotes, then `normpath`s against
-  `ROOT`, then `relpath`s and rejects anything starting with `..` — so it normalises
-  *before* the allowlist is consulted, which is the ordering that makes `%2e%2e%2f`
-  and Windows backslashes fail closed rather than fail open. A different-drive path
-  raises `ValueError` and is caught. `ALLOWED_FILES` is exact-match and
-  `ALLOWED_DIRS` refuses any further `/`, so `assets/img/` cannot be walked out of.
-  `translate_path` is not overridden, so the stdlib's own component filter is still
-  the second gate.
-- **The `temp_mockup.html` carve-out is bounded as intended.** Relaxed CSP requires
-  exact membership of `LOCAL_ONLY_FILES` *and* a loopback peer, and `end_headers`
-  deliberately recomputes both rather than trusting `allowed()` — which matters,
-  because it also runs on error responses. Nothing else can reach the relaxed policy.
-- **`wiki.py` cannot carry upstream data into the wiki.** It assembles from
-  `README.md`, `PROJECT.md` and `NOTICE.md`; its one read of `data/prime-data.json`
-  produces integer counts (`sum(1 for ...)`, `len(...)`) and no upstream string ever
-  reaches the Markdown. This was worth checking because that job holds
-  `contents: write`.
-- **The cross-tab handler does not trust the event.** It re-reads through `load()`
-  rather than using `e.newValue`, so a `storage` event cannot inject a value that
-  never passed the store's own parsing.
-- **The live fissure path escapes everything.** `esc()` on the tooltip, the tier and
-  the remaining-time text; the timestamp goes through `toLocaleTimeString`. It comes
-  from the same upstream as the three unescaped numbers in `TODO.md`, and it is the
-  proof that the convention is right and those three are the exception rather than
-  the rule.
-- **`schedule.ps1` quotes the script path** it hands to `New-ScheduledTaskAction`.
-- **Nothing generated is tracked** — `git ls-files` shows no `.cache`, `data/`,
-  `dist/`, `.claude` or credential-shaped file.
+**The first version of this list, committed on 2026-08-26, called `serve.py`'s
+allowlist clean. It is not, and the sentence that cleared it was the exact sentence
+that described the bug.** It said *"`translate_path` is not overridden, so the
+stdlib's own component filter is still the second gate."* Not overriding
+`translate_path` is the vulnerability: the server computes the request path twice,
+by two algorithms that disagree, and enforces the allowlist on the one it does not
+open. That entry is in `TODO.md` now. The lesson is kept here rather than deleted,
+because *"I checked this and it is fine"* is the most expensive sentence in this
+repository — it stops the next reader looking — and this is the second time a
+document in it has vouched for something that was not true.
+
+What survives, with the corrections the re-check forced:
+
+- **The `temp_mockup.html` carve-out is bounded by an exact-set membership and a
+  loopback peer**, and `end_headers` recomputes both rather than trusting
+  `allowed()`, which matters because it also runs on error responses. `LOOPBACK`
+  covers `::ffff:127.` so the v4-mapped v6 case is handled, and a test compares the
+  two policies directive by directive (`tests/test_build.py:1448-1461`), asserting
+  the relaxation is *exactly* `'unsafe-inline'` and that `unsafe-eval` never appears.
+  **What that does not do is bind the policy to the body** — `rel` describes the
+  request path, not the file that gets opened, so the same desync above can attach
+  the relaxed policy to a different file. That half is part of the `TODO.md` entry.
+  `temp_mockup.html` is absent from this disk, so the carve-out is currently inert.
+- **`wiki.py` carries no upstream string into the wiki today**, which is worth
+  knowing because that job holds `contents: write` — but not for the reason first
+  recorded. It assembles from `README.md`, `PROJECT.md` and **`TODO.md`** (not
+  `NOTICE.md`, which is only a link-rewrite target), and two of the six figures in
+  its stats table — `meta.itemCount` and `meta.dropSource` (`wiki.py:273, :277`) —
+  are raw dict reads interpolated into an f-string with no coercion and no escaping.
+  They are safe because `acquire_drops()` returns one of two string literals, which
+  is an invariant of `build_data.py` rather than a property of `wiki.py`.
+- **Both cross-tab handlers re-read through `load()`** and neither touches
+  `e.newValue` — `shared.js:218` and `shared.js:674`, the second of which the first
+  sweep never opened. **That is not a sanitisation claim**, and the first version of
+  this list implied it was: `load()` is `JSON.parse` in a `try`/`catch` with a
+  default and validates nothing, so re-reading yields exactly what
+  `JSON.parse(e.newValue)` would. The Mastery Rank listener is genuinely safe because
+  `mrClamp` is a real type gate; the collection listener is not gated, and where that
+  leads is in `TODO.md`.
+- **The live fissure path is safe because of a build-time allowlist, not because of
+  escaping.** `build_data.py:692` drops any `tier` outside five exact literals, and
+  `tier` is the only fissure string rendered. `node` and `mode` reach the payload as
+  free-form upstream text (`:698, :700`); nothing renders them, and `mode` has no
+  consumer at all. **This is evidence for coercing at the boundary, not against it** —
+  the first version of this list cited it as proof the three unescaped numbers in
+  `TODO.md` were an acceptable exception, which is backwards.
+- **`schedule.ps1` quotes the script path** it hands to `New-ScheduledTaskAction`,
+  verified by building the action with a space-bearing path. `schedule.sh` is the
+  other half of that subsystem and was not opened; it has its own `TODO.md` entry.
+- **The public repository has never carried a generated file or a credential.**
+  Checked against history, not only `git ls-files`: `.gitignore` has covered
+  `.cache/`, `dist/`, `.claude/` and `__pycache__/` since the root commit, which is
+  what actually produces the outcome. One correction to the first version, which
+  enumerated `.claude` as cleared: `CLAUDE.md` itself was committed at `b169683` and
+  deleted at `ae68819` about two and three-quarter hours later, so that blob is in
+  public history permanently. Its content is benign — working rules, no credentials,
+  no absolute paths — but "nothing local ever got out" would be false.
 
 ---
 
