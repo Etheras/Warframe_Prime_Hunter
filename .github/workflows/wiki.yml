@@ -56,6 +56,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The Publish step clones the wiki with its own token in the URL, so
+          # nothing here uses the credential checkout would otherwise leave in
+          # .git/config — and this job is the one that holds `contents: write`.
+          persist-credentials: false
 
       - uses: actions/setup-python@v7
         with:

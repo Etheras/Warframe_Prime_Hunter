@@ -38,10 +38,15 @@ env:
   FULL: ${{ github.event_name != 'schedule' || github.event.schedule == '40 18 * * *' }}
 
 # Read-only against the repo. This workflow cannot modify your code.
+#
+# Declared at workflow level this is the floor for *every* job, and until
+# 2026-08-26 that meant the build job carried `pages: write` and
+# `id-token: write` as well — which it never uses, and which is the one job that
+# fetches from half a dozen third-party endpoints and runs a build over what
+# they return. The two deploy scopes are granted per job below instead; this
+# block is now only what both jobs genuinely need.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Deployments to Pages have to serialise, so every run shares one group.
 #
@@ -61,8 +66,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Nothing beyond the workflow floor: this job reads the repo, fetches from
+    # upstream and writes an artifact. It does not deploy.
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The build makes no git operation, so it has no use for a credential
+          # in .git/config for the length of the job.
+          persist-credentials: false
 
       # 3.14 matches what the project is developed against. The floor is 3.8
       # (stdlib only, no walrus, no match, no 3.9+ stdlib) but there is no
@@ -207,6 +218,12 @@ jobs:
     needs: build
     if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
+    # The only job that publishes, and the only one that needs to. `id-token` is
+    # required by deploy-pages for its OIDC exchange; there is no cloud trust
+    # policy anywhere in this repo for that token to be traded into.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

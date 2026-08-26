@@ -108,20 +108,18 @@ ranking divides by means the same thing on every row.
 
 ### Build, serving and publishing
 
-**Added 2026-08-26**, from an outside security review re-checked against the code.
-Each row has a `###` entry further down; two further findings were examined and
-declined, and their reasoning is in `PROJECT.md §7`.
+**Added 2026-08-26**, from an outside security review re-checked against the code,
+and **almost entirely shipped the same day**. Eleven of the twelve entries are gone
+and their reasoning is in `PROJECT.md §7`, along with two findings that were
+examined and declined.
+
+One is left, and it is the only one of the twelve that is a decision rather than a
+repair — it needs an answer for the standalone bundle as well as for the published
+site, and those are not obviously the same answer.
 
 | Entry | Size |
 |---|---|
-| `schedule.sh` single-quotes paths into the cron line | small |
-| `mode` is carried into the payload and read by nothing | small — delete the field or allowlist it |
 | The published site has no CSP, and a meta tag is the only one Pages will take | small — but decide the standalone's policy at the same time |
-| The footer promises something two of the three artefacts break | small — the payload already carries the flag that makes it conditional |
-| The stall timeout is set on the class that ignores it | small — one line, and it makes an existing comment true |
-| The build job holds the deploy job's permissions | small — scope `permissions:` per job |
-| `serve.py` describes a check it does not do | small — two GETs, not three HEADs, and it writes to the cache |
-| Imported filters and sort are adopted without validation | small |
 
 ### One refactor
 
@@ -204,108 +202,6 @@ choosing Pages; what it does not say is that the meta half was available all alo
 The reason this is not simply "add the tag": the two pages are also inlined into the
 standalone bundle, which runs from `file://`, and a policy that is right for one is
 not automatically right for the other. Decide both, then write the tag.
-
-### The footer promises something two of the three artefacts break
-
-`assets/shared.js:492-493` says *"Artwork and data are served from this site, so no
-third party sees your visit."* On a local `serve.py` copy with `assets/img/` present
-that is true. On the published site it is not — CI builds without `--with-images`,
-so every visitor's browser fetches its artwork from `cdn.warframestat.us`. And
-`bundle.py:68-72` rewrites local paths *back* to the CDN unconditionally, so the
-standalone breaks the promise even when built on a machine that had the artwork.
-
-The same paragraph describes a rate limiter keying IP addresses in memory, which is
-`serve.py` behaviour and means nothing on Pages.
-
-`README.md:47-58` already documents the real behaviour accurately, so this is one
-surface contradicting another rather than something undisclosed. The discriminator
-is already in the payload — `meta.sources.images` (`build_data.py:1226`) — and
-`serve.py:180-186` already reads it. Because the bundle inlines `shared.js`
-verbatim, fixing the sentence once fixes all three artefacts.
-
-### The stall timeout is set on the class that ignores it
-
-`tools/serve.py:466` sets `timeout = 30` on the `Server` class, and the comment two
-lines above says it is there *"so a stalled connection releases its thread rather
-than holding it for ever."* It does not. `BaseServer.serve_forever` says so in its
-own docstring — *"Ignores self.timeout"* — and the attribute that becomes a socket
-timeout is the **handler's**, applied by `StreamRequestHandler.setup`, which is
-never set here. Accepted sockets get `gettimeout() is None`. Checked against this
-machine's Python 3.14.2, not against the docs.
-
-So a LAN peer can hold threads open by never finishing a request line, and the rate
-limiter cannot help because it runs after parsing. The exposure is small — LAN mode
-is opt-in, `daemon_threads` keeps Ctrl+C working, and HTTP/1.0 with no keep-alive
-releases threads from ordinary traffic immediately. **The reason to do it is that
-one line makes an existing comment true**, which is worth more here than the thread
-cap is.
-
-### The build job holds the deploy job's permissions
-
-`permissions:` in `.github/workflows/publish.yml` is declared once at workflow
-level, so the **build** job inherits `pages: write` and `id-token: write` and uses
-neither. That is the job running network fetches against every upstream. Scoping
-both to the deploy job is a two-line change.
-
-Separately, neither `actions/checkout@v7` sets `persist-credentials: false`; in
-`wiki.yml` that leaves a `contents: write` token in `.git/config` for the length of
-the job.
-
-All nine actions are first-party `actions/*` and neither workflow has a
-`pull_request` trigger, so pinning them to commit SHAs — which the review asked for
-— is ordinary hardening rather than a live exposure. Worth doing, worth doing after
-the two above.
-
-### `serve.py` describes a check it does not do
-
-The comment at `tools/serve.py:95` calls the freshness check *"three HEAD requests,
-no downloads"*. `sources.upstream_signature` makes **one HEAD and two GETs**, and
-both GETs write their bodies into `.cache/*.gz` with `.etag` sidecars. So opening
-the app in a browser mutates the cache the build reads from — which is the half
-worth writing down, and neither half of the sentence is true.
-
-The behaviour itself is deliberate and fine: the result is memoised for an hour,
-failures included, so a blackholed network costs one slow load per hour per process
-rather than one per request.
-
-### `schedule.sh` single-quotes paths into the cron line
-
-`tools/schedule.sh:122` builds the cron line by single-quoting `$ROOT` and `$PY`.
-Single quotes cannot escape a single quote, so a project path containing an
-apostrophe emits a line cron cannot parse — measured with a directory named
-`Etheras's stuff`: `bash -n` reports an unterminated string.
-
-No attacker here; it is the owner's own path on the owner's own machine. It is worth
-an entry because the `.ps1` half was checked and found to quote correctly, and the
-two halves of one subsystem should not have different answers.
-
-### `mode` is carried into the payload and read by nothing
-
-`tools/build_data.py:700` emits `mode` on every fissure as
-`str(entry.get("missionType") or "").strip()` — free-form upstream text, no
-allowlist, unlike `tier` on the line above it, which is dropped unless it matches one
-of five exact literals (`:692`). `node` (`:698`) is the same shape.
-
-Nothing renders `mode`. Nothing reads it at all. It is third-party text sitting in
-the shipped payload one template edit away from a sink — and *"a Lith Defense fissure
-is running here"* is a natural thing to want in that badge, with `mode` already
-there for no other reason.
-
-Either delete the field or give it the same treatment `tier` gets. The cost of
-leaving it is that the next person to use it has no reason to check where it came
-from.
-
-### Imported filters and sort are adopted without validation
-
-`parseBackup` is careful about everything else — legacy detection, catalogue-checked
-ids, part-name membership, counts clamped — but `filters` is returned on a bare
-`typeof` check (`assets/model.js:309-310`) and persisted verbatim, and `saved.sort`
-is then adopted on truthiness into `SORTS[state.sort] || SORTS.cat`
-(`assets/app.js:205, 372`). A small hand-written backup can write persistent state
-that nothing checked. Low value on its own; recorded because it is the one real
-input-validation gap in a function that was reviewed for a different one and cleared.
-
----
 
 ## Defects found by the documentation sweep of 2026-08-15
 

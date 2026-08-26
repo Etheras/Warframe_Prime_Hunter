@@ -92,9 +92,19 @@ def lan_address() -> str | None:
 # comes back opaque with unreadable headers. Having every visitor contact the
 # CDN would also undo the point of holding artwork locally.
 #
-# Verification only - three HEAD requests, no downloads, nothing rebuilt. It is
-# throttled to once an hour so a page reload does not hammer DE, and a failure
-# upstream is silent rather than alarming.
+# Verification only, in the sense that nothing is rebuilt - but this said "three
+# HEAD requests, no downloads" until 2026-08-26 and both halves were wrong.
+# `sources.upstream_signature` makes one HEAD (the drop table) and two GETs (the
+# export index, ~500 bytes, and the vault trader window), and both GETs go
+# through `fetch`, which writes the body to `.cache/*.gz` with an `.etag`
+# sidecar. So serving a page writes to the cache the build reads from. That is
+# harmless - it is the same conditional fetch the build would make, and it
+# leaves the cache warmer - but a comment that says "no downloads" is how
+# nobody notices.
+#
+# Throttled to once an hour, failures included, so a reload does not hammer DE
+# and a blackholed network costs one slow load per hour per process rather than
+# one per request.
 FRESHNESS_TTL = 3600
 _freshness: dict = {"checked": 0.0, "stamp": 0.0, "body": None}
 _freshness_lock = threading.Lock()
@@ -313,6 +323,16 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
     about the one nobody did. See `translate_path` below for what got through.
     """
 
+    # The one timeout that reaches an accepted socket. `StreamRequestHandler.setup`
+    # does `self.connection.settimeout(self.timeout)`, so it has to live on the
+    # handler; the same name on the server class is a different attribute for a
+    # different purpose, and setting it there - which is what this server did
+    # until 2026-08-26 - leaves `gettimeout()` as None on every connection. A
+    # LAN peer could then hold a thread by starting a request line and never
+    # finishing it, which is exactly what the server comment promised was
+    # handled. 30s is generous for a request from the next room.
+    timeout = 30
+
     def log_message(self, fmt, *args):  # noqa: A003 - keep the console readable
         pass
 
@@ -494,8 +514,14 @@ def main() -> int:
 
     # Threaded, because the single-threaded server could be taken down by one
     # client opening a socket and never finishing its request - measured: a
-    # second client waited the full timeout. A timeout as well, so a stalled
-    # connection releases its thread rather than holding it for ever.
+    # second client waited the full timeout.
+    #
+    # The timeout that does that job is on the HANDLER and is set on SiteHandler
+    # itself; `Server.timeout` is left here only because `handle_request` reads
+    # it. It is not what releases a stalled connection, and this comment claimed
+    # it was until 2026-08-26: `BaseServer.serve_forever` says "Ignores
+    # self.timeout" in its own docstring, so for the whole life of this server
+    # the class attribute below did nothing at all.
     class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
         allow_reuse_address = True

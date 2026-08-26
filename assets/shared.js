@@ -511,6 +511,39 @@
     const link = (href, text) =>
       `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
     const dot = '<span class="foot-dot">·</span>';
+
+    /* This paragraph used to assert, unconditionally, that "artwork and data are
+       served from this site, so no third party sees your visit". That is true of
+       a local copy built with --with-images and false of the two artefacts most
+       people actually read: CI builds the published site without images, and
+       bundle.py rewrites local paths back to the CDN for the standalone. So the
+       claim was false on GitHub Pages and false in the download, 167 times per
+       page load, in the one paragraph a reader has no way to check.
+
+       `meta.sources.images` already says which build this is, and serve.py reads
+       the same signal to decide whether its CSP may name the CDN at all — so the
+       sentence is derived from the same fact as the enforcement rather than
+       asserted beside it. */
+    function artworkNote() {
+      const src = ((DATA.meta || {}).sources || {}).images || "";
+      return src.indexOf("assets/img") === 0
+        ? "Artwork and data are served from this site, so no third party sees your visit. "
+        : "Data is served from this site, but artwork loads from " +
+          link("https://cdn.warframestat.us", "cdn.warframestat.us") +
+          ", which therefore sees your address and which items you looked at. " +
+          "A copy built with artwork included fetches nothing at all. ";
+    }
+
+    /* The rate limiter is a property of tools/serve.py, and saying so on a page
+       served by GitHub Pages or opened from file:// describes a server that is
+       not there. `WFPRIME_UPSTREAM` exists only when serve.py answered, which is
+       the same signal the stale banner uses to tell an owner from a guest. */
+    function rateLimitNote() {
+      if (!window.WFPRIME_UPSTREAM) return "";
+      return "The server counts requests per visitor briefly, in memory only, " +
+        "purely to stop one client overwhelming it; addresses are keyed-hashed " +
+        "with a per-session salt, never written down, and discarded when it stops.";
+    }
     foot.innerHTML = "<p>" +
       "WARFRAME and all related data, names and artwork are the property of " +
       link("https://www.warframe.com", "Digital Extremes Ltd.") + ", used under their " +
@@ -518,11 +551,7 @@
       " for non-commercial fan works. Warframe Prime Hunter is an unofficial fan " +
       "project, not affiliated with or endorsed by Digital Extremes." + dot +
       "Your collection is stored in this browser and is sent nowhere — there is no " +
-      "account, no cookie and no analytics. Artwork and data are served from this " +
-      "site, so no third party sees your visit. The server counts requests per " +
-      "visitor briefly, in memory only, purely to stop one client overwhelming it; " +
-      "addresses are keyed-hashed with a per-session salt, never written down, and " +
-      "discarded when it stops." + dot +
+      "account, no cookie and no analytics. " + artworkNote() + rateLimitNote() + dot +
       "Catalogue data from the " +
       link("https://wiki.warframe.com/w/Prime", "WARFRAME Wiki") +
       " (CC BY-SA); item and worldstate data via " +

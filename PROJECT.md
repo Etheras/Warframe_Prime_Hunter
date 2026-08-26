@@ -2726,6 +2726,50 @@ fix has two layers because they have two different sources.**
   `guard_text` runs over whole JavaScript files, where `<!--` is a legal line
   comment and an inserted backslash is a syntax error.
 
+**The seven remaining entries shipped the same day.** None changed a decision; each
+made something true that a document or a comment already claimed:
+
+- **The stall timeout moved to the class that can apply it.** `SiteHandler.timeout`
+  is what `StreamRequestHandler.setup` puts on the accepted socket. The same name on
+  the server class is a different attribute, `serve_forever` says in its own
+  docstring that it ignores it, and the comment beside it had promised the
+  protection for the life of the server. `Server.timeout` stays only because
+  `handle_request` reads it, and now says so.
+- **`serve.py`'s freshness comment says what the check does.** It claimed "three
+  HEAD requests, no downloads"; it is one HEAD and two GETs, and both GETs write
+  their bodies to `.cache/*.gz` with `.etag` sidecars — so serving a page writes to
+  the cache the build reads from. Harmless, and worth saying rather than denying.
+- **The deploy scopes are granted per job.** `pages: write` and `id-token: write`
+  were at workflow level, so the build job — the one fetching from six third-party
+  endpoints — carried them and never used them. Both `checkout` steps also set
+  `persist-credentials: false`; the wiki job clones with its own token in the URL,
+  so nothing there wanted a credential left in `.git/config`.
+- **The footer says what is true of the copy being read.** The artwork sentence is
+  derived from `meta.sources.images`, the same signal `serve.py` uses to decide
+  whether its CSP may name the CDN, so the claim and the enforcement come from one
+  fact. The rate-limiter sentence appears only when `WFPRIME_UPSTREAM` exists —
+  it describes `tools/serve.py`, and on Pages or `file://` it was describing a
+  server that is not there.
+- **`schedule.sh` quotes paths it cannot otherwise escape.** A single quote cannot
+  be escaped inside single quotes, so a project path containing an apostrophe
+  emitted a cron line with an unterminated string — accepted by `crontab`, failing
+  every ten minutes thereafter. The `.ps1` twin had always been right, which is the
+  kind of gap that only shows up on somebody else's machine. Parameter expansion
+  rather than `sed`: the `sed` version has to survive two levels of quoting, and
+  the first attempt silently produced `'''` instead of `'\''`.
+- **The fissure `mode` field is gone.** It carried the worldstate's `missionType`
+  as free-form upstream text and nothing had ever read it, while `tier` two lines
+  above is refused unless it matches one of five literals. If a badge ever wants to
+  say *a Lith Defense fissure is running here*, it comes back through the same
+  allowlist rather than off the wire.
+- **Restored filters are taken from the defaults, not from the file.** `avail` was
+  `Object.assign`ed wholesale, and every key of it is interpolated into a CSS
+  selector — `[data-count="${k}"]` — so a hand-edited backup with a quote in a key
+  made the selector malformed, `querySelector` threw, and `render()` stopped. The
+  existing defaults are the allowlist, so there is no second list to keep in step.
+  `sort` is normalised where `SORTS` first exists, which is below the block that
+  restores it.
+
 **Both tests were written to fail first, and both replaced a test that could not
 see the bug.** The server test used to ask `allowed()` about paths that were already
 clean — it sent the answer, not the request — so it now drives `_relative()` and

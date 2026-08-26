@@ -196,7 +196,19 @@
   {
     const saved = load(KEY_FILTERS, null);
     if (saved) {
-      Object.assign(state.avail, saved.avail || {});
+      /* Only the buckets we already have, and only as booleans. This was
+         `Object.assign(state.avail, saved.avail || {})`, which copied whatever
+         keys the file happened to carry — and every key of `state.avail` is
+         interpolated into a CSS selector further down, `[data-count="${k}"]`.
+         A hand-edited backup with a quote in a key made that selector
+         malformed, `querySelector` threw, and `render()` stopped: not a way in,
+         but a way to break the page with a file the app invites you to import.
+         The defaults above are the allowlist, so there is no second list to
+         keep in step — the same trick `PLAN_OPTIONS` uses in model.js. */
+      const savedAvail = saved.avail && typeof saved.avail === "object" ? saved.avail : {};
+      Object.keys(state.avail).forEach((k) => {
+        if (typeof savedAvail[k] === "boolean") state.avail[k] = savedAvail[k];
+      });
       if (typeof saved.showCollected === "boolean") state.showCollected = saved.showCollected;
       if (typeof saved.showMissing === "boolean") state.showMissing = saved.showMissing;
       if (Array.isArray(saved.cats) && saved.cats.length) {
@@ -267,6 +279,15 @@
     },
     release: (a, b) => byRelease(a, b) || a.name.localeCompare(b.name),
   };
+
+  /* A restored `sort` was taken on bare truthiness, and could not be checked
+     where it was read: that block runs above this one, so `SORTS` is still in
+     its dead zone there. Normalising here is the first moment the answer
+     exists. `render` already falls back for an unknown key, so nothing was
+     visibly broken — the value simply persisted, and the select showed no
+     selection because assigning an unknown value to a <select> selects
+     nothing. This makes the stored value one of the real ones. */
+  if (!Object.prototype.hasOwnProperty.call(SORTS, state.sort)) state.sort = "cat";
 
   /* ── badges ───────────────────────────────────────────────── */
   const BADGE = {

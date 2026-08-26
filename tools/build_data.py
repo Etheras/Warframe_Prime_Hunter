@@ -723,7 +723,13 @@ def build_fissures(raw, now: datetime) -> list:
         out.append({
             "node": node,
             "tier": tier,
-            "mode": str(entry.get("missionType") or "").strip(),
+            # `mode` (the worldstate's missionType) used to be emitted here and
+            # nothing ever read it - free-form third-party text sitting in the
+            # shipped payload one template edit away from a sink, while `tier`
+            # two lines up is refused unless it matches one of five literals.
+            # If a badge ever wants to say "a Lith Defense fissure is running
+            # here", bring it back through the same allowlist rather than
+            # straight off the wire.
             "ends": _instant(entry.get("expiry")).isoformat(timespec="seconds"),
             # Steel Path, and the Railjack ones, which are their own missions
             # with their own tables rather than an overlay on a normal node

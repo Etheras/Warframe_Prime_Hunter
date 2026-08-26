@@ -119,7 +119,31 @@ fi
 # that are allowed to change. It names the script's path rather than the
 # product, because the product gets renamed and tools/schedule.sh does not.
 MARKER="# managed by tools/schedule.sh"
-LINE="$MINUTES $HOURS * * * cd '$ROOT' && '$PY' tools/build_data.py --if-changed >/dev/null 2>&1 $MARKER"
+
+# Both of these are paths from the machine, and they go into a line that a
+# shell will parse later. Wrapping them in single quotes is not enough: a single
+# quote cannot be escaped inside single quotes, so a project living somewhere
+# like /home/sam/Sam's stuff produced a cron line with an unterminated string,
+# which crontab accepts and the shell then fails on every ten minutes. The
+# .ps1 twin got this right and this half did not, which is the sort of gap that
+# only shows up on somebody else's machine.
+#
+# POSIX quoting for that: end the quote, add an escaped quote, start a new one.
+# Parameter expansion rather than sed, because the sed version needs the pattern
+# to survive two levels of quoting and the first attempt at it silently emitted
+# ''' instead of '\'' - which parses, right up until the path has an apostrophe.
+sq() {
+  _s=$1; _o=''
+  while :; do
+    case $_s in
+      *"'"*) _o=$_o${_s%%\'*}"'\\''"; _s=${_s#*\'} ;;
+      *) break ;;
+    esac
+  done
+  printf "'%s'" "$_o$_s"
+}
+
+LINE="$MINUTES $HOURS * * * cd $(sq "$ROOT") && $(sq "$PY") tools/build_data.py --if-changed >/dev/null 2>&1 $MARKER"
 
 if [ "$ACTION" = show ]; then
   printf '%s\n' "$LINE"

@@ -875,8 +875,11 @@ test("a fissure that has closed is gone, whatever the build said", () => {
   const now = Date.parse("2026-08-11T21:00:00Z");
   const at = (mins) => new Date(now + mins * 60000).toISOString();
   const ROT = loadRotation({ now });
+  /* The shape build_data emits: no `mode`. It carried the worldstate's
+     missionType, nothing read it, and it was dropped rather than left as
+     unfiltered upstream text in the payload. */
   const F = (o) => Object.assign(
-    { node: "?", tier: "Lith", mode: "Defense", hard: false, storm: false }, o);
+    { node: "?", tier: "Lith", hard: false, storm: false }, o);
 
   const HERE = "Coba (Earth)";
   const gone = F({ node: HERE, tier: "Axi", ends: at(-1) });

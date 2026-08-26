@@ -1461,6 +1461,16 @@ def test_server_serves_only_the_site() -> None:
           serve.allowed("index.html", "192.168.1.169"), True,
           "the local-only rule must not have narrowed the site itself")
 
+    # A stalled connection is released by the HANDLER's timeout, because that is
+    # the one StreamRequestHandler.setup puts on the accepted socket. The same
+    # name on the server class is a different attribute, and serve_forever says
+    # in its own docstring that it ignores it - so for a long time the server
+    # had the value, the comment claimed the protection, and no socket had one.
+    check_true("a stalled connection is released, and by the attribute that can do it",
+               isinstance(serve.SiteHandler.timeout, (int, float))
+               and serve.SiteHandler.timeout > 0,
+               "Server.timeout is not a socket timeout; SiteHandler.timeout is")
+
     # Everything above asks `allowed()` about a path that is already clean, which
     # is the wrong question: the allowlist is enforced on the path the server
     # works out, and the bytes come from the path the standard library works out.
