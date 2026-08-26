@@ -321,7 +321,7 @@ was added and answered with them. The seven that remain are still unverified.
   *Spy* page says the same, that rotations are determined only by the number of
   vaults successfully hacked. It also files Spy under **Standard**, not Endless,
   which is the round-based-or-not split the model had been reverse-engineering.
-  **This is what unblocks the cap**: on a capped three-vault run the third vault
+  **This is what unblocked the cap**: on a capped three-vault run the third vault
   *is* rotation C, so Pago, Bode, Valac, Aegaeon, Amalthea and Dione keep the
   rotation they hold all their value in. The fear that capping would zero them
   came from assuming A, A, B, and it was the right fear for that assumption.
@@ -330,8 +330,14 @@ was added and answered with them. The seven that remain are still unverified.
   hacking an Abandoned Derelict Cache and pays **rotation B**. Separate tables,
   rolled independently — not a cycle at all. Our own data agrees exactly: all 38
   live `Caches` nodes are Proxima, and the 28 rotation-bearing ones publish
-  precisely A and B and nothing else. **So the recorded design is wrong on the
-  count** — it says `{Caches: {count: 3}}` and it should be 2.
+  precisely A and B and nothing else.
+
+**Both of those shipped in `d8b4484`** and this entry is no longer open on them —
+`FIXED_LENGTH` in `rotation.js` carries `Spy: {count: 3, pays: [A,B,C]}` and
+`Caches: {count: 2, pays: [A,B]}`. The line here used to read *"the recorded
+design is wrong on the count — it says `{Caches: {count: 3}}` and it should be
+2"*, and stayed after the code was corrected; it is the count that was fixed, not
+the sentence. What is still open in this entry is the **cadence sweep** below.
 - **The 10 un-rotated `Caches` nodes are Earth and Saturn Proxima**, which the
   wiki shows with a single undifferentiated cache table and no A/B labelling.
   Their `rot -` in our data matches. Costing them *one run* is already right and
@@ -357,8 +363,57 @@ eleven are not one-for-one, both checked on the wiki the same day:
 
 So the paragraph above understates it a second time: the objective counts are
 unchecked for the **confirmed eleven** as well as for the unverified nine.
-Re-sweeping the eleven for cadence is the smaller half of this entry and is worth
-doing first — it needs no code, only the wiki, and it has already turned up two.
+
+**The cadence sweep is done, 2026-08-26.** All eleven were read off
+[`Mission Rewards`](https://wiki.warframe.com/w/Mission_Rewards), whose table gives
+the reward criteria and the indices that pay each letter, and spot-checked against
+the individual mission pages. What the model charges was measured with the `node:vm`
+probe against the shipped `rotation.js`, not read off the source:
+
+| Mode | Wiki reward criteria | Per reward | We charge | Live nodes |
+|---|---|---|---|---|
+| Defense | waves cleared — 3, 6, 9, 12 | **3** | 1 | **38** |
+| Survival | minutes — 5, 10, 15, 20 | **5 min** | 1 | **37** |
+| Void Cascade | retired Exolizers — 4, 8, 12, 16 | **4** | 1 | 1 |
+| Void Flood | sealed Void Ruptures — 3, 6, 9, 12 | **3** | 1 | 1 |
+| Void Armageddon | waves — 3, 6, 9, 12 | **3** | 1 | 1 |
+| Defection | squads saved — 2, 4, 6, 8 | **2** | 1 | 3 |
+| Sanctuary Onslaught | zones cleared — 2, 4, 6, 8 | 2 | **2** ✓ | 2 |
+| Interception | rounds — 1, 2, 3, 4 | 1 | 1 ✓ | 16 |
+| Excavation | artifacts — 1, 2, 3, 4 | 1 | 1 ✓ | 11 |
+| Infested Salvage | manifests — 1, 2, 3, 4 | 1 | 1 ✓ | 1 |
+| Alchemy | crucibles — 1, 2, 3, 4 | 1 | 1 ✓ | 1 |
+
+Four of the eleven are genuinely one-for-one. Onslaught is already correct. **Six
+are not**, and two of those six are the largest modes in the dataset — Defense and
+Survival are 38 and 37 live nodes, more than any other.
+
+**But the number is not the decision, and this is why it is not a one-line fix.**
+The model's unit is inconsistent with itself, and the sweep is what exposed it:
+
+- The effort tooltip in `plan.html` defines an objective as *"A Defense round, a
+  Spy vault, a bounty stage"* — the thing that **pays a reward**. Under that
+  reading every row above is 1 by definition, and it is **Onslaught's `PER_REWARD`
+  of 2 that is wrong**, not the other six.
+- The Onslaught fix took the opposite reading: it charged the **player-visible
+  sub-unit**, so a six-reward run became twelve zones. Under *that* reading Defense
+  is a wave, and the six rows above are under-costed by 3×, 5×, 4×, 3×, 3× and 2×.
+
+Both cannot hold. The reason it matters is that *per objective* is a **cross-mission
+ranking** — it divides by this unit to compare a Defense node with an Excavation
+node — so a unit that means "3 waves" on one row and "1 dig" on the next is not a
+unit. *Per minute* is unaffected once effort weights are given, which is the
+existing escape hatch and an argument for how much this is worth.
+
+**Survival will not fit either reading**: its criterion is 5 *minutes*, not a
+countable objective, so it has no player-visible atom to charge. Whatever is
+decided for the other five, Survival needs its own answer.
+
+**Not fixed here, deliberately** — picking a reading re-costs 75+ live nodes and
+reorders the planner, which is the owner's call, not a sweep's. The wiki half of
+this entry is now closed; what is left is the decision. The seven mission types
+that carry no rotation confirmation at all are still unverified and unaffected by
+it.
 
 ### `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones
 
@@ -886,13 +941,25 @@ Recorded here only so they are not mistaken for one:
 - Item categories are read from the wiki deliberately — see `PROJECT.md §7`.
 - The five non-relic categories are dropped from the catalogue by us, not by the
   wiki, which lists them correctly — see `PROJECT.md §9`.
-- **One item has no `releaseDate`** — Kavasa Prime Collar, and it is the only one
-  of the 167. The field comes from the `warframestat.us` item API, which returns
-  `null` for it, so this is an upstream gap rather than a wiki one; the wiki page
-  has not been checked, and there is no local override because nothing today
-  needs one. **Consequence, measured 2026-08-26:** it is vaulted and not
-  farmable, so `vaultSoon` — the only other reader of the field — excludes it
-  either way. What is left is sort placement, and both date sorts in `app.js` now
-  put an undated item last through one shared `byRelease` rather than relying on
-  the direction they happen to run in. Worth re-checking if it ever becomes
-  farmable, because `vaultSoon` would then skip it silently.
+- **One item has no `releaseDate` and no `vaultDate`** — Kavasa Prime Collar, and
+  it is the only one of the 167. Both fields come from the `warframestat.us` item
+  API, which returns `null` for them, so this is an **upstream API gap and not a
+  wiki one**: the wiki page has the answer and was checked on 2026-08-26.
+
+  [`Kavasa Prime Kubrow Collar`](https://wiki.warframe.com/w/Kavasa_Prime_Kubrow_Collar)
+  says it was released **alongside Trinity Prime and Dual Kamas Prime**, entered
+  the vault on **29 August 2017**, and came back out between 26 May and 29
+  September 2020. Both of its cohort are in our catalogue and agree exactly:
+  `releaseDate` `2015-10-06` and `vaultDate` `2017-08-29` for each. So the two
+  missing values are **known, and sourced** — `2015-10-06` and `2017-08-29`.
+
+  **No local override has been added**, deliberately, because nothing today reads
+  either field for this item: it is vaulted and not farmable, so `vaultSoon` —
+  the only other reader — excludes it whatever the date says, and sort placement
+  is handled without one (`byRelease` in `app.js` puts an undated item last, by
+  rule rather than by the direction the comparison happens to run). Adding the
+  override is a two-line change in `build_data.py` if the owner would rather have
+  the field populated than empty; the argument against is `PROJECT.md §2`'s, that
+  a hand-patched value is a thing nobody re-checks when upstream fixes it.
+  **Worth revisiting if it ever becomes farmable**, because `vaultSoon` would
+  then skip it silently.
