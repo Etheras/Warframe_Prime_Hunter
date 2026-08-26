@@ -42,6 +42,11 @@ true; the cadence row changed shape and the Mastery Rank row shipped.
 Titles are given verbatim so they can be grepped — each one is a `###` heading
 further down, where the reasoning lives.
 
+**One row was added later the same day**, from the first session that ever drove
+the built single file in a browser rather than reading it as text: *The standalone
+runs both pages' wiring twice, and it shows*. It is the only entry here whose
+symptoms are confined to `dist/`, which is exactly why nothing had found it.
+
 *Size* is honest rather than optimistic: **small** is a few lines and one file,
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
@@ -102,6 +107,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
+| The standalone runs both pages' wiring twice, and it shows | session — small to stop the bundler duplicating the chrome, session to make the shared wiring idempotent and test it |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -662,6 +668,62 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 `PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
+
+### The standalone runs both pages' wiring twice, and it shows
+
+**Found 2026-08-26, measured in Chromium, pre-existing.** `dist/warframe-prime-hunter.html`
+is the file strangers download, and it is the only artefact nothing drives in a
+browser: `test_pages.mjs` serves `index.html` and `plan.html`, and the bundle is
+checked as *text* by `test_build.py`. So this has never been looked at.
+
+`tools/bundle.py` builds the single file by keeping the collection's header and
+then concatenating **both** page bodies — `body_after_header(html)` and
+`body_after_header(plan)` — followed by `app.js` and `plan.js` back to back over
+the one document. Both of those files call the same five shared wiring functions
+(`wireFileBackup`, `wireMastery`, `watchFissures`, `staleBanner`, `siteFooter`),
+and everything they touch sits *below* the header, so it exists twice while
+`getElementById` returns the first copy to both callers.
+
+Eleven ids are duplicated in the built file: `advanced`, `siteFoot`, `dataDlg`,
+`dataArea`, `downloadBtn`, `uploadBtn`, `uploadFile`, `copyBtn`, `importBtn`,
+`dlgCloseBtn`, `dlgMsg`. Neither page alone duplicates any. Five consequences were
+measured rather than reasoned about, each on `http://` and on `file://`, and each
+against the two ordinary pages as controls:
+
+| What a person does | Tracker / planner | Standalone |
+|---|---|---|
+| Presses **+** on Mastery Rank once, from 10 | 11 | **12** — and **−** goes back two as well |
+| Presses **Download backup** once | one file | **two identical files**, same name |
+| Presses **Paste & restore** once | the collection's itemised message | the planner's *"Imported 5 sections"* — both handlers ran, planner last |
+| Opens the **Planner** tab | footer with licence and attribution | **empty footer** — `siteFoot` was filled twice, both times the collection's |
+| Loads it with a build over 14 days old | one stale banner | **two stale banners** |
+| Leaves it open | one `fissures.json` poll | **two**, forever |
+
+The Mastery Rank one is the worst of them, because MR is not decoration: it
+derives the Void Trace cap, so a stepper that moves two ranks a press feeds a
+wrong cap into the planner's own numbers. The empty planner footer is second,
+since that footer carries the licence and the attribution `NOTICE.md` requires.
+
+**What is *not* wrong, checked because it was the reason for looking.** The
+standalone's backup download works from `file://` — the blob origin is
+`blob:null/`, Chromium downloads it anyway, and a scripted click, a real click and
+`Enter` on the button all produce the file. The content is right too: seeded with
+the same store, the standalone's backup carries the same `collected`, `parts`,
+`materials`, `wishlist` and `filters` as the tracker's, plus the planner's
+normalised option defaults, which is a superset rather than a loss. The two files
+one press produces are byte-identical apart from the timestamp. The session that
+raised this had it from a probe that cleared its own results before printing them.
+
+**Two shapes of fix, and they are not the same size.** Making `bundle.py` drop the
+planner's copy of the shared chrome is small and mechanical, but it leaves the
+double `S.*` calls in place and only works while the list of shared ids is right.
+Making the shared wiring idempotent — each of the five refusing a second run, in
+`shared.js`, where the Node suite can test it without a browser — is the one that
+cannot silently rot, and it is the same judgement `PROJECT.md` already makes about
+where testable logic goes. Either way the gap that hid this is the real finding:
+**nothing drives the built file in a browser.** A page test that opens
+`dist/warframe-prime-hunter.html` and presses **+** once would have caught every
+row of that table.
 
 ### The rest of the player facts the header could hold
 
