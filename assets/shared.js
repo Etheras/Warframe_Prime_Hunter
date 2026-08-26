@@ -523,10 +523,15 @@
      `LR<n-30>` above 30, exactly as the spec asked. */
   const MR_BASES = ["Initiate", "Novice", "Disciple", "Seeker", "Hunter",
                     "Eagle", "Sage", "Knight", "Lord", "Architect"];
-  const MR_TIERS = ["base", "silver", "gold"];
   const MR_TOP = 30;
 
-  const mrClamp = (n) => (isFinite(n) && n >= 0 ? Math.floor(n) : null);
+  /* The `typeof` is load-bearing and was not there at first: `isFinite(null)` is
+     **true** in JavaScript — null coerces to 0 — so a cleared rank read back as
+     `Math.floor(null)`, which is 0. Unranked and unset are different answers,
+     and that turned every "I have not said" into "I am rank 0". Latent until the
+     box became typeable, because nothing had ever written null before. */
+  const mrClamp = (n) =>
+    typeof n === "number" && isFinite(n) && n >= 0 ? Math.floor(n) : null;
 
   /* "MR 13", "LR 2", or "—" when it has never been set. */
   function masteryLabel(mr) {
@@ -543,16 +548,6 @@
     const base = MR_BASES[Math.floor((mr - 1) / 3)];
     const tier = (mr - 1) % 3;
     return tier === 0 ? base : (tier === 1 ? "Silver " : "Gold ") + base;
-  }
-
-  /* Which of the three colours the sigil takes. Unranked and Legendary sit
-     outside the cycle and get their own, so the badge never implies a tier the
-     rank does not have. */
-  function masteryTier(mr) {
-    if (mr == null) return "none";
-    if (mr === 0) return "none";
-    if (mr > MR_TOP) return "legendary";
-    return MR_TIERS[(mr - 1) % 3];
   }
 
   /* `wiki.warframe.com/w/Void_Traces`: "This cap is determined by one's Mastery
@@ -572,22 +567,27 @@
   const TRACE_PIVOT = 500;
   const traceCapped = (mr) => mr != null && traceCap(mr) <= TRACE_PIVOT;
 
-  /* The sigil. DE's own rank icons are not reachable from here: the wiki 403s
-     any request that is not a browser (see PROJECT.md section 8) and the item
-     CDN that supplies every other image in this app has no rank art - its
-     backing store 404s `IconRank1.png` while item images resolve. Both were
-     checked on 2026-08-26. So this is drawn rather than fetched, which also
-     keeps it working from file:// and off a USB stick with no network at all.
-     It is not a copy of DE's art and does not pretend to be; what it borrows is
-     the structure that IS documented - the bronze/silver/gold three-rank cycle
-     the rank titles themselves follow. */
-  function masterySigil(mr) {
-    const tier = masteryTier(mr);
-    return '<svg class="mr-sigil" data-tier="' + tier + '" viewBox="0 0 24 24" ' +
-      'aria-hidden="true" focusable="false">' +
-      '<path d="M12 2 L21 12 L12 22 L3 12 Z" class="mr-sigil-body" />' +
-      '<path d="M12 6.5 L17.5 12 L12 17.5 L6.5 12 Z" class="mr-sigil-core" />' +
-      "</svg>";
+  /* What the box shows, which above 30 is NOT what is stored. The rank keeps
+     counting as one integer - 31, 32 - and the label beside the box carries the
+     "LR", so the box shows `n - 30`. Splitting it this way is the whole reason
+     the letters could leave the field: they were never part of the value. */
+  const masteryShown = (mr) =>
+    mr == null ? "" : String(mr > MR_TOP ? mr - MR_TOP : mr);
+
+  /* And the way back, which needs to know which label the reader was looking at.
+     In MR mode the typed number IS the rank, so typing 31 rolls over to LR 1 on
+     its own and there is a way into Legendary from the keyboard. In LR mode the
+     typed number is the Legendary one, so it is offset - and typing 0 there
+     lands on MR 30, the rank below LR 1.
+
+     `undefined` means "not a number", which is different from `null` meaning
+     "cleared". The caller must not write the first and must write the second. */
+  function masteryTyped(raw, legendary) {
+    const t = String(raw == null ? "" : raw).trim();
+    if (t === "") return null;
+    if (!/^\d+$/.test(t)) return undefined;
+    const n = parseInt(t, 10);
+    return legendary ? MR_TOP + n : n;
   }
 
   /* Wires the header control on whichever page called it. Both pages carry the
@@ -597,9 +597,8 @@
   function wireMastery() {
     const field = document.getElementById("mrField");
     if (!field) return null;
-    const valueEl = document.getElementById("mrValue");
-    const sigilEl = document.getElementById("mrSigil");
-    const badge = document.getElementById("mrBadge");
+    const input = document.getElementById("mrInput");
+    const label = document.getElementById("mrLabel");
     const down = document.getElementById("mrDown");
     const up = document.getElementById("mrUp");
 
@@ -609,24 +608,26 @@
       plan.mastery = mr;
       save(KEYS.plan, plan);
     };
+    const legendary = () => label.textContent === "LR";
 
     function paint() {
       const mr = read();
-      /* Two children updated separately rather than one innerHTML over the
-         badge: rewriting the badge whole would destroy `valueEl` on the first
-         paint and leave every later one writing to a detached node. */
-      valueEl.textContent = masteryLabel(mr);
-      sigilEl.innerHTML = masterySigil(mr);
+      input.value = masteryShown(mr);
+      label.textContent = mr != null && mr > MR_TOP ? "LR" : "MR";
+      /* The visible label is aria-hidden, so the field has to say which of the
+         two it is or a screen reader hears a bare number. */
+      input.setAttribute("aria-label",
+        mr != null && mr > MR_TOP ? "Legendary Rank" : "Mastery Rank");
       field.dataset.set = mr == null ? "no" : "yes";
       down.disabled = mr == null || mr === 0;
 
-      const title = masteryTitle(mr);
       const cap = traceCap(mr);
-      badge.dataset.tip = mr == null
-        ? "Mastery Rank — not set.\n\nSet it and this says your Void Trace cap, and " +
-          "nodes can say what rank they ask of you. It never hides anything: a " +
-          "bounty above your rank can still be played when a squadmate starts it."
-        : masteryLabel(mr) + " — " + title + ".\n\n" +
+      field.dataset.tip = mr == null
+        ? "Mastery Rank — not set.\n\nType it in, or use the arrows. Once it is set " +
+          "this says your Void Trace cap, and nodes can say what rank they ask of " +
+          "you. It never hides anything: a bounty above your rank can still be " +
+          "played when a squadmate starts it."
+        : masteryLabel(mr) + " — " + masteryTitle(mr) + ".\n\n" +
           "Void Trace cap " + cap + " — (rank × 50) + 100.\n" +
           "A Radiant costs 100, so that is " + Math.floor(cap / 100) + " of them." +
           (traceCapped(mr)
@@ -646,13 +647,32 @@
       paint();
     };
 
+    /* Committed on blur and on Enter, never on every keystroke: a field that
+       saved as you typed would store MR 1 on the way to MR 13, and each of those
+       is a real rank with a real trace cap. Anything that is not a whole number
+       is refused by putting back what is stored, rather than by writing a
+       guess. */
+    function commit() {
+      const next = masteryTyped(input.value, legendary());
+      if (next !== undefined) write(next);
+      paint();
+    }
+
     up.addEventListener("click", () => step(1));
     down.addEventListener("click", () => step(-1));
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(); input.blur(); }
+      else if (e.key === "Escape") { paint(); input.blur(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); step(1); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); step(-1); }
+    });
 
     /* The same rank, changed in the other tab. It is one shared value and the
-       two headers must not drift apart while both are open. */
+       two headers must not drift apart while both are open - but not while this
+       one is being typed into, where repainting would eat the half-typed rank. */
     window.addEventListener("storage", (e) => {
-      if (e.key === KEYS.plan) paint();
+      if (e.key === KEYS.plan && document.activeElement !== input) paint();
     });
 
     paint();
@@ -662,8 +682,8 @@
   window.WFPrimeShared = {
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
-    masteryLabel, masteryTitle, masteryTier, traceCap, traceCapped, TRACE_PIVOT,
-    MR_TOP, wireMastery, siteFooter,
+    masteryLabel, masteryTitle, masteryShown, masteryTyped,
+    traceCap, traceCapped, TRACE_PIVOT, MR_TOP, wireMastery, siteFooter,
     /* One store per page, made here so the `storage` listener is registered
        once and both pages share the rules rather than a copy of them. */
     state: makeState(),

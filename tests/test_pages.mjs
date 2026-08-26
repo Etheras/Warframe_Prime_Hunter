@@ -362,31 +362,80 @@ page_test("a Mastery Rank set on one page is the same rank on the other", async 
      single-page check and still be wrong. */
   const { page, errors } = await open("/index.html");
 
-  assert.equal(await page.locator("#mrValue").innerText(), "—",
-               "it starts unset, and says so rather than claiming rank 0");
+  const box = page.locator("#mrInput");
+  const label = page.locator("#mrLabel");
+
+  assert.equal(await box.inputValue(), "",
+               "it starts unset, and shows nothing rather than claiming rank 0");
   assert.equal(await page.locator("#mrDown").isDisabled(), true,
                "there is nothing below unset to step down to");
 
   await page.locator("#mrUp").click();
-  assert.equal(await page.locator("#mrValue").innerText(), "MR 0",
+  assert.equal(await box.inputValue(), "0",
                "the first press lands on Unranked, which is a real rank");
   assert.equal(await page.locator("#mrDown").isDisabled(), true,
                "and 0 is still the floor");
 
   for (let i = 0; i < 13; i++) await page.locator("#mrUp").click();
-  assert.equal(await page.locator("#mrValue").innerText(), "MR 13");
+  assert.equal(await box.inputValue(), "13");
+  assert.equal(await label.innerText(), "MR");
 
   const stored = await page.evaluate(
     () => JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}").mastery);
   assert.equal(stored, 13, "the rank has to reach the shared plan store");
 
   await page.locator("#mrDown").click();
-  assert.equal(await page.locator("#mrValue").innerText(), "MR 12", "and it steps back down");
+  assert.equal(await box.inputValue(), "12", "and it steps back down");
 
   const plan = await (await page.context().newPage());
   await plan.goto(origin + "/plan.html", { waitUntil: "load" });
-  assert.equal(await plan.locator("#mrValue").innerText(), "MR 12",
+  assert.equal(await plan.locator("#mrInput").inputValue(), "12",
                "the planner reads the same account fact, not its own copy");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a rank can be typed straight in, and typing past 30 reaches Legendary", async () => {
+  /* The steps are for nudging; nobody should press + twenty-six times to say
+     they are MR 26. Committed on blur and on Enter rather than per keystroke,
+     because MR 1 is a real rank with a real trace cap and a field that saved as
+     you typed would store it on the way to MR 13. */
+  const { page, errors } = await open("/index.html");
+  const box = page.locator("#mrInput");
+  const label = page.locator("#mrLabel");
+  const saved = () => page.evaluate(
+    () => JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}").mastery);
+
+  await box.fill("26");
+  assert.equal(await saved(), undefined, "nothing is written while it is still being typed");
+  await box.press("Enter");
+  assert.equal(await saved(), 26, "Enter commits it");
+  assert.equal(await label.innerText(), "MR");
+
+  /* In MR mode the typed number IS the rank, so 31 rolls over on its own —
+     which is the only route into Legendary from the keyboard. */
+  await box.fill("31");
+  await box.press("Enter");
+  assert.equal(await label.innerText(), "LR", "31 is Legendary, not MR 31");
+  assert.equal(await box.inputValue(), "1", "and the box holds the Legendary number");
+  assert.equal(await saved(), 31, "while the store keeps one integer");
+
+  /* And back, because in LR mode the typed number is offset by 30. */
+  await box.fill("0");
+  await box.press("Enter");
+  assert.equal(await label.innerText(), "MR");
+  assert.equal(await box.inputValue(), "30", "LR 0 is really MR 30");
+
+  /* Refused rather than guessed at: what was stored comes back. */
+  await box.fill("nonsense");
+  await box.blur();
+  assert.equal(await box.inputValue(), "30", "a non-number puts back what was stored");
+  assert.equal(await saved(), 30);
+
+  /* Emptying it clears the rank, rather than meaning zero. */
+  await box.fill("");
+  await box.press("Enter");
+  assert.equal(await saved(), null, "an emptied box is unset, not MR 0");
+  assert.equal(await box.inputValue(), "");
   assert.deepEqual(errors, []);
 });
 
@@ -405,7 +454,7 @@ page_test("the rank badge states the Void Trace cap it implies", async () => {
      the far end of that switch cannot be reached. The badge says so and the
      switch stays enabled - this field informs and never filters. */
   const { page, errors } = await open("/plan.html");
-  const tip = () => page.locator("#mrBadge").getAttribute("data-tip");
+  const tip = () => page.locator("#mrField").getAttribute("data-tip");
 
   assert.match(await tip(), /not set/, "with no rank given there is no cap to state");
   assert.equal(await page.locator("#traceCapNote").count(), 0,
@@ -421,7 +470,7 @@ page_test("the rank badge states the Void Trace cap it implies", async () => {
   };
 
   await setRank(13);
-  assert.equal(await page.locator("#mrValue").innerText(), "MR 13");
+  assert.equal(await page.locator("#mrInput").inputValue(), "13");
   const rich = await tip();
   assert.match(rich, /750/, "MR13 caps at 750 — the wiki's own worked example");
   assert.match(rich, /Hunter/, "and the badge names the rank DE gives it");

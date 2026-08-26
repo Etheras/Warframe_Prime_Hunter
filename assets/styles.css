@@ -149,56 +149,54 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 
 /* ── Mastery Rank ─────────────────────────
-   An account fact, so it sits with the brand and the view tabs rather than in
-   either page's sidebar. Same pill vocabulary as .viewtabs, one size down, so
-   it reads as part of the header furniture and not as a control competing with
-   the two views. The sigil is drawn rather than fetched — DE's rank icons are
-   not reachable from here, see the note in shared.js. */
-.mr-field{
-  display:flex;align-items:center;gap:2px;flex:none;
-  padding:2px;
+   An account fact, so it sits with the brand rather than in either page's
+   sidebar. The letters are OUTSIDE the box because they are not part of the
+   value: past rank 30 they become LR and the box holds the Legendary number.
+
+   The steps sit directly above and below the number rather than either side of
+   it, and are sized so the whole control still fits the existing pill row —
+   measured, because a taller arrangement grew the bar from 72px to 85px and
+   this bar is sticky, so that is paid for on every screen. */
+.mr-field{display:flex;align-items:center;gap:7px;flex:none;cursor:help}
+.mr-label{
+  font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--txt-faint);
+}
+.mr-field[data-set="yes"] .mr-label{color:var(--txt-dim)}
+.mr-stack{display:flex;flex-direction:column;align-items:stretch}
+.mr-step{
+  height:11px;
+  display:flex;align-items:center;justify-content:center;
+  border:0;background:transparent;padding:0;
+  color:var(--txt-faint);font:inherit;font-size:9px;line-height:1;
+  cursor:pointer;
+  transition:color .15s;
+}
+.mr-step:hover:not(:disabled){color:var(--gold)}
+/* Not `opacity`, which would composite the token down and undo the contrast it
+   was solved for (STYLE.md 1). --txt-faint is already the dimmest level that
+   clears AAA here, so a disabled step drops the pointer instead of the colour. */
+.mr-step:disabled{cursor:default}
+.mr-step:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-1px}
+.mr-box{
+  display:flex;align-items:center;justify-content:center;
+  height:24px;
   background:var(--panel);
   border:1px solid var(--line);
   border-radius:999px;
 }
-.mr-step{
-  width:24px;height:24px;
-  display:flex;align-items:center;justify-content:center;
-  border:0;border-radius:999px;background:transparent;
-  color:var(--txt-dim);font:inherit;font-size:15px;line-height:1;
-  cursor:pointer;
-  transition:color .15s, background .15s;
-}
-.mr-step:hover:not(:disabled){color:var(--txt);background:var(--panel-2)}
-/* Not `opacity`, which would composite the token down and undo the contrast it
-   was solved for (STYLE.md 1). --txt-faint is the dimmest level that still
-   clears AAA on this surface, so the disabled state uses it directly. */
-.mr-step:disabled{color:var(--txt-faint);cursor:default}
-.mr-step:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px}
-.mr-badge{
-  display:flex;align-items:center;gap:6px;
-  padding:2px 9px 2px 5px;
-  font-size:12px;font-variant-numeric:tabular-nums;letter-spacing:.6px;
-  color:var(--txt-dim);
-  white-space:nowrap;cursor:help;
+.mr-num{
+  width:40px;
+  background:transparent;border:0;padding:0;
+  color:var(--txt-dim);font:inherit;font-size:12.5px;
+  font-variant-numeric:tabular-nums;text-align:center;
+  outline:none;
 }
 /* Unset is dimmer than set, so a header that has never been told the rank does
    not read as one asserting a rank of nothing. */
-.mr-field[data-set="yes"] .mr-badge{color:var(--txt)}
-.mr-badge:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px;border-radius:999px}
-.mr-sigil-wrap{display:flex;width:16px;height:16px}
-.mr-sigil{width:16px;height:16px;display:block}
-.mr-sigil-body{fill:none;stroke:currentColor;stroke-width:1.6}
-.mr-sigil-core{fill:currentColor}
-/* DE's own three-rank cycle — a base title, then Silver, then Gold — carried in
-   colour. Unranked and Legendary sit outside that cycle and get their own, so
-   the badge never implies a tier the rank does not have. */
-.mr-sigil[data-tier="none"]{color:var(--txt-faint)}
-.mr-sigil[data-tier="none"] .mr-sigil-core{fill:none}
-.mr-sigil[data-tier="base"]{color:var(--odd)}
-.mr-sigil[data-tier="silver"]{color:var(--txt-dim)}
-.mr-sigil[data-tier="gold"]{color:var(--gold)}
-.mr-sigil[data-tier="legendary"]{color:var(--violet)}
+.mr-field[data-set="yes"] .mr-num{color:var(--txt)}
+.mr-num::placeholder{color:var(--txt-faint)}
+.mr-box:focus-within{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
 
 /* Sized against the viewport rather than against what is left over, so the
    middle track never grows wide enough to crowd the two sides into overlap.
@@ -837,10 +835,9 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   /* The rank field and the view tabs share a row here rather than taking one
      each. At 375px they wanted 347px against 335 available — twelve short — and
      losing that argument cost a fourth row on a sticky header that was already
-     a third of the screen. Trimmed rather than wrapped: the steps lose four
-     pixels each and the badge loses its padding, which buys the row back. */
-  .mr-step{width:22px;height:22px;font-size:14px}
-  .mr-badge{padding:2px 6px 2px 4px;letter-spacing:.4px}
+     a third of the screen. The narrower box buys the row back. */
+  .mr-field{gap:5px}
+  .mr-num{width:32px}
 }
 @media (max-width:560px){
   .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}

@@ -19,13 +19,15 @@
       </div>
     </div>
 
-    <div class="mr-field" id="mrField" data-set="no" role="group" aria-label="Mastery Rank">
-      <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">−</button>
-      <span class="mr-badge" id="mrBadge" tabindex="0">
-        <span class="mr-sigil-wrap" id="mrSigil"></span>
-        <span class="mr-value" id="mrValue" aria-live="polite">—</span>
+    <div class="mr-field" id="mrField" data-set="no">
+      <span class="mr-label" id="mrLabel" aria-hidden="true">MR</span>
+      <span class="mr-stack">
+        <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">▴</button>
+        <span class="mr-box">
+          <input class="mr-num" id="mrInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="—" aria-label="Mastery Rank" value="" />
+        </span>
+        <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">▾</button>
       </span>
-      <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">+</button>
     </div>
   </div>
 

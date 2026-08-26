@@ -260,6 +260,18 @@ condensed view; it must not be the only route to it.
   `::-webkit-*-spin-button` reset). They are visually noisy at this size.
 - Default-off options that need explaining live under **Advanced options** with
   the reasoning in a tooltip, not in surrounding prose.
+- **Where the real icon cannot be had, no icon beats a lookalike.** The Mastery
+  Rank field shipped with a drawn sigil because DE's own rank art is unreachable —
+  the wiki 403s non-browsers and the item CDN carries none of it — and it was cut
+  the next day. It was spending width in the header to carry a tier the rank title
+  already states in words, and a substitute for a recognisable icon is not
+  recognisable; it is just a shape. Ask what the icon is *for* before drawing a
+  replacement.
+- **Letters that qualify a number go beside the field, not inside it.** `MR` is a
+  label next to the rank box rather than part of its value, which is what lets the
+  box be typed into — and what lets the label become `LR` past rank 30 while the
+  stored value stays one integer. A field whose text you must retype to change its
+  units is a field nobody edits twice.
 - **A control that names its own ends needs no paragraph explaining them.** The
   Void Trace switch is labelled *under 500* / *over 500*; a line beneath it saying
   *"At MR 9 your Void Trace cap is 550 — 5 Radiants at 100 traces each"* was

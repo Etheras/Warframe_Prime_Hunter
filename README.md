@@ -220,23 +220,28 @@ next*.
 
 ### Your Mastery Rank
 
-Next to the site name is a small `− ◈ MR — +` field. Press `+` to set your
-Mastery Rank; it starts blank and stays blank until you do. It is the same field
-on both pages, because it is a fact about your account rather than a setting for
-one view.
+Next to the site name is a small **MR** field with a `▴` above it and a `▾` below.
+**Type your Mastery Rank straight in**, or use the arrows to nudge it. It starts
+blank and stays blank until you tell it. It is the same field on both pages,
+because it is a fact about your account rather than a setting for one view.
+
+Typing commits when you press **Enter** or click away; **Escape** puts back what
+was there. Clearing the box sets it back to *unknown* rather than to rank 0.
 
 **It never hides anything.** Nothing is filtered by rank, on purpose: a bounty
 above your rank can still be played when a squadmate starts it, so hiding one
 from you would be wrong. The field is there to *tell* you things.
 
 The first of those is your **Void Trace cap**, which is `(rank × 50) + 100` —
-750 at MR13, 1600 at MR30. Hover the badge and it tells you your cap, how many
+750 at MR13, 1600 at MR30. Hover the field and it tells you your cap, how many
 Radiants that buys, and the rank's name. It also mentions the case worth knowing:
 at MR8 or below your cap is 500 or less, so the *over 500* side of the planner's
 **Short on Void Traces?** switch is not something you can reach yet. It says so
 and leaves the switch alone — nothing here is decided for you.
 
-Ranks above 30 show as `LR1`, `LR2` and so on.
+**Past rank 30 the label becomes `LR`** and the box holds the Legendary number —
+so `LR` with `2` in it is Legendary 2. Typing `31` while it still says `MR` rolls
+it over for you. There is no upper limit, because the wiki does not publish one.
 
 ---
 

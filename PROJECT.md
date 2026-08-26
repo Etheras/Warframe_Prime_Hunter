@@ -2417,7 +2417,10 @@ one does not depend on that.
 
 **Shipped 2026-08-26**, to the shape the owner specified on 2026-08-14: a number
 the player fills in, sitting with the site name rather than in either sidebar, a
-plain `−` / `+` pair either side of it, and empty until they say otherwise.
+step pair, and empty until they say otherwise. **Reworked the same day** on the
+owner's reading of it: the icon dropped, the letters moved outside the field, the
+number made editable by hand, and the steps stacked directly above and below it
+rather than either side.
 
 **It lives in the shared plan store beside `squad`, not in either page's filters.**
 A rank is an account fact — true on both pages at once — so a per-page copy would
@@ -2467,16 +2470,42 @@ rank means. `STYLE.md §5` covers the same ground from the other direction — a
 paragraph between a heading and its data is read once and costs a screenful
 forever.
 
-**The sigil is drawn, not fetched, and that was forced.** DE's rank icons are not
-reachable from here and both routes were checked on 2026-08-26: `wiki.warframe.com`
-403s any request that is not a browser (§8), and the item CDN that supplies every
-other image in this app has no rank art — its backing store 404s `IconRank1.png`
-while item images resolve. Drawing it also keeps the header working from `file://`
-and off a USB stick with no network, which the artwork pipeline deliberately makes
-optional for everything else. What the sigil borrows is the part that *is*
-documented — the bronze/silver/gold three-rank cycle the rank titles themselves
-follow — carried in colour, with Unranked and Legendary given their own so the badge
-never implies a tier the rank does not have. It is not a copy of DE's art.
+**There is no icon, and the second attempt is why.** The first build carried a
+drawn sigil, because DE's own rank icons are not reachable from here and both
+routes were checked on 2026-08-26: `wiki.warframe.com` 403s any request that is not
+a browser (§8), and the item CDN that supplies every other image in this app has no
+rank art — its backing store 404s `IconRank1.png` while item images resolve. **The
+owner cut the sigil rather than accept a substitute**, and that is the more useful
+precedent: where the real thing cannot be had, a lookalike is not automatically
+better than nothing. It was carrying a tier the rank titles already state in words,
+in a header that has no room to spare.
+
+**The letters sit outside the box, and that is what makes the field typeable.**
+`MR` is a label beside the control, not part of the value — so past rank 30 it
+becomes `LR` and the box holds the Legendary number while the store keeps one
+integer. Two functions carry the split, `masteryShown` and `masteryTyped`, and a
+test asserts they **round-trip**: shown and typed back must land on the same rank,
+or a reader editing what they can see would end up somewhere else.
+
+Typing is read against the label currently showing, which gives a route into
+Legendary from the keyboard: **in MR mode the typed number is the rank, so typing
+31 rolls over to LR 1 on its own**; in LR mode it is offset by 30, and typing 0
+there lands on MR 30. Committed on **blur and Enter, never per keystroke** — MR 1
+is a real rank with a real trace cap, and a field saving as you type would store it
+on the way to MR 13. A value that is not a whole number ≥ 0 is **refused by putting
+back what is stored**, never by writing a guess; an emptied box clears the rank
+rather than meaning zero. Escape reverts, and the arrow keys step.
+
+There is **no upper stop**. The wiki publishes no Legendary cap, so the field keeps
+counting and keeps rendering `LR n` rather than inventing a ceiling.
+
+**One bug worth keeping, because it was latent for a day.** `mrClamp` read
+`isFinite(n) && n >= 0`, and `isFinite(null)` is **true** in JavaScript — `null`
+coerces to `0`. So a cleared rank read back as `Math.floor(null)`, which is `0`, and
+every *"I have not said"* silently became *"I am rank 0"* — a real rank, with a real
+trace cap of 100. Nothing had ever written `null` until the box became typeable, so
+the defect shipped harmless and went off the moment the feature it was waiting for
+arrived. The guard is now `typeof n === "number"`.
 
 **Why `shared.js` and not `model.js`.** The usual rule is that testable logic goes
 in `model.js` or `rotation.js` (§2). This is the exception and the reason is load

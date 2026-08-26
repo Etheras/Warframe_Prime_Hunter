@@ -163,12 +163,42 @@ test("a rank renders as DE writes it, titles and Legendary included", () => {
                "past 30 the wiki stops naming them, so neither do we");
   assert.equal(S.masteryTitle(null), null);
 
-  /* The sigil colour carries the same cycle, so it must not claim a tier for
-     the two ranks that sit outside it. */
-  assert.deepEqual([1, 2, 3, 4].map(S.masteryTier), ["base", "silver", "gold", "base"]);
-  assert.equal(S.masteryTier(0), "none", "Unranked is not a bronze tier");
-  assert.equal(S.masteryTier(null), "none");
-  assert.equal(S.masteryTier(31), "legendary");
+});
+
+test("the box holds the number and the label holds the letters", () => {
+  /* The letters sit outside the field because they are not part of the value:
+     past 30 they become LR and the box holds the Legendary number, not the
+     stored rank. These two functions are the split, and they have to round-trip
+     or typing a rank back in would land somewhere else. */
+  const { S } = loadShared();
+
+  assert.equal(S.masteryShown(null), "", "unset shows nothing, not a zero");
+  assert.equal(S.masteryShown(0), "0");
+  assert.equal(S.masteryShown(30), "30", "the last rank the box shows as itself");
+  assert.equal(S.masteryShown(31), "1", "LR 1 is stored as 31 and shown as 1");
+  assert.equal(S.masteryShown(35), "5");
+
+  /* In MR mode the typed number IS the rank, so 31 rolls over to Legendary on
+     its own — which is the only way into LR from the keyboard. In LR mode it is
+     offset by 30. */
+  assert.equal(S.masteryTyped("13", false), 13);
+  assert.equal(S.masteryTyped("31", false), 31, "typing past 30 rolls into Legendary");
+  assert.equal(S.masteryTyped("1", true), 31, "LR 1 is rank 31");
+  assert.equal(S.masteryTyped("0", true), 30, "and LR 0 is really MR 30");
+
+  for (const mr of [0, 7, 30, 31, 42]) {
+    const legendary = mr > S.MR_TOP;
+    assert.equal(S.masteryTyped(S.masteryShown(mr), legendary), mr,
+                 `${mr} did not survive being shown and typed back`);
+  }
+
+  /* Cleared and rejected are different answers and the caller treats them
+     differently — one is written, the other is refused. */
+  assert.equal(S.masteryTyped("", false), null, "an emptied box clears the rank");
+  assert.equal(S.masteryTyped("   ", false), null);
+  assert.equal(S.masteryTyped("abc", false), undefined, "letters are refused, not stored");
+  assert.equal(S.masteryTyped("-4", false), undefined, "and so is a negative rank");
+  assert.equal(S.masteryTyped("7.5", false), undefined, "and a fractional one");
 });
 
 /* One standard bounty on all three rotations, one publishing only two, one with
