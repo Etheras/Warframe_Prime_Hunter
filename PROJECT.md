@@ -2667,15 +2667,40 @@ here instead of there.
 things; the areas below were checked afterwards because it had not looked at them.
 
 **The first version of this list, committed on 2026-08-26, called `serve.py`'s
-allowlist clean. It is not, and the sentence that cleared it was the exact sentence
+allowlist clean. It was not, and the sentence that cleared it was the exact sentence
 that described the bug.** It said *"`translate_path` is not overridden, so the
 stdlib's own component filter is still the second gate."* Not overriding
-`translate_path` is the vulnerability: the server computes the request path twice,
-by two algorithms that disagree, and enforces the allowlist on the one it does not
-open. That entry is in `TODO.md` now. The lesson is kept here rather than deleted,
-because *"I checked this and it is fine"* is the most expensive sentence in this
-repository — it stops the next reader looking — and this is the second time a
-document in it has vouched for something that was not true.
+`translate_path` was the vulnerability: the server computed the request path twice,
+by two algorithms that disagree, and enforced the allowlist on the one it did not
+open. The lesson is kept here rather than deleted, because *"I checked this and it
+is fine"* is the most expensive sentence in this repository — it stops the next
+reader looking — and this is the second time a document in it has vouched for
+something that was not true.
+
+**Both path defects were fixed the same day.** The shape of each fix is the same,
+and it is the general answer to this class:
+
+- **`serve.py` now has one path parser.** `translate_path` is overridden to build
+  from the `rel` that `_relative()` produced and `allowed()` approved, so the checked
+  string and the opened string are the same object by construction. The alternative —
+  teaching the stdlib's parser about backslashes — leaves two parsers that have to be
+  kept in step, which is the thing that failed.
+- **`artwork.local_name()` is now the only place a CDN URL becomes a filename**, used
+  by both the download loop and the rewire loop so they cannot drift. It is an
+  allowlist (`[A-Za-z0-9._-]+`) after a `basename` check, because a blocklist does not
+  work here: `os.path.join(IMG_DIR, r"C:\Windows\Temp\x")` discards `IMG_DIR` and
+  contains no `..` at all. A `realpath`/`commonpath` containment check sits at the
+  write as well — redundant today, deliberately, so a future loosening of the
+  derivation still cannot write outside the folder.
+
+**Both tests were written to fail first, and both replaced a test that could not
+see the bug.** The server test used to ask `allowed()` about paths that were already
+clean — it sent the answer, not the request — so it now drives `_relative()` and
+`translate_path` through a bare handler instance and asserts the invariant that
+actually matters: *the file opened is the file that was approved*. That is a property,
+not a list of tricks; a blocklist of known payloads only ever knows the ones somebody
+thought of. The artwork test used to call `os.path.basename` **inside** its filter, so
+`../app.js` was tested as `app.js` and passed.
 
 What survives, with the corrections the re-check forced:
 

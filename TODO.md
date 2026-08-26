@@ -114,8 +114,6 @@ declined, and their reasoning is in `PROJECT.md §7`.
 
 | Entry | Size |
 |---|---|
-| `serve.py` checks one path and opens another | **small, and first** — any file under the folder is readable in LAN mode today |
-| An upstream filename is joined to a path with nothing keeping it in the folder | **small, and arguably second** — it can write outside `assets/img/` on every online build here |
 | A part count out of a backup reaches `innerHTML` | small — the import-reachable half of the numeric-fields entry |
 | `schedule.sh` single-quotes paths into the cron line | small |
 | `mode` is carried into the payload and read by nothing | small — delete the field or allowlist it |
@@ -187,95 +185,6 @@ one path and opening another — and four more were true but recorded in words t
 strong for the evidence behind them. The corrections are in `PROJECT.md §7`; the
 defects are entries here. **A "found clean" note is worth less than nothing if it
 was not adversarial**, because it stops the next reader looking.
-
-### `serve.py` checks one path and opens another
-
-**Found on 2026-08-26 by re-checking the sweep that had just called this code
-clean.** The allowlist is enforced against a path the server computes itself, and
-the bytes come from a path the standard library computes differently. On Windows the
-two disagree, and the disagreement is one URL-encoded backslash wide.
-
-`_relative()` (`tools/serve.py:366-377`) calls `os.path.normpath`, which on Windows
-is `ntpath.normpath`: it treats `\` as a separator and **resolves** `..` across it.
-`SimpleHTTPRequestHandler.translate_path` is not overridden, and it uses
-`posixpath.normpath` and then **drops** any component where `os.path.dirname(word)`
-is truthy — on Windows, any component containing a backslash.
-
-So `..%5c..%5cindex.html` is three components to the gate and one discarded component
-to the file opener:
-
-```
-GET /.git/config/..%5c..%5cindex.html
-  _relative()    -> "index.html"                 -> allowed() -> True
-  translate_path -> <ROOT>\.git\config           -> 200 OK, served
-```
-
-Measured on this machine, not reasoned about: `/.git/config` on its own is correctly
-denied, and the same file through the form above is served. `tools/serve.py`,
-`.claude/settings.local.json`, `PROJECT.md` and the pack files under `.git/objects/`
-all come back the same way, and `/tools/..%5cindex.html/` returns a browsable
-directory listing. `do_HEAD` behaves identically.
-
-The general form is: any path under the folder, plus `/`, plus `..%5c` once per
-component, plus an allowlisted filename.
-
-**This is precisely the exposure the allowlist was written to remove.**
-`tools/serve.py:154-157` and this document both name it — a whole `.git` directory
-from which the repository can be reconstructed — and `.git` is on disk.
-
-Two bounds worth stating, because they decide how urgent it is. It **cannot escape
-the folder**: `translate_path` builds from `self.directory` and drops `..`, `.` and
-drive-bearing words, so `C:\Windows\win.ini` is not reachable. And a hostile web page
-cannot read the bytes — there are no CORS headers, so a cross-origin `fetch` is
-blocked. **The real exposure is LAN mode**, where any peer on the network can read
-the whole working folder.
-
-The fix is to stop computing the path twice: override `translate_path` to build from
-the same `rel` that `allowed()` approved, so the checked path and the opened path are
-the same string by construction. Anything else leaves two parsers to keep in step.
-
-Note for whoever fixes it: `tests/test_build.py:1362-1370` calls `serve.allowed()`
-with pre-normalised literals only. Nothing in the suite ever calls `_relative()`, and
-no test sends a percent-encoded or backslashed path — which is why this survived both
-the outside review and the sweep. A regression test wants to drive the handler, not
-the predicate.
-
-### An upstream filename is joined to a path with nothing keeping it in the folder
-
-`tools/build_data.py:1032` takes `imageName` from the items API verbatim, `:1046`
-prefixes the CDN URL, and `tools/artwork.py:69` strips that prefix straight back off
-and treats the remainder as a local filename — `dest = os.path.join(IMG_DIR, fname)`
-at `:77`, then `open(dest, "wb")` at `:98`. Nothing in between rejects a separator,
-a drive letter or a leading slash, and nothing resolves the result to check it is
-still inside `assets/img/`.
-
-Measured on this disk rather than reasoned about: `..\..\.git\hooks\pre-commit`
-resolves into the repository's own hooks directory, and `C:\Windows\Temp\x.txt`
-discards `IMG_DIR` altogether.
-
-**What fires by default is file creation, not overwrite.** `artwork.py:80` skips any
-destination that already exists and is non-empty, so the two obvious targets —
-`assets/app.js`, `serve.cmd` — are not writable without `--refresh-images`. A path
-that does not exist yet is not covered by that guard, and `.git/hooks/` holds
-nothing but `.sample` files, so `pre-commit` would be a new file that runs on the
-next commit. Under a project rule that says *commit freely*, that is the case worth
-closing.
-
-It needs the name from the API and the body from the CDN, which is one operator. It
-is unreachable on CI, which builds without images, and reachable on **every** online
-build here, because `assets/img/` already exists and the module is sticky.
-
-**The fix is already written, one import away.** `tools/sources.py:88-90` does the
-same remote-name-to-local-path conversion correctly, with a character allowlist, for
-the HTTP cache. `artwork.py` is the only build code that calls `urlopen` directly
-instead of going through `sources.py`, which is exactly how it missed the sanitiser
-sitting in the module it imports from. A `..`-only filter would not be enough —
-`C:\Windows\Temp\x.txt` contains no `..`.
-
-**The existing test cannot see this.** `tests/test_build.py:1189` calls
-`os.path.basename` *inside* the filter before checking for illegal characters, so
-every traversal reduces to a legal-looking leaf and passes. Fixing the code without
-fixing the test leaves the same blind spot for the next thing.
 
 ### The bundle's `</script>` guard is case-sensitive
 

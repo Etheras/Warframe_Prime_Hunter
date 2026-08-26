@@ -20,11 +20,41 @@ See PROJECT.md section 3.
 from __future__ import annotations
 
 import os
+import re
 import urllib.request
 
 from sources import IMG_CDN, ROOT, UA, log
 
 IMG_DIR = os.path.join(ROOT, "assets", "img")
+
+# `imageName` is third-party text - it comes from the items API - and it ends up
+# in a path we open for writing. So it gets what `sources.cache_path` already
+# gives every other remote-controlled name: an allowlist.
+#
+# A blocklist does not work here, and "reject `..`" is the version that looks
+# like it does. Measured on Windows: os.path.join(IMG_DIR, r"C:\Windows\Temp\x")
+# is C:\Windows\Temp\x - IMG_DIR discarded, not one dot involved - and
+# os.path.join(IMG_DIR, "/Windows/x") keeps the drive and drops the directory.
+SAFE_NAME = re.compile(r"[A-Za-z0-9._-]+\Z")
+
+
+def local_name(src: str) -> str | None:
+    """
+    The local filename for a CDN artwork URL, or None if we will not write it.
+
+    Three gates, because each catches something the others do not: the prefix
+    check keeps us to our own CDN, `basename` collapses both separators and any
+    drive letter (ntpath splits on `\\` too), and the allowlist refuses whatever
+    is left - spaces, colons, control characters, non-ASCII.
+    """
+    if not src.startswith(IMG_CDN):
+        return None
+    name = src[len(IMG_CDN):].split("?")[0]
+    if not name or name in (".", ".."):
+        return None
+    if name != os.path.basename(name) or not SAFE_NAME.match(name):
+        return None
+    return name
 
 
 def have_local_images() -> bool:
@@ -62,19 +92,44 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
                       repaints an existing item. So it is behind
                       --refresh-images rather than run every time.
     """
-    urls = {}
+    urls, refused = {}, []
     for it in items:
         src = it.get("image") or ""
-        if src.startswith(IMG_CDN):
-            urls[src] = src[len(IMG_CDN):].split("?")[0]
+        if not src.startswith(IMG_CDN):
+            continue
+        name = local_name(src)
+        if name is None:
+            # Say so rather than skipping quietly: a name this shape means the
+            # items API is serving something it never has before, and that is
+            # worth seeing in the build output.
+            refused.append(src[len(IMG_CDN):][:80])
+            continue
+        urls[src] = name
+    if refused:
+        log(f"  images: refused {len(refused)} unsafe filename(s): "
+            + ", ".join(sorted(refused)[:3]))
     if not urls:
         return 0
 
     os.makedirs(IMG_DIR, exist_ok=True)
     fetched = replaced = failed = skipped = 0
 
+    real_dir = os.path.realpath(IMG_DIR)
     for url, fname in sorted(urls.items()):
         dest = os.path.join(IMG_DIR, fname)
+
+        # Belt to local_name's braces. It is redundant today and that is the
+        # point: if the derivation above is ever loosened, or a symlink appears
+        # in assets/img/, this is the line that still refuses to write outside
+        # the folder. The whole defect was one derivation nobody re-checked.
+        try:
+            inside = os.path.commonpath([os.path.realpath(dest), real_dir]) == real_dir
+        except ValueError:                                # different drive
+            inside = False
+        if not inside:
+            log(f"  image refused, outside assets/img: {fname[:80]}")
+            continue
+
         on_disk = os.path.exists(dest) and os.path.getsize(dest) > 0
 
         if on_disk and not verify:
@@ -119,10 +174,9 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
     # working site rather than a page of broken images
     rewired = 0
     for it in items:
-        src = it.get("image") or ""
-        if not src.startswith(IMG_CDN):
+        fname = local_name(it.get("image") or "")
+        if fname is None:
             continue
-        fname = src[len(IMG_CDN):].split("?")[0]
         if os.path.exists(os.path.join(IMG_DIR, fname)):
             it["image"] = "assets/img/" + fname
             rewired += 1

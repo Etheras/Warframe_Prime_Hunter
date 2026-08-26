@@ -302,14 +302,50 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
     Serves the site and refuses everything else.
 
     SimpleHTTPRequestHandler is not a hardened server and the standard library
-    says as much. It does get path traversal right - ../ and its encodings were
-    tested and all return 404 - but by default it publishes the entire directory
-    it is pointed at, with browsable listings. For this folder that meant .git,
-    .cache, tools and tests.
+    says as much. By default it publishes the entire directory it is pointed at,
+    with browsable listings. For this folder that meant .git, .cache, tools and
+    tests.
+
+    This docstring used to add that the stdlib "does get path traversal right -
+    ../ and its encodings were tested and all return 404". Every clause of that
+    was true and the conclusion drawn from it was not: `../` and `%2e%2e%2f` do
+    fail closed, and testing the two forms somebody thought of said nothing
+    about the one nobody did. See `translate_path` below for what got through.
     """
 
     def log_message(self, fmt, *args):  # noqa: A003 - keep the console readable
         pass
+
+    def translate_path(self, path):
+        """
+        The file to open, from the same string the allowlist approved.
+
+        This was the standard library's version until 2026-08-26, which made it
+        a second, independent path computation - and on Windows the two
+        disagreed. `_relative` uses `os.path.normpath`, which is `ntpath` here:
+        it treats a backslash as a separator and *resolves* `..` across it. The
+        stdlib splits on `/` alone and then *drops* any component containing a
+        backslash. So one segment, `..%5c..%5cindex.html`, was three components
+        to the gate and one discarded component to the opener:
+
+            GET /.git/config/..%5c..%5cindex.html
+              _relative()  -> "index.html"        -> allowed
+              stdlib       -> <ROOT>\\.git\\config -> served
+
+        which is the exposure the allowlist exists to remove, handed out to any
+        peer on the network in LAN mode.
+
+        There is no careful fix for two parsers that have to agree; there is one
+        parser. `allowed()` and `open()` are given the same string, so a URL that
+        reaches this method can only name a file the allowlist already passed.
+        """
+        rel = self._relative()
+        if rel in ("", "."):
+            # do_GET and do_HEAD refuse these before we get here; if that ever
+            # stops being true, resolve to something that cannot exist rather
+            # than to ROOT, which would be a directory and would list it.
+            return os.path.join(ROOT, ".refused")
+        return os.path.join(ROOT, rel.replace("/", os.sep))
 
     def end_headers(self):
         """

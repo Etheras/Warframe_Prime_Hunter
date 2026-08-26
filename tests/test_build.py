@@ -1184,13 +1184,49 @@ def test_runs_on_the_other_platform() -> None:
     # 7. Artwork filenames come from DE's item data and are written to disk. A
     #    colon or a question mark in one is legal on Linux and unopenable on
     #    Windows, so the whole cache would fail there and nowhere else.
+    #
+    #    This check used to call os.path.basename INSIDE the filter, before
+    #    searching for an illegal character - so "../app.js" was tested as
+    #    "app.js" and passed, and a filename that walked out of assets/img/
+    #    could not be seen by the one test looking at filenames. The property is
+    #    now the stronger one it should always have been: the name must be a
+    #    plain leaf, which is also what artwork.local_name enforces.
     payload = os.path.join(ROOT, "data", "prime-data.json")
     if os.path.exists(payload):
-        illegal = re.compile(r'[<>:"|?*\\]')
+        illegal = re.compile(r'[<>:"|?*\\/]')
+        names = [str(i["image"]).rsplit("/", 1)[-1] if "/" in str(i["image"])
+                 else str(i["image"])
+                 for i in read_json(payload)["items"] if i.get("image")]
         check("artwork: every filename is legal on Windows",
-              [os.path.basename(str(i["image"])) for i in read_json(payload)["items"]
-               if i.get("image") and illegal.search(os.path.basename(str(i["image"])))][:5],
-              [])
+              [n for n in names if illegal.search(n)][:5], [])
+
+    # 8. And the derivation itself, which is where the traversal lived: the
+    #    filename is third-party text from the items API and it lands in a path
+    #    that gets opened for writing. Named payloads rather than generated
+    #    ones, so a reader can see exactly what is being refused.
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import artwork
+
+    hostile = ("../app.js", "..%5c..%5cserve.cmd", "../../serve.cmd",
+               r"..\..\.git\hooks\pre-commit", r"C:\Windows\Temp\x.png",
+               "/Windows/x.png", "sub/nested.png", ".", "..", "",
+               "a b.png", "x:stream.png", "\u00e9.png")
+    check("artwork: a hostile filename is refused",
+          [n for n in hostile
+           if artwork.local_name(artwork.IMG_CDN + n) is not None], [],
+          "os.path.join gives away the whole disk to a name with a drive on it")
+
+    check("artwork: an ordinary filename survives",
+          [artwork.local_name(artwork.IMG_CDN + n)
+           for n in ("AshPrime.png", "Braton_Prime.png", "a-b.1.png")],
+          ["AshPrime.png", "Braton_Prime.png", "a-b.1.png"],
+          "a rule that refuses real artwork is a broken build, not a safe one")
+
+    check("artwork: a query string is dropped, not treated as a name",
+          artwork.local_name(artwork.IMG_CDN + "AshPrime.png?v=2"), "AshPrime.png")
+
+    check("artwork: another host is not ours to cache",
+          artwork.local_name("https://example.invalid/img/AshPrime.png"), None)
 
 
 def test_a_pre_refined_relic_reward_keeps_its_refinement() -> None:
@@ -1395,6 +1431,52 @@ def test_server_serves_only_the_site() -> None:
     check("mockup: a real page is still served over the LAN",
           serve.allowed("index.html", "192.168.1.169"), True,
           "the local-only rule must not have narrowed the site itself")
+
+    # Everything above asks `allowed()` about a path that is already clean, which
+    # is the wrong question: the allowlist is enforced on the path the server
+    # works out, and the bytes come from the path the standard library works out.
+    # Those were two different computations, and on Windows they disagreed --
+    # `ntpath.normpath` resolves `..` across a backslash, while the stdlib's
+    # `translate_path` drops any component containing one. So
+    # `/.git/config/..%5c..%5cindex.html` was approved as `index.html` and served
+    # `.git/config`. No test could see it, because none of them sent a request
+    # path; they all sent the answer.
+    #
+    # The property is not "these URLs are refused" -- that is a blocklist, and it
+    # only ever knows the tricks somebody thought of. It is that the file opened
+    # is the file that was approved, whatever the URL looked like.
+    # A bare instance is enough and keeps the test off the network: `_relative`
+    # reads only `self.path`, and `translate_path` only that and `self.directory`
+    # -- which `serve.main` supplies the same way, via functools.partial.
+    probe = object.__new__(serve.SiteHandler)
+    probe.directory = ROOT
+
+    def opened(url: str, peer: str = "192.168.1.50"):
+        """(rel approved, absolute path that would be opened) or None if refused."""
+        probe.path = url
+        rel = probe._relative()
+        if not serve.allowed(rel, peer):
+            return None
+        return rel, probe.translate_path(url)
+
+    hostile = (
+        "/.git/config/..%5c..%5cindex.html",
+        "/tools/serve.py/..%5c..%5cindex.html",
+        "/.claude/settings.local.json/..%5c..%5cindex.html",
+        "/.cache/state.json/q%5c..%5c..%5c..%5cindex.html",
+        "/PROJECT.md/..%5cindex.html",
+        "/tools/..%5cindex.html/",
+        "/temp_mockup.html/..%5cindex.html",
+        # the forms that already failed closed, kept so a fix cannot regress them
+        "/../tools/serve.py", "/%2e%2e%2ftools/serve.py",
+        "/%252e%252e%252ftools/serve.py", "/C:/Windows/win.ini",
+    )
+    check("allowlist: the file opened is the file that was approved",
+          [u for u in hostile + tuple("/" + w for w in wanted)
+           if (r := opened(u)) is not None
+           and r[1] != os.path.join(ROOT, r[0].replace("/", os.sep))],
+          [],
+          "a gate on one path and an open() on another is not a gate")
 
     # and it can never reach GitHub in the first place
     ignored = subprocess.run(["git", "check-ignore", "temp_mockup.html"],
