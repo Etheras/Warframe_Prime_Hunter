@@ -2726,6 +2726,22 @@ fix has two layers because they have two different sources.**
   `guard_text` runs over whole JavaScript files, where `<!--` is a legal line
   comment and an inserted backslash is a syntax error.
 
+**The CDN is a redirector, and the CSP did not know it.** Found on 2026-08-26 while
+costing the meta-CSP options, and unrelated to that decision.
+`cdn.warframestat.us/img/AshPrime.png` answers **301** to
+`raw.githubusercontent.com/wfcd/warframe-items/master/data/img/AshPrime.png`, and a
+policy is enforced against every hop of a redirect rather than only the URL in the
+markup. `build_csp()` named the CDN alone, so on any build without local artwork —
+which is every CI build, and any local build run with `--no-images` — **all 167
+images were blocked**. Measured in Chromium against the real page: nought loaded,
+one violation each.
+
+What made it survive is worth keeping: the violation report names the
+**pre-redirect** URL, so the console accuses `cdn.warframestat.us`, which the policy
+visibly allows. The error points at the one host that is not the problem. Both hosts
+are named now, and the test asserts them as a pair — allowing one without the other
+is the broken state, so neither can be removed on its own.
+
 **The seven remaining entries shipped the same day.** None changed a decision; each
 made something true that a document or a comment already claimed:
 

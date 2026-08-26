@@ -192,7 +192,17 @@ def build_csp() -> str:
     try:
         with open(os.path.join(ROOT, "data", "prime-data.js"), encoding="utf-8") as fh:
             if "cdn.warframestat.us" in fh.read():
-                img += " https://cdn.warframestat.us"
+                # Both hosts, because the CDN is a redirector, not an origin:
+                # cdn.warframestat.us/img/AshPrime.png answers 301 to
+                # raw.githubusercontent.com/wfcd/warframe-items/.../AshPrime.png,
+                # and a policy is enforced against every hop of a redirect, not
+                # just the URL in the markup. Naming only the CDN blocked all
+                # 167 images on a build without local artwork - measured, and
+                # the violation reports the *pre-redirect* URL, so the console
+                # says cdn.warframestat.us was refused while the policy plainly
+                # allows it. That is why this stood: the error names the one
+                # host the policy already permits.
+                img += " https://cdn.warframestat.us https://raw.githubusercontent.com"
     except OSError:
         pass
     return ("default-src 'none'; "

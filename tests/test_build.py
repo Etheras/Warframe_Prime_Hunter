@@ -1545,6 +1545,20 @@ def test_server_serves_only_the_site() -> None:
 
     # the policy is only worth setting if the app can live inside it
     check_true("CSP has no unsafe-inline", "unsafe-inline" not in serve.CSP)
+
+    # The CDN is a redirector, not an origin: cdn.warframestat.us/img/X.png
+    # answers 301 to raw.githubusercontent.com/wfcd/warframe-items/.../X.png,
+    # and a policy is checked against every hop. Naming only the CDN blocked
+    # all 167 images on a build without local artwork - and the violation names
+    # the *pre-redirect* URL, so the console accused the one host the policy
+    # already allowed, which is why it went unnoticed. Asserted on the pair
+    # because allowing one without the other is the broken state.
+    img = next((p.strip() for p in serve.build_csp().split(";")
+                if p.strip().startswith("img-src")), "")
+    check("CSP: the CDN and its redirect target stand or fall together",
+          ("cdn.warframestat.us" in img, "raw.githubusercontent.com" in img),
+          ("cdn.warframestat.us" in img,) * 2,
+          "allowing one without the other is the broken state, whichever build this is")
     check_true("CSP has no unsafe-eval", "unsafe-eval" not in serve.CSP)
     check_true("CSP denies framing", "frame-ancestors 'none'" in serve.CSP)
 
