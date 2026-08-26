@@ -207,6 +207,32 @@ def slugify(s: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", (s or "").lower())).strip("-")
 
 
+def as_int(value, default=None):
+    """
+    An upstream number, or `default` when it is not one.
+
+    `masteryReq`, `ducats` and `itemCount` are documented as numeric and come
+    from a third-party JSON API, which is not the same thing. All three are
+    interpolated into markup in the browser, and the pages trusted the type
+    rather than escaping - so a string in any of them was markup, on a site
+    that rebuilds from these feeds unattended twice a day.
+
+    The browser coerces these too (`WFPrimeShared.count`). This is the half
+    that matters, because it is the boundary: nothing downstream of here has
+    to remember, and the payload on disk is the thing other people download.
+
+    Strict on purpose. A numeric string would be easy to accept and would hide
+    an upstream that had started sending them; dropping the value makes the
+    change visible on screen instead. `bool` is refused because it is an `int`
+    subclass and `True` is not a count.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    if isinstance(value, float) and not value.is_integer():
+        return default
+    return int(value)
+
+
 def build_resurgence_set(vault_trader: dict, catalog_names: list[str]) -> tuple[set[str], dict]:
     """
     Varzia's live inventory is the only trustworthy Prime Resurgence signal -
@@ -943,12 +969,13 @@ def main() -> int:
             if sub and norm(sub) != norm(name):
                 prev = next((p for p in parts if p["name"] == part_name), None)
                 if prev:
-                    prev["itemCount"] = (prev["itemCount"] or 1) + (comp.get("itemCount") or 1)
+                    prev["itemCount"] = ((prev["itemCount"] or 1)
+                                         + (as_int(comp.get("itemCount"), 1) or 1))
                     continue
                 parts.append({
                     "name": part_name,
-                    "itemCount": comp.get("itemCount") or 1,
-                    "ducats": comp.get("ducats"),
+                    "itemCount": as_int(comp.get("itemCount"), 1) or 1,
+                    "ducats": as_int(comp.get("ducats")),
                     # the catalogue name to send the reader to. Names, not ids:
                     # an id is minted further down this loop and the sub-item
                     # may not have reached it yet, while names are the
@@ -995,11 +1022,12 @@ def main() -> int:
 
             parts.append({
                 "name": part_name,
-                "itemCount": comp.get("itemCount"),
+                "itemCount": as_int(comp.get("itemCount")),
                 # What Baro pays for a spare. A fixed game constant, published
                 # per component in the item database, so it needs no guessing -
-                # a duplicate Blueprint is 15 ducats whoever you ask.
-                "ducats": comp.get("ducats"),
+                # a duplicate Blueprint is 15 ducats whoever you ask. Which is
+                # exactly why it was trusted to be a number and was not one.
+                "ducats": as_int(comp.get("ducats")),
                 "relics": part_relics,
             })
 
@@ -1045,7 +1073,7 @@ def main() -> int:
             "type": (api or {}).get("type"),
             "image": (IMG_CDN + image) if image else None,
             "wikiUrl": "https://wiki.warframe.com/w/" + entry["wikiPage"],
-            "masteryReq": (api or {}).get("masteryReq"),
+            "masteryReq": as_int((api or {}).get("masteryReq")),
             "tradable": (api or {}).get("tradable"),
             "releaseDate": (api or {}).get("releaseDate"),
             "vaultDate": (api or {}).get("vaultDate"),

@@ -34,6 +34,35 @@ OUT_FILE = os.path.join(OUT_DIR, "warframe-prime-hunter.html")
 CLOSE_SCRIPT = "</" + "script>"
 ESCAPED_CLOSE = "<" + chr(92) + "/" + "script>"
 
+# What actually ends a script block, which is not the string above.
+#
+# HTML matches the close tag ASCII-case-insensitively and terminates on
+# `</script` followed by whitespace, `/` or `>`. The guard below used to be a
+# literal `str.replace` of the exact lowercase `</script>`, so `</ScRiPt>` and
+# `</script ` walked straight out of the block. Item names reach the inlined
+# dataset from wiki.warframe.com with only whitespace normalising, and the
+# standalone is copied to _site/ beside the tracker - same origin, same
+# localStorage - so that was a public wiki edit away from running.
+#
+# `<!--` is deliberately not touched. It opens the escaped text state and is a
+# real hazard in a serialiser, but `guard` runs over whole JavaScript files,
+# where `<!--` is a legal line comment and a backslash is a syntax error. The
+# sequence cannot occur in the JSON blob (json.dumps escapes nothing there, but
+# `<` only appears inside strings, where the substitution below is safe).
+CLOSE_SCRIPT_RE = re.compile(r"</(script)(?=[\s/>])", re.IGNORECASE)
+
+
+def guard_text(text: str) -> str:
+    """
+    Inlined text with anything that would end the script block neutralised.
+
+    Module level rather than a closure inside `build`, so the suite can ask it
+    directly what it does to `</ScRiPt>` instead of building the whole bundle
+    and grepping the result. Case is preserved: JS source carrying the sequence
+    inside a string keeps its own spelling.
+    """
+    return CLOSE_SCRIPT_RE.sub(lambda m: ESCAPED_CLOSE[:3] + m.group(1), text)
+
 
 def read(*parts: str) -> str:
     path = os.path.join(ROOT, *parts)
@@ -61,9 +90,7 @@ def main() -> int:
     plan_js = read("assets", "plan.js")
     data = read("data", "prime-data.js")
 
-    def guard(text: str) -> str:
-        # a literal </script> inside inlined JS would close the tag early
-        return text.replace(CLOSE_SCRIPT, ESCAPED_CLOSE)
+    guard = guard_text
 
     # --with-images repoints items at assets/img/*, which does not survive being
     # copied around as a lone file. Put them back on the CDN for the bundle only.

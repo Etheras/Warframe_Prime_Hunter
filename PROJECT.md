@@ -2693,6 +2693,39 @@ and it is the general answer to this class:
   write as well — redundant today, deliberately, so a future loosening of the
   derivation still cannot write outside the folder.
 
+**The three untrusted-value-into-markup defects were fixed the same day, and the
+fix has two layers because they have two different sources.**
+
+- **`build_data.as_int` is the boundary.** `masteryReq`, `ducats` and `itemCount`
+  are documented as numeric and arrive as third-party JSON, which is not the same
+  thing; all three were interpolated into `innerHTML` while their neighbours in the
+  same template went through `esc()`. They are coerced once, on the way into the
+  payload, so nothing downstream has to remember — and the payload on disk is the
+  artefact other people download. It is strict on purpose: a numeric string would
+  be easy to accept and would hide an upstream that had started sending them, so
+  the value is dropped and the change shows on screen instead.
+- **`WFPrimeShared.count` is the other end**, because the second source has no
+  build boundary to coerce at: `ST.owns` reads `localStorage`, which a person can
+  hand-edit and which *Import* writes from a file they chose, and it landed in the
+  same `${have}/${need}` template. Coercing at the accessor rather than at each of
+  the eleven interpolations is deliberate — that list is easy to add to, and nobody
+  adding the twelfth would remember. `model.js` calls the same `count` rather than
+  keeping a second copy of the rule, for the reason *One store* records above.
+  `Number()` alone would not have done: `Number([])` is `0`, `Number(true)` is `1`,
+  and `Number({toString: () => "9"})` is `9`, so the type is checked before the
+  value. That last case was found by a test, not by reading.
+- **`bundle.guard_text` now matches what actually ends a script block.** It was a
+  literal `str.replace` of lowercase `</script>`; HTML matches the close tag
+  ASCII-case-insensitively and terminates on `</script` followed by whitespace, `/`
+  or `>`. Item names reach the inlined dataset from the wiki with only whitespace
+  normalised, and `publish.yml` copies the standalone into `_site/` beside the
+  tracker — same origin, same `localStorage` — so a public wiki edit was enough.
+  It was lifted out of a closure to module level so the suite can ask it directly
+  what it does to `</ScRiPt>` instead of building a bundle and grepping it.
+  `<!--` is deliberately left alone: it is a real hazard in a serialiser, but
+  `guard_text` runs over whole JavaScript files, where `<!--` is a legal line
+  comment and an inserted backslash is a syntax error.
+
 **Both tests were written to fail first, and both replaced a test that could not
 see the bug.** The server test used to ask `allowed()` about paths that were already
 clean — it sent the answer, not the request — so it now drives `_relative()` and

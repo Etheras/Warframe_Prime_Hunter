@@ -536,6 +536,16 @@ def test_built_payload() -> None:
     check("payload: ducats are the known values",
           sorted({p["ducats"] for p in withd}), [15, 25, 45, 65, 100])
 
+    # Every number that reaches markup is a number, not merely documented as
+    # one. The items API is third-party JSON and these three are interpolated
+    # into innerHTML in the browser, so the type was doing the job esc() does.
+    numeric = [("masteryReq", i.get("masteryReq")) for i in D["items"]]
+    numeric += [(f, p.get(f)) for p in parts for f in ("itemCount", "ducats")]
+    check("payload: every count is an int or absent",
+          sorted({f"{f}={v!r}" for f, v in numeric
+                  if v is not None and not isinstance(v, int)})[:5], [],
+          "a string here is markup, on a site that rebuilds unattended twice a day")
+
     # part names must be normalised, since saved progress is keyed on them
     raw = [p["name"] for i in D["items"] for p in (i.get("parts") or [])
            if p["name"] != "Blueprint" and p["name"].endswith(" Blueprint")]
@@ -1228,6 +1238,25 @@ def test_runs_on_the_other_platform() -> None:
     check("artwork: another host is not ours to cache",
           artwork.local_name("https://example.invalid/img/AshPrime.png"), None)
 
+    # 9. The other boundary sanitiser, for the same reason: three fields the
+    #    pages interpolate into markup are documented as numeric and arrive as
+    #    third-party JSON, which does not make them numeric.
+    hostile_nums = ('<img src=x onerror=alert(1)>', "3", "", None, True, False,
+                    [], {}, 1.5, float("nan"), float("inf"), "1e3")
+    check("as_int: nothing but a whole number survives",
+          [repr(v) for v in hostile_nums if build_data.as_int(v) is not None], [],
+          "a string here reaches innerHTML through a template literal")
+
+    check("as_int: real values pass through",
+          [build_data.as_int(v) for v in (0, 1, 15, 100, 2.0, -3)],
+          [0, 1, 15, 100, 2, -3])
+
+    check("as_int: the fallback is used, not invented",
+          (build_data.as_int(None, 1), build_data.as_int("x", 1),
+           build_data.as_int(0, 1)),
+          (1, 1, 0),
+          "a real zero must not be replaced by the default")
+
 
 def test_a_pre_refined_relic_reward_keeps_its_refinement() -> None:
     """
@@ -1896,6 +1925,38 @@ def test_bundle_is_self_contained() -> None:
              if "${" not in m}
     check("bundle: no local file references", local, set())
     check("bundle: no local artwork paths", html.count('"assets/img/'), 0)
+
+    # The whole dataset is inlined into a <script> block, so anything HTML would
+    # read as the end of that block is a way out of it and into live markup.
+    # The guard was a literal replace of lowercase "</script>", but HTML matches
+    # the close tag case-insensitively and ends on "</script" followed by
+    # whitespace, "/" or ">". Item names come from wiki.warframe.com with only
+    # whitespace normalised, so this was one public wiki edit from running - and
+    # the standalone is copied beside the tracker on the same origin.
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import bundle as bundle_mod
+
+    escapes = ("</script>", "</ScRiPt>", "</SCRIPT>", "</script >",
+               "</script/>", "</script\t>", "</script\n>")
+    check("bundle: every spelling of the close tag is escaped",
+          [s for s in escapes if "</" in bundle_mod.guard_text(f'x = "{s}";')], [],
+          "case-sensitivity here is a way out of the script block")
+
+    # ...and it must not maul text that does not end a block, or the inlined
+    # source stops being the source.
+    keep = ("</scriptfoo>", "<script>", "a </ b", "</style>")
+    check("bundle: leaves anything that is not a close tag alone",
+          [s for s in keep if bundle_mod.guard_text(s) != s], [])
+
+    # The built file does contain close tags - one per block it deliberately
+    # opens. The property is that there are no *extra* ones: an unescaped
+    # sequence from the dataset would end its block early and leave the rest of
+    # the payload being parsed as markup, so opens and closes must balance.
+    opens = len(re.findall(r"<script(?=[\s>])", html, re.IGNORECASE))
+    closes = len(re.findall(r"</script(?=[\s/>])", html, re.IGNORECASE))
+    check("bundle: every close tag is one the bundler opened", (opens, closes),
+          (opens, opens),
+          "an extra close tag ends the block early and the rest is markup")
     check_true("bundle: carries the collection view", 'id="view-collection"' in html)
     check_true("bundle: carries the planner view", 'id="view-planner"' in html)
     check_true("bundle: planner search came across", 'id="addSearch"' in html)

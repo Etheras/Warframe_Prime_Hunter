@@ -777,7 +777,7 @@
         <div class="d-title">
           <h2>${esc(it.name)}</h2>
           <p class="d-sub">${esc(it.type || it.category)}${
-            it.masteryReq ? " · MR " + it.masteryReq : ""}${
+            it.masteryReq ? " · MR " + esc(it.masteryReq) : ""}${
             it.tradable === false ? " · not tradable" : ""}</p>
           <div class="d-badges">${badges}</div>
         </div>
@@ -900,7 +900,7 @@
               p.ducats ? ` · <span class="ducats" data-tip="${esc(
                 "Baro Ki'Teer pays " + p.ducats + " ducats for a spare " + p.name +
                 "." + "\n" + "A fixed game value, not a market price.")
-              }">${p.ducats}d</span>` : ""}</span>
+              }">${esc(p.ducats)}d</span>` : ""}</span>
           </div>`;
 
         /* A whole weapon, not a part of one: an akimbo Prime is built from two

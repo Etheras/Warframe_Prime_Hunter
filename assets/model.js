@@ -18,8 +18,10 @@
   const REFINEMENTS = ["Intact", "Exceptional", "Flawless", "Radiant"];
 
   /* How many of a part one item needs. Ivara Prime wants two of some, and a
-     backup claiming three must be clamped rather than believed. */
-  const needOf = (part) => (part && part.itemCount) || 1;
+     backup claiming three must be clamped rather than believed — nor is the
+     payload's own `itemCount` obliged to be a number, so it goes through the
+     same `count` the store uses rather than a second copy of the rule. */
+  const needOf = (part) => S.count(part && part.itemCount, 1) || 1;
 
   /* ── what a reward is, and what it is worth ──────────────────────
      Rarity comes from the unrefined chance rather than from DE's own rarity

@@ -114,11 +114,9 @@ declined, and their reasoning is in `PROJECT.md §7`.
 
 | Entry | Size |
 |---|---|
-| A part count out of a backup reaches `innerHTML` | small — the import-reachable half of the numeric-fields entry |
 | `schedule.sh` single-quotes paths into the cron line | small |
 | `mode` is carried into the payload and read by nothing | small — delete the field or allowlist it |
-| The bundle's `</script>` guard is case-sensitive | small — a regex, and a fixture that would have caught it |
-| Three upstream numbers are trusted to be numbers | session — coerce at the boundary, escape at the sink, one hostile fixture |
+| The published site has no CSP, and a meta tag is the only one Pages will take | small — but decide the standalone's policy at the same time |
 | The footer promises something two of the three artefacts break | small — the payload already carries the flag that makes it conditional |
 | The stall timeout is set on the class that ignores it | small — one line, and it makes an existing comment true |
 | The build job holds the deploy job's permissions | small — scope `permissions:` per job |
@@ -186,47 +184,26 @@ strong for the evidence behind them. The corrections are in `PROJECT.md §7`; th
 defects are entries here. **A "found clean" note is worth less than nothing if it
 was not adversarial**, because it stops the next reader looking.
 
-### The bundle's `</script>` guard is case-sensitive
+### The published site has no CSP, and a meta tag is the only one Pages will take
 
-`tools/bundle.py:64-66` knows a literal `</script>` inside the inlined dataset would
-close the tag early, and guards it — with `text.replace(CLOSE_SCRIPT, ESCAPED_CLOSE)`
-against the exact lowercase string. HTML ends script data on `</script` matched
-**ASCII case-insensitively**, followed by whitespace, `/` or `>`. `</ScRiPt>` is not
-replaced. Neither is `</script` followed by a space.
+`serve.py` sends a strict policy with no `unsafe-inline`, and the suite asserts it.
+None of that reaches a visitor to the published site: **GitHub Pages supports no
+custom response headers at all** — no `_headers`, no `.htaccess`, no site setting —
+so the only copy of this app that is protected by a CSP is the one served from this
+machine. There is no `http-equiv` meta in either page either, so the deployed copy
+and the standalone run with nothing.
 
-This has a weaker precondition than anything else in this section. Item names come
-from `wiki.warframe.com` raw text and reach `catalogue.py:185` with only
-`re.sub(r"\s+", " ", name)` — no character filter — so a public wiki edit is enough,
-with no API compromise anywhere. And the standalone is not a private download:
-`publish.yml:196` copies it into `_site/`, so it is served from the same origin as
-the tracker and shares its `localStorage`.
+A `<meta http-equiv="Content-Security-Policy">` is the one mitigation Pages will
+honour, and it is worth having: it covers `script-src` and `style-src`, which is
+the half that matters now that no inline handlers remain. It will **not** carry
+`frame-ancestors` — that directive is ignored when a policy arrives by meta — so
+framing stays unaddressed, and the honest options for that are to accept it or to
+leave Pages. `PROJECT.md` already records the header gap as a known consequence of
+choosing Pages; what it does not say is that the meta half was available all along.
 
-A case-insensitive regex over the real terminator set, and a fixture with a
-mixed-case close tag in an item name.
-
-### Three upstream numbers are trusted to be numbers
-
-`masteryReq` (`build_data.py:1048`), `ducats` (`:1002`) and `itemCount` (`:998`)
-leave the builder exactly as the API sent them — no `int()`, no schema check. The
-comment at `:999-1001` states the numeric assumption in prose and the next line
-declines to enforce it. All three then reach `dbody.innerHTML` through template
-concatenation while their neighbours in the same template are escaped:
-
-```js
-<p class="d-sub">${esc(it.type || it.category)}${
-  it.masteryReq ? " · MR " + it.masteryReq : ""}
-```
-
-`comp.get("itemCount") or 1` is not a guard — a non-empty string is truthy and
-passes through unchanged. Today's data is clean, 166 integers and one null across
-167 items, so this is a boundary that is not enforced rather than something wrong on
-screen.
-
-Coercion at the build boundary is the real fix; escaping at the sink is the belt.
-Worth knowing while deciding how far to go: **the published site has no CSP at
-all.** There is no `http-equiv` meta in either page, and GitHub Pages cannot set
-response headers, so `serve.py`'s policy protects only the local copy. A meta CSP is
-the only hardening Pages will accept, and it cannot carry `frame-ancestors`.
+The reason this is not simply "add the tag": the two pages are also inlined into the
+standalone bundle, which runs from `file://`, and a policy that is right for one is
+not automatically right for the other. Decide both, then write the tag.
 
 ### The footer promises something two of the three artefacts break
 
@@ -290,35 +267,6 @@ worth writing down, and neither half of the sentence is true.
 The behaviour itself is deliberate and fine: the result is memoised for an hour,
 failures included, so a blackholed network costs one slow load per hour per process
 rather than one per request.
-
-### A part count out of a backup reaches `innerHTML`
-
-The same shape as the three upstream numbers above, but with a much weaker
-precondition: the value comes out of `localStorage`, and the app invites you to
-import a file into `localStorage`.
-
-`ST.owns` is `(parts[id] || {})[part] || 0` (`assets/shared.js:127`) — whatever was
-stored, uncoerced, with `|| 0` catching only falsy values. `needOf` is
-`(p && p.itemCount) || 1` (`:116`). Both land unescaped in the part chip at
-`assets/app.js:892`:
-
-```js
-${need > 1 ? `${have}/${need}` : (full ? "✓" : "&nbsp;")}
-```
-
-`esc(p.name)` sits two lines below it. The `need > 1` gate means it renders only for
-parts that legitimately need more than one, of which there are 53.
-
-`parseBackup` clamps counts with `Math.min(needOf(part), ...)`, so the ordinary
-import path is covered — this is about a hand-edited backup, which is exactly the
-file a person edits when they want to fix a count by hand. It also crosses tabs: the
-collection listener at `shared.js:218` re-reads through `load()`, which is
-`JSON.parse` and no validation, and the subscriber at `app.js:93-101` re-opens the
-drawer on an external change.
-
-Fix alongside the numeric-fields entry — the sink is the same template — but note the
-input is different, so escaping at the sink is what covers this one; there is no
-upstream boundary to coerce at.
 
 ### `schedule.sh` single-quotes paths into the cron line
 

@@ -18,6 +18,35 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+  /* A count, or the fallback if it is not one.
+
+     Counts arrive from two places that are documented as sending numbers and
+     are not obliged to: the payload, built from a third-party items API, and
+     `localStorage`, which a person can hand-edit and which `Import` writes
+     from a file they chose. Both ends reach `innerHTML` through template
+     concatenation — `${have}/${need}` — so "documented as numeric" was doing
+     the work `esc()` does two lines below it in the same template.
+
+     Numeric strings are accepted and converted, because an older backup can
+     legitimately hold "2"; anything that is not a whole count is refused
+     rather than rendered. Coerce here, at the accessor, rather than at each
+     of the eleven places a count is interpolated: those are easy to add to
+     and nobody adding the twelfth will remember.
+
+     `Number()` alone is not enough and looks like it is: `Number([])` is 0,
+     `Number(true)` is 1, and `Number({ toString: () => "9" })` is 9. So the
+     type is checked before the value, and only two types are ever a count. */
+  const count = (v, dflt) => {
+    if (typeof v === "number") {
+      return Number.isInteger(v) && v >= 0 ? v : dflt;
+    }
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      if (Number.isInteger(n) && n >= 0) return n;
+    }
+    return dflt;
+  };
+
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
@@ -113,7 +142,7 @@
     };
     const commit = (what) => { write[what](); emit(what); };
 
-    const needOf = (p) => (p && p.itemCount) || 1;
+    const needOf = (p) => count(p && p.itemCount, 1) || 1;
 
     const api = {
       /* Read-only by convention, and by shape where it is cheap: `collected` is
@@ -124,7 +153,7 @@
       get wishlist() { return wishlist; },
 
       has: (id) => collected.has(id),
-      owns: (id, part) => (parts[id] || {})[part] || 0,
+      owns: (id, part) => count((parts[id] || {})[part], 0),
       wants: (id) => wishlist.indexOf(id) >= 0,
 
       /* How many of a part you hold. Clamped to nothing sensible here on
@@ -680,7 +709,7 @@
   }
 
   window.WFPrimeShared = {
-    esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
+    esc, count, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     masteryLabel, masteryTitle, masteryShown, masteryTyped,
     traceCap, traceCapped, TRACE_PIVOT, MR_TOP, wireMastery, siteFooter,

@@ -77,6 +77,49 @@ const loadShared = (opts) => {
   return { S: ctx.window.WFPrimeShared, ctx };
 };
 
+test("a count that is not a count is refused, whichever end it came from", () => {
+  const { S } = loadShared();
+
+  /* Both ends of this are documented as numeric and neither is obliged to be:
+     the payload is built from a third-party items API, and localStorage is
+     hand-editable and is written from a file the reader chose to import. Both
+     reach innerHTML as `${have}/${need}`, beside an esc()'d name. */
+  const hostile = ['<img src=x onerror=alert(1)>', "abc", "", null, undefined,
+                   {}, [], NaN, Infinity, -1, 1.5, true, false];
+  assert.deepEqual(hostile.filter((v) => S.count(v, 7) !== 7), [],
+    "anything that is not a whole count must fall back, not render");
+
+  assert.equal(S.count(0, 7), 0, "a real zero is a count and must survive");
+  assert.equal(S.count("2", 7), 2, "an older backup can hold a numeric string");
+  assert.equal(S.count(3, 7), 3);
+});
+
+test("a part count out of storage cannot become markup", () => {
+  /* The realistic hostile input here is not an attacker but a backup someone
+     hand-edited to fix a count. `seed` puts it in the store before the module
+     runs, which is how it would actually arrive. */
+  const payload = { "warframe-ash-prime": {
+    Blueprint: '<img src=x onerror=alert(1)>',
+    Chassis: "2",
+    Neuroptics: -4,
+  } };
+  const { S } = loadShared({
+    seed: { "wfprimes.parts.v1": JSON.stringify(payload) },
+  });
+  const ST = S.state;
+
+  assert.equal(ST.owns("warframe-ash-prime", "Blueprint"), 0,
+    "owns() lands in innerHTML as `${have}/${need}` and must never be a string");
+  assert.equal(ST.owns("warframe-ash-prime", "Chassis"), 2,
+    "an older backup holding \"2\" still means two");
+  assert.equal(ST.owns("warframe-ash-prime", "Neuroptics"), 0,
+    "a negative count is not a count");
+  assert.equal(ST.owns("nobody-at-all", "Blueprint"), 0);
+
+  assert.equal(S.count({ toString: () => "9" }, 1), 1,
+    "an object that stringifies to a number is still not a number");
+});
+
 test("a store saved under the old name is carried across, not stranded", () => {
   /* The project was renamed from VorFrame on 2026-08-14 and the six storage
      keys moved with it. Everything else in that rename was cosmetic; this was
