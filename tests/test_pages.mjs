@@ -282,6 +282,79 @@ page_test("a filter setting survives a reload", async () => {
                "filters are saved under their own key and must come back");
 });
 
+page_test("the default sort groups by category and leads with the newest", async () => {
+  /* The default used to order each category by name, which answered a question
+     nobody was asking - Ash Prime above Styanax Prime because A precedes S.
+     Sorting on release instead puts what has come out lately at the top of each
+     group, where the gaps in a collection actually are.
+
+     The subjects are named rather than picked by anything app.js decides, and
+     the raw data is asserted first so a wiki change that moved a date would say
+     so rather than quietly making the test vacuous. Excalibur and Styanax are
+     the discriminator on purpose: alphabetically Excalibur leads, by date it
+     comes last, so the old comparator cannot pass this. */
+  const { page, errors } = await open("/index.html");
+
+  const raw = await page.evaluate(() => {
+    const pick = (n) => {
+      const i = window.WFPRIME_DATA.items.find((x) => x.name === n);
+      return i && { id: i.id, name: i.name, cat: i.category, d: i.releaseDate };
+    };
+    return { cats: window.WFPRIME_DATA.categories.map((c) => c.name),
+             oldest: pick("Excalibur Prime"), newest: pick("Styanax Prime"),
+             undated: pick("Kavasa Prime Collar") };
+  });
+  assert.equal(raw.oldest.cat, raw.newest.cat, "the two must share a category to compare");
+  assert.ok(raw.oldest.d < raw.newest.d, "Excalibur Prime must be the older of the pair");
+  assert.ok(raw.oldest.name < raw.newest.name,
+            "and the alphabet must disagree with the dates, or this proves nothing");
+  assert.equal(raw.undated.d, null, "Kavasa Prime Collar is the subject because it has no date");
+
+  assert.match(await page.locator("#sort option:checked").innerText(), /release date/i,
+               "the reader is told what the order is, on the control that sets it");
+
+  /* Walk the grid in document order: headings and cards are siblings, so the
+     blocks are what the reader actually sees, not what a comparator claims. */
+  const blocks = await page.evaluate(() => {
+    const out = [];
+    document.querySelectorAll("#grid > *").forEach((el) => {
+      if (el.classList.contains("cat-heading")) {
+        out.push({ cat: el.childNodes[0].textContent.trim(), ids: [] });
+      } else if (el.dataset.id && out.length) {
+        out[out.length - 1].ids.push(el.dataset.id);
+      }
+    });
+    return out;
+  });
+  assert.ok(blocks.length > 1, "the default sort has to render category headings");
+  assert.deepEqual(blocks.map((b) => b.cat),
+                   raw.cats.filter((c) => blocks.some((b) => b.cat === c)),
+                   "the groups run in the payload's category order");
+
+  const dates = await page.evaluate((ids) => {
+    const byId = new Map(window.WFPRIME_DATA.items.map((i) => [i.id, i.releaseDate]));
+    return ids.map((row) => row.map((id) => byId.get(id) || null));
+  }, blocks.map((b) => b.ids));
+
+  dates.forEach((row, i) => {
+    const seen = row.filter((d) => d !== null);
+    assert.deepEqual(row.slice(0, seen.length), seen,
+                     `${blocks[i].cat}: an undated item must sort last, not first`);
+    assert.deepEqual(seen, [...seen].sort().reverse(),
+                     `${blocks[i].cat} is not newest-first on screen`);
+  });
+
+  const frames = blocks.find((b) => b.cat === raw.newest.cat).ids;
+  assert.ok(frames.indexOf(raw.newest.id) < frames.indexOf(raw.oldest.id),
+            "Styanax Prime is newer than Excalibur Prime and must lead it");
+
+  const pets = blocks.find((b) => b.cat === raw.undated.cat).ids;
+  assert.equal(pets[pets.length - 1], raw.undated.id,
+               "the one item with no release date belongs at the end of its group");
+
+  assert.deepEqual(errors, []);
+});
+
 page_test("the materials checklist keeps what you type in it", async () => {
   const { page } = await open("/index.html");
   await page.locator("#advanced summary").click();

@@ -886,3 +886,13 @@ Recorded here only so they are not mistaken for one:
 - Item categories are read from the wiki deliberately — see `PROJECT.md §7`.
 - The five non-relic categories are dropped from the catalogue by us, not by the
   wiki, which lists them correctly — see `PROJECT.md §9`.
+- **One item has no `releaseDate`** — Kavasa Prime Collar, and it is the only one
+  of the 167. The field comes from the `warframestat.us` item API, which returns
+  `null` for it, so this is an upstream gap rather than a wiki one; the wiki page
+  has not been checked, and there is no local override because nothing today
+  needs one. **Consequence, measured 2026-08-26:** it is vaulted and not
+  farmable, so `vaultSoon` — the only other reader of the field — excludes it
+  either way. What is left is sort placement, and both date sorts in `app.js` now
+  put an undated item last through one shared `byRelease` rather than relying on
+  the direction they happen to run in. Worth re-checking if it ever becomes
+  farmable, because `vaultSoon` would then skip it silently.

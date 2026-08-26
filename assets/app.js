@@ -237,18 +237,35 @@
     return true;
   }
 
+  /* Newest first, and an undated item sorts last rather than first. Both sorts
+     that read a date go through here so the two cannot come to disagree about
+     where it lands. The date is an ISO day string, which compares correctly as
+     text, and `releaseDate` is genuinely `null` for one item rather than absent
+     - Kavasa Prime Collar, which the item API returns no date for. Left as a
+     comparison of two dates it would lead every ascending half. */
+  const byRelease = (a, b) => {
+    const ra = a.releaseDate || "", rb = b.releaseDate || "";
+    if (!ra !== !rb) return ra ? -1 : 1;
+    return rb.localeCompare(ra);
+  };
+
   const SORTS = {
     name: (a, b) => a.name.localeCompare(b.name),
+    /* Category, then newest first inside it. This orders on release rather than
+       on name because the question the default is answering is "what has come
+       out lately that I do not have", and an alphabet answers nothing - it put
+       Ash Prime above Styanax Prime for no reason a reader could use. Name is
+       still the tie-break, and still its own option for looking one thing up. */
     cat: (a, b) =>
       CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) ||
+      byRelease(a, b) ||
       a.name.localeCompare(b.name),
     status: (a, b) => {
       const order = ["farmable", "railjack", "resurgence", "baro", "special",
                      "vaulted", "founder"];
       return order.indexOf(a._status) - order.indexOf(b._status) || a.name.localeCompare(b.name);
     },
-    release: (a, b) => String(b.releaseDate || "").localeCompare(String(a.releaseDate || "")) ||
-      a.name.localeCompare(b.name),
+    release: (a, b) => byRelease(a, b) || a.name.localeCompare(b.name),
   };
 
   /* ── badges ───────────────────────────────────────────────── */

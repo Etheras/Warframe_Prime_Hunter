@@ -226,6 +226,15 @@ next*.
 
 - **Search box** at the top — type a Prime, a part, or a relic name. Press `/` to jump to it.
 - **Category** in the sidebar — Warframe, Primary, Secondary, Melee, and so on.
+- **Sort** in the sidebar — four orders, and the page remembers which one you picked:
+
+| | Order |
+|---|---|
+| **Category, then release date** | The default. Grouped by Warframe, Primary and so on, newest Prime first inside each group — so what has come out lately is at the top of every section |
+| **Name (A–Z)** | One flat alphabetical list, for looking a particular Prime up |
+| **Availability** | Farmable now first, Founder exclusive last — the same order the badges use |
+| **Newest release** | One flat list, newest first, ignoring category |
+
 - **Availability** in the sidebar — six groups you can switch on and off:
 
 | | Meaning |

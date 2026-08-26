@@ -2385,6 +2385,34 @@ the counter is yours to set.
 `tests/test_build.py` asserts part names are unique within an item, which is the
 assumption the older "part names are normalised" check silently rested on.
 
+### The collection's default order is a question, and the alphabet was not it
+
+**Changed 2026-08-26.** The collection opened grouped by category and ordered by
+**name** inside each group. Grouping is right and stays; the name was never
+answering anything. Ash Prime led the Warframes over Styanax Prime because `A`
+precedes `S`, and the reader arriving at the page — who owns most of what is old
+and is looking for the gap — had to scroll 51 cards to reach the ones that might
+be new to them. **The default now orders each group newest release first**, and
+name has dropped to the tie-break where it belongs.
+
+This **redefined the existing option rather than adding a fifth**, and the choice
+matters more than it looks: a saved `sort` wins over the default (`app.js` reads
+it back out of `wfprimes.filters.v1`), and anyone who has ever touched a filter
+has `"cat"` written down. Adding a new option would have changed the default for
+nobody who already uses the site — including the owner. Redefining `"cat"` reaches
+every saved store without a migration to write, and the stored value stays valid.
+The cost is real and was accepted: **category-then-name is no longer offered.**
+*Name (A–Z)* still exists for looking one thing up, which is the job that ordering
+actually had.
+
+Both sorts that read a date now go through one `byRelease`, because there are two
+of them and they must not drift apart on the awkward case. **`releaseDate` is
+`null` for exactly one item** — Kavasa Prime Collar — and `null` coerced to `""`
+leads any ascending comparison it takes part in, so the rule that an undated item
+sorts *last* is written once and asserted once. The old `release` comparator got
+this right by accident, through the direction it happened to be sorting; the new
+one does not depend on that.
+
 ### Shared UI conventions
 
 Both pages share one visual vocabulary so a habit learned on either carries over:
