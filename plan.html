@@ -10,27 +10,24 @@
 <body class="plan-page">
 
 <header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">◈</span>
-    <div>
-      <h1>Warframe Prime Hunter</h1>
-      <p class="brand-sub">Where to go next, for everything on your list</p>
+  <div class="topbar-left">
+    <div class="brand">
+      <span class="brand-mark">◈</span>
+      <div>
+        <h1>Warframe Prime Hunter</h1>
+        <p class="brand-sub">Where to go next, for everything on your list</p>
+      </div>
+    </div>
+
+    <div class="mr-field" id="mrField" data-set="no" role="group" aria-label="Mastery Rank">
+      <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">−</button>
+      <span class="mr-badge" id="mrBadge" tabindex="0">
+        <span class="mr-sigil-wrap" id="mrSigil"></span>
+        <span class="mr-value" id="mrValue" aria-live="polite">—</span>
+      </span>
+      <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">+</button>
     </div>
   </div>
-
-  <div class="mr-field" id="mrField" data-set="no" role="group" aria-label="Mastery Rank">
-    <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">−</button>
-    <span class="mr-badge" id="mrBadge" tabindex="0">
-      <span class="mr-sigil-wrap" id="mrSigil"></span>
-      <span class="mr-value" id="mrValue" aria-live="polite">—</span>
-    </span>
-    <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">+</button>
-  </div>
-
-  <nav class="viewtabs" aria-label="Views">
-    <a class="viewtab" href="index.html">Collection</a>
-    <a class="viewtab on" id="planLink" href="plan.html" aria-current="page">Planner</a>
-  </nav>
 
   <div class="search-wrap">
     <input id="addSearch" type="search" placeholder="Add a Prime to your list…  (press /)" autocomplete="off" spellcheck="false" />
@@ -38,6 +35,10 @@
   </div>
 
   <div class="topbar-right">
+    <nav class="viewtabs" aria-label="Views">
+      <a class="viewtab" href="index.html">Collection</a>
+      <a class="viewtab on" id="planLink" href="plan.html" aria-current="page">Planner</a>
+    </nav>
     <button class="btn ghost" id="dataBtn" data-tip="Backup or restore everything — collection, parts, farm list and options">Backup</button>
   </div>
 </header>
@@ -95,7 +96,6 @@
         <span class="switch-end end-plenty">over 500</span>
       </span>
     </label>
-    <p class="hint trace-cap" id="traceCapNote" hidden="hidden"></p>
 
     <details id="advanced" class="gap-lg">
       <summary data-tip="Ranking per run flatters anything long. Against one player's own timings, ranking per minute moved Capture and Exterminate nodes up over a hundred places and dropped Spy by a factor of ten.&#10;&#10;That is too big to ignore and too personal to ship: the numbers depend on your gear and your progression, and so do the ratios between them. So they are yours to give, and blank until you do.">Effort — optional</summary>
@@ -163,6 +163,8 @@
     </section>
   </main>
 </div>
+
+<footer class="sitefoot" id="siteFoot"></footer>
 
 <dialog id="dataDlg" class="dlg">
   <h3>Backup / restore</h3>

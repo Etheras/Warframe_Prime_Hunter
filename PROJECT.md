@@ -2448,7 +2448,7 @@ since the wiki's table stops at 30.
 
 The cap earns its place because the planner already splits on traces at **500** —
 five Radiants. `(rank × 50) + 100 ≤ 500` up to **MR8**, so at or below MR8 the far
-end of *"Short on Void Traces?"* cannot be reached at all. **The planner says so and
+end of *"Short on Void Traces?"* cannot be reached at all. **The badge says so and
 leaves the switch alone.** That is the whole rule for this field, made concrete: it
 gates nothing, by the owner's decision, and the wiki is why — a bounty above your
 rank *"can still be played, when an eligible squad member selects one"*, so hiding a
@@ -2456,6 +2456,16 @@ tier from someone whose friend can start it would be exactly the wrong answer. A
 cap is what you *can* hold; the switch is about what you *do* hold. A page test
 asserts the switch stays enabled at MR8, because "informs, never filters" is the
 kind of rule that erodes silently.
+
+**It says it on the badge, and not under the switch.** For one revision the cap had
+its own line beneath *"Short on Void Traces?"* — *"At MR 9 your Void Trace cap is
+550 — 5 Radiants at 100 traces each."* The owner cut it on sight and the reason
+generalises: **that switch already names both its ends**, so a sentence underneath
+explaining what 500 means was restating the control it sat under. A cap belongs to
+the rank that determines it, and the badge is where a reader goes to ask what their
+rank means. `STYLE.md §5` covers the same ground from the other direction — a
+paragraph between a heading and its data is read once and costs a screenful
+forever.
 
 **The sigil is drawn, not fetched, and that was forced.** DE's rank icons are not
 reachable from here and both routes were checked on 2026-08-26: `wiki.warframe.com`
@@ -2474,6 +2484,51 @@ order: `shared.js` runs first, owns the store, and is where the `storage` listen
 already lives, so a header widget that reads and writes the plan store belongs with
 it. Nothing is lost — `test_assets.mjs` loads `shared.js` in the same `node:vm`
 sandbox and covers the four pure functions without a browser.
+
+### The top bar is three tracks, and the footer is one line
+
+**Reworked 2026-08-26**, on the owner's reading of the bar after the Mastery Rank
+field went into it.
+
+**The search is centred on the page, not on the leftovers.** It was a flex child
+with `flex:1`, which centres a thing inside whatever space its neighbours leave —
+so it moved whenever the two sides differed in width, and adding the rank field
+pushed it right. Measured under the old rule: **57px right of the bar's centre**.
+The bar is now `grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)`; the side
+tracks are equal by construction, so the middle one is genuinely centred and stays
+there. A page test asserts both halves — that the centre is the centre, and that
+it **does not move when a side changes width**, which is the actual defect rather
+than one arrangement that happened to look right.
+
+Two things follow from the three tracks. The **view tabs moved into the right-hand
+group** with *Backup*, which is where a segmented control for "which half of the
+app" reads as navigation rather than as another thing competing for the middle.
+And the **overall collected count left the bar entirely**, down to the line beside
+the result count, where it sits with the other number of its kind: both say how
+much of the catalogue this is, one filtered and one absolute. In the header it was
+a two-line box arguing with the search for the centre.
+
+Below 1100px none of this applies — the bar wraps and the search takes a row of
+its own. The centring is the point of the grid, and a cramped centre would be
+worse than a wrapped one.
+
+**The footer.** Attribution, privacy and licensing now sit in one quiet line
+across the foot of **both** pages. They used to be a block appended to the
+collection sidebar's data note, which meant the planner carried **none of them** —
+a licence notice on one page of two is not a licence notice. They are rendered
+from a single function in `shared.js` rather than written into both HTML files:
+two documents drifting apart is the ordinary cost of duplication, and for a
+privacy claim and a content-policy attribution it is worse than ordinary, because
+the wrong half still reads as authoritative. A page test asserts the two pages
+render the **same string**.
+
+Small and quiet — 10.5px — but the colours are the ones the old rule had already
+solved, `#9ba1aa` and `#99a1ad`, kept rather than re-derived. That rule carried its
+own reason and it still holds: **attribution is the one thing on the page that is
+not ours to make hard to read.** The surface underneath is `--bg-2`, darker than
+the `--panel` they were solved against, so both measure higher here than they did
+there. "Low visibility" is spent on size and weight, never on contrast, and a test
+asserts the colour so that instruction cannot erode into unreadable.
 
 ### Shared UI conventions
 

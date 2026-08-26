@@ -67,15 +67,23 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:.2px}
 button,input,select,textarea{font:inherit;color:inherit}
 
 /* ── top bar ─────────────────────────────── */
+/* Three tracks rather than five flex children, and the reason is the search.
+   It used to be a flex child with `flex:1`, which centres it in *whatever space
+   its neighbours leave* — so it sat off-centre whenever the two sides differed,
+   and adding the Mastery Rank field pushed it visibly right. The side tracks
+   are `minmax(0,1fr)`: equal by construction, whatever they hold, so the middle
+   track is at the true centre of the bar and stays there. */
 .topbar{
   position:sticky;top:0;z-index:40;
-  display:flex;align-items:center;gap:20px;
+  display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;gap:20px;
   padding:12px 20px;
   background:rgba(11,14,19,.86);
   backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
 }
-.brand{display:flex;align-items:center;gap:12px;min-width:230px}
+.topbar-left{display:flex;align-items:center;gap:16px;min-width:0}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
 .brand-mark{
   font-size:26px;color:var(--gold);
   text-shadow:0 0 18px rgba(217,180,91,.45);
@@ -192,7 +200,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .mr-sigil[data-tier="gold"]{color:var(--gold)}
 .mr-sigil[data-tier="legendary"]{color:var(--violet)}
 
-.search-wrap{flex:1;display:flex;justify-content:center}
+/* Sized against the viewport rather than against what is left over, so the
+   middle track never grows wide enough to crowd the two sides into overlap.
+   The wrapped layout below 1100px overrides this to a full row. */
+.search-wrap{display:flex;justify-content:center;width:clamp(240px,34vw,520px)}
 #search,#addSearch{
   width:100%;max-width:520px;
   padding:9px 14px;
@@ -205,15 +216,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 #search::placeholder,#addSearch::placeholder{color:var(--txt-faint)}
 #search:focus,#addSearch:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
 
-.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-right{display:flex;align-items:center;gap:12px;justify-self:end;min-width:0}
+/* A row now, not a stacked block: it sits on a line beside the result count
+   rather than in the top bar, where a two-line box would set the height of the
+   whole content head. */
 .progress-chip{
-  display:flex;flex-direction:column;gap:5px;
-  padding:7px 13px;background:var(--panel);
-  border:1px solid var(--line);border-radius:var(--radius);
-  min-width:118px;
+  display:flex;flex-direction:row;align-items:center;gap:9px;
+  padding:4px 11px;background:var(--panel);
+  border:1px solid var(--line);border-radius:999px;
 }
-.progress-num{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--txt-dim)}
-.progress-bar{display:block;height:4px;background:#0c1017;border-radius:3px;overflow:hidden}
+.progress-num{font-size:12px;font-variant-numeric:tabular-nums;color:var(--txt-dim)}
+.progress-bar{display:block;width:82px;height:4px;background:#0c1017;border-radius:3px;overflow:hidden}
 .progress-bar i{
   display:block;height:100%;width:0%;
   background:linear-gradient(90deg,var(--gold-dim),var(--gold));
@@ -258,10 +271,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .hint{margin:9px 2px 0;font-size:11.5px;line-height:1.45;color:var(--txt-faint)}
 .hint strong{color:var(--txt-dim);font-weight:600}
-/* Derived from the rank the reader gave, so it is tied to the switch above it
-   rather than floating as general advice. Tighter than a plain .hint for that
-   reason: it is a consequence of the control, not a paragraph about it. */
-.hint.trace-cap{margin-top:6px;padding-left:9px;border-left:2px solid var(--line)}
 
 /* checkbox rows */
 .check{
@@ -348,16 +357,34 @@ button,input,select,textarea{font:inherit;color:inherit}
   font-size:11px;line-height:1.55;color:var(--txt-faint);
 }
 .src-note a{color:var(--txt-dim)}
-.src-note .attrib{
-  display:block;margin-top:12px;padding-top:11px;
+
+/* ── the site footer ─────────────────────────
+   Attribution, privacy and licensing, one quiet line across the foot of both
+   pages. It used to be a block inside .src-note, which put it in the collection
+   sidebar and therefore on one page of the two.
+
+   Small and low-contrast, but the floor is not negotiable and the reason is
+   carried over from the rule this replaces: the two greys here were once 3.06:1
+   and 4.21:1, and were solved to 7.03:1 and 7.01:1 because **attribution is the
+   one thing on the page that is not ours to make hard to read**. They are kept
+   at those exact values rather than re-derived; the surface underneath is
+   --bg-2, which is darker than the --panel they were solved against, so both
+   measure higher here than they did there. Quiet is a size and a weight
+   decision, never a contrast one. */
+.sitefoot{
   border-top:1px solid var(--line-soft);
-  /* The two hardcoded greys down here predate the tokens and were the darkest
-     text in the app — 3.06:1 and 4.21:1. Attribution is the one thing on the
-     page that is not ours to make hard to read. 7.03:1 and 7.01:1. */
-  font-size:10.5px;line-height:1.6;color:#9ba1aa;
+  padding:13px 20px 16px;
+  background:var(--bg-2);
 }
-.src-note .attrib a{color:#99a1ad;text-decoration:underline}
-.src-note .attrib a:hover{color:var(--gold)}
+.sitefoot p{
+  margin:0 auto;max-width:1180px;
+  font-size:10.5px;line-height:1.6;color:#9ba1aa;
+  text-align:center;text-wrap:pretty;
+}
+.sitefoot a{color:#99a1ad;text-decoration:underline;text-underline-offset:2px}
+.sitefoot a:hover{color:var(--gold)}
+/* Separates the three claims without spending a line on each. */
+.foot-dot{padding:0 8px;color:var(--line)}
 
 /* ── content ─────────────────────────────── */
 .content{padding:18px 22px 60px;min-width:0}
@@ -365,6 +392,11 @@ button,input,select,textarea{font:inherit;color:inherit}
   display:flex;align-items:center;justify-content:space-between;
   gap:14px;margin-bottom:14px;flex-wrap:wrap;
 }
+/* The overall progress moved out of the top bar and in beside the count it
+   belongs with: both are "how much of the catalogue is this", one filtered and
+   one absolute. In the header it was competing with the search for the middle
+   of the bar and winning. */
+.head-counts{display:flex;align-items:center;gap:13px;min-width:0;flex-wrap:wrap}
 .result-count{font-size:13px;color:var(--txt-dim)}
 .result-count b{color:var(--txt);font-weight:650}
 .bulk{display:flex;gap:8px}
@@ -789,13 +821,19 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 .dlg-msg{margin:10px 0 0;font-size:12px;color:var(--green);min-height:16px}
 
 /* ── responsive ──────────────────────────── */
+/* Below this the three tracks cannot hold a usable search without the two sides
+   crowding into it, so the bar goes back to wrapping and the search takes a row
+   of its own — still centred, just on its own line. The centring is the point
+   of the grid, and a cramped centre would be worse than a wrapped one. */
+@media (max-width:1100px){
+  .topbar{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between}
+  .search-wrap{order:3;width:100%;flex-basis:100%}
+}
 @media (max-width:900px){
   .layout{grid-template-columns:1fr}
   .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
-  .brand{min-width:0}
   .brand-sub{display:none}
-  .topbar{flex-wrap:wrap;gap:12px}
-  .search-wrap{order:3;width:100%;flex-basis:100%}
+  .topbar{gap:12px}
   /* The rank field and the view tabs share a row here rather than taking one
      each. At 375px they wanted 347px against 335 available — twelve short — and
      losing that argument cost a fourth row on a sticky header that was already

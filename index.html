@@ -10,37 +10,34 @@
 <body>
 
 <header class="topbar">
-  <div class="brand">
-    <span class="brand-mark">◈</span>
-    <div>
-      <h1>Warframe Prime Hunter</h1>
-      <p class="brand-sub">What you own, down to the part</p>
+  <div class="topbar-left">
+    <div class="brand">
+      <span class="brand-mark">◈</span>
+      <div>
+        <h1>Warframe Prime Hunter</h1>
+        <p class="brand-sub">What you own, down to the part</p>
+      </div>
+    </div>
+
+    <div class="mr-field" id="mrField" data-set="no" role="group" aria-label="Mastery Rank">
+      <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">−</button>
+      <span class="mr-badge" id="mrBadge" tabindex="0">
+        <span class="mr-sigil-wrap" id="mrSigil"></span>
+        <span class="mr-value" id="mrValue" aria-live="polite">—</span>
+      </span>
+      <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">+</button>
     </div>
   </div>
-
-  <div class="mr-field" id="mrField" data-set="no" role="group" aria-label="Mastery Rank">
-    <button type="button" class="mr-step" id="mrDown" aria-label="Lower Mastery Rank" disabled="disabled">−</button>
-    <span class="mr-badge" id="mrBadge" tabindex="0">
-      <span class="mr-sigil-wrap" id="mrSigil"></span>
-      <span class="mr-value" id="mrValue" aria-live="polite">—</span>
-    </span>
-    <button type="button" class="mr-step" id="mrUp" aria-label="Raise Mastery Rank">+</button>
-  </div>
-
-  <nav class="viewtabs" aria-label="Views">
-    <a class="viewtab on" href="index.html" aria-current="page">Collection</a>
-    <a class="viewtab" id="planLink" href="plan.html">Planner<span class="viewtab-n" id="planCount" hidden="hidden"></span></a>
-  </nav>
 
   <div class="search-wrap">
     <input id="search" type="search" placeholder="Search Primes, parts or relics…  (press /)" autocomplete="off" spellcheck="false" />
   </div>
 
   <div class="topbar-right">
-    <div class="progress-chip" id="progressChip" data-tip="Items marked as collected">
-      <span class="progress-num" id="progressNum">0 / 0</span>
-      <span class="progress-bar"><i id="progressFill"></i></span>
-    </div>
+    <nav class="viewtabs" aria-label="Views">
+      <a class="viewtab on" href="index.html" aria-current="page">Collection</a>
+      <a class="viewtab" id="planLink" href="plan.html">Planner<span class="viewtab-n" id="planCount" hidden="hidden"></span></a>
+    </nav>
     <button class="btn ghost" id="dataBtn" data-tip="Backup or restore your collection">Backup</button>
   </div>
 </header>
@@ -137,7 +134,13 @@
   <!-- ────────────── grid ────────────── -->
   <main class="content">
     <div class="content-head">
-      <div id="resultCount" class="result-count"></div>
+      <div class="head-counts">
+        <div id="resultCount" class="result-count"></div>
+        <div class="progress-chip" id="progressChip" data-tip="Items marked as collected">
+          <span class="progress-num" id="progressNum">0 / 0</span>
+          <span class="progress-bar"><i id="progressFill"></i></span>
+        </div>
+      </div>
       <div class="bulk">
         <button class="btn ghost sm" id="markAllBtn">Mark shown as collected</button>
         <button class="btn ghost sm" id="clearAllBtn">Unmark shown</button>
@@ -150,6 +153,8 @@
     </div>
   </main>
 </div>
+
+<footer class="sitefoot" id="siteFoot"></footer>
 
 <!-- ────────────── detail drawer ────────────── -->
 <div class="drawer-scrim" id="scrim" hidden="hidden"></div>

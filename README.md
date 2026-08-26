@@ -230,10 +230,11 @@ above your rank can still be played when a squadmate starts it, so hiding one
 from you would be wrong. The field is there to *tell* you things.
 
 The first of those is your **Void Trace cap**, which is `(rank × 50) + 100` —
-750 at MR13, 1600 at MR30. Hover the badge and it says your cap and how many
-Radiants that buys. The planner repeats it under **Short on Void Traces?**,
-including the case worth knowing: at MR8 or below your cap is 500 or less, so the
-*over 500* side of that switch is not something you can reach yet.
+750 at MR13, 1600 at MR30. Hover the badge and it tells you your cap, how many
+Radiants that buys, and the rank's name. It also mentions the case worth knowing:
+at MR8 or below your cap is 500 or less, so the *over 500* side of the planner's
+**Short on Void Traces?** switch is not something you can reach yet. It says so
+and leaves the switch alone — nothing here is decided for you.
 
 Ranks above 30 show as `LR1`, `LR2` and so on.
 

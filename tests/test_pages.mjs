@@ -390,18 +390,26 @@ page_test("a Mastery Rank set on one page is the same rank on the other", async 
   assert.deepEqual(errors, []);
 });
 
-page_test("the planner says the Void Trace cap the rank implies", async () => {
+page_test("the rank badge states the Void Trace cap it implies", async () => {
   /* (rank x 50) + 100, from `wiki.warframe.com/w/Void_Traces`. MR13 = 750 is
      the wiki's own worked example, so the number on screen is checked against
      the source rather than against our own arithmetic.
 
-     The second half is the boundary: MR8 caps at exactly 500, which is where
-     the "Short on Void Traces?" switch splits, so at or below MR8 the far end
-     of that switch cannot be reached. The note says so and the switch stays
-     enabled - this field informs and never filters. */
+     It is on the badge's tooltip rather than under the planner's traces switch.
+     That switch names both its ends already - *under 500*, *over 500* - so a
+     sentence beneath it explaining 500 restated the control it sat under. A cap
+     belongs to the rank, and the badge is where a reader asks what their rank
+     means.
+
+     The second half is the boundary: MR8 caps at exactly 500, so at or below it
+     the far end of that switch cannot be reached. The badge says so and the
+     switch stays enabled - this field informs and never filters. */
   const { page, errors } = await open("/plan.html");
-  assert.equal(await page.locator("#traceCapNote").isVisible(), false,
-               "with no rank given there is no cap to state");
+  const tip = () => page.locator("#mrBadge").getAttribute("data-tip");
+
+  assert.match(await tip(), /not set/, "with no rank given there is no cap to state");
+  assert.equal(await page.locator("#traceCapNote").count(), 0,
+               "and nothing is printed under the switch, which explains itself");
 
   const setRank = async (mr) => {
     await page.evaluate((n) => {
@@ -414,18 +422,99 @@ page_test("the planner says the Void Trace cap the rank implies", async () => {
 
   await setRank(13);
   assert.equal(await page.locator("#mrValue").innerText(), "MR 13");
-  const rich = await page.locator("#traceCapNote").innerText();
+  const rich = await tip();
   assert.match(rich, /750/, "MR13 caps at 750 — the wiki's own worked example");
-  assert.doesNotMatch(rich, /out of reach/, "750 clears the switch's 500 comfortably");
+  assert.match(rich, /Hunter/, "and the badge names the rank DE gives it");
+  assert.doesNotMatch(rich, /cannot hold more/, "750 clears the switch's 500 comfortably");
 
   await setRank(8);
-  const poor = await page.locator("#traceCapNote").innerText();
+  const poor = await tip();
   assert.match(poor, /500/, "MR8 caps at exactly the pivot");
-  assert.match(poor, /out of reach/, "so the far end of the switch cannot be reached");
+  assert.match(poor, /cannot hold more/, "so the far end of the switch is unreachable");
   assert.equal(await page.locator("#p-traces").isDisabled(), false,
                "and it still must not disable the control — this informs, never filters");
 
   assert.deepEqual(errors, []);
+});
+
+page_test("the search sits at the centre of the bar, whatever is beside it", async () => {
+  /* It used to be a flex child with `flex:1`, which centres inside the space
+     the neighbours leave rather than in the bar — so it drifted whenever the
+     two sides differed, and adding the Mastery Rank field pushed it visibly
+     right. The top bar is a three-track grid now with `minmax(0,1fr)` sides.
+
+     Measured against `clientWidth`, not `innerWidth`: the latter includes the
+     scrollbar, which is a 7px lie at this width and would make a correctly
+     centred bar look wrong. The second half is the real guard — the centre must
+     not move when a side changes width, which is the bug itself rather than one
+     arrangement that happens to look right. */
+  for (const [url, input] of [["/index.html", "#search"], ["/plan.html", "#addSearch"]]) {
+    const { page, errors } = await open(url);
+    const measure = () => page.evaluate((sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      return { centre: r.left + r.width / 2, half: document.documentElement.clientWidth / 2 };
+    }, input);
+
+    const before = await measure();
+    assert.ok(Math.abs(before.centre - before.half) <= 1,
+              `${url}: search centre ${before.centre} is not the bar's centre ${before.half}`);
+
+    const grew = await page.evaluate(() => {
+      const h1 = document.querySelector(".brand h1");
+      const was = h1.textContent;
+      h1.textContent = was + " — and a great deal more besides";
+      return was;
+    });
+    const after = await measure();
+    assert.ok(Math.abs(after.centre - before.centre) <= 1,
+              `${url}: the centre moved ${after.centre - before.centre}px when the left grew`);
+    await page.evaluate((t) => { document.querySelector(".brand h1").textContent = t; }, grew);
+
+    assert.equal(await page.locator(".topbar-right .viewtabs").count(), 1,
+                 `${url}: Collection/Planner belong in the right-hand group`);
+    assert.equal(await page.locator(".topbar #progressChip").count(), 0,
+                 `${url}: the collected count is out of the bar`);
+    assert.deepEqual(errors, []);
+  }
+});
+
+page_test("the licence and privacy notice is at the foot of both pages, identically", async () => {
+  /* It used to be built into the collection sidebar's data note, so the planner
+     carried none of it — a licence notice on one page of two. One copy now, in
+     `siteFooter`, and this asserts the two pages render the same string rather
+     than merely that each has something: two attributions that drift apart is
+     the failure this arrangement exists to prevent. */
+  const read = async (url) => {
+    const { page, errors } = await open(url);
+    const foot = page.locator("#siteFoot");
+    assert.equal(await foot.count(), 1, `${url} has no footer`);
+    assert.deepEqual(errors, []);
+    return (await foot.innerText()).replace(/\s+/g, " ").trim();
+  };
+
+  const collection = await read("/index.html");
+  const planner = await read("/plan.html");
+
+  assert.equal(collection, planner, "the two pages must carry the same notice");
+  for (const claim of ["Digital Extremes", "Content Policy", "unofficial fan",
+                       "sent nowhere", "CC BY-SA", "MIT"]) {
+    assert.ok(collection.includes(claim), `the notice dropped "${claim}"`);
+  }
+
+  /* Quiet, but not below the floor the rule it replaced was solved for:
+     attribution is the one thing on the page that is not ours to make hard to
+     read. Colour is asserted rather than described because "low visibility"
+     is exactly the instruction that erodes into unreadable. */
+  const { page } = await open("/index.html");
+  const style = await page.evaluate(() => {
+    const p = document.querySelector("#siteFoot p");
+    const cs = getComputedStyle(p);
+    return { color: cs.color, size: parseFloat(cs.fontSize) };
+  });
+  assert.equal(style.color, "rgb(155, 161, 170)",
+               "#9ba1aa is the solved 7:1 value and must not be dimmed further");
+  assert.ok(style.size <= 11 && style.size >= 10,
+            `small, but still a readable size — got ${style.size}px`);
 });
 
 page_test("the materials checklist keeps what you type in it", async () => {

@@ -1489,25 +1489,10 @@
     `catalogue: <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">wiki</a> ` +
     `+ DE public export · Resurgence: live worldstate.` +
     `<br>Refresh with <code>refresh-data.cmd</code>.` +
-    `<span class="attrib">
-       WARFRAME and all related data, names and artwork are the property of
-       <a href="https://www.warframe.com" target="_blank" rel="noopener">Digital Extremes Ltd.</a>
-       and are used here under their
-       <a href="https://www.warframe.com/en/contentpolicy" target="_blank" rel="noopener">Content Policy</a>
-       for non-commercial fan works. Warframe Prime Hunter is an unofficial fan project, not
-       affiliated with or endorsed by Digital Extremes.
-       <br><b>Privacy:</b> your collection is stored in this browser and is sent
-       nowhere &mdash; there is no account, no cookie, and no analytics. Artwork
-       and data are served from this site, so no third party sees your visit.
-       The server counts requests per visitor briefly, in memory only, purely to
-       stop one client overwhelming it; addresses are keyed-hashed with a
-       per-session salt, never written down, and discarded when it stops.
-       <br>Catalogue data from the
-       <a href="https://wiki.warframe.com/w/Prime" target="_blank" rel="noopener">WARFRAME Wiki</a>
-       (CC BY-SA); item and worldstate data via
-       <a href="https://github.com/WFCD" target="_blank" rel="noopener">WFCD</a>
-       (MIT / Apache-2.0). Warframe Prime Hunter's own code is MIT licensed.
-     </span>` +
+    /* Attribution, privacy and licensing used to hang off the end of this
+       string. They are in the site footer now, on both pages rather than only
+       this one — see `siteFooter` in shared.js. What is left here is what this
+       note was always for: where the data came from and how old it is. */
     ((m.stale && m.stale.length)
       ? `<br><span class="note-dim">Reused cached data for
          ${esc(m.stale.join(", "))} — slightly behind.</span>` : "") +
@@ -1518,9 +1503,10 @@
 
   S.wireFileBackup();
   S.staleBanner();
-  /* Nothing on this page reads the rank yet — it gates nothing, by design — so
-     there is no repaint to ask for. The planner passes a callback because its
-     trace hint does depend on it. */
+  /* Nothing on either page reads the rank yet — it gates nothing, by design.
+     What it derives, the Void Trace cap, is stated on the badge's own tooltip,
+     so there is no repaint for a page to ask for. */
   S.wireMastery();
+  S.siteFooter();
   render();
 })();

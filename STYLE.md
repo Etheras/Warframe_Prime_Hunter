@@ -260,6 +260,13 @@ condensed view; it must not be the only route to it.
   `::-webkit-*-spin-button` reset). They are visually noisy at this size.
 - Default-off options that need explaining live under **Advanced options** with
   the reasoning in a tooltip, not in surrounding prose.
+- **A control that names its own ends needs no paragraph explaining them.** The
+  Void Trace switch is labelled *under 500* / *over 500*; a line beneath it saying
+  *"At MR 9 your Void Trace cap is 550 — 5 Radiants at 100 traces each"* was
+  restating the control it sat under, and it went the day it shipped. Where a
+  derived fact genuinely belongs is with **the thing it is derived from** — the
+  cap moved to the Mastery Rank badge's tooltip, because a cap is a property of
+  the rank and the badge is where a reader asks what their rank means.
 - **A control must not rebuild the container it lives in.** `innerHTML` destroys
   the element that had the focus, so `document.activeElement` falls back to
   `<body>` and the keyboard user is returned to the top of the page. The part
@@ -318,9 +325,25 @@ rule actually says.
   go" rather than "the other half of this app". The brand block stays identical
   across views; only the sub-line changes, because the tabs already say where you
   are.
-- **Inactive nav text is `#9ca7b9`, not `--txt-dim`.** `--txt-dim` on `--panel`
-  measures 6.68:1 — under the 7:1 in §3. It passes elsewhere on lighter
-  backgrounds; on the top bar it does not, so nav sets its own value at 7.17:1.
+- **Inactive nav text is `--txt-dim`.** It was `#9ca7b9` at 7.17:1, and this rule
+  said so until 2026-08-26 — chosen only because `--txt-dim` measured 6.68:1 on
+  `--panel` and missed the §3 floor. `--txt-dim` was re-solved to `#bfc6d1` and now
+  clears 7:1 on every surface in the app, so the magic number has no job left and
+  the token does it instead. **A hardcoded colour that exists to dodge a token is
+  a debt against that token**, and it comes due silently: the CSS had already been
+  changed and this line had not.
+- **The centre of a bar is the centre of the bar, not of what is left over.** The
+  search sits in the middle track of `grid-template-columns:minmax(0,1fr) auto
+  minmax(0,1fr)`, so the two side tracks are equal by construction and the middle
+  one is genuinely centred. It was a flex child with `flex:1`, which centres it in
+  the space its neighbours happen to leave — measured 57px right of centre once
+  the Mastery Rank field was added to the left. Anything that must line up with
+  the page rather than with its siblings wants a track of its own, not `flex:1`.
+- **A footer carries what belongs to the site, not to a page.** Attribution,
+  privacy and licensing sit in one `.sitefoot` across the foot of both pages,
+  rendered from a single place in `shared.js`. They used to live inside the
+  collection sidebar's data note, which put them on one page of two. Small and
+  quiet — 10.5px — but see §3: the contrast floor is not what "quiet" is spent on.
 - Sidebars use a **solid** background, not a gradient. One that faded out after
   340px left the rest of a scrolling column unpainted.
 - Sections that sit on the page wash get **their own panel** (`--panel`, 1px

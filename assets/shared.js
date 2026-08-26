@@ -458,6 +458,50 @@
     });
   }
 
+  /* ── the site footer ─────────────────────────────────────────────
+     Attribution, privacy and licensing, in one quiet line at the foot of both
+     pages. It used to sit inside the collection sidebar's data note, which put
+     it on one page of two — a licence notice the planner never carried — and
+     buried it under three lines about when the data was last built.
+
+     Written here rather than in both HTML files so there is one copy to keep
+     true. Two documents drifting apart is the ordinary cost of duplication;
+     for a privacy claim and a content-policy attribution it is worse than
+     ordinary, because the wrong half still reads as authoritative. */
+  function siteFooter() {
+    const foot = document.getElementById("siteFoot");
+    if (!foot) return;
+    /* A template literal rather than concatenation, and not for taste: the
+       bundle check scans the built file for an href attribute whose value is
+       neither a URL nor an interpolation, and calls it a local file reference.
+       Concatenated, the literal left behind matched and failed the build;
+       `${href}` is the form that check knows to skip, and it is what the rest
+       of the project writes anyway. Do not spell the pattern out in a comment
+       either — the bundler inlines these verbatim, and this one failed the
+       build twice: once for the code, then once for the note about the code. */
+    const link = (href, text) =>
+      `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+    const dot = '<span class="foot-dot">·</span>';
+    foot.innerHTML = "<p>" +
+      "WARFRAME and all related data, names and artwork are the property of " +
+      link("https://www.warframe.com", "Digital Extremes Ltd.") + ", used under their " +
+      link("https://www.warframe.com/en/contentpolicy", "Content Policy") +
+      " for non-commercial fan works. Warframe Prime Hunter is an unofficial fan " +
+      "project, not affiliated with or endorsed by Digital Extremes." + dot +
+      "Your collection is stored in this browser and is sent nowhere — there is no " +
+      "account, no cookie and no analytics. Artwork and data are served from this " +
+      "site, so no third party sees your visit. The server counts requests per " +
+      "visitor briefly, in memory only, purely to stop one client overwhelming it; " +
+      "addresses are keyed-hashed with a per-session salt, never written down, and " +
+      "discarded when it stops." + dot +
+      "Catalogue data from the " +
+      link("https://wiki.warframe.com/w/Prime", "WARFRAME Wiki") +
+      " (CC BY-SA); item and worldstate data via " +
+      link("https://github.com/WFCD", "WFCD") +
+      " (MIT / Apache-2.0). Warframe Prime Hunter's own code is MIT licensed." +
+      "</p>";
+  }
+
   /* ── Mastery Rank ────────────────────────────────────────────────
      An account fact, so it lives in the shared plan store beside `squad`
      rather than in either page's own filters - it is true on both pages and
@@ -550,7 +594,7 @@
      same markup, so this is one function rather than one per page, and a change
      made on either is written to the shared store and picked up by the other
      through the same `storage` event everything else uses. */
-  function wireMastery(onChange) {
+  function wireMastery() {
     const field = document.getElementById("mrField");
     if (!field) return null;
     const valueEl = document.getElementById("mrValue");
@@ -589,7 +633,6 @@
             ? "\n\nAt this rank you cannot hold more than " + TRACE_PIVOT + ", so the " +
               "planner's “Short on Void Traces?” switch has no far side to reach."
             : "");
-      if (onChange) onChange(mr);
     }
 
     const step = (by) => {
@@ -620,7 +663,7 @@
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     masteryLabel, masteryTitle, masteryTier, traceCap, traceCapped, TRACE_PIVOT,
-    MR_TOP, wireMastery,
+    MR_TOP, wireMastery, siteFooter,
     /* One store per page, made here so the `storage` listener is registered
        once and both pages share the rules rather than a copy of them. */
     state: makeState(),
