@@ -277,8 +277,8 @@ condensed view; it must not be the only route to it.
   *"At MR 9 your Void Trace cap is 550 — 5 Radiants at 100 traces each"* was
   restating the control it sat under, and it went the day it shipped. Where a
   derived fact genuinely belongs is with **the thing it is derived from** — the
-  cap moved to the Mastery Rank badge's tooltip, because a cap is a property of
-  the rank and the badge is where a reader asks what their rank means.
+  cap moved to the Mastery Rank field's tooltip, because a cap is a property of
+  the rank and that field is where a reader asks what their rank means.
 - **A control must not rebuild the container it lives in.** `innerHTML` destroys
   the element that had the focus, so `document.activeElement` falls back to
   `<body>` and the keyboard user is returned to the top of the page. The part

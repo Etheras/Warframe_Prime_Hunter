@@ -2451,8 +2451,8 @@ since the wiki's table stops at 30.
 
 The cap earns its place because the planner already splits on traces at **500** —
 five Radiants. `(rank × 50) + 100 ≤ 500` up to **MR8**, so at or below MR8 the far
-end of *"Short on Void Traces?"* cannot be reached at all. **The badge says so and
-leaves the switch alone.** That is the whole rule for this field, made concrete: it
+end of *"Short on Void Traces?"* cannot be reached at all. **The rank field says so
+and leaves the switch alone.** That is the whole rule for this field, made concrete: it
 gates nothing, by the owner's decision, and the wiki is why — a bounty above your
 rank *"can still be played, when an eligible squad member selects one"*, so hiding a
 tier from someone whose friend can start it would be exactly the wrong answer. A
@@ -2460,12 +2460,12 @@ cap is what you *can* hold; the switch is about what you *do* hold. A page test
 asserts the switch stays enabled at MR8, because "informs, never filters" is the
 kind of rule that erodes silently.
 
-**It says it on the badge, and not under the switch.** For one revision the cap had
+**It says it on the rank field, and not under the switch.** For one revision the cap had
 its own line beneath *"Short on Void Traces?"* — *"At MR 9 your Void Trace cap is
 550 — 5 Radiants at 100 traces each."* The owner cut it on sight and the reason
 generalises: **that switch already names both its ends**, so a sentence underneath
 explaining what 500 means was restating the control it sat under. A cap belongs to
-the rank that determines it, and the badge is where a reader goes to ask what their
+the rank that determines it, and that field is where a reader goes to ask what their
 rank means. `STYLE.md §5` covers the same ground from the other direction — a
 paragraph between a heading and its data is read once and costs a screenful
 forever.

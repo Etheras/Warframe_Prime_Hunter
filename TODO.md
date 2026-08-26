@@ -37,8 +37,8 @@ which is what the rule at the top of this file asks for.
 
 ## What is open, at a glance
 
-**Swept against the code on 2026-08-24.** Every row below was checked to still be
-true; two entries had shipped and were rewritten to what is actually left of them.
+**Swept against the code on 2026-08-26.** Every row below was checked to still be
+true; the cadence row changed shape and the Mastery Rank row shipped.
 Titles are given verbatim so they can be grepped — each one is a `###` heading
 further down, where the reasoning lives.
 
@@ -46,9 +46,15 @@ further down, where the reasoning lives.
 **session** is an afternoon including the test, **large** touches the pipeline, the
 payload and both pages.
 
-**Nothing is currently wrong on screen**, as of 2026-08-25 — but treat that as a
-claim to re-check rather than one to trust. It read exactly this on 2026-08-24 and
-a sweep the next day found two things that were, one of them live on three parts.
+**This file no longer claims that nothing is wrong on screen.** It said so on
+2026-08-24 and a sweep the next day found two things that were; it said so again on
+2026-08-25 and the cadence sweep of 2026-08-26 found six mission types costed at a
+third to a fifth of what the wiki says they cost, two of them the largest modes in
+the dataset. The claim has now been wrong twice running, which is enough. **What is
+true is narrower and worth stating instead:** every defect anyone has actually
+identified is either fixed or has an entry below. Whether the ranking is *right*
+turns on the open question in *A round is not a universal unit of effort*, and
+until that is settled nobody should write the reassuring sentence again.
 
 Four defects shipped that day and their entries are gone, with the reasoning in
 `PROJECT.md §7`: both Onslaught nodes ranked at twice their true rate; 38 live
@@ -80,17 +86,24 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest known distortion |
+| Nine rotation-bearing mission types are still unverified | **session, and start here** — the wiki half is done; what is left is one decision that re-costs 75+ live nodes |
+| A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest distortion with an agreed unit |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | What the misses are worth, in Ducats | session |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
+
+**The first row is the one to take next**, and it is a decision rather than a
+measurement: the sweep is finished and the numbers are in the entry. It also gates
+the second — *"the largest distortion"* is only meaningful once the unit the
+ranking divides by means the same thing on every row.
 
 ### Interface
 
 | Entry | Size |
 |---|---|
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
+| The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
 
 ### One refactor
@@ -109,7 +122,12 @@ of a worklist, not of the click, and worth deciding on its own merits.
 | Plague Star and Profit-Taker are the same shape, modelled two ways | Plague Star to run |
 | The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
 | Expected openings for everything, not for the worst one | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
-| Nine rotation-bearing mission types are still unverified | wiki checking; tedious, not blocked |
+
+*Nine rotation-bearing mission types* used to sit in this table waiting on "wiki
+checking; tedious, not blocked". **The wiki checking was done on 2026-08-26** and
+the entry moved up to *Model and ranking*, because what it is waiting on now is the
+owner, not the wiki. Seven mission types that carry no rotation confirmation at all
+are still unverified and are still tedious, but they are no longer what blocks it.
 
 ### Not work
 
@@ -679,6 +697,31 @@ at level 10–30 up to MR10 at 100–100 (see *The worldstate publishes far more
 the two fields we read*). A node could say **"asks MR5"** the same way it says
 **"Railjack"**, shown only when the player's rank is below it. The rank is now on
 hand to do it; nothing reads it yet.
+
+### The Void Trace cap past rank 30 is our extrapolation, not the wiki's
+
+Small, and shipped on screen since 2026-08-26, which is why it is written down
+rather than left as a code comment.
+
+[`Void Traces`](https://wiki.warframe.com/w/Void_Traces) gives the cap as
+**`(Mastery Rank × 50) + 100`** and works two examples, MR13 = 750 and MR30 = 1600.
+Both are asserted in `test_assets.mjs` against the page's own figures, so the
+formula is solid **for ranks 0 to 30**.
+
+Past 30 it is ours. The wiki's table stops at Gold Architect and says nothing about
+Legendary ranks, so `traceCap` simply keeps counting — LR1 is rank 31 and reads
+1650. That is the obvious continuation and it may well be right, but **nobody has
+checked it**, and the number is displayed to the reader as though it were known.
+
+Two ways it could be wrong: DE might cap storage at the MR30 value and let
+Legendary ranks add nothing, or Legendary might scale on a different step. Either
+would make the figure on a Legendary player's badge wrong in a way nothing here
+would catch.
+
+**What would settle it:** one Legendary player reading their own trace cap in game.
+Failing that, a wiki page that states the Legendary case — worth re-checking
+`Void Traces` and `Mastery Rank` on any later pass, since the absence may simply be
+an unwritten section rather than a rule that does not exist.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 

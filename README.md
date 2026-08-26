@@ -289,8 +289,8 @@ ticked, Caliban Prime points at Terrorem for 5 of his 7 relics. Tick off the
 Blueprint and Chassis and it re-ranks to Zabala, covering the 2 relics that
 actually hold the parts you're missing.
 
-The bar at the top right shows your overall progress, and each category heading
-shows its own count.
+The bar above the grid, beside the result count, shows your overall progress, and
+each category heading shows its own count.
 
 **To hide everything you already own:** untick **Show collected** in the sidebar.
 (Unticking **Show not collected** does the opposite — handy for reviewing your
