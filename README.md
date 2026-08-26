@@ -218,6 +218,25 @@ progress — tick a part in one and it is ticked in the other. Which one you ope
 first depends on the question you have: *what do I still need* or *what do I run
 next*.
 
+### Your Mastery Rank
+
+Next to the site name is a small `− ◈ MR — +` field. Press `+` to set your
+Mastery Rank; it starts blank and stays blank until you do. It is the same field
+on both pages, because it is a fact about your account rather than a setting for
+one view.
+
+**It never hides anything.** Nothing is filtered by rank, on purpose: a bounty
+above your rank can still be played when a squadmate starts it, so hiding one
+from you would be wrong. The field is there to *tell* you things.
+
+The first of those is your **Void Trace cap**, which is `(rank × 50) + 100` —
+750 at MR13, 1600 at MR30. Hover the badge and it says your cap and how many
+Radiants that buys. The planner repeats it under **Short on Void Traces?**,
+including the case worth knowing: at MR8 or below your cap is 500 or less, so the
+*over 500* side of that switch is not something you can reach yet.
+
+Ranks above 30 show as `LR1`, `LR2` and so on.
+
 ---
 
 ## The collection

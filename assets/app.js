@@ -1518,5 +1518,9 @@
 
   S.wireFileBackup();
   S.staleBanner();
+  /* Nothing on this page reads the rank yet — it gates nothing, by design — so
+     there is no repaint to ask for. The planner passes a callback because its
+     trace hint does depend on it. */
+  S.wireMastery();
   render();
 })();

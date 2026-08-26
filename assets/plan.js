@@ -201,6 +201,29 @@
     };
   }
 
+  /* The Void Trace ceiling falls straight out of the Mastery Rank, so once the
+     header knows the rank the planner can say what the reader's own ceiling is
+     rather than leaving them to do `(rank × 50) + 100` themselves.
+
+     It informs and does not force, which is the whole rule for this field. Even
+     when the cap says the far end of the switch is unreachable, the switch stays
+     the reader's to set: a cap is what you CAN hold and the switch is about what
+     you DO hold, and the honest response to "your cap is 450" is to say so, not
+     to move a control the reader owns. Blank until a rank is given, like
+     everything else here. */
+  function paintTraceCap(mr) {
+    const note = $("#traceCapNote");
+    if (!note) return;
+    const cap = S.traceCap(mr);
+    if (cap == null) { note.hidden = true; note.textContent = ""; return; }
+    note.hidden = false;
+    note.textContent = S.traceCapped(mr)
+      ? `At ${S.masteryLabel(mr)} your Void Trace cap is ${cap} — you cannot hold more `
+        + `than that, so “over ${S.TRACE_PIVOT}” is out of reach below MR 9.`
+      : `At ${S.masteryLabel(mr)} your Void Trace cap is ${cap} — `
+        + `${Math.floor(cap / 100)} Radiants at 100 traces each.`;
+  }
+
   /* Railjack, event nodes and the bounty clock all live in
      assets/rotation.js - see the alias block at the top of this file. */
 
@@ -1713,6 +1736,7 @@
 
   S.wireFileBackup();
   S.staleBanner();
+  S.wireMastery(paintTraceCap);
   render();
 
   /* The bounty clock moves while the page is open: a countdown left alone goes

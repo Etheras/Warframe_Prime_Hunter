@@ -458,9 +458,169 @@
     });
   }
 
+  /* ── Mastery Rank ────────────────────────────────────────────────
+     An account fact, so it lives in the shared plan store beside `squad`
+     rather than in either page's own filters - it is true on both pages and
+     the two must not be able to disagree about it. Unset is `null` and stays
+     that way until the player says otherwise: everything else in this project
+     defaults to "not known, say nothing", and a rank guessed at would feed a
+     trace cap that is simply wrong.
+
+     It gates nothing, by the owner's decision of 2026-08-14, and the two halves
+     of that go together: the field exists to say what something ASKS of you.
+     The wiki is the reason - a bounty above your rank "can still be played,
+     when an eligible squad member selects one" - so hiding a tier from someone
+     whose friend can start it would be exactly the wrong answer. */
+
+  /* DE's own three-rank cycle: a base title, then Silver, then Gold, ten times
+     over for ranks 1-30. Taken from `wiki.warframe.com/w/Mastery_Rank`. Rank 0
+     is Unranked and anything past 30 is Legendary, which the wiki writes LR1,
+     LR2 ... with no published cap - so one integer is kept and rendered as
+     `LR<n-30>` above 30, exactly as the spec asked. */
+  const MR_BASES = ["Initiate", "Novice", "Disciple", "Seeker", "Hunter",
+                    "Eagle", "Sage", "Knight", "Lord", "Architect"];
+  const MR_TIERS = ["base", "silver", "gold"];
+  const MR_TOP = 30;
+
+  const mrClamp = (n) => (isFinite(n) && n >= 0 ? Math.floor(n) : null);
+
+  /* "MR 13", "LR 2", or "—" when it has never been set. */
+  function masteryLabel(mr) {
+    if (mr == null) return "—";
+    return mr > MR_TOP ? "LR " + (mr - MR_TOP) : "MR " + mr;
+  }
+
+  /* "Gold Seeker". Legendary ranks have their own naming beyond the table the
+     wiki publishes, so they are not guessed at - they get the plain word. */
+  function masteryTitle(mr) {
+    if (mr == null) return null;
+    if (mr === 0) return "Unranked";
+    if (mr > MR_TOP) return "Legendary";
+    const base = MR_BASES[Math.floor((mr - 1) / 3)];
+    const tier = (mr - 1) % 3;
+    return tier === 0 ? base : (tier === 1 ? "Silver " : "Gold ") + base;
+  }
+
+  /* Which of the three colours the sigil takes. Unranked and Legendary sit
+     outside the cycle and get their own, so the badge never implies a tier the
+     rank does not have. */
+  function masteryTier(mr) {
+    if (mr == null) return "none";
+    if (mr === 0) return "none";
+    if (mr > MR_TOP) return "legendary";
+    return MR_TIERS[(mr - 1) % 3];
+  }
+
+  /* `wiki.warframe.com/w/Void_Traces`: "This cap is determined by one's Mastery
+     Rank using the formula: (Mastery Rank × 50) + 100." The page's own worked
+     examples are MR13 = 750 and MR30 = 1600, and both fall out of this. A
+     Legendary rank keeps counting from 30, so LR1 is 31 and the same formula
+     carries - that continuation is ours rather than the wiki's, which stops its
+     table at 30. */
+  function traceCap(mr) {
+    return mr == null ? null : mr * 50 + 100;
+  }
+
+  /* A Radiant costs 100 traces, and the planner's "Short on Void Traces?"
+     switch splits at 500 - five Radiants. Below MR9 the cap is at or under 500,
+     so the far side of that switch is not reachable at all. Worth SAYING and
+     not worth enforcing: same rule as the rest of this field. */
+  const TRACE_PIVOT = 500;
+  const traceCapped = (mr) => mr != null && traceCap(mr) <= TRACE_PIVOT;
+
+  /* The sigil. DE's own rank icons are not reachable from here: the wiki 403s
+     any request that is not a browser (see PROJECT.md section 8) and the item
+     CDN that supplies every other image in this app has no rank art - its
+     backing store 404s `IconRank1.png` while item images resolve. Both were
+     checked on 2026-08-26. So this is drawn rather than fetched, which also
+     keeps it working from file:// and off a USB stick with no network at all.
+     It is not a copy of DE's art and does not pretend to be; what it borrows is
+     the structure that IS documented - the bronze/silver/gold three-rank cycle
+     the rank titles themselves follow. */
+  function masterySigil(mr) {
+    const tier = masteryTier(mr);
+    return '<svg class="mr-sigil" data-tier="' + tier + '" viewBox="0 0 24 24" ' +
+      'aria-hidden="true" focusable="false">' +
+      '<path d="M12 2 L21 12 L12 22 L3 12 Z" class="mr-sigil-body" />' +
+      '<path d="M12 6.5 L17.5 12 L12 17.5 L6.5 12 Z" class="mr-sigil-core" />' +
+      "</svg>";
+  }
+
+  /* Wires the header control on whichever page called it. Both pages carry the
+     same markup, so this is one function rather than one per page, and a change
+     made on either is written to the shared store and picked up by the other
+     through the same `storage` event everything else uses. */
+  function wireMastery(onChange) {
+    const field = document.getElementById("mrField");
+    if (!field) return null;
+    const valueEl = document.getElementById("mrValue");
+    const sigilEl = document.getElementById("mrSigil");
+    const badge = document.getElementById("mrBadge");
+    const down = document.getElementById("mrDown");
+    const up = document.getElementById("mrUp");
+
+    const read = () => mrClamp((load(KEYS.plan, {}) || {}).mastery);
+    const write = (mr) => {
+      const plan = load(KEYS.plan, {}) || {};
+      plan.mastery = mr;
+      save(KEYS.plan, plan);
+    };
+
+    function paint() {
+      const mr = read();
+      /* Two children updated separately rather than one innerHTML over the
+         badge: rewriting the badge whole would destroy `valueEl` on the first
+         paint and leave every later one writing to a detached node. */
+      valueEl.textContent = masteryLabel(mr);
+      sigilEl.innerHTML = masterySigil(mr);
+      field.dataset.set = mr == null ? "no" : "yes";
+      down.disabled = mr == null || mr === 0;
+
+      const title = masteryTitle(mr);
+      const cap = traceCap(mr);
+      badge.dataset.tip = mr == null
+        ? "Mastery Rank — not set.\n\nSet it and this says your Void Trace cap, and " +
+          "nodes can say what rank they ask of you. It never hides anything: a " +
+          "bounty above your rank can still be played when a squadmate starts it."
+        : masteryLabel(mr) + " — " + title + ".\n\n" +
+          "Void Trace cap " + cap + " — (rank × 50) + 100.\n" +
+          "A Radiant costs 100, so that is " + Math.floor(cap / 100) + " of them." +
+          (traceCapped(mr)
+            ? "\n\nAt this rank you cannot hold more than " + TRACE_PIVOT + ", so the " +
+              "planner's “Short on Void Traces?” switch has no far side to reach."
+            : "");
+      if (onChange) onChange(mr);
+    }
+
+    const step = (by) => {
+      const mr = read();
+      /* From unset, `+` lands on 0 rather than 1: Unranked is a real rank and
+         the alternative is a field that cannot express it. `−` from unset does
+         nothing, there being nothing below it. */
+      const next = mr == null ? (by > 0 ? 0 : null) : Math.max(0, mr + by);
+      if (next === mr) return;
+      write(next);
+      paint();
+    };
+
+    up.addEventListener("click", () => step(1));
+    down.addEventListener("click", () => step(-1));
+
+    /* The same rank, changed in the other tab. It is one shared value and the
+       two headers must not drift apart while both are open. */
+    window.addEventListener("storage", (e) => {
+      if (e.key === KEYS.plan) paint();
+    });
+
+    paint();
+    return { read, paint };
+  }
+
   window.WFPrimeShared = {
     esc, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
+    masteryLabel, masteryTitle, masteryTier, traceCap, traceCapped, TRACE_PIVOT,
+    MR_TOP, wireMastery,
     /* One store per page, made here so the `storage` listener is registered
        once and both pages share the rules rather than a copy of them. */
     state: makeState(),

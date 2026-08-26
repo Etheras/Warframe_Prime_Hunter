@@ -2413,6 +2413,68 @@ sorts *last* is written once and asserted once. The old `release` comparator got
 this right by accident, through the direction it happened to be sorting; the new
 one does not depend on that.
 
+### The Mastery Rank field, and the one number it derives
+
+**Shipped 2026-08-26**, to the shape the owner specified on 2026-08-14: a number
+the player fills in, sitting with the site name rather than in either sidebar, a
+plain `−` / `+` pair either side of it, and empty until they say otherwise.
+
+**It lives in the shared plan store beside `squad`, not in either page's filters.**
+A rank is an account fact — true on both pages at once — so a per-page copy would
+be a thing that can disagree with itself, which is the drift that cost this project
+twice already (*One store, because two copies drifted twice*). One value, one
+`storage` event, both headers.
+
+**Unset is `null` and stays that way.** Everything here defaults to "not known, say
+nothing", and the reason is stronger for this field than for most: a guessed rank
+would feed a **wrong trace cap**, which is worse than no cap at all. From unset,
+`+` lands on **0** rather than 1 — Unranked is a real rank, and a field that cannot
+express it is a field that lies about the newest players. `−` from unset does
+nothing, there being nothing below it.
+
+Ranks past 30 are Legendary, which the wiki writes `LR1`, `LR2` … with no published
+cap, so one integer is kept and rendered as `LR<n−30>` above 30. The rank *titles*
+follow DE's own three-rank cycle — a base word, then Silver, then Gold, ten times
+over — and past 30 the wiki stops naming them, so neither do we: Legendary ranks
+get the plain word rather than a guess.
+
+**The Void Trace cap is the one thing that reads it so far.**
+[`Void Traces`](https://wiki.warframe.com/w/Void_Traces): *"This cap is determined
+by one's Mastery Rank using the formula: (Mastery Rank × 50) + 100."* The page's
+own worked examples are MR13 = 750 and MR30 = 1600, and both are asserted in
+`test_assets.mjs` — an external check on the formula rather than a restatement of
+it. Legendary ranks keep counting from 30, so LR1 is 31; that continuation is ours,
+since the wiki's table stops at 30.
+
+The cap earns its place because the planner already splits on traces at **500** —
+five Radiants. `(rank × 50) + 100 ≤ 500` up to **MR8**, so at or below MR8 the far
+end of *"Short on Void Traces?"* cannot be reached at all. **The planner says so and
+leaves the switch alone.** That is the whole rule for this field, made concrete: it
+gates nothing, by the owner's decision, and the wiki is why — a bounty above your
+rank *"can still be played, when an eligible squad member selects one"*, so hiding a
+tier from someone whose friend can start it would be exactly the wrong answer. A
+cap is what you *can* hold; the switch is about what you *do* hold. A page test
+asserts the switch stays enabled at MR8, because "informs, never filters" is the
+kind of rule that erodes silently.
+
+**The sigil is drawn, not fetched, and that was forced.** DE's rank icons are not
+reachable from here and both routes were checked on 2026-08-26: `wiki.warframe.com`
+403s any request that is not a browser (§8), and the item CDN that supplies every
+other image in this app has no rank art — its backing store 404s `IconRank1.png`
+while item images resolve. Drawing it also keeps the header working from `file://`
+and off a USB stick with no network, which the artwork pipeline deliberately makes
+optional for everything else. What the sigil borrows is the part that *is*
+documented — the bronze/silver/gold three-rank cycle the rank titles themselves
+follow — carried in colour, with Unranked and Legendary given their own so the badge
+never implies a tier the rank does not have. It is not a copy of DE's art.
+
+**Why `shared.js` and not `model.js`.** The usual rule is that testable logic goes
+in `model.js` or `rotation.js` (§2). This is the exception and the reason is load
+order: `shared.js` runs first, owns the store, and is where the `storage` listener
+already lives, so a header widget that reads and writes the plan store belongs with
+it. Nothing is lost — `test_assets.mjs` loads `shared.js` in the same `node:vm`
+sandbox and covers the four pure functions without a browser.
+
 ### Shared UI conventions
 
 Both pages share one visual vocabulary so a habit learned on either carries over:

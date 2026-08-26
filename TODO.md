@@ -90,7 +90,7 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| A Mastery Rank field in the header | session |
+| The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
 
 ### One refactor
@@ -645,53 +645,40 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
-### A Mastery Rank field in the header
+### The rest of the player facts the header could hold
 
-**Specified by the owner 2026-08-14, alongside the decision *not* to gate anything
-by rank.** Those two go together and the order matters: the field is for saying
-what a node asks of you, never for hiding it.
+**The Mastery Rank field itself shipped on 2026-08-26** — the reasoning is in
+`PROJECT.md §7`, including the Void Trace cap it now derives. What is left of that
+entry is the question it deliberately did not answer: **what else belongs in the
+same slot.**
 
-The shape asked for:
+Three candidates, all the same shape — a fact about the player that feeds badges
+rather than filters:
 
-- **A Mastery Rank number the player fills in**, stored locally like everything
-  else, empty until they do.
-- **Sitting next to the site name and logo**, in the header — not in the planner
-  sidebar. It is an account fact, true on both pages, so it does not belong to
-  either one's options.
-- **A plain `−` / `+` pair** either side of the number. Ranks move one at a time
-  and rarely; a spinner or a free text box is more machinery than the job needs.
-  The materials rows in the collection view are the nearest existing pattern.
+- **Solaris United standing**, for the Profit-Taker phases.
+- **The Steel Path**, which is the interesting precedent. It had a sidebar
+  checkbox for one afternoon and it was removed on measurement: every Steel Path
+  table carrying a relic is a Faceoff variant identical to its ordinary twin, so
+  the option moved the ranking by two duplicate rows and asked a question for
+  nothing (`PROJECT.md §7`). If a header of player facts is built out, the Steel
+  Path belongs in it as a *fact* — feeding badges, not filters — rather than back
+  in the sidebar as an option.
+- **The actual Void Trace balance.** The rank gives the *cap* and the planner now
+  states it, but a cap is what you can hold and not what you have. The switch
+  still asks the cruder question, and *Expected openings for everything* wants a
+  real number.
 
-Range: 0 to 30, then **Legendary ranks** above that, which the wiki writes `LR1`,
-`LR2` and so on with no published cap. Simplest honest handling is to keep one
-integer and render anything over 30 as `LR<n−30>`.
+**Not open any more:** whether an unfilled field should prompt once. It does not —
+unset stays unset and says nothing, which is the default everything else in this
+project takes, and the reason is stronger here than elsewhere: a guessed rank
+would feed a trace cap that is simply wrong.
 
-**What it is for, given it gates nothing.** The worldstate publishes `minMR` per
-bounty tier and it matches the wiki exactly — MR1 at level 10–30 up to MR10 at
-100–100 (see *The worldstate publishes far more than the two fields we read*). So
-a node can say **"asks MR5"** the same way one says **"Railjack"** or
-**"PvPvE"** — a demand badge, shown when the player's rank is below it and silent
-when it is not.
-
-That restraint is deliberate and the wiki is the reason: *"These can still be
-played, when an eligible squad member selects one."* The rank stops you
-**selecting** a bounty, not running one. Hiding a tier from someone whose friend
-can start it would be exactly the wrong answer, so the field informs and never
-filters.
-
-**Still open:** whether an unfilled field should be treated as "rank unknown, say
-nothing" (safe, and the default everything else in this project takes) or should
-prompt once. And whether the same header slot should hold the other things the
-app would like to know about the player — Solaris United standing for the
-Profit-Taker phases, the Steel Path, and the trace count the entry above wants.
-
-The Steel Path is the interesting precedent there. It had a sidebar checkbox for
-one afternoon and it was removed on measurement: every Steel Path table carrying
-a relic is a Faceoff variant identical to its ordinary twin, so the option moved
-the ranking by two duplicate rows and asked a question for nothing
-(`PROJECT.md §7`). If a header of player facts is ever built, the Steel Path
-belongs in it as a *fact* — feeding badges, not filters — rather than back in the
-sidebar as an option. Same shape as this field, same reasoning.
+**Still not built, and still the point of the field:** the demand badge. The
+worldstate publishes `minMR` per bounty tier and it matches the wiki exactly — MR1
+at level 10–30 up to MR10 at 100–100 (see *The worldstate publishes far more than
+the two fields we read*). A node could say **"asks MR5"** the same way it says
+**"Railjack"**, shown only when the player's rank is below it. The rank is now on
+hand to do it; nothing reads it yet.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 

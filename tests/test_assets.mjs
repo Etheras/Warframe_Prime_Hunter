@@ -117,6 +117,60 @@ test("a store saved under the old name is carried across, not stranded", () => {
                    "a stale legacy key overwrote current data");
 });
 
+test("the Void Trace cap is the wiki's formula, and matches its worked examples", () => {
+  /* `wiki.warframe.com/w/Void_Traces`: "This cap is determined by one's Mastery
+     Rank using the formula: (Mastery Rank x 50) + 100." The two figures below
+     are the page's OWN worked examples, which is what makes them worth
+     asserting - they are an external check on the formula rather than a
+     restatement of the line above it. */
+  const { S } = loadShared();
+  assert.equal(S.traceCap(13), 750, "the wiki works MR13 to 750");
+  assert.equal(S.traceCap(30), 1600, "and MR30 to 1600");
+  assert.equal(S.traceCap(0), 100, "Unranked still holds a hundred");
+  assert.equal(S.traceCap(null), null, "an unset rank has no cap, rather than 100");
+
+  /* A Radiant is 100 traces and the planner's switch splits at five of them.
+     MR8 caps at exactly 500, so "over 500" first becomes reachable at MR9 -
+     the boundary is the whole point of the note the planner prints. */
+  assert.equal(S.traceCap(8), S.TRACE_PIVOT, "MR8 caps at exactly the pivot");
+  assert.equal(S.traceCapped(8), true, "so it cannot get past it");
+  assert.equal(S.traceCapped(9), false, "and MR9 is the first rank that can");
+  assert.equal(S.traceCapped(null), false, "an unset rank claims nothing either way");
+});
+
+test("a rank renders as DE writes it, titles and Legendary included", () => {
+  /* The titles and the three-rank base/Silver/Gold cycle are DE's, from
+     `wiki.warframe.com/w/Mastery_Rank`. Named ranks rather than computed ones:
+     picking the subject with the same arithmetic the code uses would assert
+     nothing (PROJECT.md section 2). */
+  const { S } = loadShared();
+
+  assert.equal(S.masteryLabel(null), "—", "unset says so rather than guessing zero");
+  assert.equal(S.masteryLabel(0), "MR 0");
+  assert.equal(S.masteryLabel(30), "MR 30", "30 is the last numbered rank");
+  assert.equal(S.masteryLabel(31), "LR 1", "and 31 is Legendary 1, not MR 31");
+  assert.equal(S.masteryLabel(35), "LR 5");
+
+  assert.equal(S.masteryTitle(0), "Unranked");
+  assert.equal(S.masteryTitle(1), "Initiate");
+  assert.equal(S.masteryTitle(2), "Silver Initiate");
+  assert.equal(S.masteryTitle(3), "Gold Initiate");
+  assert.equal(S.masteryTitle(4), "Novice", "the cycle restarts on a new base word");
+  assert.equal(S.masteryTitle(12), "Gold Seeker");
+  assert.equal(S.masteryTitle(13), "Hunter");
+  assert.equal(S.masteryTitle(30), "Gold Architect", "the last one the wiki publishes");
+  assert.equal(S.masteryTitle(31), "Legendary",
+               "past 30 the wiki stops naming them, so neither do we");
+  assert.equal(S.masteryTitle(null), null);
+
+  /* The sigil colour carries the same cycle, so it must not claim a tier for
+     the two ranks that sit outside it. */
+  assert.deepEqual([1, 2, 3, 4].map(S.masteryTier), ["base", "silver", "gold", "base"]);
+  assert.equal(S.masteryTier(0), "none", "Unranked is not a bronze tier");
+  assert.equal(S.masteryTier(null), "none");
+  assert.equal(S.masteryTier(31), "legendary");
+});
+
 /* One standard bounty on all three rotations, one publishing only two, one with
    a single table, and a vault family a step out of phase - which is what the
    live worldstate actually looks like. */
