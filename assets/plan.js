@@ -117,6 +117,14 @@
       minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
 
+  /* Whether the ranked list is showing all of itself or just the top eight.
+     Deliberately NOT in `opts` and not saved: `opts` holds assumptions about the
+     player — how they play, what they will run — and every one of them changes
+     the answer. This changes only how much of the answer is on screen, and a
+     view that silently stayed expanded from last week would make the default
+     stop meaning "the top of the ranking is the answer". Resets on reload. */
+  let expandNodes = false;
+
   /* Which number puts the rows in order. Both count the same thing - wanted
      relics - and differ only in what they divide it by, which is the question
      the reader is actually asking:
@@ -1161,10 +1169,26 @@
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
-    // nodes: show the best few, with the rest behind a hover
+    /* ── eight, and a way out of eight ────────────────────────────────
+       Eight is the right default and stays: `STYLE.md §5` is emphatic that a
+       long list condenses to a count, and the whole point of a ranking is that
+       the top of it is the answer.
+
+       What was missing was the way *out*. The rest lived in a tooltip — twenty
+       of them, as plain text, in a control that exists to hold a sentence and
+       cannot be scrolled or searched — and past twenty-eight there was no way to
+       see a place at all. That is how three separate things went missing: Spy
+       nodes reach no top eight on any item, and neither do the eleven that hand
+       relics over Radiant, so both were correct and unobservable.
+
+       Expanding in place keeps one list and one ranking and needs no new page.
+       The count stays on the control, so the condensed default still says how
+       much is behind it. */
     const SHOW = 8;
+    const showingAll = expandNodes && ranked.length > SHOW;
+    const visible = showingAll ? ranked : ranked.slice(0, SHOW);
     if (!ranked.length) $("#planNodes").innerHTML = noNodes(blocked);
-    else $("#planNodes").innerHTML = ranked.slice(0, SHOW).map((n) => {
+    else $("#planNodes").innerHTML = visible.map((n) => {
       // most useful relic first: how much of this node's score each one accounts
       // for, i.e. the chance it drops here times what one opening is worth
       const rl = Array.from(n.relics.entries())
@@ -1246,13 +1270,11 @@
         ${scoreBlock(n)}
       </div>`;
     }).join("") + (ranked.length > SHOW
-      ? `<div class="more-nodes" data-tip="${esc(ranked.slice(SHOW, SHOW + 20).map((n) =>
-          `${n.node} (${n.planet}) ${n.mode}${n.rounds ? " " + n.rounds + "rd" : ""} — ${
-            // the same number these rows are ordered by, in the same unit
-            sortBy().key === "perRunAdj"
-              ? n2(n.perRunAdj) + "/run"
-              : n2(n.rate) + (n.minutes != null ? "/min" : "/obj")}`
-        ).join("\n"))}">+${ranked.length - SHOW} more places</div>`
+      ? `<button type="button" class="more-nodes" id="moreNodes" aria-expanded="${
+          showingAll ? "true" : "false"}">${
+          showingAll
+            ? `Show the top ${SHOW} only`
+            : `Show all ${ranked.length} places`}</button>`
       : "");
 
     /* ── the other half of the split ──────────────────────────────────
@@ -1551,6 +1573,24 @@
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
   });
+  /* Same reason as the effort rows below: the button is rewritten on every
+     render, so the listener goes on the container that survives. Focus is put
+     back on it afterwards — expanding a list with the keyboard and being
+     returned to the top of the document is the sort of thing that makes a
+     control unusable without a mouse (`STYLE.md §6`). */
+  {
+    const list = $("#planNodes");
+    if (list) {
+      list.addEventListener("click", (e) => {
+        if (!e.target.closest("#moreNodes")) return;
+        expandNodes = !expandNodes;
+        render();
+        const again = $("#moreNodes");
+        if (again) again.focus();
+      });
+    }
+  }
+
   /* The rows are rewritten on every render, so the handler lives on the box
      that survives rather than on the inputs that do not. `change` rather than
      `input`: re-ranking the whole list on every keystroke would move the answer

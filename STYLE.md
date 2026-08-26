@@ -234,6 +234,22 @@ against 10.13:1.
 
 ---
 
+**A condensed list needs a way out of itself.** The count-with-detail-on-hover
+rule above is right for the default and wrong as the only option. The planner's
+ranking showed its top eight and put the next twenty in a tooltip, which cannot
+be scrolled, sorted or searched — and past twenty-eight there was no way to see a
+place at all.
+
+That hid three separate results the project had measured and believed: Spy nodes
+reach no top eight on any item, and neither do the eleven that hand relics over
+Radiant. All three were correct and unobservable, and three page tests were
+deleted for having no subject on screen before anyone noticed the pattern.
+
+So: **eight stays the default, and the count becomes a control rather than a
+hover.** *Show all 92 places* expands in place — one list, one ranking, no new
+page, and the order does not change. A tooltip may summarise what is behind a
+condensed view; it must not be the only route to it.
+
 ## 6. Controls
 
 - A **tick** marks ownership (top-right of a card). A **crosshair** marks intent

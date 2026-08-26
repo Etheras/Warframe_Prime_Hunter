@@ -1323,18 +1323,18 @@ page_test("ranking per run does not undo the thumbs on the scale", async () => {
      asserted rather than its number, because losing the bonus drops it out of
      the eight visible rows entirely — which is itself the proof that the thumb
      was moving the order, and not merely a label. */
-  const order = () => page.evaluate(() => {
-    const names = [...document.querySelectorAll("#planNodes .spot")]
-      .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim());
-    const more = document.querySelector(".more-nodes");
-    if (more) {
-      (more.getAttribute("data-tip") || "").split(/\r?\n/).forEach((line) => {
-        const m = line.match(/^(.+?) \(/);
-        if (m) names.push(m[1]);
-      });
+  /* Expand the list rather than scraping a tooltip. It used to read the next
+     twenty out of `.more-nodes`'s data-tip, which was the only way to see past
+     the eighth row; the chip is a button now and the whole ranking is real DOM,
+     so the position is read off the rows themselves. */
+  const order = async () => {
+    const more = page.locator("#moreNodes");
+    if (await more.count() && (await more.getAttribute("aria-expanded")) === "false") {
+      await more.click();
     }
-    return names;
-  });
+    return page.evaluate(() => [...document.querySelectorAll("#planNodes .spot")]
+      .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim()));
+  };
 
   const rankedWith = (await order()).indexOf(subject.node);
   await page.locator("label:has(#p-traces)").click();
@@ -1352,6 +1352,79 @@ page_test("ranking per run does not undo the thumbs on the scale", async () => {
     assert.ok(Math.abs(off.headline - off.raw) < 0.02,
               `with no thumb the headline ${off.headline} must equal the raw ${off.raw}`);
   }
+
+  assert.deepEqual(errors, []);
+});
+
+page_test("the ranking can be seen whole, not just its top eight", async () => {
+  /* Eight is the right default and stays. What was missing was the way out of
+     it: the rest lived in a tooltip, twenty of them as plain text, and past
+     twenty-eight there was no way to see a place at all.
+
+     That is not cosmetic. Three separate results this project measured were
+     correct and unobservable purely because of it — Spy nodes reach no top eight
+     on any item, and neither do the eleven that hand relics over Radiant. So
+     this asserts the expander reaches them, not merely that a button toggles. */
+  const { page, errors } = await open("/plan.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA, R = D.relics || {};
+    // want everything live, so the ranking is long enough to need expanding
+    const ids = (D.items || []).filter((it) =>
+      (it.parts || []).some((p) => (p.relics || []).some((r) =>
+        R[r.relic] && !R[r.relic].vaulted))).map((it) => it.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+    // a node that hands relics over Radiant, off the raw field
+    const pre = new Set();
+    Object.keys(R).forEach((n) => {
+      if (R[n].vaulted) return;
+      (R[n].sources || []).forEach((s) => {
+        if (s.refinement === "Radiant") pre.add(s.node);
+      });
+    });
+    return { preRefined: [...pre] };
+  });
+  assert.ok(subject.preRefined.length, "no node hands relics over Radiant any more");
+
+  await page.reload({ waitUntil: "load" });
+
+  const rows = () => page.evaluate(() => [...document.querySelectorAll("#planNodes .spot")]
+    .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim()));
+
+  const eight = await rows();
+  assert.equal(eight.length, 8, "the default is still the top eight");
+
+  const button = page.locator("#moreNodes");
+  assert.equal(await button.count(), 1, "a long ranking has to offer a way out of eight");
+  assert.equal(await button.getAttribute("aria-expanded"), "false");
+  const label = (await button.innerText()).trim();
+  assert.match(label, /^Show all \d+ places$/,
+               `the control has to say how much is behind it, got "${label}"`);
+  const total = Number(label.match(/\d+/)[0]);
+  assert.ok(total > 28,
+            `only ${total} places ranked — the old tooltip showed 28, so this ` +
+            `test would not prove anything past it`);
+
+  await button.click();
+  const all = await rows();
+  assert.equal(all.length, total, "expanding has to show every place it counted");
+  assert.equal(await page.locator("#moreNodes").getAttribute("aria-expanded"), "true");
+  assert.deepEqual(all.slice(0, 8), eight,
+                   "the order must not change — this reveals the ranking, it does not re-rank it");
+
+  /* The point of the whole thing: a node that was unreachable through the
+     interface is now reachable through it. */
+  const foundPre = subject.preRefined.filter((n) => all.includes(n));
+  assert.ok(foundPre.length,
+            `expanding still does not reach any pre-refined node. Wanted one of ` +
+            `${subject.preRefined.join(", ")}`);
+  assert.ok(!subject.preRefined.some((n) => eight.includes(n)),
+            "premise check: none of them was in the top eight to begin with");
+
+  // and it collapses back
+  await page.locator("#moreNodes").click();
+  assert.equal((await rows()).length, 8, "and folds back to the default");
+  assert.match((await page.locator("#moreNodes").innerText()).trim(), /^Show all/);
 
   assert.deepEqual(errors, []);
 });

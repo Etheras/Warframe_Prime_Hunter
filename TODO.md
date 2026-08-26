@@ -56,10 +56,15 @@ nodes costed as endless when they are not; the *Still needed* panel counting
 relics the reader's own switches had turned off; and an opt-in gate standing in
 front of the only route six Primes have.
 
-What is left of that family is not wrong, only invisible: **Spy nodes and the
-eleven pre-refined nodes never reach the rows either page renders**. Both are
-waiting on the same thing — *The node list is the top eight and a hover, not a
-table*.
+That family is closed. The last of it was not a wrong number but an unreachable
+one: **Spy nodes and the eleven pre-refined nodes never appeared in the rows
+either page rendered**. The planner's ranking can now be expanded in place, which
+puts all 92 places on screen — Elite Sanctuary Onslaught at #38, and Pago and Bode
+the first Spy nodes either page has ever shown.
+
+**The collection drawer still caps at eight with no way out**, which is the same
+defect one page over. Entry: *The collection drawer has no way past its eight
+spots*.
 
 ### The worldstate is already cached, and barely read
 
@@ -89,7 +94,7 @@ What is left of the entry is two fields and a warning about one of them.
 | A Mastery Rank field in the header | session |
 | A priority flag on the farm list | session |
 | The endless-fissure bonus is only stated on the collecting side | small |
-| The node list is the top eight and a hover, not a table | small |
+| The collection drawer has no way past its eight spots | small — the planner's half shipped 2026-08-25 |
 
 ### One refactor
 
@@ -490,21 +495,20 @@ is a rule here and this is a case where they legitimately differ. And the row's
 `relics / min` label stays honest: the minutes it divides by become the true cost
 of a run, which is what the label already claims.
 
-### Spy and Caches nodes never appear on either page
+### The collection drawer has no way past its eight spots
 
-Not a defect in the fix — a discovery from verifying it, 2026-08-25. The
-collection drawer shows **eight spots and has no overflow**; the planner shows
-eight rows and twenty more in a tooltip. A Spy node reaches neither, on any item,
-because **no live relic drops only at Spy**: the highest share is Meso V15 at 13
-Spy sources out of 147. Every Spy relic has around a hundred other places to get
-it, so Spy is always outranked.
+The planner's ranking can be expanded in place now, which is what finally put Spy
+nodes and the eleven pre-refined nodes on screen. **The collection page's drawer
+was the other half of that and did not move**: it renders `spots(...).slice(0, 8)`
+in `app.js` and offers nothing after it — not even the tooltip the planner used to
+have, so there is no route to a ninth place at all.
 
-So the corrected costing is right and unobservable for that mission type. The
-wording was verified against the shared function instead, with the exact shape
-`app.js` builds — `3 vaults`, and `2 caches` where the rotation-bearing Proxima
-nodes do surface (Nyx Prime is 100% Caches and shows them). It is the same
-family as the pre-refined nodes nobody can see, and the same entry fixes it:
-*The node list is the top eight and a hover, not a table*.
+That is why Spy could not be seen there while the fix was being verified: no live
+relic drops **only** at Spy — the highest share is Meso V15 at 13 sources out of
+147 — so a Spy node is outranked on every item, on a list that stops at eight.
+
+Same shape as the planner's, and the same answer: keep eight as the default and
+give the reader a way out of it. `STYLE.md §5` now carries the rule.
 
 ### Our four invented "mission types" leak into the ranking
 
@@ -588,12 +592,12 @@ family of change and all three were deleted for having no subject on screen.
 +137% bonus** — which would no longer be a nudge but a decision to put these
 nodes first regardless of what they pay.
 
-**The real obstacle is cost, not value.** ESO pays rotation C only, and rotation
-C on Onslaught is twelve zones. That is why it ranks where it does, and it is
-correct arithmetic. The entry that actually unblocks this is *The node list is
-the top eight and a hover, not a table* — give the ranking a way to be seen
-whole, and #33 stops being invisible. Raising the bonus further is treating the
-symptom.
+**The real obstacle was cost, not value, and the answer was not a bigger number.**
+ESO pays rotation C only, and rotation C on Onslaught is twelve zones — correct
+arithmetic, and why it ranks where it does. Making the ranking expandable put it
+on screen at **#38 of 92** without touching the constant, which is what the
+"nobody can see it" half of this entry needed. Raising the bonus further would
+have been treating the symptom.
 
 **The per-run sort no longer undoes the thumbs.** Fixed 2026-08-25. Neither the
 Radiant lift nor `CACHE_PENALTY` reached `perRun`, so ranking per run put a
@@ -756,28 +760,6 @@ worldstate does not publish at all: The Steel Path must be unlocked.
 So this is not a candidate for the exclusion rule. It is a candidate for a **demand
 badge**, and it would need the player's own rank — the first thing this project
 would have to ask about itself rather than derive.
-
-### The node list is the top eight and a hover, not a table
-
-`#planNodes` renders `ranked.slice(0, 8)` and folds everything after it into a
-single `+N more places` chip whose tooltip lists the next twenty as plain text —
-node, planet, mode, rounds and rate, one line each (`assets/plan.js`). Beyond
-twenty-eight there is no way to see a place at all.
-
-Eight is the right default and should stay: `STYLE.md §5` is emphatic that a long
-list condenses to a count with the detail on hover, and the whole point of the
-ranking is that the top of it is the answer. What is missing is the way *out* of
-the default — somewhere to see the ranking whole when you want to plan around a
-planet you can actually reach, or to check that something you expected is in there
-at all.
-
-A tooltip is the wrong container for that: it cannot be scrolled, sorted or
-searched, and it is already carrying twenty rows of tabular text through a control
-that exists to hold a sentence. Expanding in place — the chip becoming *show all N*
-— keeps one list and one ranking, and needs no new page.
-
-Worth doing after the sort toggle rather than before it, since a browsable list
-whose order cannot be changed is half a feature.
 
 ## Settled — answered, kept so the answer is not lost
 

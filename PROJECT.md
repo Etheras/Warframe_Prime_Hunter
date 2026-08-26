@@ -2096,6 +2096,39 @@ merely counted. Both sides now ask `ROT.reachableSource` with the same options,
 so they cannot drift apart again, and today **no part is mixed and none has
 nothing reachable**.
 
+### Eight is the default, and there is a way out of it
+
+The ranked list shows its top eight, and that stays: `STYLE.md §5` is emphatic
+that a long list condenses to a count, and the point of a ranking is that the top
+of it is the answer.
+
+What was missing was the way *out*. The remainder lived in the `+N more places`
+tooltip — twenty rows of tabular text in a control that exists to hold a
+sentence, and which cannot be scrolled, sorted or searched. Past twenty-eight
+there was no route to a place at all.
+
+**That was not cosmetic, and it took three findings to notice.** Every one of
+them was measured, correct, and invisible: Spy nodes reach no top eight on any
+item, because no live relic drops only at Spy; the eleven nodes that hand relics
+over Radiant sit from #33 down; and three page tests were written and deleted for
+having no subject on screen before the pattern was recognised. The interface was
+quietly bounding what could be verified about the model.
+
+The chip is a button now and expands the list in place: one list, one ranking, no
+new page, and **the order does not change** — it reveals the ranking, it does not
+re-rank it. The count stays on the control, so the condensed default still says
+how much is behind it. Measured on a want-everything plan: 8 rows become 92, ESO
+appears at #38, and Pago and Bode are the first Spy nodes either page has shown.
+
+The state is deliberately **not** in `opts` and not saved. `opts` holds
+assumptions about the player, and every one of them changes the answer; this
+changes only how much of the answer is on screen. A view that silently stayed
+expanded from last week would make the default stop meaning what it says.
+
+The collection drawer is the same defect one page over and is **not** fixed: it
+slices to eight and offers nothing after it, not even the tooltip. `TODO.md`
+carries it.
+
 ### An empty ranking has to say what emptied it
 
 Put one of those six on the farm list with *Include Railjack* off and the planner

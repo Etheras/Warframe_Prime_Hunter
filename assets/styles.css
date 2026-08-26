@@ -840,11 +840,20 @@ button.wish-collect{
   color:var(--teal);border-color:#2a5a55;background:#132522;cursor:help;
   font-variant-numeric:tabular-nums;
 }
+/* The way out of the top eight. It was a hover hint carrying twenty rows of
+   tabular text in a tooltip; it is a real button now, so it needs to look like
+   one you can press rather than one you can hover. `cursor:help` and the dotted
+   underline both went with the tooltip — they promised an explanation, and this
+   promises an action. */
 .more-nodes{
-  padding:8px 12px;font-size:12px;color:var(--txt-faint);cursor:help;
-  text-decoration:underline dotted var(--txt-faint);text-underline-offset:3px;
+  display:block;width:100%;margin-top:6px;
+  padding:9px 12px;font:inherit;font-size:12px;text-align:left;
+  color:var(--txt-dim);background:var(--panel);
+  border:1px dashed var(--line);border-radius:8px;cursor:pointer;
+  transition:color .15s, border-color .15s, background .15s;
 }
-.more-nodes:hover{color:var(--teal)}
+.more-nodes:hover{color:var(--teal);border-color:var(--teal);background:var(--panel-2)}
+.more-nodes:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 
 
 
