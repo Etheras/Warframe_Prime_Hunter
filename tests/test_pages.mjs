@@ -772,6 +772,21 @@ page_test("the rank badge states the Void Trace cap it implies", async () => {
   assert.match(rich, /Hunter/, "and the badge names the rank DE gives it");
   assert.doesNotMatch(rich, /cannot hold more/, "750 clears the switch's 500 comfortably");
 
+  /* Past 30 the formula is ours: the wiki states it, works MR13 and MR30, and
+     stops — re-checked on `Void Traces` and `Mastery Rank` on 2026-08-27, and
+     Legendary is absent from both. So the badge marks the figure as an estimate
+     at those ranks rather than showing it as though it were known, and does not
+     say so at ranks the wiki actually covers. */
+  await setRank(31);
+  const legendary = await tip();
+  assert.match(legendary, /1650/, "the continuation is still shown — it is our best answer");
+  assert.match(legendary, /not a figure the wiki states|estimate/i,
+               "and a Legendary reader is told the number is ours, not the wiki's");
+
+  await setRank(30);
+  assert.doesNotMatch(await tip(), /estimate/i,
+                      "MR30 is the wiki's own worked example, so nothing to hedge");
+
   await setRank(8);
   const poor = await tip();
   assert.match(poor, /500/, "MR8 caps at exactly the pivot");

@@ -1010,17 +1010,29 @@ formula is solid **for ranks 0 to 30**.
 Past 30 it is ours. The wiki's table stops at Gold Architect and says nothing about
 Legendary ranks, so `traceCap` simply keeps counting — LR1 is rank 31 and reads
 1650. That is the obvious continuation and it may well be right, but **nobody has
-checked it**, and the number is displayed to the reader as though it were known.
+checked it**.
 
 Two ways it could be wrong: DE might cap storage at the MR30 value and let
 Legendary ranks add nothing, or Legendary might scale on a different step. Either
 would make the figure on a Legendary player's badge wrong in a way nothing here
 would catch.
 
-**What would settle it:** one Legendary player reading their own trace cap in game.
-Failing that, a wiki page that states the Legendary case — worth re-checking
-`Void Traces` and `Mastery Rank` on any later pass, since the absence may simply be
-an unwritten section rather than a rule that does not exist.
+**Re-checked 2026-08-27, and the wiki still does not answer it.** Both pages were
+read: `Void Traces` gives the formula and works MR13 = 750 and MR30 = 1600, and
+mentions Legendary nowhere; `Mastery Rank` does not discuss trace capacity at all.
+So the absence is not an unwritten section this project simply had not looked at —
+it has now been looked at twice.
+
+**The half that could be fixed without a source has been.** The entry used to end
+*"the number is displayed to the reader as though it were known"*, and that part is
+no longer true: past rank 30 the badge says the figure is our own continuation of
+the formula and not one the wiki states. The number is still shown, because it is
+still the best answer available — it is simply no longer presented as fact. Same
+rule as Baro's window and Varzia's shelf: claim exactly what the source supports.
+
+**What is left, and what would settle it:** one Legendary player reading their own
+trace cap in game. Failing that, a wiki page that states the Legendary case —
+still worth a glance on any later pass, but two readings in, do not expect one.
 
 ### The Ghoul and Plague Star detection has never seen a live event
 

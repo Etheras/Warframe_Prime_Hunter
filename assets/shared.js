@@ -779,7 +779,13 @@
      examples are MR13 = 750 and MR30 = 1600, and both fall out of this. A
      Legendary rank keeps counting from 30, so LR1 is 31 and the same formula
      carries - that continuation is ours rather than the wiki's, which stops its
-     table at 30. */
+     table at 30.
+
+     Re-checked 2026-08-27 on both `Void Traces` and `Mastery Rank`: Legendary is
+     absent from both pages, so the continuation is still unsourced. The badge
+     now says so at those ranks rather than presenting the number as known -
+     which is the only half of this that can be fixed without a Legendary player
+     reading their own cap in game. */
   function traceCap(mr) {
     return mr == null ? null : mr * 50 + 100;
   }
@@ -856,6 +862,18 @@
         : masteryLabel(mr) + " — " + masteryTitle(mr) + ".\n\n" +
           "Void Trace cap " + cap + " — (rank × 50) + 100.\n" +
           "A Radiant costs 100, so that is " + Math.floor(cap / 100) + " of them." +
+          /* Past 30 the formula is ours. The wiki states it and works MR13 and
+             MR30, and stops - re-checked on `Void Traces` and `Mastery Rank`,
+             2026-08-27, and Legendary is absent from both. So a Legendary
+             reader is told the number is an extrapolation rather than shown it
+             as though it were known. DE could cap storage at the MR30 value, or
+             step Legendary differently, and either would make this wrong with
+             nothing here to catch it. `TODO.md` has what would settle it: one
+             Legendary player reading their own cap in game. */
+          (mr > MR_TOP
+            ? "\n\nPast Mastery Rank 30 this is our own continuation of the " +
+              "formula, not a figure the wiki states — treat it as an estimate."
+            : "") +
           (traceCapped(mr)
             ? "\n\nAt this rank you cannot hold more than " + TRACE_PIVOT + ", so the " +
               "planner's “Short on Void Traces?” switch has no far side to reach."
