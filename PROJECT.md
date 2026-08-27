@@ -211,6 +211,39 @@ table lifted verbatim, which is code wearing a data hat. `NOTICE.md` already
 credits WFCD for **data** under MIT; that credit does not extend itself to code
 nobody has checked.
 
+### Real money is out of scope, always
+
+**This tool is about what you can go and earn.** Every route it ranks, counts or
+recommends must be reachable by playing the game. Anything that needs a card is
+not a farm and has no place in the ranking, the collection counts, or the
+planner.
+
+| In scope — earned by playing | Out of scope — bought |
+|---|---|
+| Relics, and the missions that drop them | **Regal Aya** (real money only) |
+| **Aya**, farmed from missions and bounties | **Platinum** bought from Digital Extremes |
+| **Ducats**, from selling spare parts to Baro | Prime Access and Prime Vault packs |
+| Void Traces, and everything they refine | Anything else sold for money or premium currency |
+
+Aya and Ducats are *in* precisely because you get them by playing. The line is not
+"is a currency involved" — it is **"can this be earned by playing, or must it be
+purchased?"**
+
+**One place this needs care, because it looks like a violation and is not.**
+Varzia's rotating stock is read as a *signal*, not a shopping list. Her
+`Manifest` is a list of Regal Aya packs, and the packs are ignored — what is
+taken from them is **which Primes are unvaulted this rotation**, because those
+are the Primes whose relics she then sells for farmed Aya. Reading a paid
+product's name to learn which relics are farmable is the opposite of
+recommending it.
+
+Her `EvergreenManifest` is the case that made this explicit, on 2026-08-27: 82
+items, permanently on sale, and **not one of them a relic** — 42 mods and skins,
+27 miscellaneous store items, 8 accessory packs, 4 Prime weapons sold outright
+and 1 character. All bought, none farmed. They are excluded from the Resurgence
+flag for that reason and not merely because including them would make the badge
+noisy, which is the weaker argument this section originally gave.
+
 ### Ask no more often than the source says to
 
 **Every request this project makes is somebody else's bandwidth, given for
@@ -2630,11 +2663,13 @@ The cached WFCD copy and DE's raw document produced **the same five Primes**.
 That is the A/B this project had been unable to do since the proxy went down, and
 the cached response turned out to be the missing reference all along.
 
-**`Manifest` only, never `EvergreenManifest`.** The rotating stock is what *Prime
-Resurgence* means here and what the proxy published. The evergreen list is 82
-items on sale from Varzia permanently; folding them in would flag a third of the
-catalogue as *back this rotation* and make the badge meaningless. Whether those
-82 deserve a badge of their own is a real question and a different one.
+**`Manifest` only, never `EvergreenManifest`** — and the reason is scope rather
+than noise. Counted on 2026-08-27, those 82 contain **no relics whatsoever**: 42
+mods and skins, 27 miscellaneous store items, 8 accessory packs, 4 Prime weapons
+sold outright, 1 character. Every one is bought rather than farmed, which
+*"Real money is out of scope, always"* puts outside this tool entirely. The
+first version of this paragraph argued they would make the badge noisy, which was
+true and beside the point.
 
 **`character` and `location` are absent from DE's document and are not invented.**
 Their `Node` is `TradeHUB1`, which the region export does not name. Nothing needs

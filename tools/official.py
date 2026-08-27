@@ -528,11 +528,17 @@ def vault_trader_from_worldstate(doc: dict) -> dict | None:
     mostly a rename. Checked by running both through that function on the same
     day: the WFCD copy and DE's raw document produce **the same five Primes**.
 
-    **`Manifest` only, not `EvergreenManifest`.** The rotating stock is what
-    *Prime Resurgence* means here and what the proxy published; the evergreen 82
-    are on sale from Varzia permanently, so folding them in would flag a third of
-    the catalogue as "back this rotation" and make the badge meaningless. Whether
-    they deserve a badge of their own is a separate question and not this one.
+    **`Manifest` only, never `EvergreenManifest`.** Counted on 2026-08-27, the
+    evergreen 82 contain **no relics at all** — 42 mods and skins, 27 misc store
+    items, 8 accessory packs, 4 Prime weapons sold outright, 1 character. They
+    are bought rather than farmed, and `PROJECT.md §2` puts real-money purchases
+    out of scope entirely. That is the reason, not the weaker one this comment
+    first gave about the badge becoming noisy.
+
+    And the packs in `Manifest` are read as a **signal, not a shopping list**:
+    they cost Regal Aya and are ignored as products. What is taken from them is
+    which Primes are unvaulted this rotation, because those are the Primes whose
+    relics Varzia then sells for *farmed* Aya.
 
     `character` and `location` are absent from DE's document — `Node` is
     `TradeHUB1`, which their region export does not name — and are deliberately
