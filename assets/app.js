@@ -168,13 +168,26 @@
 
      Absent window means absent answer, and `false` is the safe one: it hides
      nine items behind a checkbox that is right there, where a wrong `true`
-     would quietly claim they are buyable. */
-  function baroIsHere(now) {
-    const w = (DATA.meta || {}).baro;
-    if (!w || !w.activation || !w.expiry) return false;
-    const at = now === undefined ? Date.now() : now;
-    const from = Date.parse(w.activation), to = Date.parse(w.expiry);
-    return isFinite(from) && isFinite(to) && at >= from && at < to;
+     would quietly claim they are buyable.
+
+     The window arithmetic itself lives in `rotation.js` as `traderWindow`, so
+     the yes/no and the sentence beside the box cannot disagree — they are one
+     answer read twice. It is also the half of this that a test can reach
+     without a browser, which is the reason it is not here. */
+  const baroWindow = (now) => ROT.traderWindow((DATA.meta || {}).baro, now);
+  const baroIsHere = (now) => baroWindow(now).here;
+
+  /* Only the sentence is repainted, never the checkbox. He arrives while a tab
+     is open twice a fortnight, and flipping the box under a reader who has
+     touched nothing would move nine items between buckets — the same
+     instability the fissure decision rejects for the ranking (PROJECT.md §7).
+     The default is decided once, at load; after that this only tells the truth
+     about the clock. */
+  function paintBaroWhen() {
+    const el = $("#baroWhen");
+    if (!el) return;
+    const w = baroWindow();
+    el.textContent = w.text ? " — " + w.text : "";
   }
   const state = {
     /* Defaults changed 2026-08-27, at the owner's direction, and they all point
@@ -491,6 +504,17 @@
       const el = $(`[data-count="${k}"]`);
       if (el) el.textContent = availPool.filter((it) => it._buckets.includes(k)).length;
     });
+
+    /* Baro is the one bucket whose answer has a clock on it, so the label says
+       when rather than only how many — *back in 6 days*, *here 2 days more*.
+       The half of the Baro proposal that is worth having (`TODO.md`): a live
+       fact stated where it is read, rather than a live fact moving nine items
+       between buckets twice a fortnight under a reader who has touched nothing.
+
+       Repainted on every render and again on the tick below, because a tab left
+       open across his arrival would otherwise keep counting down past zero. No
+       window means the span stays empty rather than guessing. */
+    paintBaroWhen();
 
     const collPool = ITEMS.filter((it) => matches(it, "coll"));
     const c = collPool.filter((it) => ST.has(it.id)).length;
@@ -1612,4 +1636,18 @@
   S.wireMastery();
   S.siteFooter();
   render();
+
+  /* Baro's countdown is the only thing on this page with a clock in it, so it
+     gets the same treatment the planner's bounty tick has: a slow interval, and
+     a catch-up when the tab comes back. An interval is not a clock — a
+     background tab has its timers throttled to about once a minute — so a page
+     left open all evening would come back showing "back in 6 days" a week late
+     without the second half.
+
+     Half-hourly, because the text is measured in days until the last hour and
+     the arithmetic is free either way. */
+  setInterval(paintBaroWhen, 30 * 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) paintBaroWhen();
+  });
 })();

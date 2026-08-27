@@ -256,6 +256,41 @@
       : Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
   }
 
+  /* The same question over a fortnight rather than an evening. `untilText` is
+     built for a fissure and tops out in hours, so Baro's next visit reads as
+     "151h 00m" - true, and not how anybody thinks about six days away. */
+  function awayText(ms, now) {
+    const at = now === undefined ? Date.now() : now;
+    const mins = Math.max(0, Math.round((ms - at) / 60000));
+    if (mins < 60) return mins + " min";
+    const hours = Math.round(mins / 60);
+    if (hours < 48) return hours + "h";
+    return Math.round(hours / 24) + " days";
+  }
+
+  /* A travelling vendor's window, answered against the *page's* clock.
+     `{activation, expiry}` ships on the payload rather than a computed yes/no
+     because a build is up to ten minutes old and a tab can sit open for hours -
+     so an answer frozen at build time is wrong for exactly the two changeovers
+     a fortnight that matter. Same rule as the fissure list.
+
+     Absent or unparseable window means `here: false` and nothing said. That is
+     the safe direction: it hides items behind a checkbox that is right there,
+     where a wrong `true` claims they are buyable today.
+
+     `text` is the half worth having (`TODO.md`, Baro): a live fact stated where
+     it is read, rather than a live fact moving items between buckets twice a
+     fortnight under a reader who has touched nothing. */
+  function traderWindow(w, now) {
+    const at = now === undefined ? Date.now() : now;
+    const from = w && Date.parse(w.activation), to = w && Date.parse(w.expiry);
+    if (!w || !isFinite(from) || !isFinite(to)) return { here: false, text: null };
+    if (at >= to) return { here: false, text: null };   // stale window, say nothing
+    return at >= from
+      ? { here: true, text: "here " + awayText(to, at) + " more" }
+      : { here: false, text: "back in " + awayText(from, at) };
+  }
+
   /* The letters of everything on the clock, for spotting a changeover while a
      page is open: same string, nothing has moved.
 
@@ -883,7 +918,8 @@
   window.WFPrimeRotation = {
     RUN_MODES, RUN_OVERHEAD, ROT_PATTERN, runValue, objectivesOf, objectivesText,
     bonusRotations: BONUS_ROTATIONS,
-    liveRotation, familyState, whenNext, untilText, stamp, anyClocked,
+    liveRotation, familyState, whenNext, untilText, awayText, traderWindow,
+    stamp, anyClocked,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     signature, pickNode,
     fissuresAt, minutesLeft,

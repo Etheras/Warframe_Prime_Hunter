@@ -101,7 +101,7 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| Baro's actual stock is published, and never read | what he is really selling — **his `Manifest` is empty between visits, so check it 2026-09-04 to 09-06** | session |
+| Baro's actual stock is published, and never read | what he is really selling — **his `Manifest` is empty between visits, so check it 2026-09-04 to 09-06.** The *say when* half shipped 2026-08-27 | session |
 
 ### Model and ranking
 
@@ -123,6 +123,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
+| *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
@@ -216,11 +217,21 @@ mostly does nothing, and eight items would move between buckets twice a fortnigh
 under a reader who has not touched anything. That is the same instability the
 fissure decision rejects for the ranking (`PROJECT.md §7`).
 
-The half that is clearly worth having is the one the bounty clock already
-demonstrates: **say when**. *Baro Ki'Teer (B) — back in 6 days* on the label, and
-while he is actually here, mark the items he is really selling — which is the only
-thing on this list that today's static flag genuinely cannot tell you. That is a
-live fact stated where it is read, not a live fact moving things around.
+**The *say when* half shipped 2026-08-27** and is out of this entry: the label
+reads *Baro Ki'Teer — back in 8 days*, and *here 2 days more* while he is on a
+relay. The window arithmetic moved to `ROT.traderWindow`, so the checkbox's
+yes/no and the sentence beside it are one answer read twice rather than two that
+can drift; `awayText` is its own function because `untilText` tops out in hours
+and rendered six days away as *144h 00m*. The label repaints on a slow interval
+and on `visibilitychange`, and the **checkbox deliberately does not move** — he
+arrives while a tab is open twice a fortnight, and flipping it under a reader who
+has touched nothing would shift nine items between buckets with nothing on screen
+saying why. `PROJECT.md §7` has the reasoning.
+
+What is left of that half is the part that needs him present: **while he is
+actually here, mark the items he is really selling** — the only thing on this
+list that today's static flag genuinely cannot tell you, and it waits on the
+manifest above.
 
 See also the worldstate entry below: the responses already cached carry more than
 is read, and this would be a third endpoint rather than a third use of one.
@@ -753,6 +764,40 @@ the miss turned out to be the probe — and `normalise_part()` exists because WF
 and the drop tables disagree about `Chassis` versus `Chassis Blueprint`, so a
 third spelling arriving from DE needs to go through the same funnel rather than
 around it.
+
+### *How to crack them* is one long list, and wants tier tabs past about fifteen rows
+
+**Asked for by the owner 2026-08-27. Not for now — recorded so it is not
+re-derived.**
+
+`#planRelics` renders every relic worth cracking as one flat list, ranked on
+openings per part cleared. That is the right order and it stops being readable
+somewhere around fifteen rows: a wide farm list produces dozens, and a reader
+who has decided to run Lith fissures this evening has to scan past every Meso,
+Neo and Axi row to find the four that matter to them.
+
+**The proposal is a tier filter above the list: `All | Lith | Meso | Neo | Axi`.**
+Which is a filter and not a re-rank — the surviving rows keep the order and the
+figures they already have. Same shape as the *Show all N places* expander, and
+for the same reason: the default answer stays the best one, and the control only
+narrows what is on screen.
+
+Worth settling when it is built:
+
+- **The threshold.** *"More than about fifteen"* is the owner's figure. Showing
+  the tabs only past a threshold keeps them out of the way of a one-Prime farm
+  list, and it is one more piece of state that can be wrong; showing them always
+  is simpler and costs a row of chrome nobody with four relics needs.
+- **A tier with nothing in it.** Either the tab is absent or it is present and
+  disabled. Absent is fewer lies; disabled tells the reader that tier really has
+  no relics rather than that the tab moved.
+- **Whether it is remembered.** The availability filters are, the drawer's
+  eight-place fold deliberately is not. This is closer to the fold — a question
+  about the list you are looking at now — so probably not.
+- **The counts.** The sidebar's availability boxes carry a count each and it is
+  the thing that makes them worth reading. `Lith 4` beats `Lith`.
+
+Not a defect: nothing on screen is wrong today, it is just long.
 
 ### One Cambion Drift tier labels a different letter from the rest of its family
 

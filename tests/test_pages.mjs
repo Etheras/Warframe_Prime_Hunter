@@ -449,6 +449,57 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
   assert.deepEqual(errors, []);
 });
 
+page_test("the Baro filter says when he is next on a relay, and never moves itself", async () => {
+  /* He is on a relay two days a fortnight, so *Baro Ki'Teer* is the one bucket
+     whose answer has a clock on it. The label says when — the half of the Baro
+     proposal that is worth having: a live fact stated where it is read, rather
+     than a live fact moving nine items between buckets under a reader who has
+     touched nothing.
+
+     The window is planted rather than read, because the shipped one is a real
+     date and every assertion here would otherwise expire. `traderWindow` itself
+     is tested against a frozen clock in test_assets.mjs; what this pins is that
+     the label is wired to it and repaints. */
+  const { page, errors } = await open("/index.html");
+
+  const shipped = await page.evaluate(() => (window.WFPRIME_DATA.meta || {}).baro);
+  assert.ok(shipped && shipped.activation && shipped.expiry,
+            "meta.baro ships the window, and without it there is nothing to say");
+
+  const label = page.locator("#baroWhen");
+  assert.equal(await label.count(), 1, "the label needs somewhere to put it");
+
+  /* Repainted on the same signal the fissure badges use, so no reload: a reload
+     would prove the payload, and what is in question is the open tab. */
+  const plant = (from, to) => page.evaluate(([a, b]) => {
+    window.WFPRIME_DATA.meta.baro = a === null ? null : { activation: a, expiry: b };
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, [from, to]);
+  const hours = (n) => new Date(Date.now() + n * 3600000).toISOString();
+
+  await plant(hours(24 * 6), hours(24 * 8));
+  assert.match(await label.innerText(), /back in 6 days/,
+               "six days out reads in days — untilText would have said 144h 00m");
+
+  await plant(hours(-4), hours(20));
+  assert.match(await label.innerText(), /here .* more/,
+               "while he is actually there the label says so, not a countdown to it");
+
+  /* The checkbox is decided once, at load, and this is why: he arrives while a
+     tab is open twice a fortnight, and flipping it under the reader would move
+     nine items between buckets with nothing on screen saying why. */
+  const wasChecked = await page.locator("#f-baro").isChecked();
+  await plant(hours(24 * 3), hours(24 * 5));
+  assert.equal(await page.locator("#f-baro").isChecked(), wasChecked,
+               "the label may change its mind; the filter may not");
+
+  await plant(null, null);
+  assert.equal((await label.innerText()).trim(), "",
+               "no window means nothing said, rather than a guess");
+
+  assert.deepEqual(errors, []);
+});
+
 page_test("a tooltip appears on hover and says something", async () => {
   const { page } = await open("/index.html");
   await page.locator("[data-tip]").first().hover();

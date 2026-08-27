@@ -717,6 +717,65 @@ test("countdowns read as minutes below an hour and h/m above", () => {
   assert.equal(ROT.untilText(now - 60000), "0 min", "a lapsed window never reads negative");
 });
 
+test("a fortnight away reads in days, not in three figures of hours", () => {
+  /* `untilText` is built for a fissure and tops out in hours, so Baro's next
+     visit came out as "151h 00m" — true, and not how anybody thinks about six
+     days away. `awayText` is the same question over a longer span. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const now = Date.parse("2026-08-11T21:00:00Z");
+  const inMins = (m) => now + m * 60000;
+  assert.equal(ROT.awayText(inMins(25), now), "25 min");
+  assert.equal(ROT.awayText(inMins(5 * 60), now), "5h", "under two days stays in hours");
+  assert.equal(ROT.awayText(inMins(47 * 60), now), "47h", "and 47 is still hours");
+  assert.equal(ROT.awayText(inMins(48 * 60), now), "2 days", "48 is where days begin");
+  assert.equal(ROT.awayText(inMins(6 * 24 * 60), now), "6 days");
+  assert.equal(ROT.awayText(now - 60000, now), "0 min", "never negative, as above");
+});
+
+test("a trader's window answers here-or-not and says when, from one reading", () => {
+  /* The yes/no and the sentence beside the checkbox are one answer read twice.
+     They used to be two: `baroIsHere` did the arithmetic in `app.js`, where no
+     test without a browser could reach it. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const w = { activation: "2026-09-04T13:00:00Z", expiry: "2026-09-06T13:00:00Z" };
+  const at = (iso) => Date.parse(iso);
+
+  const before = ROT.traderWindow(w, at("2026-08-29T13:00:00Z"));
+  assert.equal(before.here, false);
+  assert.equal(before.text, "back in 6 days", "the label's whole job");
+
+  const soon = ROT.traderWindow(w, at("2026-09-04T08:00:00Z"));
+  assert.equal(soon.here, false);
+  assert.equal(soon.text, "back in 5h");
+
+  const arrived = ROT.traderWindow(w, at("2026-09-04T13:00:00Z"));
+  assert.equal(arrived.here, true, "the window is inclusive at the start");
+  assert.equal(arrived.text, "here 2 days more");
+
+  /* Field by field rather than `deepEqual`: these objects are built inside the
+     vm sandbox, so they carry its `Object.prototype` and strict deep equality
+     fails on the prototype while reporting two identical-looking values. */
+  const leaving = ROT.traderWindow(w, at("2026-09-06T12:30:00Z"));
+  assert.equal(leaving.here, true);
+  assert.equal(leaving.text, "here 30 min more");
+
+  const gone = ROT.traderWindow(w, at("2026-09-06T13:00:00Z"));
+  assert.equal(gone.here, false,
+               "exclusive at the end, and a spent window says nothing rather " +
+               "than counting down to a date that has passed");
+  assert.equal(gone.text, null);
+
+  /* The safe direction, and the reason the payload ships a window rather than a
+     flag: no answer hides nine items behind a checkbox that is right there,
+     where a wrong yes claims they are buyable today. */
+  for (const bad of [null, undefined, {}, { activation: "nonsense", expiry: "also" },
+                     { activation: "2026-09-04T13:00:00Z" }]) {
+    const got = ROT.traderWindow(bad, at("2026-09-05T00:00:00Z"));
+    assert.equal(got.here, false, `${JSON.stringify(bad)} must not claim he is here`);
+    assert.equal(got.text, null, `${JSON.stringify(bad)} must not print a countdown`);
+  }
+});
+
 // ── which sources count ────────────────────────────────────────────────────
 
 test("a limited-time bounty counts as an event node only while it is not running", () => {

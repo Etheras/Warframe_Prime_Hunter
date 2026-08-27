@@ -2753,6 +2753,43 @@ pre-2026-08-27 defaults restored (everything on screen) every test passes; with
 relics by default*, whose entire subject is that default. A test about a default
 is the one kind that should fail when the default moves.
 
+### Baro's label says when, and his checkbox stays where it is
+
+**Shipped 2026-08-27.** `meta.baro` had carried his window since earlier the same
+day, and the filter opened only while he was on a relay — but the label said
+nothing about *when*, so a reader who found the box unticked had no way to know
+whether he was an hour away or a fortnight. It now reads *Baro Ki'Teer — back in
+8 days*, and *here 2 days more* while he is actually there.
+
+**Two decisions worth keeping.**
+
+*The checkbox does not move.* He arrives while a tab is open twice a fortnight,
+and flipping the box under a reader who has touched nothing would shift nine
+items between buckets with nothing on screen saying why — the same instability
+the fissure decision rejects for the ranking. The default is decided once, at
+load; after that only the sentence changes. `TODO.md` had this the same way: a
+live fact stated where it is read, not a live fact moving things around.
+
+*The arithmetic left `app.js`.* `baroIsHere` did its own window maths, which put
+it where no test without a browser could reach it and gave the yes/no and the
+sentence two chances to disagree. Both now read `ROT.traderWindow(w, now)`, which
+returns `{here, text}` — one answer read twice — and is covered against a frozen
+clock in `test_assets.mjs`, boundaries included: inclusive at the start,
+exclusive at the end, and a spent or unparseable window yields `{here: false,
+text: null}` rather than counting down to a date that has passed.
+
+`awayText` is a separate function rather than a flag on `untilText` because the
+two answer different questions. `untilText` is built for a fissure and tops out
+in hours, so six days away rendered as *144h 00m* — true, and not how anybody
+thinks about next week. `awayText` stays in minutes below an hour, hours below
+two days, and days above that.
+
+The label reuses `.check .lbl em`, a rule that had been in `styles.css` with no
+user at all. `--txt-faint` `#a4aab3` on the sidebar's `--bg-2` `#11151d`
+measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s table
+quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
+it meets and the one that governs.
+
 ### Varzia's shelf is published, but not where anyone looks for it
 
 **Found by the owner 2026-08-27, from the in-game store, and fixed the same
