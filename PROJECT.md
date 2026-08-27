@@ -2554,6 +2554,47 @@ disagrees with the drop table (`Chassis` vs `Chassis Blueprint`), so
 progress is keyed on those names and would otherwise appear to vanish when a
 build falls back to the other source.
 
+### What Digital Extremes actually publish — the sweep of 2026-08-27
+
+Done so nobody repeats it, and so the next person looking for a first-party
+route knows where the edges are.
+
+**`api.warframe.com` exposes one thing.** `/cdn/worldState.php` answers 200; the
+bare host, `/cdn/`, `/dynamic/worldState.php`, and every plausible sibling of the
+working path answer 404. There is no index and no directory listing. **That is
+where the guessing stopped**, deliberately: probing further paths on somebody's
+server is not a sweep, it is a scan, and §2 rules it out.
+
+The worldstate document itself embeds no API surface either — its URLs are news,
+forum and social links (`forums.warframe.com`, `www-static.warframe.com`, and so
+on), which is worth knowing only because it is the obvious next place to look.
+
+**The enumerable surface is the export index, and it is bigger than we use.** DE
+list **sixteen** manifests there. Reading the index is how you find them, which
+makes this counting rather than guessing:
+
+| Manifest | Status |
+|---|---|
+| `ExportWarframes_en.json`, `ExportWeapons_en.json`, `ExportSentinels_en.json` | read — the items themselves |
+| `ExportRegions_en.json` | read — node names and enemy levels |
+| `ExportManifest.json` | read since 2026-08-27 — artwork |
+| `ExportRecipes_en.json` | **not read** — components, `ItemCount`, `primeSellingPrice` (Ducats) |
+| `ExportResources_en.json` | **not read** — display names for component items, and materials |
+| `ExportRelicArcane_en.json` | **not read** — 3,261 rows, relics with `relicRewards` |
+| `ExportKeys_en.json`, `ExportUpgrades_en.json`, `ExportCustoms_en.json`, `ExportDrones_en.json`, `ExportFlavour_en.json`, `ExportFusionBundles_en.json`, `ExportGear_en.json`, `ExportSortieRewards_en.json` | not read, and nothing here needs them |
+
+The three marked **not read** in bold are live opportunities and have an entry in
+`TODO.md`: between them they carry the parts, the quantities and the Ducat values
+this project currently takes from WFCD.
+
+**What DE do not publish at all**, which is why the other two tiers exist and are
+not going away: `vaulted`, `vaultDate`, `releaseDate` and `tradable` appear in no
+manifest — they are editorial or derived — and neither do the wiki's categories or
+its `(V)` `(P)` `(B)` `(S)` markers. So the intended precedence is *first party for
+everything DE actually publish, WFCD for the availability metadata they do not,
+and the wiki for what only editors maintain* — not *first party for everything*,
+which is not on offer.
+
 ### Artwork is first party, and that retired two hosts
 
 **Shipped 2026-08-27**, and it is the first piece of the *first party first, WFCD
