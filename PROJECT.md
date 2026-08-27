@@ -2417,7 +2417,24 @@ Wiki quirks handled in the parser: non-breaking spaces inside `{{WF}}` output,
 not be mistaken for categories.
 
 **3. WFCD (warframestat) — convenience layer.** Component names, artwork
-filenames, the `vaulted` field, and the live worldstate proxy. Its part naming
+filenames, the `vaulted` field, and the live worldstate proxy.
+
+**Who WFCD are, because it is easy to get wrong and was, on 2026-08-27.** They
+are the *Warframe Community Developers* — a community organisation, not Digital
+Extremes, and their own description ends *"Not affiliated with DE."* What they
+publish is nonetheless **DE's data**: `warframe-drop-data`'s README says it is
+parsed from DE's official drop-data site and links every dataset back to it. So
+the numbers are DE's and the parsing and hosting are WFCD's, and reading this
+layer as "DE, presented nicely" is right about the data and wrong about the
+dependency.
+
+The two halves fail separately, which is what makes the distinction load-bearing
+rather than pedantic: the WFCD worldstate proxy went 404 on 2026-08-24 and stayed
+down for days while DE's own worldstate was served, complete, throughout. That is
+why the table below asks *"first party?"* about the **route** and answers
+`resurgence` with *"yes, proxied"* — the fact is DE's, the delivery was not.
+
+Its part naming
 disagrees with the drop table (`Chassis` vs `Chassis Blueprint`), so
 `normalise_part()` strips the redundant suffix — this matters because saved part
 progress is keyed on those names and would otherwise appear to vanish when a

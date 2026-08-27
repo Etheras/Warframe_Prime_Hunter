@@ -114,21 +114,49 @@ reproduced verbatim in a derivative work must remain under CC BY-SA.
 
 ## Warframe Community Developers (WFCD)
 
+**WFCD is not Digital Extremes, and says so itself.** Their own description reads
+*"Tenno who provide developed tools that people can use for their own projects or
+gameplay without infringing on aspects of Warframe. **Not affiliated with DE.**"*
+It is a community organisation, on GitHub since December 2016, reachable at
+`devs@warframestat.us`.
+
+**The data is DE's; the parsing and the hosting are WFCD's.** That distinction is
+easy to lose and worth stating plainly, because the two halves fail separately.
+`warframe-drop-data`'s own README says the data *"is parsed from Digital Extremes
+official drop data website"* and links every dataset back to DE's drop-table page
+as its source — so the numbers are DE's, published by DE, and what WFCD add is a
+machine-readable shape and a server to fetch it from. (One exception they name:
+their syndicate data is scraped from the wiki rather than from DE's drop site.)
+
+So "third party" here is a claim about the **route**, never about the origin, and
+it is load-bearing rather than pedantic. On 2026-08-24 the WFCD worldstate proxy
+began returning 404 and stayed down for days while DE's own worldstate was
+served, complete, the entire time.
+
 - **[warframe-drop-data](https://github.com/WFCD/warframe-drop-data)** — MIT
-  licensed. A mirror of DE's official drop tables, used as Warframe Prime Hunter's automatic
-  fallback when warframe.com is unreachable.
+  licensed. DE's official drop tables, parsed into JSON, used as Warframe Prime
+  Hunter's automatic fallback when warframe.com is unreachable.
 - **[warframe-status](https://github.com/WFCD/warframe-status)** —
   Apache-2.0 licensed. Powers `api.warframestat.us`, used for item metadata,
-  component lists, artwork filenames, and four reads of the game worldstate that
-  Digital Extremes publish no working endpoint for: the live Prime Resurgence
-  rotation (`/pc/vaultTrader`), which bounties are on offer and therefore which
-  rotation letter is live (`/pc/syndicateMissions`), which limited-time events are
-  running (`/pc/events`), and the Void Fissures open right now (`/pc/fissures`).
+  component lists, artwork filenames, and four reads of the game worldstate: the
+  live Prime Resurgence rotation (`/pc/vaultTrader`), which bounties are on offer
+  and therefore which rotation letter is live (`/pc/syndicateMissions`), which
+  limited-time events are running (`/pc/events`), and the Void Fissures open right
+  now (`/pc/fissures`).
+
+  This entry used to say Digital Extremes *"publish no working endpoint for"*
+  those four. **That was wrong**, and was corrected on 2026-08-27:
+  `api.warframe.com/cdn/worldState.php` serves all of them, first party, and had
+  been doing so throughout. Two DE hosts that do 404 had been read as proving the
+  general case. `TODO.md` tracks moving to it; WFCD stays as the fallback.
 - **`cdn.warframestat.us`** — serves the item artwork shown on the cards. The
   images themselves remain Digital Extremes' property.
 
 Both projects are used unmodified over their public HTTP endpoints; their
-copyright notices are preserved by this file.
+copyright notices are preserved by this file. **No WFCD code is vendored, copied
+or depended on** — see `PROJECT.md §2`, which requires the owner's approval and a
+licence reading before any of that changes, including for a mapping table taken
+verbatim.
 
 ---
 
