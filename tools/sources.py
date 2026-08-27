@@ -69,9 +69,23 @@ EXPORT_INDEX_HOSTS = (
     EXPORT_INDEX,
     "https://content.warframe.com/PublicExport/index_en.txt.lzma",
 )
-# the export files worth reading: everything that can carry a Prime
+# the export files worth reading: everything that can carry a Prime, plus the
+# texture manifest that says where each one's artwork lives
 EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
-                 "ExportSentinels_en.json", "ExportRegions_en.json"]
+                 "ExportSentinels_en.json", "ExportRegions_en.json",
+                 "ExportManifest.json"]
+
+# Where DE serve the textures `ExportManifest.json` names. The manifest gives a
+# `textureLocation` such as
+#   /Lotus/Interface/Icons/StoreIcons/Primes/AshPrime.png!00_jy1ev7ijK8d8nQ3WuE7NYQ
+# and this prefix plus that path, *including the `!00_…` suffix*, is the image.
+# Stripping the suffix gives a 404: it is a content hash and part of the path,
+# which is also why these answer `max-age` of about a year — the URL changes
+# when the picture does, so it never needs revalidating. That makes artwork the
+# politest fetch in the project, and it is first party, which the CDN below is
+# not: `cdn.warframestat.us/img/<file>` answers 301 to
+# `raw.githubusercontent.com/wfcd/warframe-items/...`.
+DE_TEXTURES = "https://content.warframe.com/PublicExport"
 
 STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 

@@ -191,7 +191,13 @@ def build_csp() -> str:
     img = "'self' data:"
     try:
         with open(os.path.join(ROOT, "data", "prime-data.js"), encoding="utf-8") as fh:
-            if "cdn.warframestat.us" in fh.read():
+            payload = fh.read()
+            # First party, and the ordinary case since 2026-08-27: DE's own
+            # texture manifest covers all 167 of the catalogue, so this is
+            # normally the only remote host the policy needs to name at all.
+            if "content.warframe.com" in payload:
+                img += " https://content.warframe.com"
+            if "cdn.warframestat.us" in payload:
                 # Both hosts, because the CDN is a redirector, not an origin:
                 # cdn.warframestat.us/img/AshPrime.png answers 301 to
                 # raw.githubusercontent.com/wfcd/warframe-items/.../AshPrime.png,

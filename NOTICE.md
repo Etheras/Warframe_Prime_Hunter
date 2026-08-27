@@ -66,10 +66,22 @@ DE's [Terms of Use](https://www.warframe.com/terms) also apply.
 itself. That is deliberate: hotlinking sends every visitor's IP address to a third
 party, which a tool that otherwise keeps everything local has no business doing.
 
-Note that `cdn.warframestat.us` is **WFCD's** CDN, not Digital Extremes'. DE host
-none of this and have no bandwidth either way, so hotlinking is not a courtesy to
-them — it pushes the cost onto a volunteer community project, once per visitor per
-instance. Serving our own copy is the better manners as well as the better privacy.
+**Since 2026-08-27 the artwork comes from Digital Extremes themselves.** Their
+`ExportManifest.json` maps each item's `uniqueName` to a `textureLocation`, and
+`content.warframe.com/PublicExport` + that path is the picture — covering all 167
+of the catalogue. So the images are now first party, like the drop tables and the
+export beside them.
+
+That also changes who pays for a hotlink, and it is worth being clear that the
+change is not a licence to stop caring. DE serve these behind a content hash with
+a `max-age` of about a year, which is as close to free as a request gets; WFCD's
+CDN did not, and every hotlinked image was a cost pushed onto a volunteer project
+once per visitor per instance. `--with-images` remains the right build for
+anything long-lived either way, because the privacy argument is unchanged: a
+hotlink sends every visitor's IP address to somebody else.
+
+`cdn.warframestat.us` is **WFCD's** CDN, not Digital Extremes', and it remains the
+fallback for a build that cannot read DE's manifest.
 
 It does mean this project **redistributes DE's artwork** rather than merely linking
 to it. DE's copyright in the images is the same either way; what changes is the
@@ -81,7 +93,8 @@ and every page says the project is unofficial. **If any of those ever stops bein
 true, this arrangement stops being covered.**
 
 The artwork itself is not committed to this repository (see `.gitignore`); each
-installation downloads its own copy from `cdn.warframestat.us`.
+installation downloads its own copy, from `content.warframe.com` where DE's
+texture manifest can be read and from `cdn.warframestat.us` when it cannot.
 
 ## Privacy
 
@@ -138,10 +151,13 @@ served, complete, the entire time.
   JSON, used as Warframe Prime Hunter's automatic fallback when warframe.com is
   unreachable.
 - **[warframe-items](https://github.com/WFCD/warframe-items)** — **MIT**
-  licensed, © 2017 Kaptard. Not requested by name, and credited because it is
-  reached anyway: `cdn.warframestat.us/img/<file>` answers **301** to
-  `raw.githubusercontent.com/wfcd/warframe-items/master/data/img/<file>`, so this
-  repository is where the artwork a visitor's browser loads actually comes from.
+  licensed, © 2017 Kaptard. Credited for the **fallback** artwork path only.
+  `cdn.warframestat.us/img/<file>` answers **301** to
+  `raw.githubusercontent.com/wfcd/warframe-items/master/data/img/<file>`, so a
+  build that cannot read DE's texture manifest ends up loading pictures from
+  this repository. Since 2026-08-27 the ordinary path does not: artwork comes
+  from Digital Extremes directly (see above), and this is reached only when
+  their manifest is unavailable.
 - **[warframe-status](https://github.com/WFCD/warframe-status)** —
   **MIT** licensed, © 2017 nspacestd. Powers `api.warframestat.us`, used for item metadata,
   component lists, artwork filenames, and four reads of the game worldstate: the

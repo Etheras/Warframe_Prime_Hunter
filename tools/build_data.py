@@ -53,7 +53,7 @@ import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
                      DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_WANTED,
-                     FISSURES, IMG_CDN,
+                     DE_TEXTURES, FISSURES, IMG_CDN,
                      ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE,
                      SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
@@ -108,18 +108,43 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
             "mirror", [], {})
 
 
+def image_for(api: dict | None, textures: dict) -> str | None:
+    """Where this item's picture lives — Digital Extremes first, WFCD if not.
+
+    First party is preferred wherever one exists, and here one does: DE's
+    `ExportManifest.json` covers all 167 of the catalogue, measured. Going
+    straight to them also drops two hosts a reader's browser would otherwise
+    talk to, because `cdn.warframestat.us/img/<file>` is a redirector rather
+    than an origin — it answers 301 to `raw.githubusercontent.com`, and a
+    content policy is enforced against every hop.
+
+    The WFCD CDN stays as the fallback rather than being deleted: it is what
+    covers a build where DE's export index could not be read, which is a real
+    failure this project has already seen from a GitHub runner. Both paths write
+    a whole URL, so nothing downstream has to know which one answered.
+    """
+    unique = (api or {}).get("uniqueName")
+    tex = textures.get(unique) if unique else None
+    if tex:
+        return DE_TEXTURES + tex
+    name = (api or {}).get("imageName")
+    return (IMG_CDN + name) if name else None
+
+
 def acquire_export(offline: bool):
-    """DE's official item manifest -> (list of Prime items, index hash)."""
+    """DE's official manifests -> (Prime items, node levels, index hash, textures)."""
     try:
         blob = fetch(EXPORT_INDEX_HOSTS, "export_index", offline)
         index = official.decode_index(blob)
     except Exception as exc:                              # noqa: BLE001
-        # Three values, because that is what the caller unpacks. This returned
+        # Four values, because that is what the caller unpacks. This returned
         # two for as long as it has existed - the one path that gives up would
         # have raised a ValueError from the assignment instead of degrading,
-        # which is precisely the moment you least want a second failure.
+        # which is precisely the moment you least want a second failure. It is
+        # the count that matters rather than the number: keep the two paths
+        # agreeing, and keep the test that says so.
         log(f"! public export index unavailable ({exc})")
-        return [], {}, None
+        return [], {}, None, {}
 
     exports = {}
     for want in EXPORT_WANTED:
@@ -127,14 +152,37 @@ def acquire_export(offline: bool):
         if not tag:
             continue
         try:
-            raw = fetch(EXPORT_MANIFEST.format(file=f"{want}!{tag}"), f"export_{want}", offline)
-            exports[want] = official.load_export(raw)
+            # `critical=False`: this loop has always meant to degrade past a
+            # manifest it cannot read — its `except` says so — but `fetch`
+            # defaults to raising SystemExit, which derives from BaseException
+            # and sails straight through `except Exception`. Cached copies hid
+            # that for as long as the four manifests here were all warm; adding
+            # a fifth found it, by making `--offline` fatal on the first run
+            # after the list grew.
+            # The texture manifest is an enrichment and the others are not: a
+            # card with no picture falls back to a glyph that already exists,
+            # while missing node levels or a missing Prime are wrong data. So
+            # only this one is `optional`, which is what keeps a cold miss on it
+            # from aborting an otherwise complete build.
+            raw = fetch(EXPORT_MANIFEST.format(file=f"{want}!{tag}"), f"export_{want}",
+                        offline, critical=False,
+                        optional=(want == "ExportManifest.json"))
+            if raw:
+                exports[want] = official.load_export(raw)
         except Exception as exc:
             log(f"! could not read {want} ({exc})")
 
+    # uniqueName -> textureLocation, for every item DE ship a picture of. The
+    # join needs no name matching and no heuristics: `uniqueName` is already one
+    # of the fields the items API is asked for by name.
+    textures = {row.get("uniqueName"): row.get("textureLocation")
+                for row in (exports.get("ExportManifest.json", {}).get("Manifest") or [])
+                if row.get("uniqueName") and row.get("textureLocation")}
+
     return (official.collect_prime_items(exports),
             official.node_levels(exports),
-            hashlib.sha256(blob).hexdigest()[:16])
+            hashlib.sha256(blob).hexdigest()[:16],
+            textures)
 
 
 
@@ -839,7 +887,7 @@ def main() -> int:
                               max_age=3 * 3600)
 
     log("export: DE public item manifest")
-    export_primes, node_levels, export_hash = acquire_export(off)
+    export_primes, node_levels, export_hash, textures = acquire_export(off)
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)
@@ -1069,7 +1117,7 @@ def main() -> int:
 
 
         wf = entry["wikiFlags"]
-        image = (api or {}).get("imageName")
+        image = image_for(api, textures)
         base_id = slugify(f"{entry['category']}-{name}")
         item_id = base_id
         n = 2
@@ -1083,7 +1131,7 @@ def main() -> int:
             "name": name,
             "category": entry["category"],
             "type": (api or {}).get("type"),
-            "image": (IMG_CDN + image) if image else None,
+            "image": image,
             "wikiUrl": "https://wiki.warframe.com/w/" + entry["wikiPage"],
             "masteryReq": as_int((api or {}).get("masteryReq")),
             "tradable": (api or {}).get("tradable"),

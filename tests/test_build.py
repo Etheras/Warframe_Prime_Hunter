@@ -801,6 +801,53 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_artwork_prefers_digital_extremes() -> None:
+    """
+    Artwork is first party since 2026-08-27. DE's `ExportManifest.json` gives a
+    `textureLocation` per `uniqueName` and covers all 167 of the catalogue, so
+    the WFCD CDN is the fallback rather than the source — which also drops two
+    hosts from the runtime, since `cdn.warframestat.us/img/*` is a redirector
+    that answers 301 to `raw.githubusercontent.com`.
+
+    The filename gate matters more here than it did. A CDN URL ended in a bare
+    filename; a DE one is a path full of separators with a `!00_<hash>` suffix,
+    and that string is used to open a file for writing.
+    """
+    import artwork
+    from sources import DE_TEXTURES, IMG_CDN
+
+    tex = "/Lotus/Interface/Icons/StoreIcons/Primes/AshPrime.png!00_jy1ev7ijK8d8nQ3WuE7NYQ"
+    api = {"uniqueName": "/Lotus/Powersuits/Ninja/AshPrime", "imageName": "AshPrime.png"}
+
+    check("artwork: Digital Extremes first when they have it",
+          build_data.image_for(api, {api["uniqueName"]: tex}), DE_TEXTURES + tex)
+    check("artwork: WFCD when DE's manifest has no row for it",
+          build_data.image_for(api, {}), IMG_CDN + "AshPrime.png")
+    check("artwork: nothing at all is None, not a broken URL",
+          build_data.image_for({}, {}), None)
+    check("artwork: and a missing item record does not raise",
+          build_data.image_for(None, {}), None)
+
+    # Both shapes reduce to the same local file, which is why an existing
+    # assets/img/ folder survives the switch instead of re-downloading.
+    check("artwork: a DE url and a CDN url name the same local file",
+          (artwork.local_name(DE_TEXTURES + tex), artwork.local_name(IMG_CDN + "AshPrime.png")),
+          ("AshPrime.png", "AshPrime.png"),
+          "the content hash is part of the path upstream and no part of it here")
+
+    # The gates still hold on the shape that now carries separators.
+    for hostile in (DE_TEXTURES + "/Lotus/x/../../../../Windows/Temp/evil.png!00_x",
+                    DE_TEXTURES + "/Lotus/x/C:\\Windows\\Temp\\evil.png!00_x",
+                    DE_TEXTURES + "/Lotus/x/..!00_x",
+                    "https://example.invalid/AshPrime.png"):
+        got = artwork.local_name(hostile)
+        check_true(f"artwork: refused {hostile[-34:]!r}",
+                   got in (None, "evil.png"),
+                   "a path may collapse to a basename, but must never escape assets/img")
+    check("artwork: traversal collapses rather than escaping",
+          artwork.local_name(DE_TEXTURES + "/a/../../etc/passwd!00_x"), "passwd")
+
+
 def test_an_impossible_304_is_treated_as_stale() -> None:
     """
     A `304` says the server has confirmed what we hold is current, and `fetch`
@@ -869,10 +916,13 @@ def test_an_unreadable_export_index_degrades_instead_of_crashing() -> None:
     try:
         build_data.fetch = lambda *a, **k: b"not an lzma stream at all"
         got = build_data.acquire_export(False)
-        check("export: gives up with the three values the caller unpacks", len(got), 3)
-        primes, levels, digest = got                     # the line that used to raise
+        # Four since 2026-08-27, when the texture manifest joined the tuple. The
+        # number is not the point and never was: the two paths have to agree, and
+        # this is what says so out loud when one of them grows.
+        check("export: gives up with the four values the caller unpacks", len(got), 4)
+        primes, levels, digest, textures = got           # the line that used to raise
         check("export: and they are empty rather than wrong",
-              (primes, levels, digest), ([], {}, None))
+              (primes, levels, digest, textures), ([], {}, None, {}))
     finally:
         build_data.fetch = real
 
@@ -2182,6 +2232,7 @@ def main() -> int:
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
                          test_an_impossible_304_is_treated_as_stale,
+                         test_artwork_prefers_digital_extremes,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,

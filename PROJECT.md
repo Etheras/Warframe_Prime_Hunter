@@ -2554,6 +2554,63 @@ disagrees with the drop table (`Chassis` vs `Chassis Blueprint`), so
 progress is keyed on those names and would otherwise appear to vanish when a
 build falls back to the other source.
 
+### Artwork is first party, and that retired two hosts
+
+**Shipped 2026-08-27**, and it is the first piece of the *first party first, WFCD
+if it fails* rule to actually land.
+
+Item pictures used to come from `cdn.warframestat.us/img/<imageName>`. That host
+is a **redirector rather than an origin**: it answers 301 to
+`raw.githubusercontent.com/wfcd/warframe-items/…`, so a reader's browser talked to
+two third parties per card and the content policy had to name both, because CSP is
+enforced against every hop.
+
+Digital Extremes publish the artwork themselves, and the key was already in hand.
+DE's export index lists sixteen manifests; we read four. A fifth,
+**`ExportManifest.json`**, is the texture manifest — 19,843 rows of `uniqueName`
+and `textureLocation` — and the picture is `content.warframe.com/PublicExport` plus
+that path:
+
+```
+/Lotus/Interface/Icons/StoreIcons/Primes/AshPrime.png!00_jy1ev7ijK8d8nQ3WuE7NYQ
+```
+
+**The `!00_…` suffix is part of the path**; strip it and the same URL is a 404. It
+is a content hash, which is why these answer `max-age` of about a year — the URL
+changes when the picture does, so it never needs revalidating. Under *"Ask no more
+often than the source says to"* that makes artwork the politest fetch here, and it
+is the fetch that happens 167 times per page load.
+
+**Coverage was the gating question and it is total**: 167 of 167, measured with the
+build's own name matching rather than a cruder one — a first pass using plain name
+equality reported 166 and the miss was the probe, not the data. The join needs no
+heuristics because `uniqueName` is already one of the fields `ITEMS_API` is asked
+for by name.
+
+**WFCD stays as the fallback rather than being deleted.** `image_for` prefers DE
+and falls back to the CDN when the manifest has no row, which is the shape the rule
+asks for and costs nothing while unused. Two consequences worth knowing:
+
+- The **static meta CSP still names all three hosts**, because that tag cannot know
+  which path a build took, and naming only DE would silently blank every image on a
+  fallback build. `serve.py`'s header is content-derived and does better — it names
+  only what the payload actually references. Dropping the two WFCD hosts from the
+  meta is a one-line change once the first-party path has proved itself.
+- `local_name` in `artwork.py` now accepts both shapes and reduces them to the same
+  basename, so `--with-images` reuses an existing `assets/img/` folder instead of
+  re-downloading 8.3 MB. Its three safety gates matter more than they did: a CDN URL
+  ended in a bare filename, while a DE one is a path full of separators plus a hash
+  suffix, and that string is used to open a file for writing.
+
+**One latent bug fell out of this.** Adding a fifth manifest made `--offline`
+fatal on the first run after the list grew, and the reason was older than the
+change: the loop that reads manifests wraps each in `except Exception` and means
+to degrade, but `fetch` raises `SystemExit`, which derives from `BaseException`
+and sails straight through. Four warm caches had hidden it since the loop was
+written. The manifests are now fetched `critical=False`, and the texture manifest
+alone is `optional` — a card with no picture falls back to a glyph that already
+exists, while a missing node list is wrong data rather than a missing nicety.
+
 ### Which source decides what
 
 | Fact | Decided by | First party? |
@@ -2566,7 +2623,7 @@ build falls back to the other source.
 | `vaulted` | WFCD's `vaulted`, wiki `(V)` as fallback | no |
 | category | wiki page sections | no |
 | `permanent` `baro` `special` `founder` | wiki markers only | **no — editorial** |
-| artwork | WFCD CDN (the images are DE's) | no |
+| artwork | DE's `ExportManifest.json` → `content.warframe.com`, WFCD CDN as fallback | **yes** since 2026-08-27 |
 
 `farmable` is the one availability fact derived entirely from official data,
 which is why the UI leans on it and why the vault/Baro/special/Founder markers

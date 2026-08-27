@@ -11,14 +11,20 @@
      Three things here are load-bearing and not obvious:
        * it must sit after <meta charset> and before the first thing it governs
          - anything parsed above it is outside the policy;
-       * raw.githubusercontent.com is not optional. cdn.warframestat.us/img/*
-         answers 301 to it, a policy is checked against every hop, and naming
-         only the CDN blocks every image on a build without local artwork;
+       * content.warframe.com is where artwork comes from since 2026-08-27 -
+         first party, from DE's own texture manifest, covering all 167;
+       * the two WFCD hosts are the fallback path and nothing more. They are
+         named because this tag is static and cannot know which path a build
+         took: if DE's texture manifest is ever unreadable the build falls back
+         to cdn.warframestat.us, which answers 301 to raw.githubusercontent.com,
+         and a policy is checked against every hop - so naming only the CDN
+         would block every image. Expected to go unused; drop both once the
+         first-party path has proved itself;
        * frame-ancestors is deliberately absent. Delivered by meta it is
          ignored *and* logged as a console error, so writing it here would fail
          the page tests while protecting nothing. Framing is covered by
          serve.py's header locally and is unfixable on Pages. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.warframestat.us https://raw.githubusercontent.com; connect-src 'self'; base-uri 'none'; form-action 'none'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://content.warframe.com https://cdn.warframestat.us https://raw.githubusercontent.com; connect-src 'self'; base-uri 'none'; form-action 'none'" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Warframe Prime Hunter — Prime collection tracker</title>
 <link rel="stylesheet" href="assets/styles.css" />

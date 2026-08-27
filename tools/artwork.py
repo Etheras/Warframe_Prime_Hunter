@@ -23,7 +23,7 @@ import os
 import re
 import urllib.request
 
-from sources import IMG_CDN, ROOT, UA, log
+from sources import DE_TEXTURES, IMG_CDN, ROOT, UA, log
 
 IMG_DIR = os.path.join(ROOT, "assets", "img")
 
@@ -40,16 +40,32 @@ SAFE_NAME = re.compile(r"[A-Za-z0-9._-]+\Z")
 
 def local_name(src: str) -> str | None:
     """
-    The local filename for a CDN artwork URL, or None if we will not write it.
+    The local filename for an artwork URL, or None if we will not write it.
+
+    Two shapes are accepted, because artwork comes from Digital Extremes first
+    and from the WFCD CDN only when DE's texture manifest could not be read:
+
+        https://content.warframe.com/PublicExport/Lotus/.../AshPrime.png!00_<hash>
+        https://cdn.warframestat.us/img/AshPrime.png
+
+    Both reduce to `AshPrime.png`, which is deliberate — the two sources agree on
+    the basename, so a folder downloaded before this change keeps working and a
+    `--with-images` build does not re-download everything.
 
     Three gates, because each catches something the others do not: the prefix
-    check keeps us to our own CDN, `basename` collapses both separators and any
-    drive letter (ntpath splits on `\\` too), and the allowlist refuses whatever
-    is left - spaces, colons, control characters, non-ASCII.
+    check keeps us to hosts we chose, `basename` collapses both separators and
+    any drive letter (ntpath splits on `\\` too), and the allowlist refuses
+    whatever is left - spaces, colons, control characters, non-ASCII. The DE form
+    needs the basename gate most: its path is full of separators, and the
+    `!00_<hash>` suffix has to come off before anything is written.
     """
-    if not src.startswith(IMG_CDN):
+    if src.startswith(DE_TEXTURES):
+        # `!` starts the content hash and is not part of any filename we keep.
+        name = os.path.basename(src[len(DE_TEXTURES):].split("?")[0].split("!")[0])
+    elif src.startswith(IMG_CDN):
+        name = src[len(IMG_CDN):].split("?")[0]
+    else:
         return None
-    name = src[len(IMG_CDN):].split("?")[0]
     if not name or name in (".", ".."):
         return None
     if name != os.path.basename(name) or not SAFE_NAME.match(name):
@@ -95,14 +111,14 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
     urls, refused = {}, []
     for it in items:
         src = it.get("image") or ""
-        if not src.startswith(IMG_CDN):
+        if not src.startswith((DE_TEXTURES, IMG_CDN)):
             continue
         name = local_name(src)
         if name is None:
-            # Say so rather than skipping quietly: a name this shape means the
-            # items API is serving something it never has before, and that is
+            # Say so rather than skipping quietly: a name this shape means a
+            # source is serving something it never has before, and that is
             # worth seeing in the build output.
-            refused.append(src[len(IMG_CDN):][:80])
+            refused.append(src.rsplit("/", 1)[-1][:80])
             continue
         urls[src] = name
     if refused:

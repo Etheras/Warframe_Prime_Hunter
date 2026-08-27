@@ -123,7 +123,6 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| Artwork has a first-party route too, and it retires two hosts | session — verified end to end; removes `cdn.warframestat.us` and `raw.githubusercontent.com` from the runtime |
 | The live worldstate has a first-party route after all | session — four adapters, and it retires the only third-party dependency |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
@@ -688,62 +687,6 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 `PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
-
-### Artwork has a first-party route too, and it retires two hosts
-
-**Found 2026-08-27.** Item artwork is the last thing a visitor's browser fetches
-from anyone but us, and today it goes to WFCD's CDN — which then **301s to
-`raw.githubusercontent.com/wfcd/warframe-items/…`**, a host the owner would
-rather not be fetching from at all. Both can go: Digital Extremes publish the
-artwork, and we already hold the key needed to find it.
-
-**The mechanism, verified end to end.** DE's export index lists sixteen
-manifests and we fetch four of them. A fifth, **`ExportManifest.json`**, is the
-texture manifest — 19,843 rows of exactly two fields:
-
-```json
-{"uniqueName": "/Lotus/Powersuits/Ninja/AshPrime",
- "textureLocation": "/Lotus/Interface/Icons/StoreIcons/Primes/AshPrime.png!00_jy1ev7ijK8d8nQ3WuE7NYQ"}
-```
-
-and the texture is served at `https://content.warframe.com/PublicExport` +
-`textureLocation`, verbatim:
-
-```
-200, 121 KB, Cache-Control: public, max-age=30105321
-```
-
-**The `!00_…` suffix is part of the path and must not be stripped** — without it
-the same URL is a 404. It is a content hash, which is also why the `max-age` is
-roughly a year: the URL changes when the image does, so it never needs
-revalidating. That makes this the politest fetch in the project by a wide margin,
-and `PROJECT.md §2` *"Ask no more often than the source says to"* is the rule it
-satisfies best.
-
-**The join already exists.** Items carry `uniqueName` — it is one of the fields
-`ITEMS_API` is asked for by name — so DE's manifest joins straight onto the
-catalogue with no matching heuristics and no guessing.
-
-**What the work is**, roughly in order:
-
-1. Fetch `ExportManifest.json` beside the four manifests already read. 3.8 MB,
-   and it re-fetches only when DE cut a build, because the index hash gates it.
-2. Join on `uniqueName`, write the DE URL into `item.image`.
-3. `build_csp()` — add `content.warframe.com` to `img-src`, and once nothing
-   points at them, **remove `cdn.warframestat.us` and
-   `raw.githubusercontent.com`**. Removing the second is the point of the
-   exercise; `PROJECT.md §7` records why the redirect target had to be named.
-4. `--with-images` downloads from DE instead, and `bundle.py`'s rewrite back to
-   a remote host points at DE too.
-5. `NOTICE.md` — artwork moves from the WFCD section to the DE one, and the
-   `warframe-items` credit goes with it if nothing reaches that repo any more.
-
-**Two things to check before trusting it for all 167.** Whether every Prime in
-the catalogue has a manifest row (spot-checked on one), and what the fallback is
-for any that do not — the `noimg` glyph already exists and is the honest answer.
-And whether the texture DE ship is the same framing as WFCD's: these are
-`StoreIcons`, and if they are a different crop or aspect the cards may need a
-look before this is called done.
 
 ### The live worldstate has a first-party route after all
 
