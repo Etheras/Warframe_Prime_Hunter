@@ -1801,8 +1801,14 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
   const row = rowFor(page, key);
   assert.match(await row.locator(".rounds").innerText(), /5 rounds/,
                "a fissure is up here, so the run goes to five rotations");
-  assert.match(await row.locator(".est").innerText(), /free relic/,
-               "and the row says what the fifth rotation bought");
+  /* Every `.est` on the row, not "the" one: a row can carry more than a single
+     estimate note — a mission type costed at the average of the weights you did
+     give also earns one — and `innerText` on a locator matching two throws a
+     strict-mode violation rather than failing an assertion. Which row is picked
+     depends on the ranking, so this must not assume a row's shape. */
+  const notes = await row.locator(".est").allInnerTexts();
+  assert.ok(notes.some((t) => /free relic/.test(t)),
+            `the row has to say what the fifth rotation bought, got ${JSON.stringify(notes)}`);
   await rerender();          // put the squad box back where it was
 
   assert.deepEqual(errors, []);
