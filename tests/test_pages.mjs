@@ -1467,13 +1467,29 @@ page_test("getting in and out is charged once a run, and only where minutes are 
     });
   }, PER);
 
+  /* Read the arithmetic off a row with SEVERAL objectives, found by that
+     property — not off whichever row happens to rank first. On a
+     single-objective row `per × 1 + overhead` and `(per + overhead) × 1` are the
+     same number, so the row cannot tell a once-per-run charge from a
+     per-objective one, and the guard below fires on a test that proved nothing.
+     It did exactly that on the first run of this test: the top row was a Capture
+     and Capture is one objective. */
   const priced = await page.evaluate(() => {
-    const el = document.querySelector("#planNodes .spot");
+    const el = [...document.querySelectorAll("#planNodes .spot")]
+      .find((x) => {
+        const m = x.textContent.match(/\b(\d+) (?:round|vault|cache|stage)s\b/);
+        return m && Number(m[1]) > 1;
+      });
+    if (!el) return null;
     const m = el.textContent.match(/\b(\d+) (?:round|vault|cache|stage)s\b/);
-    return { objectives: m ? Number(m[1]) : 1,
+    return { objectives: Number(m[1]),
+             where: el.querySelector(".spot-where").childNodes[0].textContent.trim(),
              perRun: Number((el.querySelector(".spot-alt").textContent.match(/([\d.]+) a run/) || [])[1]),
              headline: Number(el.querySelector(".spot-score b").textContent) };
   });
+  assert.ok(priced && priced.objectives > 1,
+            "no multi-objective row on screen, so nothing here can tell a " +
+            "once-per-run charge from a per-objective one");
   const overhead = 1;                       // 0.5 in + 0.5 out
   const expected = priced.perRun / (PER * priced.objectives + overhead);
   assert.ok(Math.abs(priced.headline - expected) < 0.02,
