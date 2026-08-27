@@ -695,7 +695,7 @@ What is provided instead:
 | Want | Use |
 |---|---|
 | Run it locally | `serve.cmd` |
-| One file to carry around | `tools/bundle.py` → `dist/warframe-prime-hunter.html` (1.6 MB, fully inlined) |
+| One file to carry around | `tools/bundle.py` → `dist/warframe-prime-hunter.html` (about 2.2 MB, fully inlined) |
 | Reach it from a phone | GitHub Pages + the refresh workflow |
 
 ### What deliberately isn't used
@@ -2592,6 +2592,86 @@ not ours to make hard to read.** The surface underneath is `--bg-2`, darker than
 the `--panel` they were solved against, so both measure higher here than they did
 there. "Low visibility" is spent on size and weight, never on contrast, and a test
 asserts the colour so that instruction cannot erode into unreadable.
+
+### The single file is both pages in one document, and that had a cost
+
+**Found and fixed 2026-08-27.** `dist/warframe-prime-hunter.html` is the artefact
+strangers download, and it was the only one nothing drove in a browser: the page
+tests served `index.html` and `plan.html`, and `test_build.py` read the built
+file as text. `bundle.py` keeps the collection's header and then concatenates
+**both** page bodies, running `app.js` and `plan.js` back to back over the one
+document — so every id below the header existed twice, `getElementById` handed
+the collection's copy to every caller, and the five shared wiring functions each
+ran twice. Seven defects were living in that gap. None was reachable on either
+page alone, which is exactly why none had been seen.
+
+Measured in Chromium, on `http://` and `file://`, with both ordinary pages as
+controls:
+
+| A person does this | Either page | The single file, before |
+|---|---|---|
+| Presses **+** on Mastery Rank, from 10 | 11 | **12** — and **−** went back two |
+| Presses **Download backup** once | one file | **two identical files** |
+| Presses **Paste & restore** once | that page's import | **both**, planner last, undoing the collection's reconciliation |
+| Opens the **Planner** tab | footer with the licence | **empty footer** |
+| Presses **Backup** on the Planner tab | the dialog | a modal at **0×0** — invisible, and the page inert behind it |
+| Loads a build over 14 days old | one stale banner | **two** |
+| Leaves it open | one `fissures.json` poll | **two**, forever |
+
+Mastery Rank was the worst, because MR is not decoration: it derives the Void
+Trace cap, so a stepper moving two ranks a press fed a wrong cap into the
+planner's own numbers. The invisible modal was the most alarming — pressing a
+button appeared to freeze the app.
+
+**Two halves to the fix, and they answer different questions.**
+
+*The markup.* `cut_shared` in `bundle.py` lifts the backup dialog and the site
+footer out of both bodies and emits one of each **below** both views. That is
+what makes one copy enough: a modal inside a `display:none` ancestor is promoted
+to the top layer and still renders nothing. The footer is taken from the
+collection because the two are identical and empty — `shared.js` writes them —
+and the dialog from the planner, because only its wording is true of the merged
+app: the collection's says *"Backup / restore collection"*, and the file that
+button writes has always carried the farm list and the planner's options too.
+The handlers on it are the collection's, since `app.js` runs first and claims
+it, and that is consistent rather than a mismatch — `backupPayload` writes every
+slice whichever page asks. `cut_shared` raises rather than warning if either
+block is missing or doubled, for the reason the CSP rewrite beside it already
+gives: leaving two copies in is not a crash and not visible on the tab you land
+on.
+
+*The wiring.* Four of the five shared functions are now idempotent through one
+`once` flag in `shared.js`. The fifth, `watchFissures`, is the one that shows
+why "make it run once" was not the whole answer: `app.js` calls it first and
+passes **no** callback, so a blunt guard would have kept the poller and dropped
+the planner's repaint, and a fissure opening while the standalone was open would
+never have reached the ranked list. It keeps a subscriber list instead — one
+poller, every caller's callback — and a Node test asserts exactly that, because
+the failure is silent and only reachable in `dist/`. `siteFooter` is deliberately
+*not* guarded: it now fills every `#siteFoot` it finds, so the bundler and the
+page would both have to regress to put a blank licence on screen again.
+
+**`#advanced` became a class.** It was the last id both pages carried, and the
+only one that never showed a symptom — an id selector styles every duplicate
+happily. It was still invalid markup, and leaving it would have meant a
+duplicate-id test with a named exception, which is the kind of thing that rots.
+
+**A restore now reloads on both pages.** The planner has always ended an import
+with `location.reload()`; the collection re-rendered in place and told the reader
+*"Filters restored — reload to see them."* — an admission that it could not
+finish the job. In the merged document it could not finish a second one either:
+the planner view beside it was still holding the rows and options it read at
+load. A restore replaces every slice at once, so the page that reads them all is
+the right thing to rebuild, and that sentence is gone.
+
+**What the gap really was.** Not any of the seven. It was that nothing drove the
+built file, so `bundle.py`'s own docstring could claim the two pages "share
+exactly one element id — the tab itself" and be wrong by ten for as long as the
+single file had existed. `test_pages.mjs` now opens `dist/` and presses the
+buttons; `test_build.py` asserts the built markup has no duplicated id and that
+both pieces of shared chrome sit outside both views. Each was confirmed by
+mutation — the guards removed, the chrome put back inside a view, the id
+restored — and each went red before it went green.
 
 ### Shared UI conventions
 

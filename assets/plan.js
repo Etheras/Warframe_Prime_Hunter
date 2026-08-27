@@ -1673,7 +1673,13 @@
 
   const dlg = $("#dataDlg");
   const dbtn = $("#dataBtn");
-  if (dlg && dbtn) {
+  /* Only if no one else has. The single-file build runs both pages' scripts
+     over one document and app.js gets here first, so on `plan.html` this wires
+     the dialog as it always has and in `dist/` it leaves the collection's
+     handlers alone — one press, one download, one import. See the longer note
+     beside the same guard in app.js. */
+  if (dlg && dbtn && !dlg.dataset.wired) {
+    dlg.dataset.wired = "planner";
     dbtn.addEventListener("click", () => {
       // one format, assembled in one place - see shared.js
       $("#dataArea").value = JSON.stringify(S.backupPayload());

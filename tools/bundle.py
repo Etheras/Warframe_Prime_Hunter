@@ -11,9 +11,17 @@ machine with a browser. No Python, no server, no internet needed to open it.
 It carries **both** views. They are two views of one dataset, so shipping only
 the collection made the standalone build a lesser thing than the served site.
 Both bodies go into one document and the existing tabs switch between them in
-JavaScript rather than navigating. That works because the two pages share
-exactly one element id -- the tab itself -- and both scripts are self-contained
-IIFEs that have finished running before either view is shown.
+JavaScript rather than navigating.
+
+Merging two whole pages is not free, and this file used to claim it was: the
+line here said the two pages "share exactly one element id -- the tab itself".
+They share eleven. The backup dialog and the site footer are the same chrome on
+both, so `cut_shared` lifts them out of the bodies and emits one of each below
+the views; the rest of what was duplicated was duplicated *wiring* rather than
+markup, and shared.js is now idempotent about it. Both scripts still run over
+the whole document before either view is shown, which is what makes one dialog
+enough for two views -- but nothing about that was ever true by luck, and the
+measurements that showed it were not are in `PROJECT.md`.
 
 Only the item artwork still comes from the network; without it the cards fall
 back to a placeholder glyph and everything else keeps working. If the dataset
@@ -101,6 +109,40 @@ def body_after_header(doc: str) -> str:
     """Everything between </header> and the first <script>."""
     start = doc.index("</header>") + len("</header>")
     return doc[start:doc.index("<script", start)]
+
+
+# Chrome that is the same thing on both pages, so the merged document must hold
+# exactly one of it. Both are matched by their id rather than by their tag alone,
+# since either page could grow a second <footer> or <dialog> that is genuinely
+# its own.
+SHARED_CHROME = (
+    ("siteFoot", re.compile(r'[ \t]*<footer[^>]*id="siteFoot"[^>]*>.*?</footer>\s*', re.S)),
+    ("dataDlg", re.compile(r'[ \t]*<dialog[^>]*id="dataDlg"[^>]*>.*?</dialog>\s*', re.S)),
+)
+
+
+def cut_shared(body: str, page: str) -> tuple[str, dict[str, str]]:
+    """Lift the shared chrome out of one page body, and say so if it is not there.
+
+    Silence here is the expensive kind. Leaving both copies in is not a crash and
+    not visible on the first tab you look at: it duplicates nine element ids, and
+    `getElementById` then hands every caller the collection's copy, so the
+    planner tab carried an empty footer -- the one element that holds the licence
+    and the Content Policy attribution -- and nobody saw it for as long as the
+    single file has existed.
+    """
+    taken: dict[str, str] = {}
+    for name, pattern in SHARED_CHROME:
+        found = pattern.findall(body)
+        if len(found) != 1:
+            raise SystemExit(
+                f"bundle: {page} has {len(found)} elements with id={name!r}, "
+                "expected exactly one. The single file merges both pages, so "
+                "shared chrome is taken once and emitted once; if this markup "
+                "moved or gained a copy, move this with it.")
+        taken[name] = found[0].strip()
+        body = pattern.sub("", body, count=1)
+    return body, taken
 
 
 def main() -> int:
@@ -193,15 +235,32 @@ def main() -> int:
 </script>
 """
 
+    # The shared chrome comes out of both bodies and goes back once, below both
+    # views rather than inside either. The footer is identical in the two pages
+    # and empty in both -- shared.js writes it -- so the collection's is kept for
+    # no reason beyond it being first. The backup dialog is taken from the
+    # planner, because only its wording is true of the merged app: the
+    # collection's says "Backup / restore collection", and the file this button
+    # writes carries the farm list and the planner's options as well. The
+    # handlers on it are the collection's, since app.js runs first and claims the
+    # dialog -- which is consistent, not a mismatch: `backupPayload` has always
+    # written every slice whichever page asked for it.
+    collection_body, collection_chrome = cut_shared(body_after_header(html), "index.html")
+    planner_body, planner_chrome = cut_shared(body_after_header(plan), "plan.html")
+    footer = collection_chrome["siteFoot"]
+    dialog = planner_chrome["dataDlg"]
+
     parts = [
         shell,
         '<div id="view-collection">',
-        body_after_header(html),
+        collection_body,
         "</div>",
         '<div id="view-planner" hidden>',
         plan_search,
-        body_after_header(plan),
+        planner_body,
         "</div>",
+        footer,
+        dialog,
         "<script>", guard(data), CLOSE_SCRIPT,
         "<script>", guard(shared_js), CLOSE_SCRIPT,
         "<script>", guard(rotation_js), CLOSE_SCRIPT,

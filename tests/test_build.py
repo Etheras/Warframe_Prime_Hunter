@@ -28,6 +28,7 @@ each says which.
 
 from __future__ import annotations
 
+import collections
 import datetime
 import json
 import os
@@ -2069,6 +2070,48 @@ def test_bundle_is_self_contained() -> None:
     check_true("bundle: the modules are inlined before the pages that read them",
                max(html.index("window.WFPrimeRotation"), html.index("window.WFPrimeShared"))
                < html.index("WFPrimeShared;"))
+
+    # Merging two whole pages means every id below the header arrives twice, and
+    # `getElementById` then answers every caller with the collection's copy. That
+    # is not a crash and not visible on the tab you land on: it left the planner
+    # tab with an empty footer - the element holding the licence and the Content
+    # Policy attribution - and a backup dialog that opened inside a display:none
+    # ancestor, rendering at 0x0 while making the rest of the page inert.
+    #
+    # Only the markup is scanned. The inlined scripts contain `id="..."` inside
+    # template literals, which are not elements, and counting those would make
+    # this assertion mean something other than what it says.
+    markup = html[:html.index("<script>")]
+    ids = re.findall(r'\sid="([^"]+)"', markup)
+    twice = sorted(name for name, n in collections.Counter(ids).items() if n > 1)
+    check("bundle: no element id appears twice", twice, [],
+          "shared chrome must be emitted once, not once per page")
+
+    # And the shared chrome sits outside both views, which is what makes one copy
+    # enough: a modal inside the hidden view is a modal nobody can see, and it
+    # renders at 0x0 while making the rest of the page inert.
+    #
+    # Depth-counted rather than compared by index. "After the planner view
+    # starts" is the obvious check and it is not the claim: chrome emitted
+    # *inside* the planner is also after it starts, and the first draft of this
+    # assertion passed that mutation happily. Both views are <div>s and the
+    # bundle's markup comes from two pages a test already holds to being
+    # well-formed XML, so the tags balance.
+    def ends_at(where: int) -> int:
+        """Index just past the </div> that closes the div opening at `where`."""
+        depth = 0
+        for tag in re.finditer(r"</?div\b[^>]*>", markup[where:]):
+            depth += -1 if tag.group(0).startswith("</") else 1
+            if depth == 0:
+                return where + tag.end()
+        raise AssertionError("unbalanced <div> in the built file")
+
+    after_views = max(ends_at(markup.index('<div id="view-collection">')),
+                      ends_at(markup.index('<div id="view-planner"')))
+    for name in ("siteFoot", "dataDlg"):
+        check_true(f"bundle: {name} is outside both views",
+                   markup.index(f'id="{name}"') > after_views,
+                   "inside a view it is unreachable from the other tab")
 
 
 def main() -> int:

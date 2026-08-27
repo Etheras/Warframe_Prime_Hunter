@@ -42,10 +42,16 @@ true; the cadence row changed shape and the Mastery Rank row shipped.
 Titles are given verbatim so they can be grepped — each one is a `###` heading
 further down, where the reasoning lives.
 
-**One row was added later the same day**, from the first session that ever drove
-the built single file in a browser rather than reading it as text: *The standalone
-runs both pages' wiring twice, and it shows*. It is the only entry here whose
-symptoms are confined to `dist/`, which is exactly why nothing had found it.
+**A row was added on 2026-08-26 and deleted on 2026-08-27**, in the same two days
+that produced it: *The standalone runs both pages' wiring twice, and it shows*
+came from the first session that ever drove the built single file in a browser
+rather than reading it as text, and it named seven defects confined to `dist/`.
+All seven shipped, the reasoning is in `PROJECT.md §7`, and the page tests now
+open `dist/warframe-prime-hunter.html` and press its buttons — which is the part
+worth keeping, because the gap was never any one of the seven.
+
+**One row was added in its place**, found while proving that fix: the two pages
+still restore a self-contradictory backup differently from each other.
 
 *Size* is honest rather than optimistic: **small** is a few lines and one file,
 **session** is an afternoon including the test, **large** touches the pipeline, the
@@ -107,7 +113,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| The standalone runs both pages' wiring twice, and it shows | session — small to stop the bundler duplicating the chrome, session to make the shared wiring idempotent and test it |
+| The two pages disagree about a backup whose ticks and parts contradict each other | small — one line each way, but which page is right is a decision |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -669,61 +675,41 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
-### The standalone runs both pages' wiring twice, and it shows
+### The two pages disagree about a backup whose ticks and parts contradict each other
 
-**Found 2026-08-26, measured in Chromium, pre-existing.** `dist/warframe-prime-hunter.html`
-is the file strangers download, and it is the only artefact nothing drives in a
-browser: `test_pages.mjs` serves `index.html` and `plan.html`, and the bundle is
-checked as *text* by `test_build.py`. So this has never been looked at.
+**Found 2026-08-27**, while proving the single-file fix, and left for a decision
+rather than fixed: which of the two behaviours is right is not obvious, and it is
+the owner's call.
 
-`tools/bundle.py` builds the single file by keeping the collection's header and
-then concatenating **both** page bodies — `body_after_header(html)` and
-`body_after_header(plan)` — followed by `app.js` and `plan.js` back to back over
-the one document. Both of those files call the same five shared wiring functions
-(`wireFileBackup`, `wireMastery`, `watchFissures`, `staleBanner`, `siteFooter`),
-and everything they touch sits *below* the header, so it exists twice while
-`getElementById` returns the first copy to both callers.
+Restore the same file on each page and they do different things with it. The
+collection view ends its import with `ITEMS.forEach((it) => ST.syncCollected(it))`,
+which drops a Prime from *collected* when the parts in the same file say it is not
+finished — its comment says so deliberately: *"nothing here invents one"*. The
+planner writes what the file says and reloads. So a backup listing Ash Prime as
+collected with one of its four parts banked comes back collected on `plan.html`
+and not collected on `index.html`. Measured with exactly that file.
 
-Eleven ids are duplicated in the built file: `advanced`, `siteFoot`, `dataDlg`,
-`dataArea`, `downloadBtn`, `uploadBtn`, `uploadFile`, `copyBtn`, `importBtn`,
-`dlgCloseBtn`, `dlgMsg`. Neither page alone duplicates any. Five consequences were
-measured rather than reasoned about, each on `http://` and on `file://`, and each
-against the two ordinary pages as controls:
+**How much this matters turns on a question nobody has answered: can the app
+itself produce such a file?** A backup written after ordinary use should be
+self-consistent — *Mark as collected* is a button you only reach with the parts
+banked, and unticking a part re-runs the reconciliation. The file that showed this
+was hand-made. Nobody has checked whether the planner banking a part, or a
+restore, or an older backup, can leave the store contradicting itself; until
+someone does, this is a divergence of unknown reach rather than a known data loss.
 
-| What a person does | Tracker / planner | Standalone |
-|---|---|---|
-| Presses **+** on Mastery Rank once, from 10 | 11 | **12** — and **−** goes back two as well |
-| Presses **Download backup** once | one file | **two identical files**, same name |
-| Presses **Paste & restore** once | the collection's itemised message | the planner's *"Imported 5 sections"* — both handlers ran, planner last |
-| Opens the **Planner** tab | footer with licence and attribution | **empty footer** — `siteFoot` was filled twice, both times the collection's |
-| Loads it with a build over 14 days old | one stale banner | **two stale banners** |
-| Leaves it open | one `fissures.json` poll | **two**, forever |
+Worth noting that the two pages have already been here once. `plan.js`'s import
+carries the comment *"This page used to check ids but not part names or counts, so
+the same file restored differently depending on which page you were looking at"* —
+the validation was unified into `parseBackup` for exactly this reason, and the
+reconciliation was left behind on one side.
 
-The Mastery Rank one is the worst of them, because MR is not decoration: it
-derives the Void Trace cap, so a stepper that moves two ranks a press feeds a
-wrong cap into the planner's own numbers. The empty planner footer is second,
-since that footer carries the licence and the attribution `NOTICE.md` requires.
+The **single file no longer has the problem**: `app.js` claims the dialog, so the
+standalone uses the collection's handler on both tabs. That narrows it to the two
+served pages and is a reason to settle it rather than to leave it.
 
-**What is *not* wrong, checked because it was the reason for looking.** The
-standalone's backup download works from `file://` — the blob origin is
-`blob:null/`, Chromium downloads it anyway, and a scripted click, a real click and
-`Enter` on the button all produce the file. The content is right too: seeded with
-the same store, the standalone's backup carries the same `collected`, `parts`,
-`materials`, `wishlist` and `filters` as the tracker's, plus the planner's
-normalised option defaults, which is a superset rather than a loss. The two files
-one press produces are byte-identical apart from the timestamp. The session that
-raised this had it from a probe that cleared its own results before printing them.
-
-**Two shapes of fix, and they are not the same size.** Making `bundle.py` drop the
-planner's copy of the shared chrome is small and mechanical, but it leaves the
-double `S.*` calls in place and only works while the list of shared ids is right.
-Making the shared wiring idempotent — each of the five refusing a second run, in
-`shared.js`, where the Node suite can test it without a browser — is the one that
-cannot silently rot, and it is the same judgement `PROJECT.md` already makes about
-where testable logic goes. Either way the gap that hid this is the real finding:
-**nothing drives the built file in a browser.** A page test that opens
-`dist/warframe-prime-hunter.html` and presses **+** once would have caught every
-row of that table.
+*What shipped instead, on 2026-08-27:* the seven defects that made this entry's
+predecessor — `PROJECT.md §7` has them, and the page tests now open
+`dist/warframe-prime-hunter.html` and press its buttons.
 
 ### The rest of the player facts the header could hold
 

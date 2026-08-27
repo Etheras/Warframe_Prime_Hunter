@@ -50,6 +50,27 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 
+  /* ── wired once per document ─────────────────────────────────────
+     The single-file build in `dist/` is both pages in one document, so app.js
+     and plan.js run one after the other over the same DOM and every shared
+     wiring call below happens twice. Nothing about that is obvious on either
+     page on its own, and the results were not obvious either: the Mastery Rank
+     stepper moved two ranks a press because `#mrUp` had two listeners, one
+     press of Download backup wrote the file twice, an old build drew two stale
+     banners, and `data/fissures.json` was polled twice for as long as the page
+     stayed open.
+
+     So these are idempotent by this flag rather than by luck. The first call
+     does the work and its return value is kept; every later call gets that
+     same value back without touching the DOM again. Keyed by name rather than
+     by a marker on an element, because two of them (`staleBanner`, the fissure
+     poller) create what they own rather than finding it. */
+  const wired = Object.create(null);
+  const once = (name, fn) => {
+    if (!(name in wired)) wired[name] = fn();
+    return wired[name];
+  };
+
   /* ── the store ───────────────────────────────────────────────────
      Six keys, named once. Both pages read and write the same three of them -
      parts, materials and the farm list - so a typo in one file would silently
@@ -287,7 +308,9 @@
   /* ── is this data still current ──────────────────────────────────
      A failed refresh used to be a line in the footer, which nobody scrolls to.
      If the data is behind, say so above the fold and say what to do about it. */
-  function staleBanner() {
+  function staleBanner() { return once("staleBanner", drawStaleBanner); }
+
+  function drawStaleBanner() {
     const m = DATA.meta || {};
     /* The server checks upstream before serving the data file and plants the
        answer on it. Nothing is fetched from here - the page never talks to
@@ -379,7 +402,9 @@
     return `prime-hunter-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
   }
 
-  function wireFileBackup() {
+  function wireFileBackup() { return once("wireFileBackup", bindFileBackup); }
+
+  function bindFileBackup() {
     const dl = document.getElementById("downloadBtn");
     if (dl) {
       dl.addEventListener("click", () => {
@@ -451,7 +476,22 @@
   const FISSURE_REFRESH_MS = 10 * 60 * 1000;
   if (!Array.isArray(DATA.fissures)) DATA.fissures = [];
 
+  /* One poller, every caller's callback. `once` on its own would be wrong here
+     and quietly so: it would keep the first caller's callback and drop the
+     rest, and in the single-file build the first caller is app.js, which passes
+     none — so the planner would never repaint a fissure that opened while the
+     page was open. Registering the callback before starting the poller is what
+     makes "poll once" safe rather than merely cheap. Both callers are
+     registered before the first response arrives, since the fetch is async and
+     both page scripts have run by then. */
+  const fissureWatchers = [];
+
   function watchFissures(onChange) {
+    if (onChange) fissureWatchers.push(onChange);
+    once("watchFissures", startFissurePoll);
+  }
+
+  function startFissurePoll() {
     const live = DATA.fissures;
     let seen = JSON.stringify(live);
     const pull = () => {
@@ -469,7 +509,7 @@
           if (now === seen) return;         // nothing moved; do not touch the page
           seen = now;
           live.splice.apply(live, [0, live.length].concat(doc.fissures));
-          if (onChange) onChange();
+          fissureWatchers.forEach((fn) => fn());
         })
         /* file://, a bundled single file, a server that does not carry it, or
            no network. Every one of those means "keep what the payload shipped
@@ -485,6 +525,7 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) pull();
     });
+    return true;
   }
 
   /* ── the site footer ─────────────────────────────────────────────
@@ -497,9 +538,18 @@
      true. Two documents drifting apart is the ordinary cost of duplication;
      for a privacy claim and a content-policy attribution it is worse than
      ordinary, because the wrong half still reads as authoritative. */
+  /* Every `#siteFoot` in the document, not the first one. `getElementById`
+     returns one element, and in the single-file build there were two — so both
+     calls filled the collection's and the planner tab carried an empty footer,
+     which is the one piece of chrome that must not go missing: it holds the
+     licence and the Content Policy attribution. `bundle.py` now emits one
+     footer for both views, and this fills whatever it finds, so the two
+     failures would have to happen together to put a blank footer on screen
+     again. Not wrapped in `once` for the same reason — running twice writes
+     the same markup twice, which costs nothing and hides nothing. */
   function siteFooter() {
-    const foot = document.getElementById("siteFoot");
-    if (!foot) return;
+    const feet = $$("#siteFoot");
+    if (!feet.length) return;
     /* A template literal rather than concatenation, and not for taste: the
        bundle check scans the built file for an href attribute whose value is
        neither a URL nor an interpolation, and calls it a local file reference.
@@ -544,7 +594,7 @@
         "purely to stop one client overwhelming it; addresses are keyed-hashed " +
         "with a per-session salt, never written down, and discarded when it stops.";
     }
-    foot.innerHTML = "<p>" +
+    const html = "<p>" +
       "WARFRAME and all related data, names and artwork are the property of " +
       link("https://www.warframe.com", "Digital Extremes Ltd.") + ", used under their " +
       link("https://www.warframe.com/en/contentpolicy", "Content Policy") +
@@ -558,6 +608,7 @@
       link("https://github.com/WFCD", "WFCD") +
       " (MIT / Apache-2.0). Warframe Prime Hunter's own code is MIT licensed." +
       "</p>";
+    feet.forEach((foot) => { foot.innerHTML = html; });
   }
 
   /* ── Mastery Rank ────────────────────────────────────────────────
@@ -652,7 +703,9 @@
      same markup, so this is one function rather than one per page, and a change
      made on either is written to the shared store and picked up by the other
      through the same `storage` event everything else uses. */
-  function wireMastery() {
+  function wireMastery() { return once("wireMastery", bindMastery); }
+
+  function bindMastery() {
     const field = document.getElementById("mrField");
     if (!field) return null;
     const input = document.getElementById("mrInput");

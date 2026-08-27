@@ -612,9 +612,9 @@ and rebuilds the list.
 python tools/bundle.py
 ```
 
-Creates `dist/warframe-prime-hunter.html` — the entire site squeezed into a single 1.6 MB file
-with the styling, code and data all inside it. Copy it to a USB stick, email it to
-yourself, or open it on a machine with no Python at all. Just double-click it.
+Creates `dist/warframe-prime-hunter.html` — the entire site squeezed into a single file
+of about 2.2 MB with the styling, code and data all inside it. Copy it to a USB stick,
+email it to yourself, or open it on a machine with no Python at all. Just double-click it.
 
 Only the item pictures still load from the internet; without a connection you get a
 placeholder diamond and everything else works normally.

@@ -31,7 +31,8 @@ const source = (name) => fs.readFileSync(path.join(ROOT, "assets", name), "utf8"
 /* A window with just enough in it. `now` freezes the clock: the bounty clock
    is arithmetic on Date.now(), and a test that depended on the real one would
    pass or fail according to the time of day. */
-function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z"), seed = null } = {}) {
+function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z"), seed = null,
+                   fetch = null, timers = null } = {}) {
   const FixedDate = class extends Date {
     static now() { return now; }
   };
@@ -57,6 +58,15 @@ function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z"), seed = n
     Date: FixedDate,
     Math, JSON, Object, Array, String, Number, Map, Set, isFinite, parseInt,
   };
+  /* Only for the fissure watcher, and only when a test asks. `setInterval` is
+     recorded rather than run - a repeating timer inside a vm context outlives
+     the test that made it - and its absence is what tells that test whether a
+     second poller was started. */
+  if (fetch) ctx.fetch = fetch;
+  if (timers) {
+    ctx.setInterval = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+    ctx.Promise = Promise;
+  }
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   return ctx;
@@ -953,6 +963,42 @@ test("the six storage keys are the ones the pages have always used", () => {
     plan: "wfprimes.plan.v1",
     filters: "wfprimes.filters.v1",
   }, "renaming one of these silently orphans saved progress");
+});
+
+/* The single-file build runs app.js and plan.js over one document, so every
+   shared wiring call happens twice. Guarding that with a plain "run once" is
+   right for four of them and wrong for this one, invisibly: app.js calls it
+   first and passes no callback, so keeping only the first caller's would leave
+   the planner never repainting a fissure that opened while the page was open.
+   The failure is silent, it is only reachable in `dist/`, and nothing on
+   either page on its own would show it - which is the whole reason this test
+   exists rather than a comment saying "careful here". */
+test("two callers of the fissure watcher share one poller and both are heard", async () => {
+  const timers = [];
+  let asked = 0;
+  const fetchStub = () => {
+    asked++;
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ fissures: [{ node: "Hydron", tier: "Meso" }] }),
+    });
+  };
+  const data = { fissures: [] };
+  const { S } = loadShared({ data, fetch: fetchStub, timers });
+
+  const heard = [];
+  S.watchFissures();                              // app.js passes none
+  S.watchFissures(() => heard.push("planner"));   // plan.js passes its repaint
+
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+
+  assert.equal(timers.length, 1, "one repeating poll, however many callers there are");
+  assert.equal(asked, 1, "and one request on load, not one per caller");
+  assert.deepEqual(heard, ["planner"],
+                   "the callback of a caller that did not start the poller must still run");
+  assert.equal(data.fissures.length, 1,
+               "and the list is spliced in place, because both pages hold a reference to it");
 });
 
 test("load falls back rather than throwing on a corrupt store", () => {

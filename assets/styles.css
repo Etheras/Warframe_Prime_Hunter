@@ -596,13 +596,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .card-prog{color:var(--txt-dim);font-variant-numeric:tabular-nums}
 .card-prog.full{color:var(--green)}
 
-/* advanced panel */
-#advanced summary{
+/* advanced panel — a class, not an id, because both pages have one and the
+   single-file build puts both in one document. An id selector styles every
+   duplicate happily, so this never showed on screen; the markup was simply
+   invalid, and it was the last duplicated id left in the standalone. */
+.advanced summary{
   font-size:11px;text-transform:uppercase;letter-spacing:1.3px;color:var(--txt-faint);
   font-weight:700;cursor:pointer;padding:2px 0;
 }
-#advanced summary:hover{color:var(--gold)}
-#advanced[open] summary{margin-bottom:8px}
+.advanced summary:hover{color:var(--gold)}
+.advanced[open] summary{margin-bottom:8px}
 
 /* effort weights — minutes per objective, one mission type per row.
    Full-width rows rather than a grid of boxes: the 290px planner sidebar wraps

@@ -46,9 +46,15 @@ const why = !chromium ? "Playwright is not installed (npm install)"
 const TYPES = { ".html": "text/html", ".js": "text/javascript",
                 ".css": "text/css", ".png": "image/png" };
 
+/* Every path this server was asked for. One test needs to count requests
+   rather than inspect a page: "the fissure list is polled once" is a claim
+   about the wire, and the DOM cannot answer it. */
+const hits = [];
+
 function serve() {
   const server = http.createServer((req, res) => {
     const rel = decodeURIComponent(req.url.split("?")[0]).replace(/^\/+/, "") || "index.html";
+    hits.push(rel);
     const full = path.join(ROOT, rel);
     if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
       res.writeHead(404).end("no");
@@ -568,13 +574,13 @@ page_test("the licence and privacy notice is at the foot of both pages, identica
 
 page_test("the materials checklist keeps what you type in it", async () => {
   const { page } = await open("/index.html");
-  await page.locator("#advanced summary").click();
+  await page.locator(".advanced summary").click();
   const first = page.locator("#matList input").first();
   await first.waitFor({ state: "visible", timeout: 2000 });
   await first.fill("7");
   await first.dispatchEvent("change");
   await page.reload({ waitUntil: "load" });
-  await page.locator("#advanced summary").click();
+  await page.locator(".advanced summary").click();
   assert.equal(await page.locator("#matList input").first().inputValue(), "7");
 });
 
@@ -800,7 +806,7 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
      "+N more" hover. Rather than assert on something invisible, use the effort
      weights to bring it into view - which is what a player with those timings
      would see anyway. */
-  await page.locator("#advanced > summary").click();
+  await page.locator(".advanced > summary").click();
   await page.evaluate(() => {
     // re-query every time: each change re-renders the panel, so a list captured
     // up front is a list of detached nodes and setting .value on one does nothing
@@ -983,7 +989,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
                "with nothing set, objective count is the default cost basis");
 
   // an endless mission made expensive per round has to fall behind a fast one
-  await page.locator("#advanced > summary").click();
+  await page.locator(".advanced > summary").click();
   const rows = page.locator(".effort-row input");
   assert.ok(await rows.count() > 0, "every mission type in the plan gets a box");
   const set = async (mode, mins) => {
@@ -1006,7 +1012,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
                /relics \/ min/, "the weights did not survive a reload");
 
-  await page.locator("#advanced > summary").click();
+  await page.locator(".advanced > summary").click();
   await page.locator("#effortClear").click();
   assert.deepEqual(await order(), before,
                    "clearing puts the per-objective default back");
@@ -1844,4 +1850,135 @@ page_test("the collection drawer can show more than its eight best places", asyn
   assert.ok(after <= 8, `a freshly opened item must start folded, got ${after} rows`);
 
   assert.deepEqual(errors, []);
+});
+
+// ── the single-file build ──────────────────────────────────────────────────
+//
+// `dist/warframe-prime-hunter.html` is the artefact strangers download, and
+// until 2026-08-27 nothing anywhere drove it: these tests served the two pages,
+// and test_build.py read the built file as text. Six defects were living in
+// that gap, none of them reachable on either page alone, because the single
+// file is both pages in one document - so every shared wiring call happened
+// twice and every id below the header existed twice.
+//
+// Each test below is one of those six. They are cheap, and any one of them
+// would have caught the lot on the day it appeared.
+
+const BUNDLE = path.join(ROOT, "dist", "warframe-prime-hunter.html");
+const bundleWhy = why
+  || (fs.existsSync(BUNDLE) ? null : "no single-file build yet (run tools/bundle.py)");
+const bundle_test = (name, fn) =>
+  (bundleWhy ? test(name, { skip: bundleWhy }, fn) : test(name, fn));
+
+async function openBundle(options) {
+  const page = await (await browser.newContext(options || {})).newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  await page.goto(origin + "/dist/warframe-prime-hunter.html", { waitUntil: "load" });
+  return { page, errors };
+}
+
+/* The standalone is one file with no `data/` beside it, so the ten-minute
+   fissure refresh has nothing to fetch and is caught and ignored - the
+   documented behaviour, and the same safe direction the list already fails in.
+   Served out of `dist/` that shows up as a 404 on the console, which is not an
+   error these tests should fail on. */
+const realErrors = (errors) =>
+  errors.filter((e) => !/fissures\.json|Failed to load resource/.test(e));
+
+const toTab = (page, view) => page.evaluate((v) => {
+  const tab = [...document.querySelectorAll(".viewtab[data-view]")]
+    .find((t) => t.getAttribute("data-view") === v);
+  if (!tab) throw new Error("no tab for " + v);
+  tab.click();
+}, view);
+
+bundle_test("the standalone's rank stepper moves one rank a press, not two", async () => {
+  const { page, errors } = await openBundle();
+  await page.evaluate(() => localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ mastery: 10 })));
+  await page.reload({ waitUntil: "load" });
+
+  const rank = () => page.evaluate(() =>
+    (JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}") || {}).mastery);
+
+  assert.equal(await rank(), 10, "the seeded rank has to be the one on screen");
+  await page.locator("#mrUp").click();
+  assert.equal(await rank(), 11,
+               "two listeners on #mrUp stepped twice, and the rank derives the Void Trace cap");
+  await page.locator("#mrDown").click();
+  assert.equal(await rank(), 10, "and back down by one, for the same reason");
+  assert.deepEqual(realErrors(errors), []);
+});
+
+bundle_test("one press of Download backup in the standalone saves one file", async () => {
+  const { page, errors } = await openBundle({ acceptDownloads: true });
+  const saved = [];
+  page.on("download", (d) => saved.push(d.suggestedFilename()));
+
+  await page.locator("#dataBtn").click();
+  await page.locator("#downloadBtn").click();
+  await page.waitForTimeout(1500);
+
+  assert.equal(saved.length, 1,
+               `one press must write one file, got ${saved.length}: ${JSON.stringify(saved)}`);
+  assert.match(saved[0], /^prime-hunter-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  assert.deepEqual(realErrors(errors), []);
+});
+
+bundle_test("the standalone's licence footer and backup dialog reach both tabs", async () => {
+  const { page, errors } = await openBundle();
+
+  /* Both used to sit inside the collection's half of the document. The footer
+     was filled twice and both times in that half, so the planner tab carried an
+     empty one - and it is the footer that holds the licence and the Content
+     Policy attribution. The dialog was worse: opened from the planner tab it
+     was a modal inside a `display:none` ancestor, so it rendered at 0x0 while
+     making the rest of the page inert. */
+  for (const view of ["collection", "planner"]) {
+    await toTab(page, view);
+    const seen = await page.evaluate(() => {
+      const foot = document.querySelector("#siteFoot");
+      document.querySelector("#dataBtn").click();
+      const dlg = document.querySelector("#dataDlg");
+      const box = dlg.getBoundingClientRect();
+      const out = {
+        footChars: foot.textContent.trim().length,
+        licence: /Content Policy/.test(foot.textContent),
+        dlgOpen: dlg.open,
+        dlgOnScreen: box.width > 0 && box.height > 0,
+        payload: document.querySelector("#dataArea").value.length,
+      };
+      dlg.close();
+      return out;
+    });
+    assert.ok(seen.footChars > 100, `the ${view} tab has an empty footer`);
+    assert.ok(seen.licence, `the ${view} tab's footer does not carry the Content Policy notice`);
+    assert.ok(seen.dlgOpen && seen.dlgOnScreen,
+              `the backup dialog does not render on the ${view} tab`);
+    assert.ok(seen.payload > 50, `the ${view} tab's backup box is empty`);
+  }
+  assert.deepEqual(realErrors(errors), []);
+});
+
+bundle_test("the standalone polls the fissure list once, not once per view", async () => {
+  hits.length = 0;
+  const { page, errors } = await openBundle();
+  await page.waitForTimeout(600);
+  const polls = hits.filter((h) => h.endsWith("fissures.json")).length;
+  assert.equal(polls, 1,
+               `both pages' scripts call watchFissures, so this counts pollers, not pages — got ${polls}`);
+  assert.deepEqual(realErrors(errors), []);
+});
+
+bundle_test("one page owns the backup dialog, and the other leaves it alone", async () => {
+  const { page } = await openBundle();
+  assert.equal(await page.evaluate(() => document.querySelector("#dataDlg").dataset.wired),
+               "collection",
+               "app.js runs first in the bundle, so it claims the dialog");
+
+  const { page: plan } = await open("/plan.html");
+  assert.equal(await plan.evaluate(() => document.querySelector("#dataDlg").dataset.wired),
+               "planner",
+               "and on its own page the planner still wires its own dialog");
 });

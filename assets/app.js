@@ -1334,9 +1334,25 @@
     }
   }, true);
 
-  /* backup dialog */
+  /* backup dialog.
+
+     One page's handlers, not two. The single-file build runs app.js and
+     plan.js over the same document, and both used to wire this same dialog —
+     so one press of Download backup wrote the file twice and one press of
+     Paste & restore ran two different import handlers, the second quietly
+     undoing the first's reconciliation and overwriting its message. Whichever
+     page reaches the dialog first owns it and the other leaves it alone; the
+     marker says which, because "wired" on its own tells the next reader
+     nothing about who did it. */
   const dlg = $("#dataDlg");
-  $("#dataBtn").addEventListener("click", () => {
+  const ownsDialog = !!dlg && !dlg.dataset.wired;
+  if (ownsDialog) dlg.dataset.wired = "collection";
+  const onDlg = (sel, fn) => {
+    const el = ownsDialog ? $(sel) : null;
+    if (el) el.addEventListener("click", fn);
+  };
+
+  onDlg("#dataBtn", () => {
     // Everything the user took the trouble to set. A backup that restores your
     // collection but loses your farm list and options is not a backup.
     $("#dataArea").value = JSON.stringify(S.backupPayload({ materials: materials }));
@@ -1344,13 +1360,13 @@
     $("#dlgMsg").textContent = "";
     dlg.showModal();
   });
-  $("#dlgCloseBtn").addEventListener("click", () => dlg.close());
-  $("#copyBtn").addEventListener("click", () => {
+  onDlg("#dlgCloseBtn", () => dlg.close());
+  onDlg("#copyBtn", () => {
     $("#dataArea").select();
     try { document.execCommand("copy"); $("#dlgMsg").textContent = "Copied."; }
     catch (e) { $("#dlgMsg").textContent = "Press Ctrl+C to copy."; }
   });
-  $("#importBtn").addEventListener("click", () => {
+  onDlg("#importBtn", () => {
     try {
       const backup = M.parseBackup($("#dataArea").value, ITEMS);
       const { skipped, legacy } = backup;
@@ -1393,8 +1409,16 @@
         (nextWish ? `, ${nextWish.length} on the farm list` : "") +
         (backup.plan ? ", planner options" : "") +
         (legacy ? " (old-format backup, parts filled in)" : "") +
-        (backup.filters ? " Filters restored — reload to see them." : "") +
-        (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped.` : ".");
+        (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped` : "") +
+        ". Reloading…";
+      /* The re-render above is honest about the collection and cannot be about
+         anything else: restored filters were only ever applied by reloading —
+         this message used to say so and ask the reader to do it — and in the
+         single-file build the planner view beside it is still holding the rows
+         and the options it read at load. A restore replaces every slice at
+         once, so the page that reads them all is the right thing to rebuild.
+         This is what the planner has always done; both now do it. */
+      setTimeout(() => location.reload(), 700);
     } catch (err) {
       $("#dlgMsg").style.color = "var(--red)";
       $("#dlgMsg").textContent = "Could not read that: " + err.message;
