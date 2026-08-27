@@ -2254,19 +2254,25 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.ok(await rows.count() > 0,
             `${subject} is in Resurgence and its relics are buyable, so they must be crackable`);
   assert.equal(await page.locator("#planRelics .from-varzia").count(), await rows.count(),
-               "every row here needs Varzia, and a row that does not say so reads as a drop");
+               "every row here comes from Varzia, and a row that does not say so reads as a drop");
 
-  /* And it must not claim more than DE publish. Varzia's shelf is a curated
-     handful — six the day this was written — and `vaultTrader` carries her
-     packs and not one relic row, so this list is every vaulted relic holding a
-     part of an offered Prime: a superset. Saying "from Varzia" presented a
-     superset as a shelf and sent the reader to Maroo's for a relic that is not
-     there. See TODO.md; the list itself still needs a source. */
-  const badge = page.locator("#planRelics .from-varzia").first();
-  assert.match(await badge.innerText(), /may be at Varzia/i,
-               "the badge has to hedge, because which of these she stocks is unpublished");
-  assert.match(await badge.getAttribute("data-tip"), /do not publish/i,
-               "and the tooltip has to say why, or the hedge reads as vagueness");
+  /* And it must be her shelf, not every relic that holds a part of a Prime she
+     is offering. Those are different lists and the second was shipped as the
+     first: 88 relics badged "from Varzia" against the six she was really
+     selling, which sends the reader to Maroo's for a relic that is not there.
+
+     The size is the assertion. A Prime Vault rotation is a handful of relics —
+     six as this was written, and the tag carries between 8 and 28 rows across
+     four refinements, so a couple of dozen is the ceiling. Anything past that
+     means the shelf has stopped being read and the per-Prime guess is back. */
+  const shelf = await page.evaluate(() =>
+    Object.keys(window.WFPRIME_DATA.relics).filter((n) => window.WFPRIME_DATA.relics[n].resurgence));
+  assert.ok(shelf.length > 0 && shelf.length <= 12,
+            `Varzia stocks a rotation, not a catalogue — ${shelf.length} relics ` +
+            `marked hers: ${shelf.join(", ")}`);
+
+  assert.match(await page.locator("#planRelics .from-varzia").first().innerText(),
+               /from Varzia/i, "the badge names where the relic comes from");
 
   assert.equal(await page.locator("#planNodes .spot").count(), 0,
                "these relics have no sources, so ranking a place to run them would be invented");

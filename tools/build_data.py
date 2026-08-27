@@ -319,6 +319,70 @@ def build_resurgence_set(vault_trader: dict, catalog_names: list[str]) -> tuple[
     return active, window
 
 
+# The rotation tag inside a vaulted relic's uniqueName:
+#   /Lotus/Types/Game/Projections/T1VoidProjectionRevenantBaruukVaultASilver
+#                                   ^^^^^^^^^^^^^^ this
+RELIC_VAULT_TAG = re.compile(r"VoidProjection(.+?)Vault[A-Z]")
+
+
+def build_varzia_relics(items_raw: list, vault_trader: dict) -> set[str]:
+    """
+    Which relics Varzia is actually selling, rather than which relics happen to
+    hold a part of a Prime she is offering.
+
+    Those are very different lists and we shipped the second one as the first.
+    Measured 2026-08-27 against the in-game store: her shelf held six relics and
+    we badged 88, because the flag was derived per-Prime - any relic carrying a
+    part of an offered Prime counted, which sweeps in every historical relic
+    those parts ever appeared in.
+
+    **Digital Extremes do not publish the shelf as a list.** `PrimeVaultTraders`
+    carries a `Manifest` of 22 rows - packs, Primes, cosmetics, all priced in
+    Regal Aya - and an `EvergreenManifest` of Twitch cosmetics. Neither has a
+    relic row, and neither does the WFCD proxy of them. Two sessions looked
+    there and concluded it could not be done.
+
+    It is published, though, in the item database, as a naming convention: a
+    relic minted for a Prime Vault rotation is
+    `.../T1VoidProjection<Rotation>Vault<Letter><Refinement>`, and `<Rotation>`
+    is the same word DE build the pack names from - `MPVRevenantBaruukPrimeDualPack`
+    against `...VoidProjectionRevenantBaruukVaultASilver`. So the shelf is the
+    relics whose rotation tag appears in the packs she is currently selling.
+
+    Deterministic, first party, and it needs no new request: the item database is
+    already fetched for names, images and vault state.
+
+    Verified against the owner's screenshot of the live store: six relics, and
+    exactly the six - Lith T13, Lith A9, Meso R6, Neo P8, Axi C9, Axi B9. No
+    misses and no extras.
+    """
+    packs = " ".join(str(row.get("uniqueName", ""))
+                     for row in (vault_trader.get("inventory") or []))
+    if not packs:
+        return set()
+
+    # every rotation tag the item database knows, and the relics under each
+    by_tag: dict[str, set[str]] = {}
+    for row in items_raw or []:
+        if row.get("category") != "Relics":
+            continue
+        m = RELIC_VAULT_TAG.search(str(row.get("uniqueName", "")))
+        if not m:
+            continue
+        # "Lith T13 Exceptional" -> "Lith T13": one shelf entry, four refinements
+        name = " ".join(str(row.get("name", "")).split()[:2])
+        if name:
+            by_tag.setdefault(m.group(1), set()).add(name)
+
+    live = {tag for tag in by_tag if tag in packs}
+    # `EmberRhino` is a substring of `EmberRhinos`, and both are real rotations.
+    # Keep only the longest match so a past rotation cannot ride in on a current
+    # one's pack name.
+    live = {t for t in live if not any(t != o and t in o for o in live)}
+
+    return {name for tag in live for name in by_tag[tag]}
+
+
 # --------------------------------------------------------------------------
 # bounties: which rotation is live, and which limited-time ones exist today
 # --------------------------------------------------------------------------
@@ -1064,6 +1128,18 @@ def main() -> int:
     log(f"resurgence: {len(resurgence)} items live at Varzia "
         f"({resurgence_window.get('activation', '?')[:10]} -> {resurgence_window.get('expiry', '?')[:10]})")
 
+    varzia_relics = build_varzia_relics(items_raw, vault_trader)
+    if varzia_relics:
+        log(f"  shelf: {len(varzia_relics)} relics — {', '.join(sorted(varzia_relics))}")
+    else:
+        # Said out loud rather than quietly falling back to the per-Prime guess
+        # that produced 88 of them. No shelf means the crack list is empty and
+        # these Primes answer as trade-only, which is true and is not a silent
+        # wrong claim - see PROJECT.md.
+        log("  shelf: EMPTY — no relic rotation tag matched Varzia's packs. "
+            "Either DE renamed the convention or the item database is stale; "
+            "Prime Resurgence relics will not be offered this build.")
+
     bounties = build_bounty_meta(rotation_pools, syndicate_missions, world_events,
                                  checked=bool(rotation_pools and syndicate_missions))
     if bounties["families"]:
@@ -1362,10 +1438,12 @@ def main() -> int:
             # Varzia stocks the current Prime Resurgence rotation, and one Aya
             # buys one relic there. So this marks the relics an Aya can actually
             # be spent on - which is what makes an Aya drop worth anything.
-            "resurgence": any(
-                any(rw.startswith(n) for n in resurgence)
-                for rw in (content.get("rewards") or {})
-            ),
+            #
+            # Her shelf, read off DE's own relic naming - see
+            # `build_varzia_relics`. This was a per-Prime guess until
+            # 2026-08-27: any relic holding a part of an offered Prime counted,
+            # which marked 88 where she was selling 6.
+            "resurgence": rname in varzia_relics,
         }
 
     categories = []

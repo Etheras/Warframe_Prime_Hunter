@@ -2753,6 +2753,75 @@ pre-2026-08-27 defaults restored (everything on screen) every test passes; with
 relics by default*, whose entire subject is that default. A test about a default
 is the one kind that should fail when the default moves.
 
+### Varzia's shelf is published, but not where anyone looks for it
+
+**Found by the owner 2026-08-27, from the in-game store, and fixed the same
+day.** Varzia's *Relics* tab during the Revenant & Baruuk rotation held **six**:
+Lith T13, Lith A9, Meso R6, Neo P8, Axi C9, Axi B9. The planner offered **88**,
+every one badged *from Varzia*. All six were among the 88, so it was a superset
+rather than a wrong answer — but a superset presented as a shelf, which sends
+the reader to Maroo's Bazaar for a relic that is not there.
+
+**Where the 88 came from.** `build_resurgence_set` reads `vaultTrader.inventory`
+to learn which *Primes* she is offering — Baruuk, Revenant, Phantasma, Afuris,
+Tatsu. That half was always right, and is the documented reason we read her
+inventory at all (§2, real money). The relic flag was then derived from it: a
+relic counted as hers if **any** of its rewards was a part of an offered Prime,
+which sweeps in every historical relic those parts ever appeared in.
+
+**The obvious source does not have it, and that is why this took two attempts.**
+Measured against the cached feeds:
+
+| Where we looked | What is there |
+|---|---|
+| `vaultTrader.inventory` (WFCD's proxy) | 22 rows — packs, Primes, cosmetics. **No relic row** |
+| DE `PrimeVaultTraders[0].Manifest` | the same 22, priced in Regal Aya |
+| DE `EvergreenManifest` | 82 rows of Twitch cosmetics and four Primes — real money, correctly excluded already |
+| `vaultTrader.schedule` | 54 past and future **pack** rotations |
+| the drop tables | nothing; her shelf is a shop, not a drop |
+
+Nor can it be inferred from the drop tables. Two heuristics were measured
+against the known six and both failed: *fraction of rewards from offered Primes*
+puts Meso R6 (stocked) at 2 of 6 and Lith P8 (not stocked) at 3 of 6; *only
+offered Primes plus Forma* matches **zero** of the 88, the six included. `Lith
+T13` and `Lith P8` are the same shape reward for reward.
+
+**It is published in the item database, as a naming convention.** A relic minted
+for a Prime Vault rotation carries the rotation in its `uniqueName`:
+
+```
+/Lotus/Types/Game/Projections/T1VoidProjectionRevenantBaruukVaultASilver
+                                ^^^^^^^^^^^^^^
+```
+
+and DE build the pack names from the same word —
+`MPVRevenantBaruukPrimeDualPack`. So the shelf is *the relics whose rotation tag
+appears in the packs she is currently selling*. The item database knows 28 such
+tags, 8 to 28 rows each across four refinements; the live one resolves to 24
+rows, which is six relics.
+
+Verified against the owner's screenshot: **six, and exactly the six.** No misses,
+no extras.
+
+Three things make this the right shape rather than a lucky string match:
+
+- **It needs no new request.** The item database is already fetched, for names,
+  images and vault state. Rule 11 is untouched.
+- **It is deterministic and first party** — a DE identifier, parsed, no prose and
+  no model. Rule 4 holds.
+- **The longest tag wins.** `EmberRhino` is a substring of `EmberRhinos` and both
+  are real rotations, so a past one could otherwise ride in on a current one's
+  pack name.
+
+**An empty shelf is said out loud, not filled in.** If no tag matches — DE rename
+the convention, or the item database goes stale — the build logs that Prime
+Resurgence relics will not be offered, and the planner answers those Primes as
+trade-only, which is the true statement. Falling back to the per-Prime guess
+would restore the 88 silently, and a silent wrong claim is the thing this fixed.
+
+The test asserts the **size**: a rotation is a handful, so more than a dozen
+relics marked means the shelf has stopped being read.
+
 ### Obtainable is not owned, and a Prime with no way in still has an answer
 
 **Shipped 2026-08-27**, immediately after the Resurgence fix and generalising it

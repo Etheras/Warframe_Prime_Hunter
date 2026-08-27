@@ -123,7 +123,6 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| Varzia's relic shelf is a curated handful and we list every relic that could be on it | session — DE publish her packs and not her relics, so this needs a new source |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
@@ -782,67 +781,6 @@ Worth checking against a live window rather than the cached one, since a single
 reading cannot tell a misfiled job from a genuinely different phase on Deimos.
 If Deimos really does run its own rotation phase, the family split is too coarse
 and that is a larger and more interesting problem than a misfiled bounty.
-
-### Varzia's relic shelf is a curated handful and we list every relic that could be on it
-
-**Found by the owner 2026-08-27, from the in-game store.** Varzia's *Relics* tab
-during the Revenant & Baruuk rotation held **six**: Lith T13, Lith A9, Meso R6,
-Neo P8, Axi C9, Axi B9. The planner's crack list offered **88**, each badged as
-hers. Every one of the six is in our 88, so this is a superset rather than a
-wrong answer — but a superset presented as a shelf, which sends the reader to
-Maroo's Bazaar for a relic that is not there.
-
-**Where the 88 come from.** `build_resurgence_set` in `tools/build_data.py` reads
-`vaultTrader.inventory` to learn which *Primes* she is offering — five of them:
-Baruuk, Revenant, Phantasma, Afuris, Tatsu. That part is right and is the
-documented reason we read her inventory at all (`PROJECT.md §2`, real money).
-The relic flag is then derived from it, at `build_data.py:1365`: a relic is hers
-if **any** of its rewards is a part of an offered Prime. Every historical relic
-that ever carried one of those parts qualifies.
-
-**Digital Extremes do not publish the relic list.** Measured against the cached
-feed on 2026-08-27: `vaultTrader.inventory` has 22 rows — three MPV packs, the
-Primes themselves, an armour set, cosmetics — and **not one relic row**. So the
-list cannot be read from the source we already have.
-
-**And it cannot be inferred.** Two heuristics were tried against the six known
-relics and both failed:
-
-- *Fraction of rewards from offered Primes.* Meso R6, which she stocks, is 2 of
-  6; Lith P8, which she does not, is 3 of 6.
-- *Only offered Primes plus Forma.* Zero of the 88 qualify, the six included —
-  every relic in this set carries parts of unoffered Primes as well. `Lith T13`
-  (stocked) and `Lith P8` (not) are the same shape reward for reward.
-
-The shelf is a Digital Extremes editorial choice, and nothing in the drop tables
-encodes it.
-
-**Shipped meanwhile, on 2026-08-27: the claim was narrowed, not the list.** The
-badge reads *may be at Varzia* rather than *from Varzia*, and its tooltip says
-DE do not publish her stock, that this is every vaulted relic holding a part of
-an offered Prime, and to check the shelf in game before spending. Same rule as
-Baro's window — a wrong yes claims something is buyable when it is not. It is a
-holding position and it does not reduce 88 rows to 6.
-
-**The proper fix needs a source, and that is the whole of the work.** In order of
-preference:
-
-1. **A first-party route to her inventory.** `vaultTrader` is a proxy of DE's
-   worldstate; check whether the raw worldstate `PrimeVaultTraders` entry carries
-   a `Manifest` the proxy is dropping. Baro's `Manifest` was measured empty
-   between visits and is still unanswered (see the Baro entry) — Varzia's is
-   worth the same check, and unlike Baro she is present continuously, so it can
-   be checked today.
-2. **The wiki's Prime Resurgence page**, if it carries a generated relic table.
-   Read it the way `catalogue.py` reads the Prime page. Rule 4 holds: a table, no
-   prose, no model.
-3. **Nothing, and say so properly** — keep the superset but rank it, so the
-   relics most likely to be on the shelf lead. That is a guess dressed as an
-   order and is the worst of the three; it is here because it is the only one
-   that needs no new source.
-
-Do **not** hardcode the six. They change every rotation, and a list that goes
-stale silently is worse than a superset that says it is one.
 
 ### The page tests flake in a full run and pass on their own
 
