@@ -111,6 +111,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Two relics that pay the same part are counted as two | session — the owner's, 2026-08-27; reproduced, and it inflates the top of the ranking |
+| Cap an endless run at 4 rounds, 5 on a fissure | small — the owner's, 2026-08-27; half of it already ships, and it moves 45 of 66 endless rows |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -357,6 +358,84 @@ Worth settling first: **whether the fix belongs to the node ranking, the crack
 list, or both** — the two observations come from one cause but surface in two
 lists, and the project's standing rule is that those two lists answer different
 questions and must not be merged into one score.
+
+### Cap an endless run at 4 rounds, 5 on a fissure
+
+**Asked for by the owner 2026-08-27.** On an endless mission the planner should
+recommend staying **4 rounds**, or **5 when a fissure is up**, rather than working
+the length out from the arithmetic.
+
+**Half of it already ships.** A node carrying a live fissure is run to
+`BONUS_ROTATIONS = 5` — the free relic for reaching five rotations is value the
+rate cannot see, so the fissure overrides the arithmetic and always has. That half
+needs no change. Measured on the live build: the one endless row with a fissure on
+it is at 5.
+
+**The other half is the 6.** `runValue` offers a non-fissure endless node two
+lengths (`rotation.js`, the mode list): `reset`, meaning run to the last round
+that pays anything — at most the 4-round cycle — and `aabcaa`, meaning six rounds,
+a cycle and a half, whose extra two rounds are both rotation **A**. `scorePlan`
+picks between them on `value / (rounds + RUN_OVERHEAD)`, and six wins whenever
+two more A rotations beat the cost of restarting.
+
+**The rule, refined by the owner the same day:** do not compute `aabcaa` at all
+**unless the player is in a 4-man premade AND rotation A is the only thing wanted
+at that node**. Otherwise the length is `reset`, capped at 4; a fissure is still 5.
+
+**Two measurements make that rule the right shape rather than a preference.**
+
+*First: `aabcaa` wins whenever rotation A is wanted at all.* Driven through
+`runValue` against a Survival node:
+
+| What is wanted | Length chosen |
+|---|---|
+| only rotation A | **6** (`aabcaa`) |
+| A and C | **6** |
+| all three | **6** |
+| A heavy, C light | **6** |
+| only rotation C | 4 (`reset`) |
+| only rotation B | 3 (`reset`) |
+
+So it is not an occasional answer, it is the answer for every profile containing
+A — which is why **45 of 66 endless rows** run to 6 over every farmable Prime,
+against 15 at four and 5 at three, with the single fissured row correctly at five.
+
+*Second, and this is the part that decides it: in the only-A case the arithmetic
+is exactly tied.* With `RUN_OVERHEAD = 2`, `reset` takes 2 A rewards over 2 rounds
+and `aabcaa` takes 4 over 6 — `0.4/(2+2)` against `0.8/(6+2)`, **0.1000 both
+ways**, equal to the last bit. `aabcaa` wins that comparison on tie-break order
+and nothing else. So in the one case the owner wants it kept, the model has no
+opinion at all, and the player's circumstance is the only thing that can decide —
+which is precisely what "4-man premade" is.
+
+**And that is why the squad flag is the right input.** A premade runs rounds
+faster, so four A rewards in one sitting beat two-and-a-restart in wall clock even
+though the rate model calls them equal. `opts.squad` already exists and already
+means "you have an organised team"; today it gates only Disruption's under-defend
+*pattern* (`squadOnly` in `ROT_PATTERN`), never a run *length*. This would be the
+first time it decided how long to stay, which is a new coupling and worth naming
+in the code rather than discovering later.
+
+**Three things to settle when it is built:**
+
+- **Where the gate lives.** `squadOnly` is a property of a rotation *pattern* and
+  `aabcaa` is a *length*, so reusing that flag would overload it. The mode list
+  in `runValue` is where the condition belongs, and it needs the wanted-rotation
+  profile — which that function already receives as `alt`.
+- **What "only rotation A is needed" means exactly.** Strictly zero value in B
+  and C, or A above some share of the total? Strict is defensible and rare; a
+  share is a second constant to justify. Strict first, and measure how many nodes
+  qualify before adding a threshold nobody asked for.
+- **What it does to `RUN_OVERHEAD`.** Its whole job is deciding *this*
+  comparison, and with one length left on most nodes it decides much less. Do not
+  delete it: Spy, Caches and Faceoff still choose nothing, and `reset` still picks
+  between shorter answers on nodes that pay in fewer than four rounds.
+
+**Say it on the row.** The project has exactly one deliberate thumb on the scale
+today — the Railjack cache halving — and `PROJECT.md §7` requires it to be visible
+where it applies. A length that is capped by preference rather than by arithmetic
+is the second, and it should be held to the same standard: the row already says
+*"Worth staying 6 rounds…"*, so it can as easily say why it is staying four.
 
 ### What the misses are worth, in Ducats
 
