@@ -21,6 +21,9 @@
      assets/rotation.js, so this page and the collection view cannot disagree
      about it. Aliased here so the call sites read the same as they always did. */
   const ROT = window.WFPrimeRotation;
+  /* The Mastery Rank field's handle, set where it is wired at the foot of this
+     file. Null until then, and on a document without the field. */
+  let MR = null;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -858,9 +861,13 @@
   }
 
   /* What a node demands before you can play it — a ship, or other players.
-     Said on the row rather than left to be discovered in the mission. */
+     Said on the row rather than left to be discovered in the mission.
+
+     The reader's own rank goes in because one demand is about them rather than
+     the node: a bounty DE list at MR 5 is worth saying to somebody below it and
+     is noise to everybody else. */
   function demandTags(n) {
-    return ROT.demandsOf(n).map((d) =>
+    return ROT.demandsOf(n, MR ? MR.read() : null).map((d) =>
       '<span class="demand" data-tip="' + esc(d.tip) + '">' + esc(d.label) + "</span>"
     ).join("");
   }
@@ -1827,7 +1834,10 @@
 
   S.wireFileBackup();
   S.staleBanner();
-  S.wireMastery();
+  /* Repaints when the rank moves: since 2026-08-27 a bounty DE list above the
+     reader's rank says so on the row, so the ranking's badges follow the field.
+     It still gates nothing — this informs and never filters. */
+  MR = S.wireMastery(render);
   S.siteFooter();
   render();
 

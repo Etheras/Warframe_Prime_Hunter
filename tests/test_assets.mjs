@@ -278,8 +278,13 @@ const BOUNTY_DATA = {
           family: "standard", rotations: "ABC", stages: 3 },
         "Level 30 - 40 Cambion Drift Bounty": {
           family: "standard", rotations: "AB", letter: "A" },
+        /* `minMR` is Digital Extremes' own per-job figure, and it sits on the
+           GROUP rather than on the source row — which is the whole trap: a
+           first attempt read `source.minMR`, found nothing on any of the 96
+           bounty rows in the live build, and the badge silently never
+           appeared. Carried here so a test would catch that. */
         "Level 30 - 40 Isolation Vault": {
-          family: "vault", rotations: "ABC", letter: "B", stages: 5 },
+          family: "vault", rotations: "ABC", letter: "B", stages: 5, minMR: 5 },
         /* Publishes two letters and DE named neither, so it falls back to the
            family's C — a letter it does not have. That is the case the row has
            to average rather than claim, and it is why the published letters
@@ -866,6 +871,50 @@ test("the Profit-Taker heist asks for standing, and says so", () => {
                    "an ordinary board bounty asks for nothing extra");
   assert.match(ROT.demandsOf({ node: "Level 40 - 60 PROFIT-TAKER - PHASE 1" })[0].tip,
                /Rank 5/, "the tip has to name the rank, not just imply a gate");
+});
+
+test("a bounty above your rank says so, and stops once you have the rank", () => {
+  /* DE publish the rank a bounty asks for, per job, and it sat on the payload
+     unused because saying "this needs MR 5" is worth nothing to somebody whose
+     rank we do not know. The Mastery Rank field shipped 2026-08-26 and
+     unblocked it.
+
+     It informs and never filters — the wiki's Bounty page is explicit that
+     these "can still be played, when an eligible squad member selects one", so
+     the rank gates picking the bounty off the board rather than running it. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const vault = { kind: "bounty", node: "Level 30 - 40 Isolation Vault" };
+  const labels = (mr) => plain(ROT.demandsOf(vault, mr).map((d) => d.label));
+
+  assert.deepEqual(labels(null), ["MR 5"],
+                   "with no rank given the demand is real and worth saying");
+  assert.deepEqual(labels(undefined), ["MR 5"], "and not asking is the same as not saying");
+  assert.deepEqual(labels(0), ["MR 5"], "Unranked is a real rank and is below 5");
+  assert.deepEqual(labels(4), ["MR 5"], "one short still counts");
+  assert.deepEqual(labels(5), [], "at the rank there is nothing left to warn about");
+  assert.deepEqual(labels(30), [],
+                   "and 'needs MR 5' on an MR 30 player's row is noise on a strip " +
+                   "that has to earn every badge");
+
+  const tip = ROT.demandsOf(vault, null).find((d) => /^MR /.test(d.label)).tip;
+  assert.match(tip, /Mastery Rank 5/, "the tip names the rank rather than implying a gate");
+  assert.match(tip, /squadmate|squad member/i,
+               "and says a squadmate can select it, or it reads as a wall it is not");
+  assert.match(tip, /Nothing here is hidden/,
+               "this field informs and never filters, and the tip has to say so");
+
+  /* Off the group, not the row. Reading `source.minMR` finds nothing on any of
+     the live build's 96 bounty rows, so the badge would never appear and no
+     assertion above would notice. */
+  assert.deepEqual(plain(ROT.demandsOf(
+    { kind: "bounty", node: "Level 30 - 40 Isolation Vault", minMR: 99 }, 50).map((d) => d.label)),
+    [], "a minMR planted on the row must not be what this reads");
+
+  assert.deepEqual(plain(ROT.demandsOf(
+    { kind: "bounty", node: "Level 5 - 15 Cetus Bounty" }, null).map((d) => d.label)),
+    [], "a group with no rank gate carries no badge");
+  assert.deepEqual(plain(ROT.demandsOf({ kind: "mission", node: "Ukko" }, null).map((d) => d.label)),
+                   [], "and an ordinary mission is not a bounty at all");
 });
 
 test("two nodes are the same bet only when the table AND the mode match", () => {

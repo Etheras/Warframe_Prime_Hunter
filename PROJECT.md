@@ -2753,6 +2753,43 @@ pre-2026-08-27 defaults restored (everything on screen) every test passes; with
 relics by default*, whose entire subject is that default. A test about a default
 is the one kind that should fail when the default moves.
 
+### A bounty above your rank says so, and only to you
+
+**Shipped 2026-08-27**, and it is the first thing on either page that reads the
+Mastery Rank field — which is why it could not be built before that field landed
+on 2026-08-26. DE publish the rank each bounty asks for as `minMR`; it had been
+on the payload and unused, because *"this needs MR 5"* is worth nothing to
+somebody whose rank you do not know.
+
+`MR 5` now sits in the demand strip beside `Railjack` and `Steel Path`, and
+**appears only when the reader is below the rank, or has not given one.** A badge
+saying *needs MR 5* on an MR 30 player's row is noise on a strip that has to earn
+every entry. Six of the thirteen relic-bearing bounty nodes are gated today, all
+Isolation Vaults at MR 5.
+
+**It informs and never filters**, which is this field's standing rule and is also
+simply true: the wiki's Bounty page says these *"can still be played, when an
+eligible squad member selects one"*. The rank gates picking the bounty off the
+board, not running it, so the tooltip says a squadmate who has the rank can
+select one — without that sentence the badge reads as a wall it is not.
+
+**Two traps, both caught by measuring rather than by reading the code.**
+
+*`minMR` is on the group, not the source row.* The first attempt read
+`source.minMR`, which is what the field is called in the worldstate — and found
+nothing, on any of the 96 bounty source rows in the live build. `build_data.py`
+files it under `meta.bounties.groups[node]`, where 19 of 24 groups carry one. A
+badge that never appears breaks no test that does not already know the answer, so
+the fixture now carries a group `minMR` and a test plants a decoy on the row.
+
+*`wireMastery` is `once()`-guarded.* The single-file build runs both pages'
+wiring over one document, so the DOM must be bound once — but both views need
+telling when the rank moves, or the planner's badges keep a stale answer. One
+callback would have been silently dropped for whichever page ran second, so it
+takes a list of subscribers instead. This is also the first change that makes the
+rank need a repaint at all; `app.js` carried a comment saying no page read it and
+therefore none had to be told, and that comment was true until this.
+
 ### Baro's label says when, and his checkbox stays where it is
 
 **Shipped 2026-08-27.** `meta.baro` had carried his window since earlier the same
