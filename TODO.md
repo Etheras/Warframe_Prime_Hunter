@@ -908,28 +908,72 @@ the cache it fell back on was 69 minutes old, so the build 69 minutes earlier
 *did* fetch successfully from the same runner. Something rejects some requests and
 not others.
 
-**What is not yet known, and would need measuring before any fix:**
+**Why, researched 2026-08-28 rather than guessed.** `api.warframe.com` sits
+behind **Akamai**, and Akamai's edge blocks datacentre and VPN address ranges. A
+[DigitalOcean community
+report](https://www.digitalocean.com/community/questions/403-forbidden-access-denied-please-help-warframe-blocking-digitalocean-or-vice-versa)
+of the same symptom carries the giveaway header:
 
-- **How often.** One log line is one data point. The rate matters: an occasional
-  403 against a document that changes every few minutes is cosmetic, and a
-  majority of runs failing means the live feeds on the deployed site are mostly
-  fiction. `gh run list` plus a grep over several builds' logs answers it.
-- **Why.** A 403 rather than a 429 points at the requester rather than the rate —
-  a datacentre IP range, or the user agent, or both. This project already knows
-  that `wiki.warframe.com` 403s anything that is not a browser, which is why
-  artwork comes from a CDN instead; the same shape of block on a cloud IP would
-  explain this exactly. It fetches fine from the owner's own machine, which fits.
-- **Whether the local scheduled task masks it.** `schedule.ps1` refreshes from the
-  owner's machine, where the fetch works. If that is what keeps the published data
-  current in practice, then CI has been degraded for longer than anyone noticed
-  and the banner has been telling the truth to nobody.
+```
+HTTP/1.1 403 Forbidden
+Server: AkamaiGHost
+```
 
-**Do not "fix" it by retrying harder.** `PROJECT.md §2` — every request is
-somebody else's bandwidth, and a 403 is a refusal rather than a hiccup. If DE do
-not want requests from a cloud runner, the answer is to stop making them from
-there, not to make more of them. Options worth weighing: publish from the
-scheduled local refresh instead, accept the staleness and let the banner say so
-(which is the current behaviour and is honest), or ask DE.
+GitHub's runners are Azure datacentre IPs, which is the same category. Two more
+observations fit and neither was arranged: the same request succeeds from the
+owner's residential connection, and an attempt to read
+`forums.warframe.com` from this session's own cloud IP was **also** 403ed while
+researching this. It is the network path being refused, not the request.
+
+**That is also why it is intermittent.** Akamai's rules are applied per edge PoP
+and per address, so one runner draws an IP that passes and the next does not.
+Nothing about our request changes between builds.
+
+**Two things follow, and the first corrects a claim in our own docs.**
+
+*`PROJECT.md §8` item 7 says wiki images "return HTTP 403 to anything that isn't a
+real browser session".* The **403 was observed**; *"isn't a real browser session"*
+is an interpretation laid on top of it, and today's evidence points elsewhere — at
+the edge refusing an address range rather than at anything sniffing the request.
+That distinction is not academic: if it were user-agent detection, a different UA
+would fix it, and **it will not**. Changing the origin might. The observation
+stands; the explanation attached to it should be treated as unproven.
+
+*Probing for other endpoints is not an option, and is already settled.* `§2` and
+the endpoint sweep both say so: `api.warframe.com` exposes exactly one path, ten
+plausible siblings were checked and 404, and going further is brute-forcing
+somebody's server. A 403 from an edge appliance is a refusal, and the answer to a
+refusal is not more requests. **Do not add retries** — every request is somebody
+else's bandwidth (`§2`), and retrying an Akamai block just spends it.
+
+**The real defect is ours, and it is not the 403.** All three WFCD fallbacks —
+`vault_trader`, the bounty boards, the fissures — fire only when the worldstate
+yields **nothing usable**. A stale cached copy is "usable", so on this build the
+403 was absorbed by the cache and **no fallback ran**: the site published
+69-minute-old fissures while a fresh copy of the same document sat unused at the
+proxy. The log even reads *"19 fissures from Digital Extremes"*, which was true of
+the copy and not of the hour. Fissures last a couple of hours, so this is the feed
+where an hour of staleness costs the most.
+
+**Options, in the order they are worth weighing:**
+
+1. **Prefer a fresh proxy copy over a stale first-party one, for live feeds only.**
+   The adapters already produce identical shapes — `PROJECT.md §6` says they were
+   built that way *"so the two are interchangeable and either can be the fallback
+   for the other"* — so this is a condition, not a port. First party stays the
+   default; the cache stops out-ranking a live alternative.
+2. **Publish from the local scheduled refresh.** `schedule.ps1` runs where the
+   fetch works. Worth checking first whether it is already masking this: if the
+   published data is usually current, CI has been degraded longer than anyone
+   noticed and the banner has been telling the truth to nobody.
+3. **Accept it and let the banner say so.** Current behaviour, and honest. The
+   weakest option only because option 1 is cheap.
+4. **Ask DE.** Their forums are the documented channel. Slowest, and the only one
+   that could make the runner work directly.
+
+**Still worth measuring: how often.** One log line is one data point, and the rate
+decides how much option 1 buys. A grep for `refresh failed` across several builds'
+logs answers it and costs nothing.
 
 ### The shell-write guard lets `python - <<'EOF'` straight through
 

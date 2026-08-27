@@ -3633,8 +3633,8 @@ forever.
 
 **There is no icon, and the second attempt is why.** The first build carried a
 drawn sigil, because DE's own rank icons are not reachable from here and both
-routes were checked on 2026-08-26: `wiki.warframe.com` 403s any request that is not
-a browser (§8), and the item CDN that supplies every other image in this app has no
+routes were checked on 2026-08-26: `wiki.warframe.com` 403s us (§8 — the reason is
+not established), and the item CDN that supplies every other image in this app has no
 rank art — its backing store 404s `IconRank1.png` while item images resolve. **The
 owner cut the sigil rather than accept a substitute**, and that is the more useful
 precedent: where the real thing cannot be had, a lookalike is not automatically
@@ -4123,9 +4123,18 @@ These cost real debugging time — worth remembering.
    does this.
 6. **Export names carry internal tags**: `"<ARCHWING> Odonata Prime"`. Strip the
    leading `<…>` or every archwing looks like a brand-new Prime.
-7. **Wiki images return HTTP 403** to anything that isn't a real browser session, with
-   or without the `?hash` query. Artwork comes from `cdn.warframestat.us/img/<imageName>`
-   using the exact casing the items API reports (`AshPrime.png`, not `ash-prime.png`).
+7. **Wiki images return HTTP 403**, with or without the `?hash` query. Artwork comes
+   from `cdn.warframestat.us/img/<imageName>` using the exact casing the items API
+   reports (`AshPrime.png`, not `ash-prime.png`).
+   This said *"to anything that isn't a real browser session"* until 2026-08-28, and
+   that half was an interpretation rather than an observation. The 403 was measured;
+   the cause was not. Evidence gathered while chasing the same status from
+   `api.warframe.com` points at **the edge refusing an address range** — DE sit
+   behind Akamai, a datacentre IP draws `403 / Server: AkamaiGHost`, and the same
+   request succeeds from a residential connection. If that is the mechanism here too
+   then **changing the user agent cannot help and changing the origin might**, which
+   is the opposite of what the old sentence implied. See `TODO.md`, *Digital Extremes
+   403 the GitHub runner*.
 8. **Only ~35 relics drop at any one time.** That looks broken but is correct — the
    rest are vaulted. It's why only 36 of 167 Primes are farmable right now.
 9. **The pipeline is Python stdlib and the front end has no dependencies**, and that
