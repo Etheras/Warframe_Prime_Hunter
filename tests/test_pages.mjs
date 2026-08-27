@@ -1779,8 +1779,13 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
     return null;
   });
   assert.ok(key, "no endless node ranked without a fissure already on it");
-  const endless = page.locator("#planNodes .spot")
-    .filter({ hasText: key.split(" (")[0] }).first();
+  /* Located on the node key, never on `hasText` of the node's name. `hasText`
+     is a case-insensitive SUBSTRING match, so picking "Ani" also matched
+     Tar-ani-s — and when the ranking changed on 2026-08-27 Taranis sorted above
+     Ani, already carried a fissure, and reported the five rounds this asserts
+     are six. The selection was already careful; the lookup was not, and a
+     fuzzy lookup makes a careful selection worth nothing. */
+  const endless = rowFor(page, key);
   assert.match(await endless.locator(".rounds").innerText(), /6 rounds/,
                "with no fissure this should be staying for rotation A");
 
@@ -1793,7 +1798,7 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
   }, key);
   await rerender();
 
-  const row = page.locator("#planNodes .spot").filter({ hasText: key.split(" (")[0] }).first();
+  const row = rowFor(page, key);
   assert.match(await row.locator(".rounds").innerText(), /5 rounds/,
                "a fissure is up here, so the run goes to five rotations");
   assert.match(await row.locator(".est").innerText(), /free relic/,

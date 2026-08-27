@@ -87,6 +87,18 @@ EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
                  "ExportRecipes_en.json", "ExportResources_en.json",
                  "ExportManifest.json"]
 
+# Which of those a build may finish without. Each has a documented fallback that
+# is already tested: no texture manifest means cards fall back to the glyph they
+# already use, and no recipes or resources means the part list, the quantities
+# and the Ducat values come from the item API as they did before 2026-08-27.
+#
+# The other four are not on this list on purpose. A missing node level or a
+# missing Prime is wrong data rather than thinner data, and a build that quietly
+# published it would be worse than one that stopped.
+EXPORT_OPTIONAL = frozenset({
+    "ExportManifest.json", "ExportRecipes_en.json", "ExportResources_en.json",
+})
+
 # Where DE serve the textures `ExportManifest.json` names. The manifest gives a
 # `textureLocation` such as
 #   /Lotus/Interface/Icons/StoreIcons/Primes/AshPrime.png!00_jy1ev7ijK8d8nQ3WuE7NYQ

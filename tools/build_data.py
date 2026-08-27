@@ -52,7 +52,8 @@ import official                                           # noqa: E402
 import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
-                     DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_WANTED,
+                     DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_OPTIONAL,
+                     EXPORT_WANTED,
                      DE_TEXTURES, FISSURES, IMG_CDN,
                      ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE,
                      SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WORLDSTATE, WIKI_RAW,
@@ -159,14 +160,21 @@ def acquire_export(offline: bool):
             # that for as long as the four manifests here were all warm; adding
             # a fifth found it, by making `--offline` fatal on the first run
             # after the list grew.
-            # The texture manifest is an enrichment and the others are not: a
-            # card with no picture falls back to a glyph that already exists,
-            # while missing node levels or a missing Prime are wrong data. So
-            # only this one is `optional`, which is what keeps a cold miss on it
-            # from aborting an otherwise complete build.
+            # Three of these are enrichments and three are not. A card with no
+            # picture falls back to a glyph that already exists, and a Prime with
+            # no DE recipe falls back to the item API's part list — both are
+            # documented, tested degradations. Missing node levels or a missing
+            # Prime are wrong data, so those stay fatal on a cold miss.
+            #
+            # `ExportRecipes` and `ExportResources` joined this list on
+            # 2026-08-27 and were NOT marked optional, which turned CI red the
+            # same day: the runner restores a cache from an earlier run, that
+            # cache predates the two new files by definition, and `--offline`
+            # then aborted the whole build over an enrichment it is designed to
+            # do without. A source whose absence has a fallback must never be
+            # able to stop the build — `PROJECT.md §6`.
             raw = fetch(EXPORT_MANIFEST.format(file=f"{want}!{tag}"), f"export_{want}",
-                        offline, critical=False,
-                        optional=(want == "ExportManifest.json"))
+                        offline, critical=False, optional=want in EXPORT_OPTIONAL)
             if raw:
                 exports[want] = official.load_export(raw)
         except Exception as exc:

@@ -115,10 +115,12 @@ What is left of the entry is two fields and a warning about one of them.
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
 
-**The first row is the one to take next**, and it is a decision rather than a
-measurement: the sweep is finished and the numbers are in the entry. It also gates
-the second — *"the largest distortion"* is only meaningful once the unit the
-ranking divides by means the same thing on every row.
+**The second row is the one to take next.** It was gated by the unit question —
+*"the largest distortion"* is only meaningful once the unit the ranking divides by
+means the same thing on every row — and that was settled on 2026-08-27, so the
+gate is gone. The first row is what is left of the entry that gated it: seven
+mission types with no rotation confirmation, tedious rather than hard, and
+blocking nothing.
 
 ### Interface
 
