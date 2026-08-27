@@ -126,7 +126,7 @@ ranking divides by means the same thing on every row.
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
-| The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
+| The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
@@ -864,20 +864,46 @@ treated as one until somebody measures it.
 **Worth fixing rather than tolerating.** This suite is the gate before every push
 — `PROJECT.md §2` says so — and a gate that fails one run in a few teaches people
 to re-run rather than to read, which is exactly how a real failure gets waved
-through. Start by capturing which assertion inside each test fails, since both
-are multi-assertion and the runner currently reports only the test name.
+through.
 
-**One candidate cause was removed on 2026-08-27, and it is not yet known whether
-it was the cause.** Until that day no page test closed its browser context, so a
-full run finished holding fifty live Chromium profiles, all of them accumulating
-while the browser group ran last on an already-busy machine. Contexts are now
-closed as each test ends. That is a real reduction in pressure of exactly the
-kind the timing guess above describes — and it is a guess that this addressed it,
-not a measurement. **The flake has not been reproduced since, but neither has it
-been hunted**: it needed two consecutive full runs to appear once, and only a few
-full runs have happened since. Leave this entry open until somebody runs the
-suite enough times to say. If it does recur, the fifty-contexts theory is dead
-and the next suspect is the per-assertion detail this entry already asks for.
+**The diagnostic gap is closed, which was step one.** The runner parsed TAP's
+`ok`/`not ok` lines and threw the rest away, so a failure said *which test* and
+never *which claim* — and both flaking tests carry a dozen assertions each. That
+is why it could be observed twice and diagnosed neither time. `_tap_failure` now
+reads the `error:` block underneath and reports it:
+
+```
+js: the collection drawer can show more than its eight best places
+  got 'not ok', wanted 'ok'
+     the drawer still opens on the top eight 8 !== 9  [tests\test_pages.mjs:269:42]
+```
+
+One caveat worth knowing: the `location` is where `test()` was called, so every
+`test_pages.mjs` entry reports the `page_test` wrapper's line and only the file
+name is useful. The message is the part that matters.
+
+**Two candidate causes were removed on 2026-08-27, and it is still not proven
+which — or whether either — was it.**
+
+- No page test closed its browser context, so a full run finished holding fifty
+  live Chromium profiles, accumulating while the browser group ran last on an
+  already-busy machine. Contexts are now closed as each test ends.
+- `test_offline_build` rewrote `data/` on every run, which the page tests then
+  read. The runner walks its groups in order so they never *overlap* — that was
+  checked and is why this was dismissed once — but "does not overlap" is not
+  "does not interact": the browser group was reading a payload rebuilt seconds
+  earlier by another process. It is snapshotted and restored now, so the page
+  tests see the same bytes every run.
+
+**Evidence, such as it is: six consecutive clean full runs, plus a dozen
+incidental ones the same day.** The flake needed two consecutive runs to appear
+once, so that is meaningfully more than it took to find — and it is still absence
+of evidence rather than evidence of absence, which is why this entry stays open.
+
+**What to do if it recurs.** The output will now name the assertion, which is the
+thing nobody had before. Both theories above are dead at that point, and the next
+suspect is the one the original entry named and could not test: timing under
+load, in a group that runs last after half a minute of subprocesses.
 
 ### A backend refresh finds new fissures and the ranking does not move
 

@@ -2415,6 +2415,66 @@ def find_node() -> str | None:
     return None
 
 
+def _tap_failure(lines: list[str], at: int) -> str:
+    """
+    The assertion behind a `not ok`, out of TAP's diagnostic block.
+
+    The runner used to report only the test name, which is why the page-test
+    flake of 2026-08-27 could be observed twice and diagnosed neither time:
+    both failing tests carry a dozen assertions each and the output said which
+    test, never which claim. Node writes the reason directly underneath —
+
+        not ok 12 - the drawer can show more than its eight best places
+          ---
+          location: '/…/tests/test_pages.mjs:1932:3'
+          failureType: 'testCodeFailure'
+          error: |-
+            expanding has to show every place it counted
+
+    — and this reads it back out. Best effort by design: a shape it does not
+    recognise costs nothing, because the caller already reports the failure.
+
+    **The `location` is where `test()` was called, not where the assertion
+    failed.** Every test in `test_pages.mjs` goes through the `page_test`
+    wrapper, so they all report its line and the file is the only useful half.
+    `test_assets.mjs` calls `test()` directly and gets a real one. The message is
+    the part worth reading either way, which is why it comes first.
+    """
+    error: list[str] = []
+    location, indent, in_error = "", None, False
+    for line in lines[at + 1:]:
+        if not line.strip():
+            continue
+        width = len(line) - len(line.lstrip())
+        if indent is None:
+            if width == 0:
+                return ""                   # no diagnostic block at all
+            indent = width
+        elif width < indent:
+            break                           # the block ended; the next test
+        text = line.strip()
+        key = re.match(r"^([a-z_]+):\s*(.*)$", text)
+        if key:
+            # `stack:` and `error:` are folded blocks and the stack is the noisy
+            # one — every frame in it is node's own test runner. Only the error
+            # is worth carrying, so a new key always closes the last block.
+            in_error = key.group(1) == "error"
+            if key.group(1) == "location":
+                # keep the file and line; the absolute path in front is noise
+                location = re.sub(r"^.*[\\/](tests[\\/])", r"\1",
+                                  key.group(2).strip().strip("'\""))
+            elif in_error and key.group(2).strip() not in ("|-", "|", ">-", ">"):
+                error.append(key.group(2).strip().strip("'\""))
+        elif in_error:
+            error.append(text)
+        if len(" ".join(error)) > 240:
+            break
+    said = re.sub(r"\s+", " ", " ".join(error)).strip()
+    if location:
+        said = f"{said}  [{location}]" if said else location
+    return said[:400]
+
+
 def test_browser_assets() -> None:
     """
     The pipeline was tested and the JavaScript was not, which is where the
@@ -2459,8 +2519,9 @@ def test_browser_assets() -> None:
                         os.path.join("tests", "test_model.mjs"),
                         os.path.join("tests", "test_pages.mjs")],
                        capture_output=True, text=True, cwd=ROOT)
+    lines = (r.stdout or "").splitlines()
     seen = skipped = 0
-    for line in (r.stdout or "").splitlines():
+    for i, line in enumerate(lines):
         m = re.match(r"^(ok|not ok) \d+ - (.+?)\s*$", line)
         if not m:
             continue
@@ -2472,7 +2533,7 @@ def test_browser_assets() -> None:
             if skipped == 1:      # one line, not one per test
                 print(f"  skip page tests ({reason.group(1).strip() or 'skipped'})")
             continue
-        check("js: " + name, status, "ok")
+        check("js: " + name, status, "ok", _tap_failure(lines, i) if status != "ok" else "")
     if not seen:
         check_true("browser tests ran", False, (r.stdout or r.stderr)[-400:])
 
