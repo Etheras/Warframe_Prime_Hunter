@@ -111,7 +111,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Two relics that pay the same part are counted as two | session — the owner's, 2026-08-27; reproduced, and it inflates the top of the ranking |
-| Cap an endless run at 4 rounds, 5 on a fissure | small — the owner's, 2026-08-27; half of it already ships, and it moves 45 of 66 endless rows |
+| Six rounds is not a plan a random squad can run | small — the owner's, 2026-08-27; an availability rule, not a thumb; it moves 45 of 66 endless rows |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -359,7 +359,7 @@ list, or both** — the two observations come from one cause but surface in two
 lists, and the project's standing rule is that those two lists answer different
 questions and must not be merged into one score.
 
-### Cap an endless run at 4 rounds, 5 on a fissure
+### Six rounds is not a plan a random squad can run
 
 **Asked for by the owner 2026-08-27.** On an endless mission the planner should
 recommend staying **4 rounds**, or **5 when a fissure is up**, rather than working
@@ -382,7 +382,27 @@ two more A rotations beat the cost of restarting.
 **unless the player is in a 4-man premade AND rotation A is the only thing wanted
 at that node**. Otherwise the length is `reset`, capped at 4; a fissure is still 5.
 
-**Two measurements make that rule the right shape rather than a preference.**
+**And it is a question of what is available, not of what is optimal.** This entry
+was first written as a preference — the model says six is best, the owner would
+rather stay four — and that framing is wrong. The owner's correction: *"with
+randoms nobody goes up to 6 rounds. It's not a matter of being optimal, it's not
+a valid choice for non-4man."* A public squad extracts; you cannot hold three
+strangers for a cycle and a half by preferring to. So a six-round plan is not a
+worse plan for someone in a random squad, it is **not a plan** — the same
+category as a Railjack node without a ship or an event node while the event is
+off, and **not** the same category as the Railjack cache halving, which really is
+a judgement about worth.
+
+That distinction decides the implementation. A thumb gets applied to the score
+and announced on the row. An unavailable option gets **filtered out of the choice
+before scoring**, which is what `plansFor(mission, squad)` already does for
+`squadOnly` rotation patterns — Disruption's under-defend plan is not offered to a
+random squad because a random squad will not execute it. The precedent is in the
+file already; this is the same rule applied to length rather than to pattern.
+
+**Two measurements, taken while writing this down.** Neither is the reason for the
+rule — the reason is the paragraph above, that the plan is not executable — but
+both say how much the change moves and where.
 
 *First: `aabcaa` wins whenever rotation A is wanted at all.* Driven through
 `runValue` against a Survival node:
@@ -400,28 +420,33 @@ So it is not an occasional answer, it is the answer for every profile containing
 A — which is why **45 of 66 endless rows** run to 6 over every farmable Prime,
 against 15 at four and 5 at three, with the single fissured row correctly at five.
 
-*Second, and this is the part that decides it: in the only-A case the arithmetic
-is exactly tied.* With `RUN_OVERHEAD = 2`, `reset` takes 2 A rewards over 2 rounds
-and `aabcaa` takes 4 over 6 — `0.4/(2+2)` against `0.8/(6+2)`, **0.1000 both
-ways**, equal to the last bit. `aabcaa` wins that comparison on tie-break order
-and nothing else. So in the one case the owner wants it kept, the model has no
-opinion at all, and the player's circumstance is the only thing that can decide —
-which is precisely what "4-man premade" is.
+*Second: in the only-A case the arithmetic is exactly tied.* With
+`RUN_OVERHEAD = 2`, `reset` takes 2 A rewards over 2 rounds and `aabcaa` takes 4
+over 6 — `0.4/(2+2)` against `0.8/(6+2)`, **0.1000 both ways**, equal to the last
+bit. `aabcaa` wins that comparison on tie-break order and nothing else.
 
-**And that is why the squad flag is the right input.** A premade runs rounds
-faster, so four A rewards in one sitting beat two-and-a-restart in wall clock even
-though the rate model calls them equal. `opts.squad` already exists and already
-means "you have an organised team"; today it gates only Disruption's under-defend
-*pattern* (`squadOnly` in `ROT_PATTERN`), never a run *length*. This would be the
-first time it decided how long to stay, which is a new coupling and worth naming
-in the code rather than discovering later.
+That is worth knowing but it is **not** the reason to remove it, and saying so
+was this entry's first mistake. It means only that taking `aabcaa` away from a
+random squad costs that squad nothing it could have had — the rate is identical
+and the six-round version was never available to them. For a premade, where it
+*is* available, the tie is what makes it worth offering: four A rewards in one
+sitting against two-and-a-restart at the same modelled rate, and a premade runs
+rounds faster, so the wall clock breaks the tie in favour of staying.
+
+**`opts.squad` is the right input and already means the right thing** — "you have
+an organised team". Today it gates only Disruption's under-defend *pattern*
+through `squadOnly`, never a run *length*. This would be the first time it decided
+how long to stay, which is a new coupling worth naming in the code rather than
+discovering later.
 
 **Three things to settle when it is built:**
 
 - **Where the gate lives.** `squadOnly` is a property of a rotation *pattern* and
   `aabcaa` is a *length*, so reusing that flag would overload it. The mode list
-  in `runValue` is where the condition belongs, and it needs the wanted-rotation
-  profile — which that function already receives as `alt`.
+  in `runValue` is where the condition belongs — it is already the place that
+  decides which lengths are on offer, and it already receives both `squad` and
+  the wanted-rotation profile as `alt`. Filtering there rather than scoring and
+  discarding is what keeps this an availability rule.
 - **What "only rotation A is needed" means exactly.** Strictly zero value in B
   and C, or A above some share of the total? Strict is defensible and rare; a
   share is a second constant to justify. Strict first, and measure how many nodes
@@ -431,11 +456,25 @@ in the code rather than discovering later.
   delete it: Spy, Caches and Faceoff still choose nothing, and `reset` still picks
   between shorter answers on nodes that pay in fewer than four rounds.
 
-**Say it on the row.** The project has exactly one deliberate thumb on the scale
-today — the Railjack cache halving — and `PROJECT.md §7` requires it to be visible
-where it applies. A length that is capped by preference rather than by arithmetic
-is the second, and it should be held to the same standard: the row already says
-*"Worth staying 6 rounds…"*, so it can as easily say why it is staying four.
+**Not a second thumb on the scale, and it must not be built as one.** The project
+has exactly one — the Railjack cache halving — and `PROJECT.md §7` requires a thumb
+to be applied to the score and announced on the row, because it moves a number
+away from what the data says. This moves nothing: it removes a plan that was never
+executable, and the surviving plan is scored honestly. Adding a "capped" badge
+would tell the reader something was taken from them when nothing was.
+
+What the row should say is what it already says, correctly, for the same class of
+thing elsewhere: `"Worth staying 4 rounds — one fewer trip in and out than leaving
+sooner"`. If anything is worth adding it is on the **squad** control rather than
+on the row — it currently promises rotation A on Disruption, and it would then
+also be buying longer endless runs, which is a second thing it does and a reader
+has no way to discover.
+
+**One consequence to check before building it.** Ticking 4-squad already changes
+the ranking (Disruption's rotation A); afterwards it would change every endless
+row that wants rotation A as well. That is a much larger swing on one checkbox, so
+measure it: the same list with `squad` off and on, before and after the change,
+and make sure the difference is legible rather than merely large.
 
 ### What the misses are worth, in Ducats
 
