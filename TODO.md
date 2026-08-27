@@ -115,12 +115,19 @@ What is left of the entry is two fields and a warning about one of them.
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
 
-**The second row is the one to take next.** It was gated by the unit question —
-*"the largest distortion"* is only meaningful once the unit the ranking divides by
-means the same thing on every row — and that was settled on 2026-08-27, so the
-gate is gone. The first row is what is left of the entry that gated it: seven
-mission types with no rotation confirmation, tedious rather than hard, and
-blocking nothing.
+**Two of this table's rows shipped on 2026-08-27** and their reasoning is in
+`PROJECT.md §7`: the unit question — *an objective is one reward draw* — and the
+fixed cost of a run, which was gated by it. What is left is no longer gated by
+anything.
+
+**The row to take next is *Two relics that pay the same part are counted as two*.**
+It is the only one here that is a live defect rather than an improvement: it is
+reproduced, it inflates the top of the ranking, and it was found by reading the
+app rather than the code. Everything else in this table adds something; that one
+corrects something.
+
+*Seven rotation-bearing mission types* is what remains of the entry that gated the
+unit question — tedious rather than hard, and blocking nothing.
 
 ### Interface
 
