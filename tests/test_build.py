@@ -677,6 +677,80 @@ def test_offline_build() -> None:
           "two builds from the same cache must agree")
 
 
+def test_parts_are_digital_extremes_own_numbers() -> None:
+    """
+    Every part, quantity and ducat value in the payload has to be the one DE
+    publish — checked across the whole catalogue, never spot-checked.
+
+    That is the caution the entry this came from insisted on, and it was earned:
+    the artwork change once reported 166 of 167 on a first pass and the miss
+    turned out to be in the probe. So this walks all of them and names any
+    disagreement rather than counting agreements.
+
+    It is also the check that would catch the switch silently reverting. The
+    part list, `itemCount` and `ducats` came from `api.warframestat.us/items`
+    until 2026-08-27; if `partSpecs` ever arrives empty the parts fall back to
+    that API, which is the right behaviour and completely invisible — the
+    numbers agree today. This fails instead.
+    """
+    import gzip
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import official                                        # noqa: PLC0415
+
+    want = ["ExportWarframes_en.json", "ExportWeapons_en.json",
+            "ExportSentinels_en.json", "ExportRecipes_en.json",
+            "ExportResources_en.json"]
+    paths = {n: os.path.join(ROOT, ".cache", f"export_{n}.gz") for n in want}
+    if not all(os.path.exists(p) for p in paths.values()):
+        print("  skip first-party parts (no warm export cache)")
+        return
+    data_js = os.path.join(ROOT, "data", "prime-data.json")
+    if not os.path.exists(data_js):
+        print("  skip first-party parts (run tools/build_data.py first)")
+        return
+
+    exports = {}
+    for name, path in paths.items():
+        with gzip.open(path, "rb") as fh:
+            exports[name] = official.load_export(fh.read())
+    specs = official.prime_part_specs(exports)
+    check_true("parts: DE publish a recipe for most of the catalogue",
+               len(specs) > 100, f"only {len(specs)} — the manifests changed shape")
+
+    D = read_json(data_js)
+    disagreed, covered, uncovered = [], 0, []
+    for item in D["items"]:
+        ours = item.get("parts") or []
+        spec = specs.get(item["name"])
+        if spec is None:
+            if ours:
+                uncovered.append(item["name"])
+            continue
+        de = {p["name"]: p for p in spec}
+        for p in ours:
+            got = de.get(p["name"])
+            if not got:
+                disagreed.append(f"{item['name']}/{p['name']}: DE has {sorted(de)}")
+            elif (got["itemCount"] or 1) != (p.get("itemCount") or 1):
+                disagreed.append(f"{item['name']}/{p['name']}: count "
+                                 f"{p.get('itemCount')} vs DE {got['itemCount']}")
+            elif not got["sub"] and got["ducats"] != p.get("ducats"):
+                disagreed.append(f"{item['name']}/{p['name']}: ducats "
+                                 f"{p.get('ducats')} vs DE {got['ducats']}")
+            else:
+                covered += 1
+
+    check("parts: every one agrees with DE's own manifests", disagreed[:6], [])
+    check_true("parts: and nearly all of them come from there",
+               covered > 500, f"only {covered} parts matched a DE recipe")
+    # Named rather than counted: DE publish no recipe for Kavasa Prime Collar in
+    # any manifest, so it keeps the item API's list. That is the documented
+    # precedence — first party for what DE publish, WFCD for what they do not —
+    # and a second name appearing here means the join has started missing.
+    check("parts: only the items DE do not publish fall back",
+          sorted(uncovered), ["Kavasa Prime Collar"])
+
+
 def test_the_scheduled_task_can_actually_be_registered() -> None:
     """
     Register the task for real, read it back, and remove it.
@@ -1178,8 +1252,13 @@ def test_an_unreadable_export_index_degrades_instead_of_crashing() -> None:
         # The fourth is a named bag so the tuple stops growing — but it must
         # still carry every key the caller reads, or the giving-up path trades a
         # ValueError for a KeyError and nothing is gained.
+        # `partSpecs` joined the bag on 2026-08-27, when the part list, the
+        # quantities and the ducat values moved to DE's own manifests. It is
+        # named here on purpose: an empty one falls the parts back to the item
+        # API, and a MISSING one would be a KeyError on the giving-up path,
+        # which is exactly what this check exists to prevent.
         check("export: and the bag has the keys the caller reads, empty",
-              extra, {"textures": {}, "nodeNames": {}})
+              extra, {"textures": {}, "nodeNames": {}, "partSpecs": {}})
     finally:
         build_data.fetch = real
 
@@ -2484,7 +2563,7 @@ def main() -> int:
         ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
-        ("built payload", [test_built_payload]),
+        ("built payload", [test_built_payload, test_parts_are_digital_extremes_own_numbers]),
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,

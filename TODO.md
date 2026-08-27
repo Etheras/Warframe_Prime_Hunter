@@ -125,7 +125,6 @@ ranking divides by means the same thing on every row.
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
-| Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
@@ -716,54 +715,6 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 `PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
-
-### Parts, quantities and Ducats are all published first party
-
-**Found 2026-08-27 by the endpoint sweep**, and it is the largest remaining WFCD
-dependency in the data rather than a nicety. Every part of every Prime — the
-component list, how many of each you need, and what Baro pays for a spare — comes
-from `api.warframestat.us/items` today, in the `components` array. Digital
-Extremes publish all three.
-
-**The sweep found it by counting rather than guessing.** `api.warframe.com`
-exposes exactly one thing: `/cdn/worldState.php`. There is no index, no directory
-listing, and ten plausible sibling paths are all 404 — going further would be
-brute-forcing somebody's server, which `PROJECT.md §2` forbids. But DE's export
-index is an **enumerable** first-party surface: it lists **sixteen** manifests and
-we read five. The other eleven had never been looked at.
-
-**The chain, verified end to end:**
-
-| Manifest | Gives | Example |
-|---|---|---|
-| `ExportRecipes_en.json` | `ingredients[]` with `ItemType` + **`ItemCount`**, and **`primeSellingPrice`** | Ash Prime Blueprint → Helmet ×1, Chassis ×1, Systems ×1, Orokin Cell ×1; `primeSellingPrice: 45` |
-| `ExportResources_en.json` | the display name of each component | `/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetComponent` → **"Ash Prime Neuroptics"** |
-
-That second row is the one that makes this tractable. The ingredient is an
-internal path — `AshPrimeHelmetComponent` — and the part we show is *Neuroptics*,
-which is a real rename rather than a substring. `ExportResources_en.json` closes
-it with DE's own display name, so nothing has to be guessed or hand-mapped.
-
-`ItemCount` is our `itemCount`, the figure behind *"53 parts need more than one"*.
-`primeSellingPrice` is our `ducats` — the field whose comment already says it is
-*"a fixed game constant… so it needs no guessing"*, which is truer of DE's own
-number than of a copy.
-
-**What this does not replace, and why the other tiers stay.** DE's export carries
-no `vaulted`, `vaultDate`, `releaseDate` or `tradable` — those are editorial or
-derived, and stay with WFCD and the wiki. So the precedence after this lands is
-the one asked for: first party for everything DE actually publish, WFCD for the
-availability metadata they do not, and the wiki for categories and its own
-markers.
-
-**Do it after the worldstate adapters, not before.** Both are the same shape of
-work and the worldstate is the one with a live outage behind it. Two cautions
-when it is picked up: the part-name join must be checked against all 167 rather
-than spot-checked — the artwork change reported 166 of 167 on a first pass and
-the miss turned out to be the probe — and `normalise_part()` exists because WFCD
-and the drop tables disagree about `Chassis` versus `Chassis Blueprint`, so a
-third spelling arriving from DE needs to go through the same funnel rather than
-around it.
 
 ### *How to crack them* is one long list, and wants tier tabs past about fifteen rows
 

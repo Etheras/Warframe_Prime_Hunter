@@ -69,10 +69,22 @@ EXPORT_INDEX_HOSTS = (
     EXPORT_INDEX,
     "https://content.warframe.com/PublicExport/index_en.txt.lzma",
 )
-# the export files worth reading: everything that can carry a Prime, plus the
-# texture manifest that says where each one's artwork lives
+# the export files worth reading: everything that can carry a Prime, the texture
+# manifest that says where each one's artwork lives, and the two that carry what
+# a Prime is BUILT from.
+#
+# `ExportRecipes_en.json` gives each blueprint's `ingredients[]` with an
+# `ItemType` and an `ItemCount`, plus `primeSellingPrice` - the component list,
+# how many of each, and what Baro pays for a spare. All three used to come from
+# `api.warframestat.us/items`, and all three are DE's own numbers.
+#
+# `ExportResources_en.json` is what makes that tractable. An ingredient is an
+# internal path - `AshPrimeHelmetComponent` - and the part a reader knows is
+# *Neuroptics*, which is a rename rather than a substring. This manifest carries
+# DE's own display name for it, so nothing has to be guessed or hand-mapped.
 EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
                  "ExportSentinels_en.json", "ExportRegions_en.json",
+                 "ExportRecipes_en.json", "ExportResources_en.json",
                  "ExportManifest.json"]
 
 # Where DE serve the textures `ExportManifest.json` names. The manifest gives a

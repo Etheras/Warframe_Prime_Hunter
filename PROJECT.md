@@ -1276,7 +1276,7 @@ other becomes an automatic fallback.
 | **[warframe.com/droptables](https://www.warframe.com/droptables)** | Relic contents **and every relic's farm location** | First party. Every mirror is generated *from* this page, so it changes first. Parsed by `official.parse_droptables` |
 | **[DE Public Export](https://origin.warframe.com/PublicExport/index_en.txt.lzma)** | Catalogue cross-check — Primes that exist in game data | First party, refreshed on every game build. Catches a new Prime **before the wiki is edited** |
 | [wiki.warframe.com/w/Prime](https://wiki.warframe.com/w/Prime) | Categories and the (V)/(P)/(B)/(S)/Founder markers | The grouping you asked for; the export fills any gaps |
-| [api.warframestat.us/items](https://api.warframestat.us/items) | Component names, artwork filenames, vault state | Convenience layer; the drop table can reconstruct parts without it |
+| [api.warframestat.us/items](https://api.warframestat.us/items) | Which relics drop each component, vault state, release and vault dates, `tradable` | Convenience layer. The part list, the quantities and the Ducat values left it for DE's own manifests on 2026-08-27 |
 | [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **All four live feeds**, first party, since 2026-08-27: Void Fissures, Prime Resurgence, the bounty boards and limited-time events | `max-age=28`. Raw shapes, so each has an adapter in `official.py`; §7 has what each one had to resolve |
 | `/pc/vaultTrader`, `/pc/fissures`, `/pc/syndicateMissions`, `/pc/events` on `api.warframestat.us` | **Fallback only** since 2026-08-27, and unused on a healthy build | Kept rather than deleted: they normalise the same document, and they can name the Proxima nodes DE's export omits. All four were 404 from 2026-08-24 |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
@@ -2611,8 +2611,10 @@ Wiki quirks handled in the parser: non-breaking spaces inside `{{WF}}` output,
 `== Prime Related==` carrying a leading space, and `====` sub-headers that must
 not be mistaken for categories.
 
-**3. WFCD (warframestat) — convenience layer.** Component names, artwork
-filenames, the `vaulted` field, and the live worldstate proxy.
+**3. WFCD (warframestat) — convenience layer.** Which relics drop each component,
+artwork filenames, the `vaulted` field, and the live worldstate proxy. The part
+list, the quantities and the Ducat values were here too until 2026-08-27, when
+they moved to DE's own manifests.
 
 **Who WFCD are, because it is easy to get wrong and was, on 2026-08-27.** They
 are the *Warframe Community Developers* — a community organisation, not Digital
@@ -2659,14 +2661,22 @@ makes this counting rather than guessing:
 | `ExportWarframes_en.json`, `ExportWeapons_en.json`, `ExportSentinels_en.json` | read — the items themselves |
 | `ExportRegions_en.json` | read — node names and enemy levels |
 | `ExportManifest.json` | read since 2026-08-27 — artwork |
-| `ExportRecipes_en.json` | **not read** — components, `ItemCount`, `primeSellingPrice` (Ducats) |
-| `ExportResources_en.json` | **not read** — display names for component items, and materials |
+| `ExportRecipes_en.json` | read since 2026-08-27 — components, `ItemCount`, `primeSellingPrice` (Ducats) |
+| `ExportResources_en.json` | read since 2026-08-27 — display names for component items, and materials |
 | `ExportRelicArcane_en.json` | **not read** — 3,261 rows, relics with `relicRewards` |
 | `ExportKeys_en.json`, `ExportUpgrades_en.json`, `ExportCustoms_en.json`, `ExportDrones_en.json`, `ExportFlavour_en.json`, `ExportFusionBundles_en.json`, `ExportGear_en.json`, `ExportSortieRewards_en.json` | not read, and nothing here needs them |
 
-The three marked **not read** in bold are live opportunities and have an entry in
-`TODO.md`: between them they carry the parts, the quantities and the Ducat values
-this project currently takes from WFCD.
+**Two of the three opportunities this sweep found are taken.** `ExportRecipes`
+and `ExportResources` shipped the same day and carry the parts, the quantities
+and the Ducat values that used to come from WFCD — see *What a Prime is built
+from* above. Seven of the sixteen manifests are read now, against five when the
+sweep ran.
+
+`ExportRelicArcane_en.json` is the one left. It is not an obvious win: relic
+**contents** already come from DE's drop tables, which is where the odds are, and
+this manifest carries the reward lists without them. Worth a look for what it
+says about vaulting, not as a replacement for a source that is already first
+party.
 
 **What DE do not publish at all**, which is why the other two tiers exist and are
 not going away: `vaulted`, `vaultDate`, `releaseDate` and `tradable` appear in no
@@ -2815,6 +2825,61 @@ user at all. `--txt-faint` `#a4aab3` on the sidebar's `--bg-2` `#11151d`
 measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s table
 quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
 it meets and the one that governs.
+
+### What a Prime is built from is Digital Extremes' own answer now
+
+**Shipped 2026-08-27**, and it was the largest remaining WFCD dependency in the
+data rather than a nicety. Every part of every Prime — the component list, how
+many of each you need, and what Baro pays for a spare — came from
+`api.warframestat.us/items`. DE publish all three, in two manifests we had never
+read.
+
+| Manifest | Gives |
+|---|---|
+| `ExportRecipes_en.json` | `ingredients[]` with `ItemType` and **`ItemCount`**, plus **`primeSellingPrice`** |
+| `ExportResources_en.json` | the display name of each component, and its own `primeSellingPrice` |
+
+**The second is what makes it tractable.** An ingredient is an internal path —
+`AshPrimeHelmetComponent` — and the part a reader knows is *Neuroptics*, which is
+a rename rather than a substring. DE publish the rename, so nothing is guessed
+and nothing is hand-mapped. `ItemCount` is our `itemCount`, the figure behind
+*"53 parts need more than one"*; `primeSellingPrice` is our `ducats`, whose old
+comment already called it *"a fixed game constant… so it needs no guessing"* —
+truer of DE's own number than of a copy of it.
+
+**Measured across the whole catalogue before it was wired in, and again after.**
+That caution is in the entry this came from and it was earned: the artwork change
+once reported 166 of 167 on a first pass and the miss turned out to be in the
+probe. **583 parts, every name, count and ducat value agreeing with what the item
+API had been supplying, and no disagreements at all.** So this changed where the
+numbers come from and, on today's data, nothing whatever about what they are —
+which is the only way a swap like this can be shown to be safe. The payload still
+carries 167 items, 586 parts, 53 needing more than one and 4 that are a whole
+Prime.
+
+**What did not move, and why.** Each component's `drops` still comes from the
+item API: that is the relic link, which is a different question from what a Prime
+is made of, and the loop that attaches per-refinement odds is built on it. The
+DE-sourced part list borrows `drops` by name through `normalise_part`, the same
+funnel that already reconciles the item API's *Chassis* with the drop table's
+*Chassis Blueprint* — a third spelling has to meet the same fate rather than
+route around it.
+
+**Six Primes have no DE recipe and only one of them has parts.** Excalibur, Lato
+and Skana Prime, Gotva Prime and War Prime have none at all, so nothing is lost.
+Kavasa Prime Collar keeps the item API's list, because DE publish nothing about
+it in any manifest. That is the documented precedence rather than an exception to
+it: first party for what DE publish, WFCD for the availability metadata they do
+not — `vaulted`, `vaultDate`, `releaseDate`, `tradable` are editorial or derived
+and stay where they are — and the wiki for categories and its own markers.
+
+**The fallback is silent, so a test is not optional.** If `partSpecs` ever
+arrives empty — the export index unreadable, a manifest renamed — the parts fall
+back to the item API, which is the right behaviour and completely invisible while
+the two agree. `test_parts_are_digital_extremes_own_numbers` walks all 167 and
+names any disagreement, asserts that over 500 parts came from a DE recipe, and
+pins the fallback list to exactly `["Kavasa Prime Collar"]` so a second name
+appearing there means the join has started missing.
 
 ### Varzia's shelf is published, but not where anyone looks for it
 
@@ -3144,7 +3209,8 @@ two third parties per card and the content policy had to name both, because CSP 
 enforced against every hop.
 
 Digital Extremes publish the artwork themselves, and the key was already in hand.
-DE's export index lists sixteen manifests; we read four. A fifth,
+DE's export index lists sixteen manifests; we read four at the time, and seven
+now. A fifth,
 **`ExportManifest.json`**, is the texture manifest — 19,843 rows of `uniqueName`
 and `textureLocation` — and the picture is `content.warframe.com/PublicExport` plus
 that path:

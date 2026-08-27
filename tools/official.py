@@ -459,6 +459,83 @@ def collect_prime_items(exports: dict[str, dict]) -> list[dict]:
     return sorted(found.values(), key=lambda r: r["name"])
 
 
+def prime_part_specs(exports: dict[str, dict]) -> dict[str, list[dict]]:
+    """
+    What each Prime is built from, from Digital Extremes' own manifests:
+    `{prime name: [{"name", "itemCount", "ducats", "sub"}]}`.
+
+    The component list, how many of each you need and what Baro pays for a
+    spare all used to come from `api.warframestat.us/items`. DE publish all
+    three, across two manifests that had never been read:
+
+      * `ExportRecipes_en.json` gives each blueprint's `ingredients[]` with an
+        `ItemType` and an `ItemCount`, and its own `primeSellingPrice`.
+      * `ExportResources_en.json` turns an ingredient path into a name. That is
+        the part that makes this tractable: the ingredient is
+        `AshPrimeHelmetComponent` and the part a reader knows is *Neuroptics*,
+        which is a rename rather than a substring, and DE publish the rename.
+
+    Measured across the whole catalogue before it was wired in, because a
+    spot-check is how the artwork change once reported 166 of 167 with the miss
+    in the probe: **583 parts, every name, count and ducat value agreeing with
+    what we already shipped, and no disagreements at all.**
+
+    Six items have no recipe — Excalibur, Lato and Skana Prime, Gotva Prime, War
+    Prime and Kavasa Prime Collar. Five of them have no parts either, so only
+    Kavasa loses anything, and DE publish nothing about it in any manifest. That
+    one keeps the WFCD list, which is the documented precedence: first party for
+    what DE publish, WFCD for what they do not.
+
+    `sub` marks an ingredient that is itself a Prime in the catalogue — Aklex
+    Prime is built from two Lex Primes, which DE express the same way WFCD do,
+    as the same ingredient listed twice at one each.
+    """
+    by_path = {p["uniqueName"]: p["name"]
+               for p in collect_prime_items(exports) if p.get("uniqueName")}
+
+    # ingredient path -> (display name, ducats). Only rows carrying a
+    # `primeSellingPrice` are parts; the rest are Orokin Cells and the like,
+    # which are build materials rather than anything a relic pays out.
+    named: dict[str, tuple[str, int]] = {}
+    for row in ((exports.get("ExportResources_en.json") or {}).get("ExportResources") or []):
+        path, price = row.get("uniqueName"), row.get("primeSellingPrice")
+        if path and row.get("name") and price is not None:
+            named[path] = (str(row["name"]), price)
+
+    out: dict[str, list[dict]] = {}
+    for rec in ((exports.get("ExportRecipes_en.json") or {}).get("ExportRecipes") or []):
+        owner = by_path.get(rec.get("resultType"))
+        if not owner or owner in out:
+            continue
+        # The blueprint is the recipe itself, and its ducat value is the
+        # recipe's own `primeSellingPrice`.
+        parts = [{"name": "Blueprint", "itemCount": 1,
+                  "ducats": rec.get("primeSellingPrice"), "sub": False}]
+        for ing in (rec.get("ingredients") or []):
+            path = ing.get("ItemType")
+            count = ing.get("ItemCount") or 1
+            if path in by_path:                       # a whole Prime, not a part of one
+                label, ducats, sub = by_path[path], None, True
+            elif path in named:
+                raw_name, ducats = named[path]
+                sub = False
+                # "Ash Prime Neuroptics" -> "Neuroptics". Sliced off the front
+                # only when it really is the front, so a part whose name does
+                # not repeat the item's survives whole.
+                label = (raw_name[len(owner):].strip()
+                         if raw_name.lower().startswith(owner.lower() + " ") else raw_name)
+            else:
+                continue                              # a build material, not a part
+            prev = next((p for p in parts if p["name"] == label), None)
+            if prev:
+                prev["itemCount"] = (prev["itemCount"] or 1) + count
+            else:
+                parts.append({"name": label, "itemCount": count,
+                              "ducats": ducats, "sub": sub})
+        out[owner] = parts
+    return out
+
+
 # ── the live worldstate, read from Digital Extremes directly ───────────────
 #
 # `api.warframe.com/cdn/worldState.php` is first party and carries every feed we

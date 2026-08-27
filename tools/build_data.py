@@ -144,7 +144,7 @@ def acquire_export(offline: bool):
         # the count that matters rather than the number: keep the two paths
         # agreeing, and keep the test that says so.
         log(f"! public export index unavailable ({exc})")
-        return [], {}, None, {"textures": {}, "nodeNames": {}}
+        return [], {}, None, {"textures": {}, "nodeNames": {}, "partSpecs": {}}
 
     exports = {}
     for want in EXPORT_WANTED:
@@ -186,7 +186,8 @@ def acquire_export(offline: bool):
     return (official.collect_prime_items(exports),
             official.node_levels(exports),
             hashlib.sha256(blob).hexdigest()[:16],
-            {"textures": textures, "nodeNames": official.node_names(exports)})
+            {"textures": textures, "nodeNames": official.node_names(exports),
+             "partSpecs": official.prime_part_specs(exports)})
 
 
 
@@ -1044,6 +1045,12 @@ def main() -> int:
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash, export_extra = acquire_export(off)
     textures = export_extra.get("textures") or {}
+    # What each Prime is built from, in DE's own numbers. Empty when the export
+    # index could not be read, which falls the parts back to the item API rather
+    # than emptying them - the same safe direction the rest of this file takes.
+    de_part_specs = export_extra.get("partSpecs") or {}
+    log(f"  parts: DE publish a recipe for {len(de_part_specs)} of "
+        f"{len(export_primes)} Primes")
 
     # Normalised here rather than beside the fetch, because naming a node needs
     # DE's region export and that arrives on the line above. First party first:
@@ -1195,8 +1202,46 @@ def main() -> int:
             unmatched.append(name)
 
         # components -> relics
+        #
+        # The component list, the quantities and the ducat values are Digital
+        # Extremes' own, from `ExportRecipes_en.json` and `ExportResources_en.json`
+        # — see `official.prime_part_specs`. What still comes from the item API
+        # is each component's `drops`, which is the relic link and is a separate
+        # question from what a Prime is made of.
+        #
+        # Verified across the whole catalogue before it was switched over, not
+        # spot-checked: 583 parts, every name, count and ducat value agreeing
+        # with what the item API had been supplying, and no disagreements. So
+        # this changes where the numbers come from and, on today's data, nothing
+        # about what they are.
+        #
+        # Six Primes have no DE recipe and only one of them has parts — Kavasa
+        # Prime Collar, which DE publish nothing about in any manifest. It keeps
+        # the item API's list, which is the documented precedence rather than an
+        # exception to it: first party for what DE publish, WFCD for what they
+        # do not.
+        wfcd_components = (api or {}).get("components") or []
+        components = wfcd_components
+        spec = de_part_specs.get(name)
+        if spec:
+            # `drops` borrowed from the matching item-API component, through the
+            # same `normalise_part` funnel both spellings already go through —
+            # the drop table says "Chassis Blueprint" where the API says
+            # "Chassis", and a third spelling from DE has to meet the same fate
+            # rather than route around it.
+            drops_by_part = {}
+            for comp in wfcd_components:
+                drops_by_part.setdefault(normalise_part(comp.get("name")),
+                                         comp.get("drops") or [])
+            components = [{
+                "name": p["name"],
+                "itemCount": p["itemCount"],
+                "ducats": p["ducats"],
+                "drops": drops_by_part.get(normalise_part(p["name"]), []),
+            } for p in spec]
+
         parts = []
-        for comp in ((api or {}).get("components") or []):
+        for comp in components:
             part_name = normalise_part(comp.get("name"))
 
             # A component that is itself a Prime in the catalogue is a whole
