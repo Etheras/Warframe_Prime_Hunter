@@ -218,6 +218,43 @@ test("a backup restores what it should and counts what it could not", () => {
   assert.equal(out.skipped, 4, "one item, one part, one whole item, one wish");
 });
 
+/* The two pages disagreed over exactly this file until 2026-08-27: the
+   collection view retracted a tick its own parts did not account for and the
+   planner kept it, so restoring one backup gave two different collections. It
+   is reachable without anyone hand-editing anything — tick a Prime, then let a
+   rebuild rename or add one of its parts, and the next backup written says both
+   things. Neither page corrects it now; `parseBackup` counts it and they say so
+   in the same words. */
+test("a tick the file's own parts do not account for is counted, never corrected", () => {
+  const M = load();
+  const out = M.parseBackup(JSON.stringify({
+    format: 3,
+    collected: ["warframe-xaku-prime", "primary-braton-prime", "warframe-excalibur-prime"],
+    parts: {
+      "warframe-xaku-prime": { Blueprint: 1, Chassis: 1 },      // Systems needs 2, has none
+      "primary-braton-prime": { Blueprint: 1, Barrel: 1 },      // complete
+    },
+  }), CATALOGUE);
+
+  assert.deepEqual(plain(out.collected),
+                   ["warframe-xaku-prime", "primary-braton-prime", "warframe-excalibur-prime"],
+                   "a restore reproduces the file — it is not the place to retract a claim");
+  assert.equal(out.unfinished, 1,
+               "Xaku is short of Systems; Braton is complete and Excalibur has no parts to be short of");
+  assert.match(M.unfinishedNote(out.unfinished), /1 Prime is ticked but its parts are incomplete/);
+  assert.match(M.unfinishedNote(2), /2 Primes are ticked but their parts are incomplete/);
+  assert.equal(M.unfinishedNote(0), "", "and nothing at all to say when there is nothing to say");
+});
+
+test("an old bare-array backup can never contradict itself", () => {
+  const M = load();
+  const out = M.parseBackup(JSON.stringify(
+    ["warframe-xaku-prime", "primary-braton-prime"]), CATALOGUE);
+  assert.equal(out.legacy, true);
+  assert.equal(out.unfinished, 0,
+               "its parts are derived from the ticks, so counting before that fill would report every one");
+});
+
 test("a part count is clamped to what the part actually needs", () => {
   const M = load();
   const out = M.parseBackup(JSON.stringify({

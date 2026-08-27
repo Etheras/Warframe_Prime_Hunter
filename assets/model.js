@@ -286,6 +286,33 @@
       });
     }
 
+    /* Ticks the file's own parts do not account for — counted, never corrected.
+       A restore reproduces the file; it is not the place to change what someone
+       saved. The collection view used to drop these on import, and the planner
+       kept them, so the same file restored differently depending on which page
+       you were looking at — the second time these two have diverged over one
+       backup, and `known()` above exists because of the first.
+
+       Counting rather than correcting is also the honest reading of the cause.
+       The obvious one — "they ticked something they had not finished" — is not
+       reachable: the tick sets the parts to match, and every part click on
+       either page runs `syncCollected`. What *is* reachable is a rebuild moving
+       under a store that was consistent when it was written, by renaming a part
+       or adding one. Nothing about that is the reader's mistake, and silently
+       retracting their claim would be the app putting words in their mouth in
+       the direction `syncCollected`'s own comment says it stopped doing.
+
+       It sits below the legacy fill on purpose. An old-format file has its
+       parts derived from the tick a few lines up, so it cannot contradict
+       itself; counted before that ran, every legacy backup would report every
+       Prime in it. */
+    const unfinished = collected.filter((id) => {
+      const item = byId.get(id);
+      if (!item || !(item.parts || []).length) return false;
+      const bag = parts[id] || {};
+      return !item.parts.every((p) => (Number(bag[p.name]) || 0) >= needOf(p));
+    }).length;
+
     const wishlist = Array.isArray(payload.wishlist) ? known(payload.wishlist) : null;
 
     const materials = Array.isArray(payload.materials)
@@ -311,13 +338,27 @@
     const filters = (payload.filters && typeof payload.filters === "object")
       ? payload.filters : null;
 
-    return { legacy, skipped, collected, parts, wishlist, materials, plan, filters };
+    return { legacy, skipped, unfinished, collected, parts, wishlist, materials, plan, filters };
+  }
+
+  /* One sentence, named once. Both pages report `unfinished` after a restore
+     and neither is entitled to word it differently — the same rule the run-cost
+     wording is under, and for the same reason: two copies of a sentence are two
+     sentences, and the divergence this whole count exists to end started as two
+     copies of a rule. Returns "" for none, so callers concatenate it blind. */
+  function unfinishedNote(n) {
+    if (!n) return "";
+    return n === 1
+      ? " 1 Prime is ticked but its parts are incomplete — a rebuild may have"
+        + " renamed or added one."
+      : ` ${n} Primes are ticked but their parts are incomplete — a rebuild may`
+        + " have renamed or added one.";
   }
 
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
-    relicValue, bestRefinement, sourceValue, parseBackup,
+    relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
   };
 })();

@@ -1852,6 +1852,66 @@ page_test("the collection drawer can show more than its eight best places", asyn
   assert.deepEqual(errors, []);
 });
 
+/* One file, two pages, one result. Until 2026-08-27 the collection view ended
+   its import by retracting any tick the file's own parts did not account for and
+   the planner kept it, so the same backup restored two different collections
+   depending on which page you happened to be looking at. The file below is the
+   shape that produced it, and it is reachable without hand-editing anything:
+   tick a Prime, let a rebuild rename or add one of its parts, and the next
+   backup written says both things. */
+page_test("a self-contradictory backup restores the same way on both pages", async () => {
+  const build = async (page) => page.evaluate(() => {
+    const item = (window.WFPRIME_DATA.items || []).find((i) => (i.parts || []).length >= 2);
+    const first = item.parts[0];
+    return {
+      id: item.id,
+      partCount: item.parts.length,
+      file: JSON.stringify({
+        format: 3,
+        exported: "2026-08-20T10:00:00.000Z",
+        collected: [item.id],                                    // the claim
+        parts: { [item.id]: { [first.name]: first.itemCount || 1 } },  // one of several
+        wishlist: [], materials: [], filters: null, plan: {},
+      }),
+    };
+  });
+
+  const restore = async (url) => {
+    const { page } = await open(url);
+    const { id, file } = await build(page);
+    await page.evaluate((text) => {
+      document.querySelector("#dataBtn").click();
+      document.querySelector("#dataArea").value = text;
+      document.querySelector("#importBtn").click();
+    }, file);
+    await page.waitForTimeout(300);                    // before the reload at 700ms
+    const message = await page.evaluate(() => document.querySelector("#dlgMsg").textContent);
+    await page.waitForTimeout(1400);
+    const stored = await page.evaluate(() => ({
+      collected: JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]"),
+      parts: JSON.parse(localStorage.getItem("wfprimes.parts.v1") || "{}"),
+    }));
+    return { id, message, stored };
+  };
+
+  const collection = await restore("/index.html");
+  const planner = await restore("/plan.html");
+
+  assert.deepEqual(collection.stored.collected, [collection.id],
+                   "the tick has to survive — a restore reproduces the file, it does not judge it");
+  assert.deepEqual(planner.stored.collected, collection.stored.collected,
+                   "and both pages have to agree about it, which is the whole point");
+  assert.deepEqual(planner.stored.parts, collection.stored.parts);
+
+  for (const [where, r] of [["collection", collection], ["planner", planner]]) {
+    assert.match(r.message, /1 Prime is ticked but its parts are incomplete/,
+                 `the ${where} page restored it silently, which is the other half of the bug`);
+  }
+  assert.equal(collection.message.includes("1 Prime is ticked but its parts are incomplete"),
+               planner.message.includes("1 Prime is ticked but its parts are incomplete"),
+               "and in the same words — two copies of a sentence are two sentences");
+});
+
 // ── the single-file build ──────────────────────────────────────────────────
 //
 // `dist/warframe-prime-hunter.html` is the artefact strangers download, and

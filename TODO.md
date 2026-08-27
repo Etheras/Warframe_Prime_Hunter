@@ -50,8 +50,14 @@ All seven shipped, the reasoning is in `PROJECT.md §7`, and the page tests now
 open `dist/warframe-prime-hunter.html` and press its buttons — which is the part
 worth keeping, because the gap was never any one of the seven.
 
-**One row was added in its place**, found while proving that fix: the two pages
-still restore a self-contradictory backup differently from each other.
+**A row added in its place lasted a few hours**: the two pages restored a
+self-contradictory backup differently from each other, found while proving that
+fix. It is settled and gone too — neither page corrects such a file now, both
+report it in the same words, and `PROJECT.md §7` has why the reasoning behind the
+old behaviour was wrong about its own cause.
+
+**What is left of those two days is one row**, and it is process rather than code:
+no feature-usability audit has ever been done, and one is now due monthly.
 
 *Size* is honest rather than optimistic: **small** is a few lines and one file,
 **session** is an afternoon including the test, **large** touches the pipeline, the
@@ -113,7 +119,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| The two pages disagree about a backup whose ticks and parts contradict each other | small — one line each way, but which page is right is a decision |
+| No feature-usability audit has ever been done | session — the first one, and it sets the shape for the rest |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -675,41 +681,29 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
-### The two pages disagree about a backup whose ticks and parts contradict each other
+### No feature-usability audit has ever been done
 
-**Found 2026-08-27**, while proving the single-file fix, and left for a decision
-rather than fixed: which of the two behaviours is right is not obvious, and it is
-the owner's call.
+**Added 2026-08-27**, when the monthly audit cadence was written down in
+`PROJECT.md §2`. A full security audit and a full feature-usability audit are due
+once a month each, skipped whenever nothing has been committed since the last one.
+Security has been done — an outside review on 2026-08-26. Usability never has, so
+the first one is outstanding, and it is the one that sets the shape the rest copy.
 
-Restore the same file on each page and they do different things with it. The
-collection view ends its import with `ITEMS.forEach((it) => ST.syncCollected(it))`,
-which drops a Prime from *collected* when the parts in the same file say it is not
-finished — its comment says so deliberately: *"nothing here invents one"*. The
-planner writes what the file says and reloads. So a backup listing Ash Prime as
-collected with one of its four parts banked comes back collected on `plan.html`
-and not collected on `index.html`. Measured with exactly that file.
+The question it asks is not the one the suite asks. Every test here answers *"does
+it still do what it did"*; this asks whether each feature can be **found,
+understood and finished** by someone who did not build it. Both defect families
+this project has actually shipped were of the second kind and neither was found by
+running anything.
 
-**How much this matters turns on a question nobody has answered: can the app
-itself produce such a file?** A backup written after ordinary use should be
-self-consistent — *Mark as collected* is a button you only reach with the parts
-banked, and unticking a part re-runs the reconciliation. The file that showed this
-was hand-made. Nobody has checked whether the planner banking a part, or a
-restore, or an older backup, can leave the store contradicting itself; until
-someone does, this is a divergence of unknown reach rather than a known data loss.
+Cover all three artefacts, not the two pages: the collection view, the planner, the
+single file in `dist/`, and the deployed site. Skipping the built file is what let
+seven defects live in it for as long as it had existed. A phone-width pass belongs
+in the same sweep — one test covers the sidebar and nothing covers the rest.
 
-Worth noting that the two pages have already been here once. `plan.js`'s import
-carries the comment *"This page used to check ids but not part names or counts, so
-the same file restored differently depending on which page you were looking at"* —
-the validation was unified into `parseBackup` for exactly this reason, and the
-reconciliation was left behind on one side.
-
-The **single file no longer has the problem**: `app.js` claims the dialog, so the
-standalone uses the collection's handler on both tabs. That narrows it to the two
-served pages and is a reason to settle it rather than to leave it.
-
-*What shipped instead, on 2026-08-27:* the seven defects that made this entry's
-predecessor — `PROJECT.md §7` has them, and the page tests now open
-`dist/warframe-prime-hunter.html` and press its buttons.
+Record it the way the security review was recorded: what was examined and
+**declined** goes in `PROJECT.md §7` so the question is not re-asked from scratch;
+what is outstanding gets an entry here. Then date it in `PROJECT.md §2` so the next
+one knows when it is due.
 
 ### The rest of the player facts the header could hold
 

@@ -1393,11 +1393,17 @@
         }
       }
       if (backup.filters) save(KEY_FILTERS, backup.filters);
-      /* A backup carries both facts, so both are restored as written. This only
-         drops a claim the parts in the same file contradict — nothing here
-         invents one, which is what would happen if a file listing every part
-         but no ticks came back with everything collected. */
-      ITEMS.forEach((it) => ST.syncCollected(it));
+      /* A backup carries both facts, and both are restored as written.
+         This used to end with `ITEMS.forEach((it) => ST.syncCollected(it))`,
+         which retracted any tick the file's own parts did not account for. The
+         planner never did, so one file restored two ways — and the reasoning
+         behind the loop turned out to be wrong about its own cause. The reader
+         cannot tick something unfinished: the tick sets the parts, and every
+         part click on either page reconciles. What actually produces such a
+         file is a rebuild renaming or adding a part under a store that was
+         consistent when it was saved, and dropping the tick for that is the app
+         putting words in their mouth. `parseBackup` counts them instead and the
+         message below says so. */
       if (nextMaterials) { materials = nextMaterials; renderMaterials(); saveMaterials(); }
       render();
 
@@ -1410,7 +1416,7 @@
         (backup.plan ? ", planner options" : "") +
         (legacy ? " (old-format backup, parts filled in)" : "") +
         (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped` : "") +
-        ". Reloading…";
+        "." + M.unfinishedNote(backup.unfinished) + " Reloading…";
       /* The re-render above is honest about the collection and cannot be about
          anything else: restored filters were only ever applied by reloading —
          this message used to say so and ask the reader to do it — and in the

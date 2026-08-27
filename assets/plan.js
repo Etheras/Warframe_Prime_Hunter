@@ -1716,7 +1716,7 @@
         $("#dlgMsg").textContent =
           `Imported ${wrote.length} section${wrote.length === 1 ? "" : "s"}` +
           (skipped ? ` — ${skipped} unrecognised entr${skipped === 1 ? "y" : "ies"} skipped` : "") +
-          ". Reloading…";
+          "." + M.unfinishedNote(backup.unfinished) + " Reloading…";
         setTimeout(() => location.reload(), 700);
       } catch (err) {
         $("#dlgMsg").style.color = "var(--red)";

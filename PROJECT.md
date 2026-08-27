@@ -421,6 +421,7 @@ node --test tests/test_assets.mjs
 | `assets/rotation.js`, `assets/shared.js` | `node --test tests/test_assets.mjs` |
 | `assets/model.js` | `node --test tests/test_model.mjs` |
 | `assets/plan.js`, `assets/app.js`, either page | `node --test tests/test_pages.mjs` |
+| `tools/bundle.py` | `python tests/test_build.py` for the built markup, **and** `node --test tests/test_pages.mjs` — since 2026-08-27 the page tests open `dist/warframe-prime-hunter.html` itself. Build it first; they use the file on disk and skip if it is absent |
 | `tools/*.py`, the data pipeline | `python tests/test_build.py` — no finer split |
 
 **Before pushing, the full run, every time — and then check CI.**
@@ -463,8 +464,51 @@ python tools/build_data.py --offline   # rebuild from the cache, a few seconds
 python tools/serve.py                  # then look at it
 ```
 
-Reset state between checks with `localStorage.clear()`, and leave it clean when
-you finish — the owner's real collection lives in those keys.
+**Never call `localStorage.clear()` on `localhost:8777`.** This paragraph said to,
+until 2026-08-27, and *"leave it clean when you finish"* is what made it sound
+harmless. It is not a scratch area: the six `wfprimes.*` keys on that origin are
+the owner's real collection, 167 ticked boxes with no backup but the one you make.
+Seed only the key your check needs, remove exactly that key afterwards, and leave
+everything else untouched — **"clean" means as you found it, not empty.**
+
+Serving the check on another port is better still, because a different origin
+cannot reach those keys at all: `test_pages.mjs` serves on port `0` for exactly
+this reason, and `vorframe-plain` on 8781 is the ready-made one for a quick look.
+
+### Two audits, monthly, and only if something changed
+
+**A full security audit and a full feature-usability audit, once a month each,
+skipped whenever there have been no commits since the last one.** The condition is
+half the rule: auditing an unchanged tree produces a document saying nothing
+changed, and a habit of producing those is how the real one stops being read.
+
+They are separate passes because they ask different questions and nothing in the
+suite asks either.
+
+| | Asks | Ends in |
+|---|---|---|
+| **Security** | what an attacker, a hostile file or a malicious wiki edit could do — the policy, the server, the parsers, what leaves this machine | `PROJECT.md` for what was examined and **declined**, `TODO.md` for what is outstanding |
+| **Feature usability** | whether each feature can be found, understood and finished by someone who did not build it — on both pages, on a phone, and in the single file | the same two places |
+
+**Why monthly, and why both.** The tests answer *"does it still do what it did"*
+and cannot answer *"is that the right thing"* or *"can anyone find it"*. Both of
+the defect families this project has actually shipped were of the second kind: a
+Spy node costed at a third of its length passed every test it had, and the single
+file ran both pages' wiring over one document for as long as it had existed while
+every suite stayed green. Neither was found by running anything; both were found
+by someone going and looking.
+
+**Include the built file and the deployed site, not just the two pages.** That is
+the lesson of 2026-08-27 and it is the cheapest part of the rule to skip.
+
+**How to tell one is due.** Each audit is recorded here with its date, so the
+answer is that date plus a month, and `git log --oneline --since=<that date>`
+being non-empty. As of 2026-08-27:
+
+- **Security** — last done 2026-08-26, an outside review of ten findings; two
+  declined and recorded in §7, eight in `TODO.md`. Next due **2026-09-26**.
+- **Feature usability** — **never done.** The first one is outstanding, and it has
+  an entry in `TODO.md` rather than a date here.
 
 ---
 
@@ -2384,6 +2428,44 @@ has nowhere to wrap. Correcting a mis-click there still means opening the item o
 the collection page. That is a property of a worklist rather than of the click, and
 showing owned parts in a list of what is left is a change worth deciding on its own
 merits rather than as a side effect of this.
+
+### A restore reproduces the file, and counts what the file disagrees with itself about
+
+**Third divergence between the two pages over one backup, settled 2026-08-27.**
+The collection view ended its import with `ITEMS.forEach((it) => ST.syncCollected(it))`,
+retracting any tick the file's own parts did not account for; the planner wrote
+what the file said. So the same backup restored two different collections
+depending on which page you were looking at — the failure `parseBackup` was
+unified to end, one level up from where it was unified.
+
+**The reasoning behind that loop was wrong about its own cause**, which is why
+this went the way it did rather than the other way. Its comment justified the
+retraction as dropping *"a claim the parts in the same file contradict"*, the
+implied cause being someone ticking a Prime they had not finished. That is not
+reachable: the tick sets the parts to match, and every part click on either page
+runs `syncCollected`. What *is* reachable was measured — tick a Prime, then let a
+rebuild rename or add one of its parts, and the store that was consistent when it
+was written now contradicts itself, with no import and no hand-editing anywhere
+in it. The next backup written says both things.
+
+That makes the retraction a bad trade. Nothing about a renamed part is the
+reader's mistake, and silently dropping their tick for it is the app putting words
+in their mouth — in the direction `syncCollected`'s own comment says it stopped
+doing. **So neither page corrects it now. `parseBackup` counts it, and both pages
+say so:** *"1 Prime is ticked but its parts are incomplete — a rebuild may have
+renamed or added one."* The reader is told, their data is untouched, and the fix
+is one click on the part in question.
+
+The sentence is `unfinishedNote` in `model.js`, named once and used by both, under
+the same rule as the run-cost wording — two copies of a sentence are two
+sentences, and this whole entry is about two copies of a rule. The count is
+computed *below* the legacy fill: an old bare-array backup has its parts derived
+from its ticks, so it cannot contradict itself, and counted above that every
+legacy file would report every Prime in it.
+
+Reconciliation stays exactly where the reader is acting: a part click on either
+page still retracts a tick it makes impossible. What changed is that a restore is
+no longer treated as the reader making a claim.
 
 ### A part can be a whole Prime, and four of them are
 
