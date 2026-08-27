@@ -120,6 +120,7 @@ ranking divides by means the same thing on every row.
 | Entry | Size |
 |---|---|
 | The live worldstate has a first-party route after all | session — four adapters, and it retires the only third-party dependency |
+| A failed fissure fetch looks exactly like a quiet hour | small once the mechanism is confirmed — it hid a three-day outage |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | The planner ignores Prime Resurgence items on the farm list | session |
 | No feature-usability audit has ever been done | session — the first one, and it sets the shape for the rest |
@@ -749,6 +750,48 @@ URLs and tries them in order, which is the shape this wants: first party first,
 proxy as the fallback, so a bad day at either end is survivable. That mechanism
 exists because `origin.warframe.com` answers a GitHub runner with 403 and
 `content.warframe.com` with 200 — the same lesson, already learnt once.
+
+### A failed fissure fetch looks exactly like a quiet hour
+
+**Found 2026-08-27**, while checking why the banner had only just appeared.
+`api.warframestat.us/pc/fissures` has been answering 404 since **2026-08-24** —
+that is what `meta.staleSince` says on both this machine and the deployed site,
+independently. The banner did not appear until 2026-08-27, when a push forced a
+full rebuild.
+
+What the ten-minute cron published in between, from the CI log of the 03:07 run:
+
+```
+no upstream changes since 2026-08-26T21:10:54+00:00 - rebuilding from cache,
+  with a fresh fissure list
+api: void fissures running right now
+fissures       0 running (none, or unreachable)
+```
+
+No `~ api_fissures` line, no `ALERT`, nothing in `meta.stale`, and so **no
+banner**. The deployed planner showed no fissures for three days and gave the
+reader no way to tell that from a genuine lull — and `PROJECT.md` says plainly
+that zero fissures is normal rather than a fault, which is exactly what makes
+the failure invisible.
+
+The log line already knows: *"none, or unreachable"*. It is the payload that
+does not — `fissures: []` carries no reason, so the page cannot say which it is.
+
+**What to change is the smaller question; confirm the mechanism first.** A
+failure with a cached copy marks `STALE` and would have raised the banner, so
+this run took some other path — cold cache on the runner, or the `--if-changed`
+route where `off = True` makes the three heavy worldstate sources cache reads
+that are never marked stale while the fissure list alone is fetched live. Read
+`fetch_json`'s optional/cold path against a CI log before designing anything.
+
+The fix is likely one field: let the payload distinguish *"asked, and there are
+none"* from *"could not ask"*, and let the planner say the second out loud. That
+is the same distinction `meta.stale` already draws for every other source, and
+the fissure list is the one source deliberately exempted from it — the exemption
+is the bug.
+
+Related but not the same as the entry below: this is about a fetch that failed
+being silent, that one is about a fetch that succeeded not reaching the ranking.
 
 ### A backend refresh finds new fissures and the ranking does not move
 
