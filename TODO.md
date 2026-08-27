@@ -135,7 +135,7 @@ unit question — tedious rather than hard, and blocking nothing.
 | Entry | Size |
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
-| Digital Extremes 403 the GitHub runner | small — our half shipped 2026-08-28; what is left is DE's, and is not urgent |
+| Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
@@ -963,17 +963,41 @@ reached the payload rather than what `fetch` had to try. `from_chain` in
 `build_data.py` holds the order in one place and a test asserts it;
 `PROJECT.md §7` has the reasoning.
 
-**What is left is DE's half, and it is not ours to fix.**
+**Verified on the runner, which is the only place it can be.** The owner's point,
+and it was right: every earlier check was an offline build on a machine DE answer
+normally, which is no evidence at all about CI. Two consecutive builds on
+2026-08-27 each met a real 403 and each fell through cleanly — both detectors
+firing independently, all three feeds served by WFCD — and the deployed
+`prime-data.js` reports `"stale": []` with `"feeds"` naming the proxy. The
+symptom the owner saw is gone from the live site.
 
-- **How often the 403 happens.** Still one data point. It no longer costs
-  freshness — the proxy covers it — so this is now only worth knowing for its own
-  sake, and a grep for `refresh failed` across several builds' logs answers it.
-- **Whether the local scheduled refresh has been masking it.** `schedule.ps1`
-  runs where the fetch works. Worth knowing how much of the published data's
-  freshness has been coming from there rather than from CI.
+**So the defect is closed and the condition is not.** Two things follow that were
+not visible before, and they are why this entry stays open.
+
+- **The 403 is frequent, not occasional.** Two builds out of two, ten minutes
+  apart. The earlier guess of "intermittent" came from a single log line and a
+  69-minute-old cache; the truth is closer to "usually". **On CI the first-party
+  path is mostly aspirational and WFCD is doing the real work.**
+- **Which means the deployed site's live feeds now depend on WFCD being up.**
+  That is a genuine shift and it is not free: all four WFCD endpoints were 404
+  for three days from 2026-08-24, which is the outage that prompted moving to DE
+  in the first place. The chain would have fallen to `cache` throughout — correct
+  behaviour, correctly reported, and still an hour-old fissure list. First party
+  first is right; first party *unavailable* is now the normal case on CI.
+
+**What is left, in order of what it would buy:**
+
+- **Watch `meta.feeds` on the deployed payload.** It ships as of 2026-08-28 and
+  one `curl` reads it, so the rate needs no log spelunking. What is worth knowing
+  is whether `"worldstate"` ever appears there — if it never does, the first-party
+  path on CI is decorative and the entry below becomes the real question.
 - **Whether to ask DE.** Their forums are the documented channel, and an
-  allowlisted runner is the only thing that would make the first-party path work
-  from CI. Slow, and no longer urgent.
+  allowlisted runner is the only thing that would restore the first-party path
+  from CI. This has moved up: it is no longer a nicety if DE effectively never
+  answer the runner.
+- **Whether the local scheduled refresh has been masking it.** `schedule.ps1`
+  runs where the fetch works. Worth knowing how much of the published freshness
+  has been coming from there rather than from CI.
 
 **Do not add retries**, whatever else is decided. A 403 from an edge appliance is
 a refusal rather than a hiccup, and `PROJECT.md §2` is explicit that every request
