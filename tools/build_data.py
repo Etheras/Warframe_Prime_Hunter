@@ -1391,6 +1391,10 @@ def main() -> int:
             "relicCount": len(relics_out),
             "farmableRelicCount": sum(1 for r in relics_out.values() if not r["vaulted"]),
             "resurgence": resurgence_window,
+            # Baro Ki'Teer's visit window. The collection view opens its Baro
+            # filter only while he is actually on a relay, and it decides that
+            # against its own clock rather than one frozen at build time.
+            "baro": official.void_trader_from_worldstate(worldstate or {}),
             # which bounty rotation is live, and which limited-time bounties
             # exist at all today. A bounty run pays one rotation - the one the
             # clock says - so without this the planner counts rewards you

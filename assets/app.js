@@ -155,6 +155,27 @@
 
   const rotSlot = (r) =>
     ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
+
+  /* Is Baro Ki'Teer on a relay right now? He is there for two days a fortnight,
+     so a filter for what he sells is worth opening on exactly while he is, and
+     is noise the rest of the time — nine items you cannot buy today.
+
+     Read against this page's clock rather than the build's. `meta.baro` carries
+     the window and nothing else for that reason: a build is up to ten minutes
+     old and a page can sit open for hours, so an answer decided at build time
+     would be wrong for the two changeovers a fortnight that matter most. Same
+     rule as the fissure list, which ships expiries rather than a live flag.
+
+     Absent window means absent answer, and `false` is the safe one: it hides
+     nine items behind a checkbox that is right there, where a wrong `true`
+     would quietly claim they are buyable. */
+  function baroIsHere(now) {
+    const w = (DATA.meta || {}).baro;
+    if (!w || !w.activation || !w.expiry) return false;
+    const at = now === undefined ? Date.now() : now;
+    const from = Date.parse(w.activation), to = Date.parse(w.expiry);
+    return isFinite(from) && isFinite(to) && at >= from && at < to;
+  }
   const state = {
     /* Defaults changed 2026-08-27, at the owner's direction, and they all point
        the same way: the page opens on **what is left to go and get**.
@@ -171,8 +192,8 @@
        possible.
 
        Only defaults moved. A saved value wins over every one of these. */
-    avail: { farmable: true, railjack: true, resurgence: true, baro: true, special: false,
-             vaulted: true, founder: false },
+    avail: { farmable: true, railjack: true, resurgence: true, baro: baroIsHere(),
+             special: false, vaulted: false, founder: false },
     showCollected: false,
     showMissing: true,
     cats: new Set(CATEGORIES),

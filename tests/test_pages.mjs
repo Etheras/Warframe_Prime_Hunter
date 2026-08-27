@@ -83,11 +83,49 @@ test.after(async () => {
   server?.close();
 });
 
-async function open(page_url) {
+/* Everything on screen: every availability bucket, collected and not, nothing
+   hidden in the drawer.
+
+   Seeded before load by `open`, and it is the reason a test can name a subject
+   and expect to find it. A test that says `page.locator('[data-id="…"]')` is
+   asserting something about that card, not about whether the app happens to
+   show it today — and the app's defaults move: on 2026-08-27 five of them did,
+   *Vaulted* among them, which alone hides 113 of 167 Primes. Six tests failed
+   that afternoon, every one of them for the same non-reason: they had inherited
+   a default instead of stating what they needed.
+
+   So the rule is: **a test that is not about the defaults must set its own
+   state.** This is that state, in one place, so the next default to move breaks
+   nothing that is not actually about it.
+
+   A test that *is* about the defaults passes `{ asShipped: true }` and gets the
+   app exactly as a first-time reader would — and those tests are supposed to
+   fail when a default changes. That is their whole job. */
+const seedFilters = (target) => target.addInitScript((f) => {
+  try {
+    if (!localStorage.getItem("wfprimes.filters.v1")) {
+      localStorage.setItem("wfprimes.filters.v1", JSON.stringify(f));
+    }
+  } catch (e) { /* file:// can refuse storage */ }
+}, SHOW_EVERYTHING);
+
+const SHOW_EVERYTHING = {
+  avail: { farmable: true, railjack: true, resurgence: true, baro: true,
+           special: true, vaulted: true, founder: true },
+  showCollected: true,
+  showMissing: true,
+  hideVaultedRelics: false,
+  hideOwnedParts: false,
+};
+
+async function open(page_url, opts) {
   const page = await (await browser.newContext()).newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  if (!(opts && opts.asShipped)) {
+    await seedFilters(page);
+  }
   await page.goto(origin + page_url, { waitUntil: "load" });
   return { page, errors };
 }
@@ -1330,6 +1368,10 @@ page_test("a part banked on the planner reaches an open collection tab", async (
      origin in the same profile, and the helper above makes a fresh context per
      page, which would put them in different profiles and fire nothing. */
   const context = await browser.newContext();
+  // Its own context, so it misses the seeding `open` does — and its subject is
+  // "the first item with two or more parts", which is vaulted and hidden by
+  // default. Seeded here for the same reason and in the same way.
+  await seedFilters(context);
   const collection = await context.newPage();
   const planner = await context.newPage();
   const errors = [];
@@ -2055,7 +2097,13 @@ page_test("the drawer hides vaulted relics by default, and says so rather than s
      you can actually go and get. Safe to default on only because the empty case
      answers itself — which is what this asserts, because a silently empty part
      is the failure this default could otherwise introduce. */
-  const { page, errors } = await open("/index.html");
+  const { page, errors } = await open("/index.html", { asShipped: true });
+  await page.evaluate(() => {
+    // Vaulted is hidden by default too, and Ash Prime is vaulted — this test is
+    // about the drawer's default, so show the card without touching that.
+    const el = document.querySelector("#f-vaulted");
+    if (el && !el.checked) el.click();
+  });
   await page.locator('[data-id="warframe-ash-prime"]').click();
   assert.equal(await page.locator("#hideVaulted").isChecked(), true,
                "the default moved, and a saved choice still wins over it");

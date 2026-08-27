@@ -609,6 +609,31 @@ def events_from_worldstate(doc: dict) -> list[dict]:
     return out
 
 
+def void_trader_from_worldstate(doc: dict) -> dict | None:
+    """Baro Ki'Teer's next or current visit — the window, not a yes/no.
+
+    `VoidTraders` carries an activation and an expiry and nothing else useful
+    until he arrives (`Manifest` is empty between visits). The **window** is what
+    is emitted rather than a computed "is he here": a build is up to ten minutes
+    old and a page can be open for hours, so the page compares the window to its
+    own clock, exactly as it already does for fissure expiry. Deciding it here
+    would freeze the answer at build time and be wrong twice a fortnight.
+    """
+    trader = (doc.get("VoidTraders") or [None])[0]
+    if not isinstance(trader, dict):
+        return None
+    activation = _worldstate_instant(trader.get("Activation"))
+    expiry = _worldstate_instant(trader.get("Expiry"))
+    if not activation or not expiry:
+        return None
+    return {
+        "activation": activation,
+        "expiry": expiry,
+        "node": str(trader.get("Node") or ""),
+        "character": str(trader.get("Character") or ""),
+    }
+
+
 def rotation_letter(path: str) -> str | None:
     """The rotation letter a bounty's reward-table path states outright.
 

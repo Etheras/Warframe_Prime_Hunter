@@ -101,7 +101,7 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| Baro's actual stock is published, and never read | *back in 6 days* on the label; what he is really selling | session |
+| Baro's actual stock is published, and never read | what he is really selling — **his `Manifest` is empty between visits, so check it 2026-09-04 to 09-06** | session |
 
 ### Model and ranking
 
@@ -189,9 +189,25 @@ they were.
 
 `flags.baro` comes from a wiki marker — `[[Baro Ki'Teer|B]]`, `tools/catalogue.py:159`
 — and it means *he sells this sometimes*, not *he is here now*. Eight items carry
-it. `/pc/vaultTrader` is fetched for Resurgence (`tools/sources.py:46`);
-`/pc/voidTrader`, which carries his arrival, departure and current inventory, is not
-fetched at all.
+it.
+
+**Half of this shipped on 2026-08-27.** DE's worldstate carries `VoidTraders`,
+and `meta.baro` now ships his window — `{activation, expiry, node, character}`,
+currently `2026-09-04T13:00Z → 2026-09-06T13:00Z` at `EarthHUB`. The collection
+view's *Baro Ki'Teer* filter opens only while he is actually on a relay, decided
+against the **page's** clock rather than the build's, so a tab left open across
+his arrival is right without a reload.
+
+**What is left is the stock itself, and it cannot be checked yet.** His
+`Manifest` is **empty between visits** — measured at 0 entries on 2026-08-27,
+eight days before he arrives — so whether it names what he is selling, and in
+what shape, is unknown. **Check it while he is present: 2026-09-04 to
+2026-09-06.** Until then anything written here about his inventory would be a
+guess, and this project has already been caught once reading a field whose name
+matched and whose contents did not (`Events` versus `Goals`).
+
+If the manifest does carry his stock, it answers the *"what is he really
+selling"* half below with first-party data and no wiki marker involved.
 
 **The proposal has two halves and only one is safe.** Disabling the checkbox while
 he is away changes what the flag means, and he is present roughly two days in
