@@ -128,7 +128,7 @@ ranking divides by means the same thing on every row.
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
-| The planner ignores Prime Resurgence items on the farm list | session |
+| Relics you already own are invisible to the planner, vaulted or not | session — needs a decision on input first; three shapes weighed in the entry |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -860,30 +860,45 @@ Whatever is chosen, the collection view's *Still needed* panel reads the same
 list through the same `opts` and would need the same treatment, or the two go
 back to disagreeing about what is reachable — which they did once already.
 
-### The planner ignores Prime Resurgence items on the farm list
+### Relics you already own are invisible to the planner, vaulted or not
 
-**Asked for 2026-08-27.** Put a Prime Resurgence item on the farm list and the
-planner has nothing to say about it. *Where to go* is right to say nothing —
-Varzia sells those relics for Aya, they do not drop, and there is nowhere to go.
-But the relics still have to be **cracked**, and that half is a real farm the
-planner already knows how to describe for everything else.
+**Raised by the owner 2026-08-27**, immediately after the Resurgence fix, and it
+is the general case that fix is one instance of.
 
-So: when a wanted item's route is Resurgence, the planner should show the
-Resurgence relics it needs and **where to crack them** — the fissure side of the
-page, not the node ranking. The two lists already exist and already split on
-exactly this question (*"Where to go"* ranks wanted relics per objective; *"How to
-crack them"* ranks openings to finish the relic), so this is the second list
-learning about a source the first one is correctly silent on.
+*How to crack them* is filtered by whether a relic can be **obtained**, which
+quietly assumes the reader has none. Put a vaulted Prime on the farm list and the
+crack list is empty — but a player who has been going for years has a stack of
+vaulted relics sitting in their inventory, and *"which of these do I crack, and
+at what refinement"* is exactly the question that list answers. The relic being
+unobtainable says nothing about whether you are holding one.
 
-Worth stating plainly in the UI too, because a farm-list entry that produces no
-guidance currently reads as a bug: something has to say *"bought from Varzia for
-Aya — nothing to farm, but here is how to crack it."*
+Prime Resurgence was the case where obtainability and ownership happened to
+coincide: those relics are vaulted **and** currently buyable, so including them
+was right on the obtainability test alone and shipped that day. The wider case
+does not have that excuse and needs a real answer.
 
-`meta.resurgence` carries the window and Varzia's location, and the items already
-carry the Resurgence flag, so the data is in the payload. Note that the flag
-depends on `api_vaulttrader` — the feed that is down — so build this against the
-first-party route above, or against a cached copy, and do not let it silently
-show nothing when the flag is stale.
+**The blocker is that the app does not know what relics you hold.** It tracks
+Primes and parts, not relic inventory — and *Relic inventory* is **[settled]**
+under this file's own heading, declined because entering a stack of relics by
+hand is more work than the answer is worth. So this feature needs either that
+decision revisited with a better input method, or a cheaper approximation.
+
+Two cheaper shapes worth weighing before anything is built:
+
+- **A switch, not an inventory.** The collection page already has a *Vaulted*
+  availability filter; the planner could take the same idea — *"I have vaulted
+  relics"* — and stop filtering the crack list on obtainability when it is on.
+  No inventory, no data entry, and it matches how the collection view already
+  lets the reader say what they are interested in.
+- **Say it rather than hide it.** Keep the list filtered, but where a wanted
+  Prime's relics are all vaulted, say so instead of showing nothing —
+  *"3 relics, all vaulted; crack them if you have them"* — which is the same
+  lesson the Resurgence fix taught, generalised. Cheapest of the three, and it
+  removes the "looks broken" reading without pretending to know your inventory.
+
+Whichever, the empty-state wording is the part to get right: an empty crack list
+currently means *"cannot be obtained"* and is read as *"nothing to do"*, and
+those are not the same sentence.
 
 ### The rest of the player facts the header could hold
 

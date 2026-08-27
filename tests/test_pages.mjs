@@ -1925,6 +1925,45 @@ page_test("a self-contradictory backup restores the same way on both pages", asy
                "and in the same words — two copies of a sentence are two sentences");
 });
 
+page_test("a Prime Resurgence Prime gets a crack list, and is told why there is nowhere to run", async () => {
+  /* A Resurgence relic is **vaulted by definition** — that is what being in
+     Resurgence means — so `rec.vaulted` alone dropped all of them out of the
+     plan, and putting one of these Primes on the farm list produced a planner
+     with nothing whatever to say. Which reads as a broken page rather than a
+     deliberate silence, and it was silent about exactly the Primes the
+     collection view was busy badging as available.
+
+     Both halves are asserted, because either alone is still wrong: *Where to go*
+     must stay empty (these do not drop), and it must say so in terms that are
+     true — the old fallback claimed "these relics drop, but nowhere you can
+     reach", which names a problem the reader does not have. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const it = (window.WFPRIME_DATA.items || [])
+      .find((i) => (i.flags || {}).resurgence && (i.relics || []).length);
+    if (!it) return null;
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    return it.name;
+  });
+  assert.ok(subject, "no Prime is in Resurgence in this build, so nothing to assert");
+  await page.reload({ waitUntil: "load" });
+
+  const rows = page.locator("#planRelics .relic-row");
+  assert.ok(await rows.count() > 0,
+            `${subject} is in Resurgence and its relics are buyable, so they must be crackable`);
+  assert.equal(await page.locator("#planRelics .from-varzia").count(), await rows.count(),
+               "every row here comes from Varzia, and a row that does not say so reads as a drop");
+
+  assert.equal(await page.locator("#planNodes .spot").count(), 0,
+               "these relics have no sources, so ranking a place to run them would be invented");
+  const why = await page.locator("#planNodes .nowhere").innerText();
+  assert.match(why, /Prime Resurgence/,
+               `the reader has to be told why: ${why}`);
+  assert.ok(!/relics drop, but nowhere you can reach/.test(why),
+            "they do not drop at all — that message is true of a different situation");
+  assert.deepEqual(errors, []);
+});
+
 // ── the single-file build ──────────────────────────────────────────────────
 //
 // `dist/warframe-prime-hunter.html` is the artefact strangers download, and

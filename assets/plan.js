@@ -378,11 +378,27 @@
   function buildPlan() {
     const { want, needs, formaShort } = wantedIndex();
 
-    // only relics that actually drop somewhere right now
+    /* Only relics you can actually get hold of right now — which is not the
+       same as "relics that drop". A Prime Resurgence relic is **vaulted by
+       definition**: that is what being in Resurgence means, it is out of the
+       normal rotation and Varzia sells it for Aya instead. All 88 of them carry
+       `sourceCount: 0`.
+
+       So `rec.vaulted` alone silently emptied the crack list for exactly the
+       Primes the collection page was busy badging as available. Put five
+       Resurgence Primes on the farm list and the planner had nothing whatever
+       to say about them, which reads as a broken page rather than as a
+       deliberate silence.
+
+       *Where to go* stays right to ignore them, and needs no change to do it:
+       the node loop walks each relic's `sources`, and these have none. This
+       list is the other half of the split — it ranks openings to finish a relic
+       and knows nothing about where the relic came from — so a relic bought
+       with farmed Aya belongs in it on exactly the same terms as a dropped one. */
     const relicPlan = new Map();
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
-      if (!rec || rec.vaulted) return;
+      if (!rec || (rec.vaulted && !rec.resurgence)) return;
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value, openings, blocker } = bestRefinement(entries);
@@ -1011,7 +1027,20 @@
      relics that exist only on Proxima, so with Railjack off the page finds eight
      perfectly good places, discards every one of them, and says nothing. Name
      the switch and say where it is. */
-  function noNodes(blocked) {
+  function noNodes(blocked, relicPlan) {
+    /* Nothing to run because nothing *drops* — every relic still wanted is a
+       Prime Resurgence one, bought from Varzia for Aya. Said first because it
+       is the common case for a Resurgence Prime and because the fallback below
+       would be actively wrong about it: those relics do not drop anywhere, so
+       "nowhere you can reach" names a problem the reader does not have and
+       hides the answer, which is sitting in the list beside it. */
+    const rp = Array.from((relicPlan || new Map()).keys());
+    if (rp.length && rp.every((n) => (RELICS[n] || {}).resurgence)) {
+      return `<p class="nowhere">Nothing to run — every relic you still need is
+        <b>Prime Resurgence</b>. Varzia sells them at Maroo's Bazaar for
+        <b>Aya</b>, which is farmed, and <i>How to crack them</i> beside this
+        says what to do with them once you have them.</p>`;
+    }
     const off = [];
     if (blocked.railjack) {
       off.push([blocked.railjack, "a Railjack mission", "Include Railjack"]);
@@ -1195,7 +1224,7 @@
     const SHOW = 8;
     const showingAll = expandNodes && ranked.length > SHOW;
     const visible = showingAll ? ranked : ranked.slice(0, SHOW);
-    if (!ranked.length) $("#planNodes").innerHTML = noNodes(blocked);
+    if (!ranked.length) $("#planNodes").innerHTML = noNodes(blocked, relicPlan);
     else $("#planNodes").innerHTML = visible.map((n) => {
       // most useful relic first: how much of this node's score each one accounts
       // for, i.e. the chance it drops here times what one opening is worth
@@ -1326,8 +1355,20 @@
                        qty: e.stillNeed || 1 }))
         .sort((a, b) => (RAR_ORDER[a.rar] ?? 9) - (RAR_ORDER[b.rar] ?? 9) ||
                         a.label.localeCompare(b.label));
+      /* Where the relic itself comes from, said only when it is not the usual
+         answer. A Resurgence relic does not drop anywhere — Varzia sells it for
+         Aya — so without this the row looks like every other and sends the
+         reader to *Where to go*, which is correctly silent about it. Aya is
+         farmed, so this is a route rather than a purchase; Regal Aya packs are
+         a real-money product and are no part of this. */
+      const varzia = (RELICS[rname] || {}).resurgence
+        ? `<span class="from-varzia" data-tip="${esc(
+            "Prime Resurgence. This relic does not drop — buy it from Varzia at " +
+            "Maroo's Bazaar for Aya, which is farmed.\n" +
+            "That is why nowhere is listed under Where to go.")}">from Varzia</span>`
+        : "";
       return `<div class="relic-row ref-row-${esc(p.refinement)}">
-        <span class="relic-name">${esc(rname)}</span>
+        <span class="relic-name">${esc(rname)}${varzia}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
               data-tip="${esc(
                 "Take it to " + p.refinement + ", chosen to clear the scarcest\n" +
@@ -1351,7 +1392,8 @@
           x.qty > 1 ? `<span class="qty">×${x.qty}</span>` : ""
         }</span>`).join("")
       }</div>`;
-    }).join("") : `<p class="hint">None of the relics you need are currently dropping.</p>`;
+    }).join("") : `<p class="hint">None of the relics you need can be got right now —
+      they are vaulted, and not in this Prime Resurgence rotation either.</p>`;
 
     paintFissures();
 

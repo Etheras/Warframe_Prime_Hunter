@@ -2650,6 +2650,39 @@ everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
 
+### A Resurgence relic is vaulted, and that emptied the crack list
+
+**Fixed 2026-08-27.** *How to crack them* filtered on `rec.vaulted`, under the
+comment *"only relics that actually drop somewhere right now"*. A Prime
+Resurgence relic is **vaulted by definition** — that is what being in Resurgence
+means: it is out of the normal rotation and Varzia sells it for Aya instead. All
+88 of them carry `sourceCount: 0`.
+
+So putting a Resurgence Prime on the farm list produced a planner with nothing
+whatever to say — no places to run, which is correct, and no relics to crack,
+which is not. It was silent about exactly the five Primes the collection view was
+busy badging as available.
+
+**The two lists split on precisely this question, and the split was right all
+along.** *Where to go* ranks wanted relics per objective and needs no change to
+ignore these: it walks each relic's `sources`, and these have none. *How to crack
+them* ranks openings to finish a relic and knows nothing about where the relic
+came from — so one bought with farmed Aya belongs in it on the same terms as one
+that dropped. The filter was asking the left-hand list's question in the
+right-hand list.
+
+**Two pieces of wording carry the change**, because a crack list that appears
+from nowhere is its own confusion. Each row says **from Varzia** — violet, the
+colour the collection badge already uses for Resurgence — with a tooltip saying
+the relic does not drop and Aya is farmed. And the empty *Where to go* heading
+now says why, instead of falling through to *"these relics drop, but nowhere you
+can reach"*, which names a problem the reader does not have and hides the answer
+sitting in the list beside it.
+
+**Obtainable is not the same as owned**, and this fix only got away with
+conflating them because Resurgence relics are both. The general case — a player
+holding vaulted relics the planner refuses to rank — is open in `TODO.md`.
+
 ### Bounties and events came off the proxy too, and `meta.stale` went empty
 
 **Shipped 2026-08-27**, finishing the move. All four live feeds — fissures,

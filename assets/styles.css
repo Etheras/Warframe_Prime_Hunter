@@ -693,6 +693,14 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
 }
 .relic-row.is-vaulted .relic-name{color:var(--txt-dim)}
 .relic-name{font-weight:600;min-width:76px}
+/* "from Varzia" beside a Resurgence relic's name — it does not drop anywhere, so
+   the row would otherwise read like any other and send the reader to a ranking
+   that is correctly silent about it. Violet is the Resurgence colour the
+   collection badge already uses; quiet enough not to compete with the name. */
+.from-varzia{
+  color:var(--violet);font-weight:600;font-size:10px;text-transform:uppercase;
+  letter-spacing:.6px;margin-left:6px;white-space:nowrap;
+}
 .rarity{cursor:help}
 .relic-count{
   cursor:help;text-decoration:underline dotted var(--txt-faint);text-underline-offset:2px;
