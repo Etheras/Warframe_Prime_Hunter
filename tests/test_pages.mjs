@@ -1394,13 +1394,26 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
   });
   await page.reload({ waitUntil: "load" });
 
-  // an endless row: one that stays for rotations at all, so five is reachable
-  const endless = page.locator("#planNodes .spot").filter({ hasText: /\d+ rounds/ }).first();
-  assert.ok(await endless.count() > 0, "no endless node ranked, so nothing can stay");
-  const before = await endless.locator(".rounds").innerText();
-  assert.match(before, /6 rounds/,
+  /* An endless row that is *not already a fissure*, because the whole test is
+     what happens when one arrives. Picking the first endless row assumed the
+     shipped fissure list was empty, which it was for the three days that feed
+     was down — and the moment it came back the top-ranked endless node carried
+     one, reported five rounds, and this failed on its own success. Select on a
+     raw-data property instead of on whatever the ranking put first. */
+  const key = await page.evaluate(() => {
+    const live = new Set((window.WFPRIME_DATA.fissures || []).map((f) => f.node));
+    for (const el of document.querySelectorAll("#planNodes .spot")) {
+      if (!/\d+ rounds/.test(el.textContent)) continue;
+      const node = (el.querySelector(".fissure-slot") || {}).dataset?.node;
+      if (node && !live.has(node)) return node;
+    }
+    return null;
+  });
+  assert.ok(key, "no endless node ranked without a fissure already on it");
+  const endless = page.locator("#planNodes .spot")
+    .filter({ hasText: key.split(" (")[0] }).first();
+  assert.match(await endless.locator(".rounds").innerText(), /6 rounds/,
                "with no fissure this should be staying for rotation A");
-  const key = await endless.locator(".fissure-slot").getAttribute("data-node");
 
   const rerender = () => page.evaluate(() => document.querySelector("#p-squad").click());
   await page.evaluate((n) => {

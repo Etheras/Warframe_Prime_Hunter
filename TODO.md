@@ -123,7 +123,6 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| The live worldstate has a first-party route — two feeds still to move | session — fissures and Resurgence shipped 2026-08-27; bounties and events remain |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
@@ -766,127 +765,6 @@ Worth checking against a live window rather than the cached one, since a single
 reading cannot tell a misfiled job from a genuinely different phase on Deimos.
 If Deimos really does run its own rotation phase, the family split is too coarse
 and that is a larger and more interesting problem than a misfiled bounty.
-
-### The live worldstate has a first-party route — two feeds still to move
-
-**Fissures and Prime Resurgence moved on 2026-08-27 and work; bounties
-(`SyndicateMissions`) and events (`Events`) have not.** What follows is the
-original entry, kept because the sizing still applies to the two that are left.
-`PROJECT.md §7` has how the two that landed were done and checked.
-
-Both remaining feeds serve the bounty layer — `derive_bounty_rotation`,
-`find_live_events` and `read_bounty_jobs` — which is the most derived thing in
-the pipeline, and the one place an adapter can be subtly wrong and still look
-plausible.
-
-**A finding from 2026-08-27 that changes the shape of this work, and should be
-read before starting it.** This project says in several places that *"the
-rotation letter is not published anywhere"* and derives it by matching the
-reward pools on offer against DE's own tables, one vote per job. **DE do publish
-it.** Every bounty job carries a reward-table path, and the letter is in it:
-
-```
-/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/TierATableCRewards
-                                                            ^^^^^^
-```
-
-Measured across the whole cached window — 21 jobs — and it agrees with the vote
-exactly: **14 jobs say `TableC` and 7 say `TableA`**, against a derivation that
-produced `standard: C` and `vault: A` the same day. Ostrons and Solaris United
-are all C; Entrati carries both, 2 C and 7 A, which is precisely the standard
-and vault families the build already separates.
-
-**Settled by the owner on 2026-08-27 and shipped the same day: read the label,
-cross-check with the vote, and raise a banner if they ever disagree.** See
-`PROJECT.md §7`. The rest of this entry is what is still outstanding — the DE
-adapters for these two feeds — and the letter change is independent of it,
-because it reads the same reward-table path whether the proxy or DE supplied it.
-
-**Do not ship a partial adapter here.** `derive_bounty_rotation` reads
-`job.rewardPool`, a list of reward *names*, and DE publish a reward-table *path*
-instead; a job with no pool is skipped, so an adapter that fills in everything
-except the pool yields no votes, `checked: false`, and a planner that says the
-rotation is unknown. That is worse than today's stale-but-correct cached answer.
-Resolve the path to a pool, or read the letter from the path, or leave it.
-
-The A/B that validated the first two feeds applies here too and is now doubly
-available: `.cache/api_syndicatemissions.gz` and `.cache/api_events.gz` are
-known-good output, and the path letters above are a second oracle.
-
-The pattern the fissure adapter established is the
-one to copy: `official.fissures_from_worldstate` normalises DE's raw document
-into exactly the shape the WFCD proxy produced, so the two stay interchangeable
-and either can be the fallback for the other, and `build_data` prefers DE and
-asks the proxy only when first party yields nothing usable.
-
-**One finding from doing it, which will bite the other three.** DE's region
-export carries **no `CrewBattleNode*` rows at all**, so Railjack storm nodes
-cannot be named from first-party data — 12 of 31 fissures. They are emitted with
-`node: None`, counted in the build log, and dropped. The WFCD proxy can name
-them, so this is a genuine case for the fallback tier rather than a defect. If
-you find a first-party route to Proxima node names, it closes.
-
-**Found 2026-08-27, by the owner, and it overturns a `[settled]` answer below.**
-*Prime Resurgence is the only non-first-party source* says there is no
-first-party route to find and nothing to do until DE publish one. There is one,
-and it is not new:
-
-```
-https://api.warframe.com/cdn/worldState.php     200, 127 KB, live
-```
-
-Verified the same day. It carries every feed the WarframeStat proxy serves us:
-`ActiveMissions` (21 entries — Void Fissures), `VoidStorms` (the Railjack ones),
-`SyndicateMissions` (38 — bounties), `Events` (34), and `PrimeVaultTraders`
-(Prime Resurgence). The two hosts `PROJECT.md §6` records as 404 —
-`content.warframe.com` and `origin.warframe.com`, both `/dynamic/worldState.php`
-— are still 404; nobody had tried `api.warframe.com/cdn/`.
-
-**This is why it matters today rather than in the abstract.** All four
-`api.warframestat.us/pc/*` endpoints have been answering `404 {"error":"No such
-worldstate field"}` since 2026-08-27 03:07 UTC — every platform, so the proxy is
-up and its worldstate ingestion is not. That is what put the *Live data is an
-older copy* banner on the deployed site, and there is currently no way to clear
-it. Taking this route retires the dependency instead of waiting it out.
-
-**It is not a URL swap, and that is the whole cost.** DE publish raw worldstate;
-WarframeStat publish a normalised shape, and the four consumers in
-`build_data.py` are written against the normalised one. Each needs an adapter:
-
-| Consumer | Raw shape | What the adapter has to resolve |
-|---|---|---|
-| fissures | `{Node: "SolNode106", Modifier: "VoidT1", MissionType: "MT_TERRITORY", Expiry: {$date:{$numberLong}}}` | node id → name (we already hold `ExportRegions_en.json` for enemy levels), `VoidT1..6` → Lith/Meso/Neo/Axi/Requiem/Omnia, `MT_*` → mission type, Steel Path flag, `VoidStorms` merged in |
-| Resurgence | `PrimeVaultTraders[0].Manifest[].ItemType` like `/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVRevenantPrimeSinglePack` | store-item path → Prime name. **The messiest by far** — those are pack names, not item names |
-| bounties | `SyndicateMissions[].{Tag, Expiry, Jobs[]}` | job type → the bounty families `derive_bounty_rotation` expects |
-| events | `Events[]` / `Goals[]` | the Ghoul and Plague Star detection in `find_live_events` |
-
-Mongo-style `{$date:{$numberLong}}` and `{$oid}` wrappers throughout, so a date
-helper first.
-
-**The blocker, and what softens it.** The honest reason not to write these on the
-day they were needed is that **the proxy is down, so there is no known-good
-output to check a new normaliser against** — building them blind is the guessing
-`PROJECT.md §2` refuses. What softens it, pointed out the same day:
-[`WFCD/warframe-drop-data`](https://github.com/WFCD/warframe-drop-data) and the
-WFCD parsers beside it are open source, so the mapping tables can be read from
-the reference implementation rather than inferred. That is a source to check
-against, which is most of what was missing. It does not remove the need to
-verify against live data once the proxy is back and the two can be diffed.
-
-**Read it; do not take it.** WFCD is a reference here, not a dependency — see
-`PROJECT.md §2` *"An API is not a dependency; a library is"*. Reading how they
-resolve `SolNode106` or `VoidT1` and writing our own is the point. Vendoring
-their tables, copying their parser or adding their package needs the owner's
-approval first and their licence read second, **including a mapping table lifted
-verbatim**, which is code wearing a data hat. `NOTICE.md` credits WFCD for data
-under MIT / Apache-2.0 and that credit does not stretch to cover code nobody has
-checked.
-
-**Do not delete the proxy when this lands.** `fetch_json` already takes several
-URLs and tries them in order, which is the shape this wants: first party first,
-proxy as the fallback, so a bad day at either end is survivable. That mechanism
-exists because `origin.warframe.com` answers a GitHub runner with 403 and
-`content.warframe.com` with 200 — the same lesson, already learnt once.
 
 ### The page tests flake in a full run and pass on their own
 

@@ -520,6 +520,95 @@ def _worldstate_instant(value) -> str | None:
         timespec="milliseconds").replace("+00:00", "Z")
 
 
+# DE's syndicate tag -> the name this project already uses for it, which is the
+# name WFCD published and therefore the one `SYNDICATE_SECTION` is keyed on.
+# A naming table, not a data table: four entries, and changing one changes only
+# what we call a thing.
+SYNDICATE_TAGS = {
+    "CetusSyndicate": "Ostrons",
+    "SolarisSyndicate": "Solaris United",
+    "EntratiSyndicate": "Entrati",
+    "ZarimanSyndicate": "The Holdfasts",
+}
+
+
+def syndicate_missions_from_worldstate(doc: dict) -> list[dict]:
+    """DE's raw worldstate -> the bounty boards, in the shape the build consumes.
+
+    **DE publish two windows at once** — the one running now and the one after
+    it — as separate rows per syndicate. That is not a quirk to flatten: it is
+    what `_one_window` upstream already exists to pick between, and merging them
+    would silently average two different rotation letters into nonsense.
+
+    `rewardPool` is deliberately absent, because DE do not publish it. They give
+    the reward *table path* and WFCD resolved that into reward names. The letter
+    is read from the path either way — see `rotation_letter` — so nothing that
+    matters is lost; what goes is the independent cross-check, which is why the
+    one that replaces it compares the jobs in a window against each other
+    instead. `PROJECT.md §7` has the reasoning and the owner's decision.
+
+    Isolation Vault bounties come through with **no `jobType` at all**, which is
+    DE's own signal and a cleaner one than the level-matching this project uses
+    to split the vault family. Passed through untouched rather than acted on:
+    changing how the family is decided is its own change.
+    """
+    out = []
+    for row in (doc.get("SyndicateMissions") or []):
+        name = SYNDICATE_TAGS.get(str(row.get("Tag") or ""))
+        jobs_in = row.get("Jobs") or []
+        if not name or not jobs_in:
+            continue
+        jobs = []
+        for job in jobs_in:
+            lo, hi = job.get("minEnemyLevel"), job.get("maxEnemyLevel")
+            jobs.append({
+                "uniqueName": job.get("rewards") or "",
+                "enemyLevels": [lo, hi] if lo is not None and hi is not None else [],
+                "minMR": job.get("masteryReq"),
+                "type": str(job.get("jobType") or "").rsplit("/", 1)[-1],
+                # WFCD's `standingStages` is DE's `xpAmounts`: one entry per
+                # stage, and its length is the stage count the planner costs a
+                # bounty by. Same list, different name — and a bounty costed at
+                # the wrong number of stages is the exact defect this project
+                # has already shipped once.
+                "standingStages": list(job.get("xpAmounts") or []),
+                # No rewardPool: DE publish a table path, not a list of names.
+                "rewardPool": [],
+            })
+        out.append({
+            "syndicate": name,
+            "activation": _worldstate_instant(row.get("Activation")),
+            "expiry": _worldstate_instant(row.get("Expiry")),
+            "jobs": jobs,
+        })
+    return out
+
+
+def events_from_worldstate(doc: dict) -> list[dict]:
+    """DE's raw worldstate -> the limited-time events, as the build reads them.
+
+    **`Goals`, not `Events`.** DE's `Events` is the news feed — Discord invites,
+    patch-note links, image URLs — 34 rows of it, and nothing this project wants.
+    The in-game events WFCD publish as `events`, the Ghoul Purge and Plague Star
+    among them, are `Goals`. Reading the field with the matching name would have
+    produced a confident empty answer, which is the worst kind.
+    """
+    out = []
+    for goal in (doc.get("Goals") or []):
+        out.append({
+            "tag": str(goal.get("Tag") or ""),
+            "node": str(goal.get("Node") or ""),
+            # An internal string path rather than prose; `find_live_events`
+            # scans it alongside the tag, and the tag is what actually decides.
+            "description": str(goal.get("Desc") or ""),
+            "tooltip": "",
+            "name": str(goal.get("Tag") or ""),
+            "activation": _worldstate_instant(goal.get("Activation")),
+            "expiry": _worldstate_instant(goal.get("Expiry")),
+        })
+    return out
+
+
 def rotation_letter(path: str) -> str | None:
     """The rotation letter a bounty's reward-table path states outright.
 

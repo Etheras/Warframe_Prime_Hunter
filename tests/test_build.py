@@ -869,6 +869,68 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
 
 
+def test_bounties_and_events_read_from_the_first_party_worldstate() -> None:
+    """
+    The last two feeds off the WFCD proxy.
+
+    Two traps, both of which would have produced a confident wrong answer:
+
+    **DE publish two windows at once** — the one running and the one after it —
+    as separate rows per syndicate. Merging them would average two different
+    rotation letters into nonsense; they are passed through as they came, and
+    `_one_window` upstream picks.
+
+    **`Goals`, not `Events`.** DE's `Events` is the news feed: Discord invites,
+    patch-note links, image URLs. The in-game events this project wants — the
+    Ghoul Purge, Plague Star — are `Goals`. Reading the field whose name matches
+    would have returned an empty list and looked fine.
+    """
+    ms = 1787815825511
+    when = {"$date": {"$numberLong": str(ms)}}
+    doc = {
+        "SyndicateMissions": [
+            {"Tag": "CetusSyndicate", "Activation": when, "Expiry": when, "Jobs": [
+                {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/ReclamationBountyCap",
+                 "rewards": "/x/TierATableCRewards", "masteryReq": 2,
+                 "minEnemyLevel": 5, "maxEnemyLevel": 15, "xpAmounts": [1, 2, 3]},
+            ]},
+            {"Tag": "CetusSyndicate", "Activation": when, "Expiry": when, "Jobs": [
+                {"jobType": "/x/Other", "rewards": "/x/TierATableARewards",
+                 "minEnemyLevel": 5, "maxEnemyLevel": 15, "xpAmounts": [1, 2]},
+            ]},
+            {"Tag": "ArbitersSyndicate", "Activation": when, "Expiry": when, "Jobs": []},
+            {"Tag": "NotASyndicateWeKnow", "Activation": when, "Expiry": when,
+             "Jobs": [{"rewards": "/x/TierATableARewards"}]},
+        ],
+        "Events": [{"Messages": [{"Message": "/Lotus/Language/CommunityMessages/JoinDiscord"}]}],
+        "Goals": [{"Tag": "GhoulEmergence", "Node": "EventNode1",
+                   "Desc": "/Lotus/Language/Alerts/GhoulEmergence",
+                   "Activation": when, "Expiry": when}],
+    }
+
+    boards = official.syndicate_missions_from_worldstate(doc)
+    check("bounties: both windows come through, not one merged board", len(boards), 2,
+          "DE publish this window and the next; averaging them averages two letters")
+    check("bounties: a syndicate we have no section for is left out",
+          [b["syndicate"] for b in boards], ["Ostrons", "Ostrons"])
+    job = boards[0]["jobs"][0]
+    check("bounties: the reward path carries across as the uniqueName the letter is read from",
+          job["uniqueName"], "/x/TierATableCRewards")
+    check("bounties: levels become the pair the family match needs",
+          job["enemyLevels"], [5, 15])
+    check("bounties: xpAmounts is standingStages under another name",
+          len(job["standingStages"]), 3,
+          "its length is the stage count a bounty is costed by")
+    check("bounties: and no rewardPool is invented", job["rewardPool"], [],
+          "DE publish a table path, not names; a made-up pool would poison the vote")
+
+    events = official.events_from_worldstate(doc)
+    check("events: Goals are the events, and Events are the news", len(events), 1)
+    check("events: with the tag find_live_events actually matches on",
+          events[0]["tag"], "GhoulEmergence")
+    check("events: and a window", events[0]["expiry"], "2026-08-27T07:30:25.511Z")
+
+
 def test_the_rotation_letter_is_read_then_cross_checked() -> None:
     """
     The letter Digital Extremes print on each bounty is the primary reading, and
@@ -2432,6 +2494,7 @@ def main() -> int:
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,
                          test_the_rotation_letter_is_read_then_cross_checked,
+                         test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,

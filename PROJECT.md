@@ -1251,9 +1251,8 @@ other becomes an automatic fallback.
 | **[DE Public Export](https://origin.warframe.com/PublicExport/index_en.txt.lzma)** | Catalogue cross-check — Primes that exist in game data | First party, refreshed on every game build. Catches a new Prime **before the wiki is edited** |
 | [wiki.warframe.com/w/Prime](https://wiki.warframe.com/w/Prime) | Categories and the (V)/(P)/(B)/(S)/Founder markers | The grouping you asked for; the export fills any gaps |
 | [api.warframestat.us/items](https://api.warframestat.us/items) | Component names, artwork filenames, vault state | Convenience layer; the drop table can reconstruct parts without it |
-| [`/pc/vaultTrader`](https://api.warframestat.us/pc/vaultTrader) | Live **Prime Resurgence** rotation | Proxies the game worldstate. **Down since 2026-08-27**, and a first-party route exists after all — see §7 gotcha 4 and `TODO.md` |
-| [`/pc/syndicateMissions`](https://api.warframestat.us/pc/syndicateMissions) + [`/pc/events`](https://api.warframestat.us/pc/events) | Which **bounty rotation** is live, and whether the Ghoul Purge or Plague Star is running | Same proxy, same outage, same replacement. The rotation letter is derived by matching the bounties on offer against DE's table (§7) — and **is** published after all, in the reward-table path each job carries; the two agree, see `TODO.md` |
-| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **Void Fissures**, first party, since 2026-08-27. Also carries Resurgence, bounties and events, which have not moved yet | `max-age=28`. Raw shapes, so each consumer needs an adapter; `TODO.md` sizes the three that remain |
+| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **All four live feeds**, first party, since 2026-08-27: Void Fissures, Prime Resurgence, the bounty boards and limited-time events | `max-age=28`. Raw shapes, so each has an adapter in `official.py`; §7 has what each one had to resolve |
+| `/pc/vaultTrader`, `/pc/fissures`, `/pc/syndicateMissions`, `/pc/events` on `api.warframestat.us` | **Fallback only** since 2026-08-27, and unused on a healthy build | Kept rather than deleted: they normalise the same document, and they can name the Proxima nodes DE's export omits. All four were 404 from 2026-08-24 |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
 
@@ -2650,6 +2649,51 @@ its `(V)` `(P)` `(B)` `(S)` markers. So the intended precedence is *first party 
 everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
+
+### Bounties and events came off the proxy too, and `meta.stale` went empty
+
+**Shipped 2026-08-27**, finishing the move. All four live feeds — fissures,
+Prime Resurgence, bounty boards and events — now come from
+`api.warframe.com/cdn/worldState.php`, and `meta.stale` is `[]` for the first
+time since the WFCD proxy started 404-ing on 2026-08-24.
+
+**Two traps in these two, each of which produces a confident wrong answer.**
+
+*DE publish two windows at once* — the one running and the one after it — as
+separate rows per syndicate. Merging them averages two different rotation letters
+into nonsense. They are passed through as they arrive and `_one_window` picks,
+which is what that function was always for. It also gave a free validation: the
+two windows predicted `standard A → B` and `vault B → C`, and when the board
+turned over the build read exactly `B` and `C`.
+
+*`Goals`, not `Events`.* DE's `Events` is the news feed — Discord invites,
+patch-note links, image URLs, 34 rows of it. The in-game events this project
+wants, the Ghoul Purge and Plague Star among them, are `Goals`. Reading the field
+whose name matches would have returned an empty list and looked perfectly fine.
+
+**What the cross-check became, at the owner's direction.** The vote needs
+`rewardPool` — reward *names* — and DE publish a table *path* instead. Resolving
+the path back into a pool would be circular: the pool would be derived from the
+letter it is meant to check. So on first-party data the vote cannot run, and what
+replaces it is agreement among the jobs in one window. A renamed table or a
+changed sequence moves most jobs at once and fails a majority; one odd job does
+not, and there is one. Majority rather than unanimity for exactly that reason.
+
+**Also passed through untouched: `jobType`.** Isolation Vault bounties arrive
+with none at all, which is DE's own signal and a cleaner one than the
+level-matching that splits the vault family today. Carried in the payload, acted
+on by nothing — changing how the family is decided is its own change and wants
+its own evidence.
+
+**A test broke for the right reason and was fixed the right way.** *"A fissure
+changes how far the row says to run"* picked the first endless row in the ranking
+and asserted it said six rounds. That silently assumed the shipped fissure list
+was empty — true for the three days the feed was down, false the moment it came
+back, because the top-ranked endless node then carried a fissure and correctly
+said five. The model was verified unchanged first (six without, five with) and
+the *subject selection* was fixed, not the assertion: the test now picks an
+endless row that has no fissure on it, which is a raw-data property rather than
+whatever the ranking put first. `PROJECT.md §2` has the rule it was breaking.
 
 ### The rotation letter is read, then cross-checked, and says so if the two differ
 

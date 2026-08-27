@@ -585,8 +585,26 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
             # the interesting case is the day they stop agreeing, and that is
             # what the page raises a banner about rather than quietly averaging.
             "from": "label" if from_label else "vote",
-            "crossCheck": ({"vote": from_vote, "agrees": from_vote == from_label}
-                           if from_label and from_vote else None),
+            # Two cross-checks, because which one is available depends on where
+            # the feed came from. The WFCD proxy resolves each job's reward table
+            # into names, so the vote can run and check the label against a
+            # genuinely independent reading. DE publish the table path and no
+            # names, so on first-party data the vote has nothing to work from —
+            # and resolving the path back into a pool would be circular, since
+            # the pool would be derived from the letter it is meant to check.
+            #
+            # What remains on DE data is still a real check: the jobs in one
+            # window should all name the same letter. A renamed table or a
+            # changed sequence moves most of them at once, which fails a
+            # majority; a single odd job does not, and there is one — see the
+            # Cambion Drift entry in `TODO.md`. Majority rather than unanimity
+            # for exactly that reason, and no invented fraction beyond it.
+            "crossCheck": (
+                {"vote": from_vote, "agrees": from_vote == from_label}
+                if from_label and from_vote else
+                {"agreed": tally.get(letter, 0), "of": sum(tally.values()),
+                 "agrees": tally.get(letter, 0) * 2 > sum(tally.values())}
+                if from_label else None),
         }
     return families
 
@@ -923,10 +941,19 @@ def main() -> int:
     # unknown and treats the limited-time bounties as not running, which is a
     # smaller loss than refusing to publish a catalogue that is otherwise whole.
     log("api: bounties on offer + world events (live rotation, Ghoul, Plague Star)")
-    syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
-                                    off, critical=False, optional=True)
-    world_events = fetch_json(WORLD_EVENTS, "api_events", off,
-                              critical=False, optional=True)
+    syndicate_missions = official.syndicate_missions_from_worldstate(worldstate or {})
+    world_events = official.events_from_worldstate(worldstate or {})
+    if syndicate_missions:
+        boards = len(syndicate_missions)
+        jobs = sum(len(s["jobs"]) for s in syndicate_missions)
+        log(f"  worldstate: {jobs} bounties across {boards} boards"
+            f" (DE publish this window and the next), {len(world_events)} live event(s)")
+    else:
+        log("  worldstate: no bounty boards from DE, falling back to the WFCD proxy")
+        syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
+                                        off, critical=False, optional=True)
+        world_events = fetch_json(WORLD_EVENTS, "api_events", off,
+                                  critical=False, optional=True)
 
     # Fetched live even when everything else is coming from the cache, because
     # this is the one source where a cached copy is worth nothing: every entry
