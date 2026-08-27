@@ -125,6 +125,7 @@ ranking divides by means the same thing on every row.
 |---|---|
 | The live worldstate has a first-party route — three feeds still to move | session — fissures shipped 2026-08-27; Resurgence, bounties and events remain |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
+| The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | The planner ignores Prime Resurgence items on the farm list | session |
@@ -816,6 +817,35 @@ proxy as the fallback, so a bad day at either end is survivable. That mechanism
 exists because `origin.warframe.com` answers a GitHub runner with 403 and
 `content.warframe.com` with 200 — the same lesson, already learnt once.
 
+### The page tests flake in a full run and pass on their own
+
+**Observed twice on 2026-08-27, in consecutive full runs, on two different
+tests**, each of which then passed standalone:
+
+```
+FAIL js: the licence and privacy notice is at the foot of both pages, identically
+FAIL js: the collection drawer can show more than its eight best places
+```
+
+Both pass immediately afterwards when `node --test tests/test_pages.mjs` is run
+on its own — the second was confirmed at 47 of 47. So the failures are not about
+what the tests assert; something about running them at the end of a full suite is
+different.
+
+**The cause is not established, and the obvious guess is wrong.** The first
+thought was that `test_offline_build` rewrites `data/` while pages are reading it,
+but the runner walks its groups in order and one test at a time, so those never
+overlap. What is left is timing: the browser group runs last, after about half a
+minute of builds and subprocesses, and Playwright work that is fine on an idle
+machine can miss a wait on a busy one. That is a guess too, and it should be
+treated as one until somebody measures it.
+
+**Worth fixing rather than tolerating.** This suite is the gate before every push
+— `PROJECT.md §2` says so — and a gate that fails one run in a few teaches people
+to re-run rather than to read, which is exactly how a real failure gets waved
+through. Start by capturing which assertion inside each test fails, since both
+are multi-assertion and the runner currently reports only the test name.
+
 ### Running the tests rebuilds `data/` underneath you
 
 **Found 2026-08-27**, after it caused the same confusion twice in one session.
@@ -846,6 +876,14 @@ whatever replaces this has to leave a dataset behind or run after them.
 Related in spirit to the rule about `localStorage` on 8777: a test that quietly
 rewrites the owner's working state is a test that will mislead somebody, and it
 has.
+
+**It is not, however, a race.** The runner walks its groups strictly in order and
+one test at a time, so `test_offline_build` finishes long before the browser group
+starts and nothing reads `data/` while it is being written. That explanation was
+written into this entry on 2026-08-27 and deleted the same hour, once the loop in
+`main()` was actually read. It is recorded here only because it is a plausible
+story that survives a glance and dies on inspection — see the separate entry on
+the page tests flaking, which is the real observation it was invented to explain.
 
 ### A backend refresh finds new fissures and the ranking does not move
 
