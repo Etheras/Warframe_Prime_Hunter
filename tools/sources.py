@@ -134,8 +134,34 @@ MISSING: list[str] = []
 STALE_AGE: dict[str, float] = {}
 
 
+def stale_if_older(key: str, path: str, max_age: float | None) -> None:
+    """Mark a reused copy stale when it is older than the document can plausibly be.
+
+    Some documents cannot legitimately go unchanged. Void Fissures turn over
+    every hour or two, so a fissure list that has not moved in three hours is
+    evidence of a broken feed rather than of a quiet evening — and a `304` from
+    a CDN in front of a failing origin says exactly that, in the voice of good
+    news. `fetch` trusts a 304 and returns the cached bytes without rewriting the
+    file, so nothing anywhere gets newer and no alert is raised.
+
+    Measured on 2026-08-27: `.cache/api_fissures.gz` had an mtime of 2026-08-24,
+    so no successful `200` had arrived in three days, and every build in between
+    reported nothing stale and published an empty fissure list. `PROJECT.md` says
+    zero fissures is normal rather than a fault, which is what made it invisible.
+    """
+    if not max_age or not os.path.exists(path):
+        return
+    age = time.time() - os.path.getmtime(path)
+    if age <= max_age:
+        return
+    log(f"~ {key}: upstream says unchanged, but this copy is "
+        f"{int(age // 3600)}h old and {key} cannot be — treating it as stale")
+    STALE.append(key)
+    STALE_AGE[key] = os.path.getmtime(path)
+
+
 def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
-          optional: bool = False):
+          optional: bool = False, max_age: float | None = None):
     """
     GET with a small on-disk cache so reruns and --offline are cheap.
 
@@ -199,6 +225,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 # current. Only reachable when a body was cached, since the
                 # header is only sent then.
                 if exc.code == 304:
+                    # Confirmed current by the server — unless the document is
+                    # one that cannot be this old and still be current.
+                    stale_if_older(key, path, max_age)
                     with gzip.open(path, "rb") as fh:
                         return fh.read()
                 last_err = exc
@@ -236,8 +265,8 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
 
 def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
-               optional: bool = False):
-    raw = fetch(url, key, offline, critical, optional)
+               optional: bool = False, max_age: float | None = None):
+    raw = fetch(url, key, offline, critical, optional, max_age)
     if raw is None:
         return None
     try:

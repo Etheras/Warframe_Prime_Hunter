@@ -42,7 +42,7 @@ appears, that is the moment to split them, because a channel that carries two
 meanings is exactly what this section exists to prevent.
 
 The **same blue** carries the same requirement at item scale: a card whose every
-farmable relic drops on Railjack says `RAILJACK ONLY`, in place of the `P · NEVER
+farmable relic drops on Railjack says `RAILJACK ONLY`, in place of the `NEVER
 VAULTED` teal it would otherwise wear. Two badges, one colour, one meaning —
 *you will need a ship*. Choosing a different colour for the card would have made
 them look like two unrelated facts.

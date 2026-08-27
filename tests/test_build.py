@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -797,6 +798,59 @@ def test_a_blocked_host_is_routed_around() -> None:
     finally:
         sources.CACHE_DIR = real_cache
         sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_an_impossible_304_is_treated_as_stale() -> None:
+    """
+    A `304` says the server has confirmed what we hold is current, and `fetch`
+    duly returns the cached bytes without rewriting the file. For most sources
+    that is right. For the fissure list it is not: a fissure lasts an hour or
+    two, so an unchanged list is only possible for a short while, and a CDN in
+    front of a failing origin will answer 304 indefinitely.
+
+    Measured 2026-08-27: `.cache/api_fissures.gz` had an mtime three days old,
+    so no successful 200 had arrived in three days — and every build in between
+    reported nothing stale and published an empty fissure list. Zero fissures is
+    documented as normal rather than a fault, so nothing on the page said a word.
+
+    Exercised through the age check rather than through a real 304, because what
+    is being asserted is the policy: a copy older than the document can be gets
+    recorded as stale, and one that is not does not.
+    """
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-304-")
+    stale, ages = list(sources.STALE), dict(sources.STALE_AGE)
+    try:
+        path = os.path.join(tmp, "api_fissures.gz")
+        with open(path, "wb") as fh:
+            fh.write(b"yesterday's fissures")
+
+        # Fresh enough to believe: a fissure list can genuinely be unchanged.
+        os.utime(path, (time.time() - 600, time.time() - 600))
+        sources.STALE.clear(); sources.STALE_AGE.clear()
+        sources.stale_if_older("api_fissures", path, 3 * 3600)
+        check("fetch: a recent unchanged copy is not an alert", sources.STALE, [],
+              "ten minutes without a new fissure is an ordinary evening")
+
+        # Older than any fissure lives: the feed is broken, whatever it says.
+        old = time.time() - 3 * 24 * 3600
+        os.utime(path, (old, old))
+        sources.stale_if_older("api_fissures", path, 3 * 3600)
+        check("fetch: a copy older than the document can be is stale",
+              sources.STALE, ["api_fissures"],
+              "a 304 from a CDN in front of a dead origin is not a confirmation")
+        check_true("fetch: and it records when that copy was written",
+                   sources.STALE_AGE.get("api_fissures") == old)
+
+        # No policy given, no opinion offered — every other source is unchanged.
+        sources.STALE.clear(); sources.STALE_AGE.clear()
+        sources.stale_if_older("api_items", path, None)
+        check("fetch: a source with no lifetime keeps the old behaviour",
+              sources.STALE, [])
+    finally:
+        sources.STALE[:] = stale
+        sources.STALE_AGE.clear(); sources.STALE_AGE.update(ages)
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -2127,6 +2181,7 @@ def main() -> int:
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
+                         test_an_impossible_304_is_treated_as_stale,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,

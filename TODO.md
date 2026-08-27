@@ -120,12 +120,10 @@ ranking divides by means the same thing on every row.
 | Entry | Size |
 |---|---|
 | The live worldstate has a first-party route after all | session — four adapters, and it retires the only third-party dependency |
-| A failed fissure fetch looks exactly like a quiet hour | small once the mechanism is confirmed — it hid a three-day outage |
+| Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | The planner ignores Prime Resurgence items on the farm list | session |
 | No feature-usability audit has ever been done | session — the first one, and it sets the shape for the rest |
-| Vaulted belongs directly below Prime Resurgence | small |
-| The single-letter shorthands say nothing the word beside them does not | small |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -751,47 +749,36 @@ proxy as the fallback, so a bad day at either end is survivable. That mechanism
 exists because `origin.warframe.com` answers a GitHub runner with 403 and
 `content.warframe.com` with 200 — the same lesson, already learnt once.
 
-### A failed fissure fetch looks exactly like a quiet hour
+### Running the tests rebuilds `data/` underneath you
 
-**Found 2026-08-27**, while checking why the banner had only just appeared.
-`api.warframestat.us/pc/fissures` has been answering 404 since **2026-08-24** —
-that is what `meta.staleSince` says on both this machine and the deployed site,
-independently. The banner did not appear until 2026-08-27, when a push forced a
-full rebuild.
+**Found 2026-08-27**, after it caused the same confusion twice in one session.
+`test_offline_build` runs `python tools/build_data.py --offline` — twice, to
+check determinism — with `cwd=ROOT`, so it writes the repository's real
+`data/prime-data.js`. Every full test run therefore replaces whatever was built
+there with an offline rebuild.
 
-What the ten-minute cron published in between, from the CI log of the 03:07 run:
+Nothing is lost: `data/` is generated and gitignored. What is lost is **the
+truth about freshness**, and silently. An offline build reads every source from
+the cache without marking anything stale — correctly, because `--offline` is a
+request for exactly that — so `meta.stale` comes back `[]` and `meta.staleSince`
+`null` no matter what the network is doing. Load the page after a test run and
+the banner is gone, whatever the real state of the feeds.
 
-```
-no upstream changes since 2026-08-26T21:10:54+00:00 - rebuilding from cache,
-  with a fresh fissure list
-api: void fissures running right now
-fissures       0 running (none, or unreachable)
-```
+That cost two wrong readings here on one afternoon: a build stamped `stale: []`
+was taken as evidence the API was healthy, and later a rebuilt-at-07:43 payload
+with no stale markers was taken as the outage having ended. It had not; the test
+suite had simply run in between. Both were caught, but only by going and
+checking the endpoint by hand — which is the check the banner exists to save.
 
-No `~ api_fissures` line, no `ALERT`, nothing in `meta.stale`, and so **no
-banner**. The deployed planner showed no fissures for three days and gave the
-reader no way to tell that from a genuine lull — and `PROJECT.md` says plainly
-that zero fissures is normal rather than a fault, which is exactly what makes
-the failure invisible.
+**The fix is to stop it writing there**, not to remember the footgun. Build into
+a temp directory and compare, the way `test_clone_and_build` already does, or
+save and restore `data/` around it. Watch the ordering: `test_built_payload` and
+the bundle checks read `data/` and currently benefit from it existing, so
+whatever replaces this has to leave a dataset behind or run after them.
 
-The log line already knows: *"none, or unreachable"*. It is the payload that
-does not — `fissures: []` carries no reason, so the page cannot say which it is.
-
-**What to change is the smaller question; confirm the mechanism first.** A
-failure with a cached copy marks `STALE` and would have raised the banner, so
-this run took some other path — cold cache on the runner, or the `--if-changed`
-route where `off = True` makes the three heavy worldstate sources cache reads
-that are never marked stale while the fissure list alone is fetched live. Read
-`fetch_json`'s optional/cold path against a CI log before designing anything.
-
-The fix is likely one field: let the payload distinguish *"asked, and there are
-none"* from *"could not ask"*, and let the planner say the second out loud. That
-is the same distinction `meta.stale` already draws for every other source, and
-the fissure list is the one source deliberately exempted from it — the exemption
-is the bug.
-
-Related but not the same as the entry below: this is about a fetch that failed
-being silent, that one is about a fetch that succeeded not reaching the ranking.
+Related in spirit to the rule about `localStorage` on 8777: a test that quietly
+rewrites the owner's working state is a test that will mislead somebody, and it
+has.
 
 ### A backend refresh finds new fissures and the ranking does not move
 
@@ -843,40 +830,6 @@ carry the Resurgence flag, so the data is in the payload. Note that the flag
 depends on `api_vaulttrader` — the feed that is down — so build this against the
 first-party route above, or against a cached copy, and do not let it silently
 show nothing when the flag is stale.
-
-### Vaulted belongs directly below Prime Resurgence
-
-**Asked for 2026-08-27.** The availability filters in the collection sidebar are
-in this order, measured on the page:
-
-```
-Farmable 29 · Railjack only 6 · Prime Resurgence 5 · Baro Ki'Teer 9
-· Other sources 4 · Vaulted 113 · Founder exclusive 3
-```
-
-Vaulted should sit **directly** below Prime Resurgence — above Baro Ki'Teer and
-Other sources, not merely somewhere beneath it, which it already is. The markup
-is `index.html` lines 76–86; nothing but the order changes.
-
-### The single-letter shorthands say nothing the word beside them does not
-
-**Asked for 2026-08-27.** Three places write a letter and then immediately write
-the word it stands for, so the letter carries no information:
-
-| Where | Now |
-|---|---|
-| `assets/app.js` `BADGE` | `R · RESURGENCE`, `V · VAULTED`, `B · BARO` |
-| `index.html` sidebar | `Prime Resurgence <em>(R)</em>`, `Baro Ki'Teer <em>(B)</em>`, `Vaulted <em>(V)</em>` |
-
-Drop the letters and the `<em>` wrappers; keep the words.
-
-**One the request did not name, and it is the same shape:** `perm` is
-`P · NEVER VAULTED`. Decide it with the other three rather than leaving one
-lonely letter behind — that is how a convention half-removed becomes a mystery.
-
-Check `STYLE.md` before touching the badge strings, and check the sidebar still
-lines up once the `<em>` goes: the counts are right-aligned in a column whose
-width came from labels that were longer.
 
 ### No feature-usability audit has ever been done
 

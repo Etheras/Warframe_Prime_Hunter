@@ -828,9 +828,15 @@ def main() -> int:
     # this is the one source where a cached copy is worth nothing: every entry
     # in it will have expired. `args.offline` rather than `off` for exactly that
     # reason - only an explicit --offline settles for yesterday's fissures.
+    # `max_age`: a fissure lasts an hour or two, so a list that has not changed
+    # in three is a broken feed rather than a quiet evening. Without it a `304`
+    # from a CDN sitting in front of a failing origin reads as good news, and
+    # this shipped a three-day-old empty list for three days without a word —
+    # `stale_if_older` carries the measurement.
     log("api: void fissures running right now")
     fissures_raw = fetch_json(FISSURES, "api_fissures", args.offline,
-                              critical=False, optional=True)
+                              critical=False, optional=True,
+                              max_age=3 * 3600)
 
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash = acquire_export(off)

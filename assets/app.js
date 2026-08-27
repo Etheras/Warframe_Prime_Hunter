@@ -292,13 +292,17 @@
   /* ── badges ───────────────────────────────────────────────── */
   const BADGE = {
     farmable: ["farmable", "FARMABLE"],
-    resurgence: ["resurgence", "R · RESURGENCE"],
-    vaulted: ["vaulted", "V · VAULTED"],
-    baro: ["baro", "B · BARO"],
+    /* No letter in front of the word it stands for. `R · RESURGENCE` spent the
+       letter on a reader who could already see "RESURGENCE" — the shorthand is
+       the wiki's, where it is a marker in a table with no room for the word, and
+       it was carried across into a place that has the room. */
+    resurgence: ["resurgence", "RESURGENCE"],
+    vaulted: ["vaulted", "VAULTED"],
+    baro: ["baro", "BARO"],
     founder: ["founder", "FOUNDER EXCLUSIVE"],
     special: ["special", "OTHER SOURCE"],
     vaultsoon: ["vaultsoon", "VAULTING SOON"],
-    perm: ["perm", "P · NEVER VAULTED"],
+    perm: ["perm", "NEVER VAULTED"],
     railjack: ["railjack", "RAILJACK ONLY"],
     fresh: ["fresh", "NEW"],
   };

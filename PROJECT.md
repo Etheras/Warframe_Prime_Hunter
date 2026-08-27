@@ -1029,6 +1029,28 @@ that stamp the banner outlived the refresh that cleared it: `refresh-data` finis
 data on disk was current, and the page went on saying it was behind for the rest of the
 hour. Reloading did not help, because the server held the stale answer, not the browser.
 
+**A `304` is a confirmation from the server, not from the world.** Fixed
+2026-08-27, and it is the reason the banner had nothing to report while there was
+plenty to report. `fetch` treats `304 Not Modified` as the success it is and
+returns the cached bytes — **without rewriting the file**, since there is nothing
+new to write. So on a feed whose origin has failed behind a CDN that keeps
+answering 304, nothing anywhere gets newer: the mtime stops moving, `STALE` stays
+empty, and every build says the data is current.
+
+Measured: `.cache/api_fissures.gz` had an mtime of 2026-08-24 and no successful
+`200` had arrived in the three days since, while every build in between reported
+nothing stale and published an empty fissure list. `PROJECT.md` says elsewhere
+that zero fissures is normal rather than a fault, which is precisely what made
+three days of failure invisible.
+
+`stale_if_older` gives a source an optional **lifetime** — how long that document
+can legitimately go unchanged. The fissure list gets three hours, because a
+fissure lasts an hour or two and a list that has not moved in longer is not a
+quiet evening, it is a broken feed. Past that the copy is recorded as stale
+whatever the server says, and the banner tells the truth without anyone reading a
+CI log. Only the fissure list carries a lifetime today; the drop tables and the
+catalogue can go unchanged for weeks and a 304 on those means what it says.
+
 **The banner names what is behind in the reader's words, and says how far.**
 Rewritten 2026-08-27, after the deployed site spent a morning telling strangers
 *"The last update could not reach api_events, api_fissures, api_syndicatemissions,
@@ -2103,7 +2125,8 @@ Extremes' `vaulted` flag at the same moment, and *both markers are correct*:
 
 The second group never becomes unobtainable, which is exactly what the wiki
 marker claims — and until 2026-08-14 the card told them apart from the first
-group not at all. Both showed `P · NEVER VAULTED`, tooltipped *"its relics keep
+group not at all. Both showed `NEVER VAULTED` (spelled `P · NEVER VAULTED` until
+2026-08-27, when the letters went), tooltipped *"its relics keep
 dropping indefinitely"*, which is a poor thing to say to someone with no
 Railjack. Nyx Prime's card compounded it by showing no farm section whatsoever,
 for the separate reason recorded above.
