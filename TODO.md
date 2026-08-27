@@ -135,7 +135,7 @@ unit question — tedious rather than hard, and blocking nothing.
 | Entry | Size |
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
-| Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale | session — intermittent, and the banner on the live site is the symptom |
+| Digital Extremes 403 the GitHub runner | small — our half shipped 2026-08-28; what is left is DE's, and is not urgent |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
@@ -955,25 +955,29 @@ proxy. The log even reads *"19 fissures from Digital Extremes"*, which was true 
 the copy and not of the hour. Fissures last a couple of hours, so this is the feed
 where an hour of staleness costs the most.
 
-**Options, in the order they are worth weighing:**
+**Our half is fixed, 2026-08-28.** The owner's ruling: **Digital Extremes, then
+WFCD, then the stale copy — always, in that order, not conditional.** A reused
+copy is no longer treated as a first-party answer, so a 403 now falls through to
+the proxy instead of being absorbed by the cache, and the banner reports what
+reached the payload rather than what `fetch` had to try. `from_chain` in
+`build_data.py` holds the order in one place and a test asserts it;
+`PROJECT.md §7` has the reasoning.
 
-1. **Prefer a fresh proxy copy over a stale first-party one, for live feeds only.**
-   The adapters already produce identical shapes — `PROJECT.md §6` says they were
-   built that way *"so the two are interchangeable and either can be the fallback
-   for the other"* — so this is a condition, not a port. First party stays the
-   default; the cache stops out-ranking a live alternative.
-2. **Publish from the local scheduled refresh.** `schedule.ps1` runs where the
-   fetch works. Worth checking first whether it is already masking this: if the
-   published data is usually current, CI has been degraded longer than anyone
-   noticed and the banner has been telling the truth to nobody.
-3. **Accept it and let the banner say so.** Current behaviour, and honest. The
-   weakest option only because option 1 is cheap.
-4. **Ask DE.** Their forums are the documented channel. Slowest, and the only one
-   that could make the runner work directly.
+**What is left is DE's half, and it is not ours to fix.**
 
-**Still worth measuring: how often.** One log line is one data point, and the rate
-decides how much option 1 buys. A grep for `refresh failed` across several builds'
-logs answers it and costs nothing.
+- **How often the 403 happens.** Still one data point. It no longer costs
+  freshness — the proxy covers it — so this is now only worth knowing for its own
+  sake, and a grep for `refresh failed` across several builds' logs answers it.
+- **Whether the local scheduled refresh has been masking it.** `schedule.ps1`
+  runs where the fetch works. Worth knowing how much of the published data's
+  freshness has been coming from there rather than from CI.
+- **Whether to ask DE.** Their forums are the documented channel, and an
+  allowlisted runner is the only thing that would make the first-party path work
+  from CI. Slow, and no longer urgent.
+
+**Do not add retries**, whatever else is decided. A 403 from an edge appliance is
+a refusal rather than a hiccup, and `PROJECT.md §2` is explicit that every request
+is somebody else's bandwidth. Retrying an address-range block just spends it.
 
 ### The shell-write guard lets `python - <<'EOF'` straight through
 

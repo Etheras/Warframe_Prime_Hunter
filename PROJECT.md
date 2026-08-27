@@ -2826,6 +2826,61 @@ measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s tab
 quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
 it meets and the one that governs.
 
+### Digital Extremes, then WFCD, then our own cache — always, in that order
+
+**Shipped 2026-08-28**, at the owner's direction, after the banner on the
+deployed site was traced to a 403.
+
+**The failure it fixes was ours, not DE's.** `fetch` answers a failed refresh by
+handing back the cached bytes, so a 403 from DE produced a **usable** worldstate —
+and every fallback was written as *"if the worldstate gave nothing usable, ask the
+proxy"*. A reused copy is something, so the proxy was never asked. The published
+site served **69-minute-old fissures** while a fresh copy of the same document sat
+one request away, and the build log read *"19 fissures from Digital Extremes"* as
+though it were current.
+
+**Why DE refuse at all**, so nobody tries to fix it at the wrong end: they sit
+behind **Akamai**, whose edge blocks datacentre and VPN address ranges. GitHub's
+runners are Azure datacentre IPs; the same fetch succeeds from the owner's
+residential connection, and a request to `forums.warframe.com` from a cloud IP was
+refused the same way while this was being researched. It is intermittent because
+Akamai apply rules per edge and per address, not because anything about our
+request varies. **There is no retry, and no user-agent trick, that helps** — a 403
+is a refusal, and `§2` is explicit that every request is somebody else's
+bandwidth. `TODO.md` keeps the evidence.
+
+**The rule is unconditional.** Not "for live feeds", not "when the cache is old
+enough" — the same three steps for every feed, every build:
+
+1. **Digital Extremes**, from a worldstate that was actually refreshed.
+2. **WFCD**, if that errors or comes back empty.
+3. **Our cached copy of DE's worldstate**, if the proxy errors or comes back empty.
+
+A **reused copy is deliberately not a first-party answer.** `from_chain` is given
+the worldstate only when `de_worldstate` is absent from `STALE`; otherwise the
+same document is offered as step 3, which is what it is — the last resort wearing
+a first-party name.
+
+**One function, not three copies**, because the guarantee is the *order*. Three
+call sites can be edited apart and the disagreement would stay invisible until the
+day a fallback was needed. `from_chain` returns `(value, "worldstate" | "proxy" |
+"cache" | None)` so each feed can say which answered without deciding anything
+itself, and a test asserts the order, that nothing further is asked once a step
+answers, that an **empty list is a miss** rather than an answer, and that neither
+a `SystemExit` nor an ordinary exception from the proxy can abort the build. A
+fallback that can raise is not a fallback.
+
+**The banner reports what reached the payload, not what `fetch` had to try.** If
+DE refused and the proxy answered, the live feeds *are* current, and `de_worldstate`
+is removed from `STALE` before the payload is written. Leaving it would be a second
+wrong claim in the opposite direction — telling readers to distrust data that is
+fine. The reused copy is news only when something was actually built from it, which
+is what `fell_back_to_cache` tracks.
+
+**Bounties and events come from the same step.** The boards decide which source
+answers and the events follow it, so a build cannot mix bounties from one hour
+with events from another and present them as one board.
+
 ### A run costs something before and after the part you count
 
 **Shipped 2026-08-27**, on the owner's measurements and their decision of

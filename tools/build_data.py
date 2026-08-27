@@ -937,6 +937,50 @@ def build_fissures(raw, now: datetime) -> list:
     return out
 
 
+def from_chain(what, de_fresh, proxy, de_cached):
+    """
+    One live feed, from the best source that answers.
+
+    **Digital Extremes, then WFCD, then our own cached copy. Always, in that
+    order.** Owner's decision, 2026-08-28. A step is taken when the one before it
+    errors or comes back empty, and nothing about the feed or the circumstances
+    reorders it.
+
+    Returns `(value, "worldstate" | "proxy" | "cache" | None)` so the caller can
+    say which answered without deciding anything itself. It exists as one
+    function rather than three copies because the guarantee is the *order*: three
+    copies can be edited to disagree, and the disagreement would be invisible
+    until the day a fallback was needed.
+
+    The bug it fixes: `fetch` answers a failed refresh by handing back cached
+    bytes, so a 403 from DE produced a *usable* worldstate and the proxy was
+    never asked at all. The published site served 69-minute-old fissures while a
+    fresh copy of the same document sat one request away. Hence `de_fresh` is
+    given the worldstate only when it was really refreshed — a reused copy is not
+    a first-party answer, it is the last resort wearing a first-party name.
+
+    An exception from the proxy is a miss, exactly as an empty answer is: this
+    is the fallback path, and a fallback that can raise is not a fallback.
+    """
+    value = de_fresh()
+    if value:
+        return value, "worldstate"
+    try:
+        value = proxy() or None
+    except SystemExit:                        # `fetch` aborts a cold critical miss
+        log(f"  proxy: {what} unavailable")
+        value = None
+    except Exception as exc:                  # noqa: BLE001 - any failure is a miss
+        log(f"  proxy: {what} failed ({exc})")
+        value = None
+    if value:
+        return value, "proxy"
+    value = de_cached()
+    if value:
+        return value, "cache"
+    return None, None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the Warframe Prime Hunter data payload.")
     ap.add_argument("--offline", action="store_true", help="rebuild from the HTTP cache only")
@@ -1011,35 +1055,81 @@ def main() -> int:
     worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
                             critical=False, optional=True, max_age=3 * 3600)
 
+    # ── the source chain, and it is the same for every live feed ──────
+    #
+    # **Digital Extremes, then WFCD, then our own cached copy. Always, in that
+    # order.** Owner's decision, 2026-08-28. Each step is taken when the one
+    # before it errors or comes back empty; nothing about the feed or the
+    # circumstances changes the order.
+    #
+    # The bug it fixes: `fetch` answers a failed refresh by handing back the
+    # cached bytes, so a 403 from DE produced a *usable* worldstate and the
+    # proxy was never asked. The published site served 69-minute-old fissures
+    # while a fresh copy of the same document sat unused one request away. DE
+    # sit behind Akamai, which refuses datacentre address ranges, so CI draws a
+    # 403 intermittently and there is nothing to change about the request — see
+    # `TODO.md`. This is the part that was ours to fix.
+    #
+    # So a reused copy is deliberately NOT treated as a first-party answer: the
+    # feeds ask the proxy first and fall back to it only if that fails too.
+    ws_stale = "de_worldstate" in STALE
+    ws_fresh = {} if ws_stale else (worldstate or {})
+    ws_cached = worldstate or {}
+    if ws_stale:
+        log("  worldstate: the copy is reused, so the proxy is asked before it")
+    # Set only when a feed actually falls back to the cached copy. Without it
+    # the banner would report staleness the payload does not contain — the
+    # proxy having answered means the data IS current, whatever `fetch` had to
+    # do to discover that.
+    fell_back_to_cache = False
+
     log("api: Varzia / vault trader (live Prime Resurgence rotation)")
-    vault_trader = official.vault_trader_from_worldstate(worldstate or {})
-    if vault_trader:
+    vault_trader, src = from_chain(
+        "vault trader",
+        lambda: official.vault_trader_from_worldstate(ws_fresh),
+        lambda: fetch_json(VAULT_TRADER, "api_vaulttrader", off,
+                           critical=False, optional=True),
+        lambda: official.vault_trader_from_worldstate(ws_cached))
+    if src == "worldstate":
         log(f"  worldstate: Varzia is selling {len(vault_trader['inventory'])} packs")
+    elif src == "proxy":
+        log("  proxy: Varzia read from WFCD")
+    elif src == "cache":
+        fell_back_to_cache = True
+        log("  cache: Varzia from our copy of DE's worldstate")
     else:
-        log("  worldstate: no vault trader from DE, falling back to the WFCD proxy")
-        try:
-            vault_trader = fetch_json(VAULT_TRADER, "api_vaulttrader", off)
-        except SystemExit:
-            log("! vault trader unavailable - Resurgence flags will be empty")
-            vault_trader = {}
+        log("! vault trader unavailable - Resurgence flags will be empty")
+        vault_trader = {}
 
     # Optional on purpose: without these the planner says the bounty rotation is
     # unknown and treats the limited-time bounties as not running, which is a
     # smaller loss than refusing to publish a catalogue that is otherwise whole.
     log("api: bounties on offer + world events (live rotation, Ghoul, Plague Star)")
-    syndicate_missions = official.syndicate_missions_from_worldstate(worldstate or {})
-    world_events = official.events_from_worldstate(worldstate or {})
-    if syndicate_missions:
-        boards = len(syndicate_missions)
+    # The boards decide which source answers; the events then come from that same
+    # source, so a build cannot mix bounties from one hour with events from
+    # another and present them as one board.
+    syndicate_missions, src = from_chain(
+        "bounty boards",
+        lambda: official.syndicate_missions_from_worldstate(ws_fresh),
+        lambda: fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
+                           off, critical=False, optional=True),
+        lambda: official.syndicate_missions_from_worldstate(ws_cached))
+    if src == "worldstate":
+        world_events = official.events_from_worldstate(ws_fresh)
         jobs = sum(len(s["jobs"]) for s in syndicate_missions)
-        log(f"  worldstate: {jobs} bounties across {boards} boards"
+        log(f"  worldstate: {jobs} bounties across {len(syndicate_missions)} boards"
             f" (DE publish this window and the next), {len(world_events)} live event(s)")
-    else:
-        log("  worldstate: no bounty boards from DE, falling back to the WFCD proxy")
-        syndicate_missions = fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
-                                        off, critical=False, optional=True)
+    elif src == "proxy":
         world_events = fetch_json(WORLD_EVENTS, "api_events", off,
-                                  critical=False, optional=True)
+                                  critical=False, optional=True) or []
+        log(f"  proxy: {len(syndicate_missions)} boards read from WFCD")
+    elif src == "cache":
+        fell_back_to_cache = True
+        world_events = official.events_from_worldstate(ws_cached)
+        log("  cache: bounty boards from our copy of DE's worldstate")
+    else:
+        syndicate_missions, world_events = [], []
+        log("  bounty boards unavailable - the rotation will read unknown")
 
     # Fetched live even when everything else is coming from the cache, because
     # this is the one source where a cached copy is worth nothing: every entry
@@ -1064,25 +1154,48 @@ def main() -> int:
     # DE's region export and that arrives on the line above. First party first:
     # the worldstate is DE's own, and the proxy is asked only if it gave us
     # nothing usable.
-    fissures_raw = official.fissures_from_worldstate(
-        worldstate or {}, export_extra.get("nodeNames") or {})
-    named = [f for f in fissures_raw if f.get("node")]
-    if named:
+    def named_fissures(doc):
+        """DE's rows, minus the ones there is no name for."""
+        rows = official.fissures_from_worldstate(doc, export_extra.get("nodeNames") or {})
+        return [f for f in rows if f.get("node")], len(rows)
+
+    # The proxy normalises the same document and can name the Proxima nodes DE's
+    # export omits. Asked before the cached copy, never after it: every entry in
+    # an hour-old fissure list is closer to expiring than the list admits, and
+    # this is the feed where that costs the most.
+    fissures_raw, src = from_chain(
+        "fissures",
+        lambda: named_fissures(ws_fresh)[0],
+        lambda: fetch_json(FISSURES, "api_fissures", args.offline,
+                           critical=False, optional=True, max_age=3 * 3600),
+        lambda: named_fissures(ws_cached)[0])
+    if src == "worldstate":
         # Storms are dropped rather than mourned: DE publish no CrewBattleNode
         # row in their region export, so there is no name to give them. Say how
         # many went, because a shorter list with no explanation is how a broken
         # feed looks exactly like a quiet evening.
-        lost = len(fissures_raw) - len(named)
-        log(f"  worldstate: {len(named)} fissures from Digital Extremes"
+        lost = named_fissures(ws_fresh)[1] - len(fissures_raw)
+        log(f"  worldstate: {len(fissures_raw)} fissures from Digital Extremes"
             + (f", {lost} Railjack storm(s) unnamed and dropped" if lost else ""))
-        fissures_raw = named
+    elif src == "proxy":
+        log(f"  proxy: {len(fissures_raw)} fissures read from WFCD")
+    elif src == "cache":
+        fell_back_to_cache = True
+        log(f"  cache: {len(fissures_raw)} fissures from our copy of DE's worldstate")
     else:
-        # First party gave nothing usable, so ask the proxy — which is the whole
-        # point of keeping it. It normalises the same document and can name the
-        # Proxima nodes DE's export omits.
-        log("  worldstate: nothing usable from DE, falling back to the WFCD proxy")
-        fissures_raw = fetch_json(FISSURES, "api_fissures", args.offline,
-                                  critical=False, optional=True, max_age=3 * 3600)
+        fissures_raw = []
+        log("  fissures unavailable - the list will be empty")
+
+    # The banner reports what reached the payload, not what `fetch` had to try.
+    # If DE refused and the proxy answered, the live feeds ARE current and
+    # saying otherwise would be a second wrong claim in the other direction —
+    # readers would be told to distrust data that is fine. The reused copy is
+    # only news when something was actually built from it.
+    if ws_stale and not fell_back_to_cache:
+        while "de_worldstate" in STALE:
+            STALE.remove("de_worldstate")
+        STALE_AGE.pop("de_worldstate", None)
+        log("  worldstate: DE refused, the proxy answered — the feeds are current")
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)

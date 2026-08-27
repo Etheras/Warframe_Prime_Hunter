@@ -953,6 +953,68 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_live_feed_asks_de_then_wfcd_then_its_own_cache() -> None:
+    """
+    **Digital Extremes, then WFCD, then our own cached copy. Always, in that
+    order.** The owner's decision of 2026-08-28, and the order is the whole of
+    what `from_chain` guarantees — so it is asserted here rather than trusted to
+    three call sites that could be edited apart.
+
+    What it fixes: `fetch` answers a failed refresh by handing back cached bytes,
+    so a 403 from DE produced a *usable* worldstate and the proxy was never
+    asked. The deployed site published 69-minute-old fissures while a fresh copy
+    of the same document sat one request away. DE sit behind Akamai, which
+    refuses datacentre address ranges, so CI draws that 403 intermittently and
+    there is nothing to change about the request — the fallback order was ours.
+    """
+    called = []
+
+    def chain(de, proxy, cached):
+        called.clear()
+        return build_data.from_chain(
+            "test feed",
+            lambda: called.append("de") or de,
+            lambda: called.append("proxy") or proxy,
+            lambda: called.append("cache") or cached)
+
+    value, src = chain("DE", "WFCD", "old")
+    check("chain: first party wins", (value, src), ("DE", "worldstate"))
+    check("chain: and nothing else is asked", called, ["de"],
+          "asking the proxy when DE answered spends somebody else's bandwidth")
+
+    value, src = chain(None, "WFCD", "old")
+    check("chain: an empty first party falls to the proxy", (value, src), ("WFCD", "proxy"))
+    check("chain: in that order", called, ["de", "proxy"])
+
+    value, src = chain(None, None, "old")
+    check("chain: the cache is last, not second", (value, src), ("old", "cache"))
+    check("chain: and only after both", called, ["de", "proxy", "cache"])
+
+    value, src = chain(None, None, None)
+    check("chain: nothing anywhere is not an answer", (value, src), (None, None))
+
+    # An empty list is a miss, not an answer: the proxy returning `[]` for the
+    # fissures has to fall through to the cache rather than publish an empty
+    # evening. This is the shape the feeds actually return.
+    value, src = chain([], [], ["something"])
+    check("chain: an empty list is a miss", (value, src), (["something"], "cache"))
+
+    # The middle link must not be able to abort the build. `fetch` raises
+    # SystemExit on a cold critical miss, and a fallback that can raise is not a
+    # fallback.
+    def boom():
+        raise SystemExit(2)
+
+    def blow_up():
+        raise RuntimeError("connection reset")
+
+    for fail, label in ((boom, "SystemExit"), (blow_up, "an exception")):
+        got, where = build_data.from_chain(
+            "test feed", lambda: None, fail, lambda: "old")
+        check(f"chain: {label} from the proxy is a miss, not a crash",
+              (got, where), ("old", "cache"))
+
+
 def test_fissures_read_from_the_first_party_worldstate() -> None:
     """
     DE publish the worldstate at api.warframe.com/cdn/worldState.php and we read
@@ -2709,6 +2771,7 @@ def main() -> int:
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
+                         test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,
                          test_the_rotation_letter_is_read_then_cross_checked,
