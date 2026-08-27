@@ -128,7 +128,7 @@ ranking divides by means the same thing on every row.
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
-| Relics you already own are invisible to the planner, vaulted or not | session — needs a decision on input first; three shapes weighed in the entry |
+| A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -860,45 +860,34 @@ Whatever is chosen, the collection view's *Still needed* panel reads the same
 list through the same `opts` and would need the same treatment, or the two go
 back to disagreeing about what is reachable — which they did once already.
 
-### Relics you already own are invisible to the planner, vaulted or not
+### A vaulted relic on a Prime you *can* farm another way is still hidden
 
-**Raised by the owner 2026-08-27**, immediately after the Resurgence fix, and it
-is the general case that fix is one instance of.
+**What is left of the owned-relics question after 2026-08-27.** A Prime with no
+way in at all now shows its relics to trade for — `PROJECT.md §7` has that. The
+remaining case is narrower and genuinely undecided: a Prime you *can* get another
+way, some of whose relics are vaulted. Those stay hidden, and for that Prime the
+filter is arguably right — there is somewhere to go, and burying it under relics
+you cannot farm is what *Hide vaulted* exists to prevent.
 
-*How to crack them* is filtered by whether a relic can be **obtained**, which
-quietly assumes the reader has none. Put a vaulted Prime on the farm list and the
-crack list is empty — but a player who has been going for years has a stack of
-vaulted relics sitting in their inventory, and *"which of these do I crack, and
-at what refinement"* is exactly the question that list answers. The relic being
-unobtainable says nothing about whether you are holding one.
+But it is still true that a player who has been going for years holds a stack of
+vaulted relics, and *"which of these do I crack"* is a fair question the page
+declines to answer.
 
-Prime Resurgence was the case where obtainability and ownership happened to
-coincide: those relics are vaulted **and** currently buyable, so including them
-was right on the obtainability test alone and shipped that day. The wider case
-does not have that excuse and needs a real answer.
+**The blocker is unchanged and is about input, not display.** The app tracks
+Primes and parts, never relic inventory, and *Relic inventory* is **[settled]**
+below as declined — hand-entering a stack is more work than the answer is worth.
+Nothing here is worth building until that is revisited or sidestepped.
 
-**The blocker is that the app does not know what relics you hold.** It tracks
-Primes and parts, not relic inventory — and *Relic inventory* is **[settled]**
-under this file's own heading, declined because entering a stack of relics by
-hand is more work than the answer is worth. So this feature needs either that
-decision revisited with a better input method, or a cheaper approximation.
+Two shapes, if it is:
 
-Two cheaper shapes worth weighing before anything is built:
-
-- **A switch, not an inventory.** The collection page already has a *Vaulted*
-  availability filter; the planner could take the same idea — *"I have vaulted
-  relics"* — and stop filtering the crack list on obtainability when it is on.
-  No inventory, no data entry, and it matches how the collection view already
-  lets the reader say what they are interested in.
-- **Say it rather than hide it.** Keep the list filtered, but where a wanted
-  Prime's relics are all vaulted, say so instead of showing nothing —
-  *"3 relics, all vaulted; crack them if you have them"* — which is the same
-  lesson the Resurgence fix taught, generalised. Cheapest of the three, and it
-  removes the "looks broken" reading without pretending to know your inventory.
-
-Whichever, the empty-state wording is the part to get right: an empty crack list
-currently means *"cannot be obtained"* and is read as *"nothing to do"*, and
-those are not the same sentence.
+- **A planner switch**, mirroring the collection view's *Hide vaulted*: *"I have
+  vaulted relics"*, and the crack list stops filtering on obtainability. No data
+  entry. Note this is exactly the switch the fully-vaulted case deliberately did
+  **not** need — there the answer follows from the data, here it depends on
+  something only the reader knows, which is the honest reason to have one.
+- **Say it rather than show it**: where a wanted Prime has vaulted relics it is
+  not being shown, count them — *"3 more, vaulted"* — so the reader knows the
+  list is filtered rather than complete.
 
 ### The rest of the player facts the header could hold
 

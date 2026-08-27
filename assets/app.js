@@ -163,7 +163,16 @@
     cats: new Set(CATEGORIES),
     sort: "cat",
     q: "",
-    hideVaultedRelics: false,
+    /* On by default since 2026-08-27, at the owner's direction. The drawer's
+       question is "where do I farm this part", and a vaulted relic cannot be
+       farmed — listing it first thing buries the handful you can actually go and
+       get under the many you cannot. Safe to default on because the empty case
+       already answers itself: a part whose every relic is vaulted says so and
+       names the checkbox to untick.
+
+       Only the default moves. A saved value is still restored, so anybody who
+       has already chosen keeps their choice. */
+    hideVaultedRelics: true,
     hideOwnedParts: false,
     squad: false,
   };

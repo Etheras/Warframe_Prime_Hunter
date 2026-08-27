@@ -697,10 +697,16 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
    the row would otherwise read like any other and send the reader to a ranking
    that is correctly silent about it. Violet is the Resurgence colour the
    collection badge already uses; quiet enough not to compete with the name. */
-.from-varzia{
-  color:var(--violet);font-weight:600;font-size:10px;text-transform:uppercase;
+.from-varzia,.from-trade{
+  font-weight:600;font-size:10px;text-transform:uppercase;
   letter-spacing:.6px;margin-left:6px;white-space:nowrap;
 }
+.from-varzia{color:var(--violet)}
+/* A vaulted relic on a Prime with no other route. Dim rather than coloured:
+   the two markers answer the same question and only one of them is good news,
+   so they must not read as equals. `--txt-dim` is what the vaulted badge
+   already uses. */
+.from-trade{color:var(--txt-dim)}
 .rarity{cursor:help}
 .relic-count{
   cursor:help;text-decoration:underline dotted var(--txt-faint);text-underline-offset:2px;

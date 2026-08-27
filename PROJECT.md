@@ -2650,6 +2650,47 @@ everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
 
+### Obtainable is not owned, and a Prime with no way in still has an answer
+
+**Shipped 2026-08-27**, immediately after the Resurgence fix and generalising it
+at the owner's direction.
+
+*How to crack them* filtered on whether a relic can be **obtained**, which
+quietly assumed the reader holds none. Target a Prime that is fully vaulted with
+no other route — Ash Prime, 21 relics, no Baro, no quest — and the planner
+answered with a blank page. But *"which relics do I need to trade for, and what
+do I refine them to"* is a real question with a real answer, and the refinement
+is the part worth showing: it is the one thing still to decide, and it is the
+same advice the row would carry if the relic were dropping.
+
+**The rule is per Prime, not per relic**, which is what makes it safe. A relic is
+let through only when the *item* wanting it has no way in at all: no relic of
+its still drops, none is in Resurgence, and it carries no `baro`, `special`,
+`founder` or `permanent` route either. `wantedIndex` works that out per wishlist
+entry and hands `buildPlan` a set of `stranded` relic names. A vaulted relic on a
+Prime you *can* farm another way stays hidden, because there the filter is right.
+
+**No switch, deliberately.** The condition is *"this Prime has no other route"*,
+which the page can determine; a checkbox would ask the reader to tell it
+something it already knows. The owner made this call and it is the right one —
+the collection view's *Hide vaulted* exists because there the reader is browsing
+and genuinely has a preference, while here the answer follows from the data.
+
+Rows say **trade for it** in `--txt-dim` rather than the violet **from Varzia**
+wears: the two markers answer the same question and only one of them is good
+news, so they must not read as equals. And the empty *Where to go* says which of
+the two situations it is, instead of falling through to *"these relics drop, but
+nowhere you can reach"* — which is the one thing that is never true of either.
+
+**The collection drawer's *Hide vaulted* now defaults on**, same day and same
+reasoning from the other side: the drawer's question is *where do I farm this
+part*, and a vaulted relic cannot be farmed, so listing them first buries the few
+you can actually go and get. It was only safe to default on because the empty
+case already answered itself — *"Every relic for this part is vaulted — untick
+Hide vaulted to see which ones to trade for"* — and a test now holds that,
+because a silently empty part is the failure this default could have introduced.
+A saved choice still wins; only the default moved.
+
 ### A Resurgence relic is vaulted, and that emptied the crack list
 
 **Fixed 2026-08-27.** *How to crack them* filtered on `rec.vaulted`, under the

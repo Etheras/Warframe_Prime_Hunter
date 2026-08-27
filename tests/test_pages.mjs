@@ -216,8 +216,14 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
   assert.ok(!done.includes("secondary-aklex-prime"),
             "holding one of the two Lex Primes it needs is not owning it");
 
-  // and the card says where a built weapon actually comes from
-  const note = await page.locator("#drawerBody .relic-none").first().innerText();
+  /* And the card says where a built weapon actually comes from. Scoped to the
+     part it belongs to rather than taking the first `.relic-none` on the card:
+     Aklex is vaulted, `Hide vaulted` is on by default since 2026-08-27, and the
+     Blueprint's "every relic is vaulted" note now sits above this one. Both are
+     correct; only the selector was picking by position. */
+    const note = await page.locator("#drawerBody .part")
+    .filter({ has: page.locator('[data-part="Lex Prime"]') })
+    .locator(".relic-none").innerText();
   assert.match(note, /Lex Prime/, "the row has to send you to the weapon itself");
   assert.deepEqual(errors, []);
 });
@@ -1961,6 +1967,59 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
                `the reader has to be told why: ${why}`);
   assert.ok(!/relics drop, but nowhere you can reach/.test(why),
             "they do not drop at all — that message is true of a different situation");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a Prime with no way in still gets the relics to trade for, and the refinement", async () => {
+  /* Named subject: Ash Prime is vaulted, has no Baro or quest route, and every
+     one of its 21 relics is vaulted. Before 2026-08-27 the planner answered that
+     with an empty page.
+
+     *"Which relics do I need to trade for, and what do I refine them to"* is a
+     real question with a real answer, and the refinement beside each row is the
+     part that makes it worth showing — it is the one thing still to decide, and
+     it is the same advice the row would carry if the relic were dropping.
+
+     No switch turns this on, deliberately. The condition is "this Prime has no
+     other route", which the page can work out; a checkbox would ask the reader
+     to tell it something it already knows. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() =>
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(["warframe-ash-prime"])));
+  await page.reload({ waitUntil: "load" });
+
+  const rows = page.locator("#planRelics .relic-row");
+  const n = await rows.count();
+  assert.ok(n > 0, "Ash Prime is trade-only, which is an answer rather than a blank");
+  assert.equal(await page.locator("#planRelics .from-trade").count(), n,
+               "every row is trade-only here, and one that does not say so reads as a drop");
+  assert.ok(await rows.first().locator(".advice").count() > 0,
+            "the refinement is the point of showing the row at all");
+
+  assert.equal(await page.locator("#planNodes .spot").count(), 0,
+               "nothing drops, so ranking somewhere to run would be invented");
+  const why = await page.locator("#planNodes .nowhere").innerText();
+  assert.match(why, /vaulted/, `the reader has to be told why: ${why}`);
+  assert.ok(!/relics drop, but nowhere you can reach/.test(why),
+            "they do not drop — that message belongs to a different situation");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the drawer hides vaulted relics by default, and says so rather than showing nothing", async () => {
+  /* Changed 2026-08-27: the drawer's question is "where do I farm this part",
+     and a vaulted relic cannot be farmed, so listing them first buries the few
+     you can actually go and get. Safe to default on only because the empty case
+     answers itself — which is what this asserts, because a silently empty part
+     is the failure this default could otherwise introduce. */
+  const { page, errors } = await open("/index.html");
+  await page.locator('[data-id="warframe-ash-prime"]').click();
+  assert.equal(await page.locator("#hideVaulted").isChecked(), true,
+               "the default moved, and a saved choice still wins over it");
+  const note = await page.locator("#drawerBody .relic-none").first().innerText();
+  assert.match(note, /vaulted/i,
+               "every relic here is vaulted, so the part must say so rather than look empty");
+  assert.match(note, /Hide vaulted/,
+               "and name the switch that would show them");
   assert.deepEqual(errors, []);
 });
 

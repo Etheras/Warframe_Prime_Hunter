@@ -216,10 +216,18 @@
   function wantedIndex() {
     const want = new Map();   // relic -> [{label, chances, qty, stillNeed}]
     const needs = [];         // for the "still needed" list
+    /* Relics belonging to a Prime with no way in at all — every relic vaulted,
+       and no Baro, quest or event route either. They are kept rather than
+       filtered because *"which relics do I need to trade for, and at what
+       refinement"* is a real question with a real answer, and returning an
+       empty page to it reads as a fault. Populated below, once each wanted item
+       has been walked and it is known whether anything of its is obtainable. */
+    const stranded = new Set();
 
     ST.wishlist.forEach((id) => {
       const it = BY_ID.get(id);
       if (!it) return;
+      const mine = [];
       it.parts.forEach((p) => {
         const short = needOf(p) - haveOf(id, p.name);
         if (short <= 0) return;
@@ -230,6 +238,7 @@
         needs.push({ item: it, part: p.name, short, need: needOf(p),
                      builtFrom: p.builtFrom || null });
         p.relics.forEach((r) => {
+          mine.push(r.relic);
           if (!want.has(r.relic)) want.set(r.relic, []);
           want.get(r.relic).push({
             label: `${it.name} ${p.name}`,
@@ -237,6 +246,20 @@
           });
         });
       });
+
+      /* Is there any way in at all? A relic that still drops or that Varzia is
+         selling counts; so does a route that is not a relic — Baro, a quest, an
+         event, the Founder pack. If none of that is true, the only honest
+         answer is the trade list, so its relics are let through the filter that
+         would otherwise drop every one of them. */
+      const f = it.flags || {};
+      const buyable = mine.some((n) => {
+        const rec = RELICS[n];
+        return rec && (!rec.vaulted || rec.resurgence);
+      });
+      if (!buyable && !f.baro && !f.special && !f.founder && !f.permanent) {
+        mine.forEach((n) => stranded.add(n));
+      }
     });
 
     /* Forma never *adds* a relic to the plan.
@@ -262,7 +285,7 @@
       needs.push({ item: { name: "Forma", id: null }, part: "Blueprint",
                    short: formaShort, need: forma.need, bonus: true });
     }
-    return { want, needs, formaShort };
+    return { want, needs, formaShort, stranded };
   }
 
   const relicValue = (entries, refinement) =>
@@ -376,7 +399,7 @@
   /* ── the plan ────────────────────────────────────────────────── */
 
   function buildPlan() {
-    const { want, needs, formaShort } = wantedIndex();
+    const { want, needs, formaShort, stranded } = wantedIndex();
 
     /* Only relics you can actually get hold of right now — which is not the
        same as "relics that drop". A Prime Resurgence relic is **vaulted by
@@ -398,7 +421,7 @@
     const relicPlan = new Map();
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
-      if (!rec || (rec.vaulted && !rec.resurgence)) return;
+      if (!rec || (rec.vaulted && !rec.resurgence && !stranded.has(rname))) return;
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value, openings, blocker } = bestRefinement(entries);
@@ -1041,6 +1064,16 @@
         <b>Aya</b>, which is farmed, and <i>How to crack them</i> beside this
         says what to do with them once you have them.</p>`;
     }
+    /* The other way to have nothing to run: everything left is vaulted and the
+       Prime has no other route, so the relics are trade-only. Same shape of
+       answer as above and for the same reason — the fallback below would say
+       these relics drop, which is the one thing they do not do. */
+    if (rp.length && rp.every((n) => (RELICS[n] || {}).vaulted)) {
+      return `<p class="nowhere">Nothing to run — every relic you still need is
+        <b>vaulted</b>, and this Prime has no other route. They have to be traded
+        for; <i>How to crack them</i> beside this lists which ones, and what to
+        refine each to once you have it.</p>`;
+    }
     const off = [];
     if (blocked.railjack) {
       off.push([blocked.railjack, "a Railjack mission", "Include Railjack"]);
@@ -1361,12 +1394,22 @@
          reader to *Where to go*, which is correctly silent about it. Aya is
          farmed, so this is a route rather than a purchase; Regal Aya packs are
          a real-money product and are no part of this. */
-      const varzia = (RELICS[rname] || {}).resurgence
+      const rec = RELICS[rname] || {};
+      const varzia = rec.resurgence
         ? `<span class="from-varzia" data-tip="${esc(
             "Prime Resurgence. This relic does not drop — buy it from Varzia at " +
             "Maroo's Bazaar for Aya, which is farmed.\n" +
             "That is why nowhere is listed under Where to go.")}">from Varzia</span>`
-        : "";
+        : rec.vaulted
+          /* Only ever reached for a Prime with no way in at all — see
+             `stranded`. The refinement beside it is the point of showing the
+             row: it is the one thing here you can still decide, and it is the
+             same advice it would carry if the relic were dropping. */
+          ? `<span class="from-trade" data-tip="${esc(
+              "Vaulted, and this Prime has no other route — no drop, no Baro, " +
+              "no quest.\nSo this relic has to be traded for, and the refinement " +
+              "beside it is what to take it to once you have one.")}">trade for it</span>`
+          : "";
       return `<div class="relic-row ref-row-${esc(p.refinement)}">
         <span class="relic-name">${esc(rname)}${varzia}</span>
         <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
