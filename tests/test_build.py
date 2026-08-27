@@ -963,6 +963,58 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_the_feed_log_keeps_a_day_and_survives_a_runner() -> None:
+    """
+    `meta.feeds` says what happened on **this** build and is overwritten by the
+    next, so it answers *"is the site on first-party data right now"* and cannot
+    answer *"how often does DE actually reply"*. The owner asked for the second,
+    which needs a history.
+
+    It cannot live in `.cache`: the ten-minute build restores that read-only and
+    never writes one — deliberately, since saving it 144 times a day would evict
+    everything else — so a cached log would miss 143 runs in 144. It is a sidecar
+    beside the payload, and each build continues the last one's.
+    """
+    now = datetime.datetime(2026, 8, 28, 12, 0, tzinfo=datetime.timezone.utc)
+    ago = lambda h: (now - datetime.timedelta(hours=h)).isoformat().replace("+00:00", "Z")
+
+    rows = [
+        {"at": ago(30), "de": "ok"},          # older than the window
+        {"at": ago(23), "de": "refused"},
+        {"at": ago(1), "de": "ok"},
+        {"at": ago(12), "de": "stale"},       # out of order on purpose
+        {"at": "not a date", "de": "ok"},     # unparseable
+        "nonsense",                            # not even a row
+        {"de": "ok"},                          # undated
+    ]
+    kept = build_data.trim_feed_log(rows, now)
+    check("feed log: only the last day is kept", len(kept), 3,
+          "24 hours is the window, and 30 hours ago is not in it")
+    check("feed log: oldest first, whatever order they arrived in",
+          [r["de"] for r in kept], ["refused", "stale", "ok"])
+    check("feed log: a row that cannot be dated is dropped, not guessed at",
+          [r for r in kept if not r.get("at")], [])
+
+    # An empty or unreadable source starts a new log rather than failing a build
+    # over bookkeeping. The runner has no `data/` and may have no published copy.
+    check("feed log: nothing to continue is not an error",
+          build_data.trim_feed_log([], now), [])
+    # An unreachable published copy must not raise. It returns a list either way:
+    # `[]` on a runner with no `data/`, or the local file when there is one —
+    # which is why this asserts the type and not the contents.
+    check_true("feed log: an unreachable published copy is not an error",
+               isinstance(build_data.read_feed_log("http://127.0.0.1:9/none.json"), list),
+               "a build must not fail because it could not read its own statistics")
+
+    # The vocabulary. `offline` is separate from `ok` on purpose: an --offline
+    # build never asks DE, so counting it as a reply would inflate the exact
+    # number this log exists to answer.
+    src = read_text(os.path.join(ROOT, "tools", "build_data.py"))
+    for word in ('"offline" if args.offline', '"refused" if "de_worldstate" in STALE'):
+        check_true(f"feed log: outcome {word.split()[0]} is recorded", word in src,
+                   "an outcome that collapses into another cannot be counted apart")
+
+
 def test_the_worldstate_is_judged_on_its_own_timestamp() -> None:
     """
     Staleness is a fact about the **content**, not only about the transport.
@@ -2821,6 +2873,7 @@ def main() -> int:
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
+                         test_the_feed_log_keeps_a_day_and_survives_a_runner,
                          test_the_worldstate_is_judged_on_its_own_timestamp,
                          test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
                          test_fissures_read_from_the_first_party_worldstate,

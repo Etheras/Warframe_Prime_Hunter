@@ -31,13 +31,15 @@ structured HTML table, so a scheduled task can keep the site current unattended.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+import urllib.request
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -56,7 +58,7 @@ from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E40
                      DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_OPTIONAL,
                      EXPORT_WANTED,
                      DE_TEXTURES, FISSURES, IMG_CDN,
-                     ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE,
+                     ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE, UA,
                      SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WORLDSTATE, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
                      upstream_signature)
@@ -953,6 +955,75 @@ def build_fissures(raw, now: datetime) -> list:
 WORLDSTATE_MAX_AGE = 15 * 60
 
 
+# How long the feed log keeps a build. One entry per build, and the ten-minute
+# cron means about 144 a day — a few kilobytes, which is why this is a sidecar
+# file rather than something the 2MB payload carries.
+FEED_LOG_HOURS = 24
+
+# Where a runner finds the log it is continuing. A fresh checkout has no `data/`
+# and the ten-minute build writes no cache, so the previously **published** copy
+# is the only place a CI build's own history survives. Overridable so a fork
+# publishing elsewhere is not silently reading this one's numbers.
+PUBLISHED_FEED_LOG = os.environ.get(
+    "PRIMEHUNTER_FEED_LOG",
+    "https://etheras.github.io/Warframe_Prime_Hunter/data/feed-log.json")
+
+
+def read_feed_log(published_url: str | None) -> list:
+    """
+    The rolling record of which source answered, from wherever it survived.
+
+    It cannot live in `.cache`: the ten-minute build restores that read-only and
+    never writes one — deliberately, since saving it 144 times a day would evict
+    everything else the repo keeps — so a cached log would miss 143 runs in 144.
+    It lives in `data/feed-log.json`, deployed beside the payload, and each build
+    picks up where the last one left off.
+
+    Locally that is the copy on disk. On a runner the checkout has no `data/`, so
+    the previously **published** file is fetched instead, which is the only place
+    a CI build's own history exists. Best effort by design: a missing or
+    unreachable log starts a new one rather than failing a build over
+    bookkeeping.
+    """
+    local = os.path.join(DATA_DIR, "feed-log.json")
+    if os.path.exists(local):
+        try:
+            with open(local, encoding="utf-8") as fh:
+                rows = json.load(fh)
+            if isinstance(rows, list):
+                return rows
+        except (OSError, ValueError):
+            pass
+    if not published_url:
+        return []
+    try:
+        req = urllib.request.Request(published_url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+        return rows if isinstance(rows, list) else []
+    except Exception as exc:                    # noqa: BLE001 - never fatal
+        log(f"  feed log: no previous copy ({exc})")
+        return []
+
+
+def trim_feed_log(rows: list, now: datetime) -> list:
+    """The last `FEED_LOG_HOURS`, oldest first, and nothing that cannot be dated."""
+    cutoff = now - timedelta(hours=FEED_LOG_HOURS)
+    out = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("at"):
+            continue
+        try:
+            at = datetime.fromisoformat(str(row["at"]).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        if at >= cutoff:
+            out.append(row)
+    return sorted(out, key=lambda r: r["at"])
+
+
 def from_chain(what, de_fresh, proxy, de_cached):
     """
     One live feed, from the best source that answers.
@@ -1242,6 +1313,39 @@ def main() -> int:
     # which is the same wrong-in-the-other-direction mistake, made by the code
     # that exists to prevent it.
     log("  feeds: " + ", ".join(f"{k} from {v}" for k, v in sorted(feed_source.items())))
+
+    # ── the rolling record ────────────────────────────────────────────
+    # `meta.feeds` says what happened on THIS build and is overwritten by the
+    # next one, so it answers "is the site on first-party data right now" and
+    # cannot answer "how often does DE actually reply". The owner asked for the
+    # second, which needs a history, so one entry is appended per build and the
+    # last 24 hours are kept.
+    #
+    # `de` is what Digital Extremes did, separately from what the site ended up
+    # using: a 403 that the proxy covered leaves the payload current and is still
+    # a refusal, and conflating those is how the first "intermittent" reading
+    # went wrong.
+    #
+    # `offline` is its own outcome and not `ok`. An `--offline` build never asks
+    # DE, so counting it as a reply would inflate the very number this log exists
+    # to answer — and locally that is most builds. It stays in the record rather
+    # than being dropped, because "no request was made" is different news from
+    # "no build ran".
+    de_outcome = ("offline" if args.offline
+                  else "stale" if ws_too_old
+                  else "refused" if "de_worldstate" in STALE
+                  else "ok")
+    built_at = datetime.now(timezone.utc)
+    feed_log = trim_feed_log(read_feed_log(PUBLISHED_FEED_LOG), built_at)
+    feed_log.append({
+        "at": built_at.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "de": de_outcome,
+        "used": dict(sorted(feed_source.items())),
+        "full": not args.if_changed,
+    })
+    tally = collections.Counter(r.get("de") for r in feed_log)
+    log(f"  feed log: {len(feed_log)} build(s) in {FEED_LOG_HOURS}h — "
+        + ", ".join(f"{n} {k}" for k, n in sorted(tally.items())))
     if ws_stale and not fell_back_to_cache and not args.offline:
         while "de_worldstate" in STALE:
             STALE.remove("de_worldstate")
@@ -1790,6 +1894,13 @@ def main() -> int:
         json.dump({"generated": payload["meta"]["generated"],
                    "fissures": payload["fissures"]},
                   fh, ensure_ascii=False, separators=(",", ":"))
+
+    # The rolling record of which source answered, one entry per build. A sidecar
+    # rather than a field on the payload: 144 builds a day is a few kilobytes,
+    # and the next build has to read it back — cheaply, without pulling 2MB to
+    # find out what happened yesterday.
+    with open(os.path.join(DATA_DIR, "feed-log.json"), "w", encoding="utf-8") as fh:
+        json.dump(feed_log, fh, ensure_ascii=False, separators=(",", ":"))
 
     # remember what upstream looked like, so --if-changed can skip next time
     new_state = {
