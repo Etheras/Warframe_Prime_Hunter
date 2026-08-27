@@ -1076,7 +1076,7 @@ and the reasoning is in `PROJECT.md §7`; what is below is what is left.
 | `standingStages[]` | its length is the stage count: 3, 4 or 5 by tier | **read.** `objectivesOf` no longer assumes four |
 | `enemyLevels[]` | e.g. `[40, 60]` | **filled**, from the group's own name — all 13 bounty nodes carry levels now |
 | `tag` on `/pc/events` | `HeatFissure`, `WaterFight` | **recorded when seen.** Still unobserved for our two events — see below |
-| `minMR` | Minimum Mastery Rank, 0 to 10 | **read 2026-08-27.** A demand badge on the row, shown only to a reader below the rank — the header field it was waiting on shipped 2026-08-26 |
+| `minMR` | Minimum Mastery Rank, 0 to 10 | **declined 2026-08-27 [settled].** Built as a demand badge and reverted the same day — see below |
 | `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | open — a real name instead of `Level 20 - 40 Cetus Bounty` |
 | `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | open — a cross-check against DE's static table |
 
@@ -1112,21 +1112,39 @@ bounty, not running it — so excluding a tier outright would be wrong for anyon
 playing with friends. Second, the 100–100 tier carries a **second** gate the
 worldstate does not publish at all: The Steel Path must be unlocked.
 
-So this is not a candidate for the exclusion rule. It is a candidate for a **demand
-badge**, and it would need the player's own rank — the first thing this project
-would have to ask about itself rather than derive.
+So this is not a candidate for the exclusion rule.
 
-**Shipped 2026-08-27.** The rank field arrived on 2026-08-26 and unblocked it, and
-this is the first thing on either page that reads it. `MR 5` sits in the demand
-strip beside `Railjack` and `Steel Path`, and appears **only when the reader is
-below the rank or has not given one** — *needs MR 5* on an MR 30 player's row is
-noise on a strip that has to earn every badge. The tooltip carries the wiki's
-caveat, because without it the badge reads as a wall it is not: the rank gates
-picking the bounty off the board, and a squadmate who has it can select one you
-can then run. Six of the thirteen relic-bearing bounty nodes are gated, all of
-them Isolation Vaults at MR 5. `PROJECT.md §7` has the two traps.
+**It was built as a demand badge on 2026-08-27 and reverted the same day, at the
+owner's direction. [settled] — do not re-propose.** The rank field had just
+shipped, which lifted the only blocker this entry named, and that turned out to
+be the wrong reason to build it. The owner's reasoning, which is better than the
+entry's:
 
-What is left of this entry is `type` and `rewardPoolDrops`.
+- **Nobody it would help is here.** The tool is a relic-farm planner; a player
+  below MR 5 is not the reader. All six gated relic-bearing nodes are Isolation
+  Vaults at MR 5, so the badge would show for a reader who almost certainly does
+  not exist and never for anyone else.
+- **It is the player's own job.** Whether you can enter a mission is something
+  you look up in game, in the place that will tell you authoritatively. A badge
+  here restates it less reliably and one step further from the truth.
+- **The strip has to earn every entry.** `Railjack`, `Steel Path` and `Old Mate`
+  each say something the reader cannot work out from the row. A rank gate almost
+  nobody is behind does not.
+
+What that leaves is a general rule worth keeping past this entry: *the blocker
+lifting is not the same as the case being made.* This one had been waiting on the
+rank field for so long that its arrival read as permission.
+
+Two pieces of the reverted work are worth knowing about if anything ever does
+read the rank, because both cost a measurement to find:
+
+- **`minMR` sits on `meta.bounties.groups[node]`, not on the source row**, even
+  though the worldstate calls it a job field. Nineteen of twenty-four groups
+  carry one; none of the 96 bounty source rows does. Reading `source.minMR`
+  returns nothing and fails silently.
+- **`wireMastery` is `once()`-guarded**, so a single `onChange` callback is
+  dropped for whichever page runs second in the single-file build. Anything that
+  needs a repaint on a rank change needs a subscriber list, not a callback.
 
 ## Settled — answered, kept so the answer is not lost
 

@@ -607,16 +607,42 @@ python tools/build_data.py --offline   # rebuild from the cache, a few seconds
 python tools/serve.py                  # then look at it
 ```
 
-**Never call `localStorage.clear()` on `localhost:8777`.** This paragraph said to,
-until 2026-08-27, and *"leave it clean when you finish"* is what made it sound
-harmless. It is not a scratch area: the six `wfprimes.*` keys on that origin are
-the owner's real collection, 167 ticked boxes with no backup but the one you make.
-Seed only the key your check needs, remove exactly that key afterwards, and leave
-everything else untouched — **"clean" means as you found it, not empty.**
+**`localhost:8777` is a test origin. Cold-start it, and clear up after yourself.**
+
+This paragraph spent two days saying the opposite of itself and then the wrong
+thing outright, so both corrections are recorded rather than quietly replaced.
+Until 2026-08-25 it said to call `localStorage.clear()` and *"leave it clean when
+you finish"*. It was then rewritten to say that origin held **the owner's real
+collection — 167 ticked boxes with no backup**, and that nothing there could be
+removed. **That is also wrong**, corrected by the owner on 2026-08-27:
+
+> the owner's collection lives on the **GitHub Pages deployment**, which is a
+> different origin and out of reach from here. `localhost:8777` had not been
+> opened in over a week, and the browser a session drives is not the owner's
+> browser at all. Measured the same day: that origin held one key,
+> `wfprimes.plan.v1`, and no collection data whatsoever.
+
+So the rule is the ordinary one and always was: **the browser starts cold, the
+data there is yours to make, and you clear it when you are done.** Seed what your
+check needs, remove it afterwards, and do not leave a half-finished state behind
+for the next session to puzzle over.
+
+What survives from the frightened version is one habit worth keeping, for its own
+reasons rather than out of fear: **snapshot a key before you overwrite it.** Not
+because the value is precious, but because "as I found it" is not a state you can
+restore if you never looked — and a session that cannot describe what it changed
+cannot report honestly on what it did.
 
 Serving the check on another port is better still, because a different origin
-cannot reach those keys at all: `test_pages.mjs` serves on port `0` for exactly
-this reason, and `vorframe-plain` on 8781 is the ready-made one for a quick look.
+starts empty by construction: `test_pages.mjs` serves on port `0` for exactly this
+reason, and `vorframe-plain` on 8781 is the ready-made one for a quick look.
+
+**The deployment is the real one, and the local server is the workshop.** Worth
+stating because it inverts the assumption above and nothing else here says it:
+what the owner actually uses is the published site. A local check answers *does
+this work*; only the deployed build answers *does this work for the person using
+it*, which is why `PROJECT.md` and `CLAUDE.md` both say an audit must cover the
+built file and the deployed site rather than the two pages on disk.
 
 ### Two audits, monthly, postponed rather than skipped
 
@@ -2753,43 +2779,6 @@ pre-2026-08-27 defaults restored (everything on screen) every test passes; with
 relics by default*, whose entire subject is that default. A test about a default
 is the one kind that should fail when the default moves.
 
-### A bounty above your rank says so, and only to you
-
-**Shipped 2026-08-27**, and it is the first thing on either page that reads the
-Mastery Rank field — which is why it could not be built before that field landed
-on 2026-08-26. DE publish the rank each bounty asks for as `minMR`; it had been
-on the payload and unused, because *"this needs MR 5"* is worth nothing to
-somebody whose rank you do not know.
-
-`MR 5` now sits in the demand strip beside `Railjack` and `Steel Path`, and
-**appears only when the reader is below the rank, or has not given one.** A badge
-saying *needs MR 5* on an MR 30 player's row is noise on a strip that has to earn
-every entry. Six of the thirteen relic-bearing bounty nodes are gated today, all
-Isolation Vaults at MR 5.
-
-**It informs and never filters**, which is this field's standing rule and is also
-simply true: the wiki's Bounty page says these *"can still be played, when an
-eligible squad member selects one"*. The rank gates picking the bounty off the
-board, not running it, so the tooltip says a squadmate who has the rank can
-select one — without that sentence the badge reads as a wall it is not.
-
-**Two traps, both caught by measuring rather than by reading the code.**
-
-*`minMR` is on the group, not the source row.* The first attempt read
-`source.minMR`, which is what the field is called in the worldstate — and found
-nothing, on any of the 96 bounty source rows in the live build. `build_data.py`
-files it under `meta.bounties.groups[node]`, where 19 of 24 groups carry one. A
-badge that never appears breaks no test that does not already know the answer, so
-the fixture now carries a group `minMR` and a test plants a decoy on the row.
-
-*`wireMastery` is `once()`-guarded.* The single-file build runs both pages'
-wiring over one document, so the DOM must be bound once — but both views need
-telling when the rank moves, or the planner's badges keep a stale answer. One
-callback would have been silently dropped for whichever page ran second, so it
-takes a list of subscribers instead. This is also the first change that makes the
-rank need a repaint at all; `app.js` carried a comment saying no page read it and
-therefore none had to be told, and that comment was true until this.
-
 ### Baro's label says when, and his checkbox stays where it is
 
 **Shipped 2026-08-27.** `meta.baro` had carried his window since earlier the same
@@ -2895,6 +2884,22 @@ would restore the 88 silently, and a silent wrong claim is the thing this fixed.
 
 The test asserts the **size**: a rotation is a handful, so more than a dozen
 relics marked means the shelf has stopped being read.
+
+**And a relic you have to go and buy sorts below every relic you can farm.**
+Owner's call the same day. *How to crack them* ranks on openings per part
+cleared, which is the right question inside a group and the wrong one across
+them: a Varzia relic with a good ratio sat above relics the reader could go and
+get that evening — measured, one of them at the very top of the list — and that
+reads as advice to go shopping.
+
+They are not the same errand. A dropping relic costs a mission you were going to
+run anyway; a Resurgence one costs Aya and a trip to Maroo's; a trade-only one
+costs finding another player. So the list groups **farmable → Varzia →
+trade-only**, and the ratio orders within each group exactly as before. Nothing
+is lost and nothing is re-scored — the two kinds simply stop interleaving, which
+a single ranked list had been quietly claiming was meaningful.
+
+Same shape as *Two lists, two questions, never one score*, one level down.
 
 ### Obtainable is not owned, and a Prime with no way in still has an answer
 

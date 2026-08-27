@@ -824,16 +824,7 @@
      same markup, so this is one function rather than one per page, and a change
      made on either is written to the shared store and picked up by the other
      through the same `storage` event everything else uses. */
-  /* Subscribers rather than one callback, because `once` would keep only the
-     first: in the single-file build app.js and plan.js both call this over one
-     document, the DOM must be wired once, and *both* views need telling when
-     the rank moves or the planner's rows would keep the old MR badges. */
-  const mrListeners = [];
-  function wireMastery(onChange) {
-    if (typeof onChange === "function") mrListeners.push(onChange);
-    return once("wireMastery", bindMastery);
-  }
-  const mrChanged = () => mrListeners.forEach((fn) => fn());
+  function wireMastery() { return once("wireMastery", bindMastery); }
 
   function bindMastery() {
     const field = document.getElementById("mrField");
@@ -844,14 +835,10 @@
     const up = document.getElementById("mrUp");
 
     const read = () => mrClamp((load(KEYS.plan, {}) || {}).mastery);
-    /* Something reads the rank now. It gated nothing until 2026-08-27, so a
-       change needed no repaint and this file said so; the MR demand badge on a
-       bounty row is the first thing that goes stale if nobody is told. */
     const write = (mr) => {
       const plan = load(KEYS.plan, {}) || {};
       plan.mastery = mr;
       save(KEYS.plan, plan);
-      mrChanged();
     };
     const legendary = () => label.textContent === "LR";
 
@@ -929,7 +916,7 @@
        two headers must not drift apart while both are open - but not while this
        one is being typed into, where repainting would eat the half-typed rank. */
     window.addEventListener("storage", (e) => {
-      if (e.key === KEYS.plan && document.activeElement !== input) { paint(); mrChanged(); }
+      if (e.key === KEYS.plan && document.activeElement !== input) paint();
     });
 
     paint();

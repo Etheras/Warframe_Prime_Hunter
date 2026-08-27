@@ -739,31 +739,6 @@
       "your chart at all.",
     ].join("\n") },
   };
-
-  /* Digital Extremes publish the rank a bounty asks for, per job, as `minMR` -
-     already on the payload's bounty rows and unused until now, because saying
-     "this needs MR 5" is only worth anything to somebody whose rank we know.
-     The Mastery Rank field shipped 2026-08-26 and unblocked it.
-
-     Shown when the reader is short of it, or has not said - never when they
-     have cleared it, because "needs MR 2" on the row of an MR 20 player is
-     noise on a badge strip that has to earn every entry.
-
-     It informs and never filters, which is this field's standing rule and is
-     also just true: the wiki's Bounty page says these "can still be played,
-     when an eligible squad member selects one". The rank gates SELECTING the
-     bounty, not running it, so excluding one would be wrong for anybody
-     playing with friends - and the tip says so rather than implying a wall. */
-  const mrDemand = (need) => ({
-    label: "MR " + need,
-    tip: [
-      "Digital Extremes list this bounty at Mastery Rank " + need + ".",
-      "",
-      "That gates picking it from the board, not playing it: a",
-      "squadmate who has the rank can select it and you can run",
-      "it with them. Nothing here is hidden because of it.",
-    ].join("\n"),
-  });
   // DE files all four Faceoff tables under transientRewards, so the node
   // name is the only signal: "Faceoff: Single Squad", "Faceoff: Squad VS
   // Squad", each with a Steel Path variant.
@@ -814,26 +789,13 @@
     ].filter((l) => l !== null).join("\n") };
   }
 
-  /* `mr` is the reader's own rank, or null when they have not given one. It is
-     the only argument here that is about the player rather than the node, which
-     is why it is passed rather than read: `rotation.js` has no store. */
-  function demandsOf(s, mr) {
+  function demandsOf(s) {
     const out = [];
     if (isRailjack(s)) out.push(DEMANDS.railjack);
     if (isPvPvE(s)) out.push(DEMANDS.pvpve);
     if (isHeist(s)) out.push(DEMANDS.heist);
     if (s.kind === "enemy") out.push(enemyDemand(s));
     if (isSteelPath(s)) out.push(DEMANDS.steel);
-    /* Off the bounty group rather than the source row. `build_data.py` files
-       `minMR` under `meta.bounties.groups[node]` — 19 of 24 groups carry one —
-       and the 96 bounty source rows carry none, so reading `s.minMR` finds
-       nothing on real data and the badge silently never appears. Measured. */
-    const need = s.kind === "bounty" && BOUNTY
-      ? ((BOUNTY.groups || {})[s.node] || {}).minMR
-      : null;
-    if (need > 0 && (mr === null || mr === undefined || mr < need)) {
-      out.push(mrDemand(need));
-    }
     return out;
   }
 

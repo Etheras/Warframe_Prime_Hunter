@@ -135,10 +135,6 @@
      assets/rotation.js, so the collection view and the planner cannot disagree
      about it. Aliased here so the call sites read as they always did. */
   const ROT = window.WFPrimeRotation;
-  /* The Mastery Rank field's handle, set when it is wired at the foot of this
-     file. Null until then, and null forever on a document that has no such
-     field — `demandsOf` treats "no rank given" and "not asked" the same way. */
-  let MR = null;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -809,13 +805,9 @@
   }
 
   /* What a node demands before you can play it — a ship, or other players.
-     Same wording as the planner, from the same place.
-
-     The reader's own rank goes in because one demand is about them rather than
-     the node: a bounty DE list at MR 5 is worth saying to somebody below it and
-     is noise to everybody else. Read at paint time, so it follows the field. */
+     Same wording as the planner, from the same place. */
   function demandTags(n) {
-    return ROT.demandsOf(n, MR ? MR.read() : null).map((d) =>
+    return ROT.demandsOf(n).map((d) =>
       '<span class="demand" data-tip="' + esc(d.tip) + '">' + esc(d.label) + "</span>"
     ).join("");
   }
@@ -1638,10 +1630,10 @@
 
   S.wireFileBackup();
   S.staleBanner();
-  /* It still gates nothing — this field informs and never filters. But since
-     2026-08-27 something *reads* it: a bounty DE list above the reader's rank
-     says so on the row, so the grid repaints when the rank moves. */
-  MR = S.wireMastery(render);
+  /* Nothing on either page reads the rank yet — it gates nothing, by design.
+     What it derives, the Void Trace cap, is stated on the badge's own tooltip,
+     so there is no repaint for a page to ask for. */
+  S.wireMastery();
   S.siteFooter();
   render();
 

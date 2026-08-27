@@ -2337,6 +2337,7 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
             `Varzia stocks a rotation, not a catalogue — ${shelf.length} relics ` +
             `marked hers: ${shelf.join(", ")}`);
 
+
   assert.match(await page.locator("#planRelics .from-varzia").first().innerText(),
                /from Varzia/i, "the badge names where the relic comes from");
 
@@ -2347,6 +2348,46 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
                `the reader has to be told why: ${why}`);
   assert.ok(!/relics drop, but nowhere you can reach/.test(why),
             "they do not drop at all — that message is true of a different situation");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a relic you have to go and buy sorts below every relic you can farm", async () => {
+  /* Owner's call, 2026-08-27. Ranked purely on openings per part cleared, a
+     Varzia relic with a good ratio sat above relics the reader could go and get
+     this evening — which reads as advice to go shopping. They are not the same
+     kind of errand: a dropping relic costs a mission you were going to run
+     anyway, a Resurgence one costs Aya and a trip to Maroo's, and a trade-only
+     one costs finding another player. The ratio still orders within each group,
+     so nothing is lost; the groups simply no longer interleave.
+
+     Both kinds have to be on screen at once or there is nothing to sort, so the
+     farm list is everything with a live relic plus everything in Resurgence. */
+  const { page, errors } = await open("/plan.html");
+  const wanted = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const ids = D.items.filter((i) => (i.flags || {}).resurgence ||
+                                      (i.farmableRelics || []).length).map((i) => i.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+    return ids.length;
+  });
+  assert.ok(wanted > 0, "nothing to want, so nothing to rank");
+  await page.reload({ waitUntil: "load" });
+
+  /* Read off the badge each row carries rather than recomputed here — the badge
+     is what tells the reader which errand this is, so it is the right thing to
+     be ordering by. */
+  const kinds = await page.evaluate(() => [...document.querySelectorAll("#planRelics .relic-row")]
+    .map((el) => (el.querySelector(".from-varzia") ? "varzia"
+                : el.querySelector(".from-trade") ? "trade" : "farm")));
+  assert.ok(kinds.includes("farm"), `no farmable relic on screen: ${kinds.join(",")}`);
+  assert.ok(kinds.includes("varzia"), `no Varzia relic on screen: ${kinds.join(",")}`);
+  assert.ok(kinds.lastIndexOf("farm") < kinds.indexOf("varzia"),
+            `every farmable relic must come before the first Varzia one — got ` +
+            kinds.join(","));
+  if (kinds.includes("trade")) {
+    assert.ok(kinds.lastIndexOf("varzia") < kinds.indexOf("trade"),
+              "and trade-only is further from farmable still, so it sorts last");
+  }
   assert.deepEqual(errors, []);
 });
 

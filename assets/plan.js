@@ -21,9 +21,6 @@
      assets/rotation.js, so this page and the collection view cannot disagree
      about it. Aliased here so the call sites read the same as they always did. */
   const ROT = window.WFPrimeRotation;
-  /* The Mastery Rank field's handle, set where it is wired at the foot of this
-     file. Null until then, and on a document without the field. */
-  let MR = null;
   const runValue = ROT.runValue;
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
@@ -861,13 +858,9 @@
   }
 
   /* What a node demands before you can play it — a ship, or other players.
-     Said on the row rather than left to be discovered in the mission.
-
-     The reader's own rank goes in because one demand is about them rather than
-     the node: a bounty DE list at MR 5 is worth saying to somebody below it and
-     is noise to everybody else. */
+     Said on the row rather than left to be discovered in the mission. */
   function demandTags(n) {
-    return ROT.demandsOf(n, MR ? MR.read() : null).map((d) =>
+    return ROT.demandsOf(n).map((d) =>
       '<span class="demand" data-tip="' + esc(d.tip) + '">' + esc(d.label) + "</span>"
     ).join("");
   }
@@ -1376,8 +1369,30 @@
        single easy one even though it takes longer to exhaust.
 
        Infinite sorts last rather than first: a relic whose wanted reward has no
-       chance at any refinement is not urgent, it is impossible. */
+       chance at any refinement is not urgent, it is impossible.
+
+       **A relic you cannot farm sorts below every relic you can**, whatever the
+       arithmetic says — owner's call, 2026-08-27. A Varzia relic costs Aya and a
+       trip to Maroo's; a dropping one costs a mission you were going to run
+       anyway. Ranking them together let a Resurgence relic with a good ratio sit
+       above relics the reader could go and get this evening, which reads as
+       advice to go shopping. The ratio still orders each group internally, so
+       nothing is lost — the two are simply not the same kind of errand, and a
+       single ranked list was quietly claiming they were.
+
+       Trade-only relics — the fully-vaulted case, `stranded` — sit in the same
+       bucket for the same reason and are further from farmable still: those need
+       another player. */
+    /* 0 farmable, 1 Varzia, 2 trade-only. Keyed off the relic name, which is
+       the entry's own key — the plan object does not carry it. */
+    const errand = (rname) => {
+      const rec = RELICS[rname] || {};
+      if (!rec.vaulted) return 0;
+      return rec.resurgence ? 1 : 2;
+    };
     const rp = Array.from(relicPlan.entries()).sort((a, b) => {
+      const ar = errand(a[0]), br = errand(b[0]);
+      if (ar !== br) return ar - br;
       const ap = isFinite(a[1].perPart) ? a[1].perPart : Infinity;
       const bp = isFinite(b[1].perPart) ? b[1].perPart : Infinity;
       if (Math.abs(ap - bp) > 1e-9) return ap - bp;
@@ -1834,10 +1849,7 @@
 
   S.wireFileBackup();
   S.staleBanner();
-  /* Repaints when the rank moves: since 2026-08-27 a bounty DE list above the
-     reader's rank says so on the row, so the ranking's badges follow the field.
-     It still gates nothing — this informs and never filters. */
-  MR = S.wireMastery(render);
+  S.wireMastery();
   S.siteFooter();
   render();
 
