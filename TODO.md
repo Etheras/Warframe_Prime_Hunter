@@ -1077,8 +1077,8 @@ and the reasoning is in `PROJECT.md §7`; what is below is what is left.
 | `enemyLevels[]` | e.g. `[40, 60]` | **filled**, from the group's own name — all 13 bounty nodes carry levels now |
 | `tag` on `/pc/events` | `HeatFissure`, `WaterFight` | **recorded when seen.** Still unobserved for our two events — see below |
 | `minMR` | Minimum Mastery Rank, 0 to 10 | **declined 2026-08-27 [settled].** Built as a demand badge and reverted the same day — see below |
-| `type` | `"Cull the Enemy"`, `"Reclaim What's Ours"` | open — a real name instead of `Level 20 - 40 Cetus Bounty` |
-| `rewardPoolDrops[]` | `{item, rarity, chance, count}`, **live** | open — a cross-check against DE's static table |
+| `type` | **not what this row said.** DE publish `jobType`, a path — `VenusHelpingJobResource` | **blocked 2026-08-27** — the readable name is WFCD's mapping table, and rule 9 gates it. Owner's call |
+| `rewardPoolDrops[]` | **not published by DE at all.** `rewards` is a table *path* | **declined 2026-08-27 [settled]** — the cross-check would compare our join against WFCD's join of the same two sources |
 
 **`type` is the one with a trap in it.** Our node names are the join key between
 DE's drop table and the worldstate, and they are what `ROT.signature` folds on and
@@ -1087,8 +1087,54 @@ this is done at all it wants to be an annotation beside the name, not a
 replacement — and it overlaps with *Our four invented "mission types" leak into the
 ranking*, which is the same problem one level up.
 
-Neither of the remaining two needs a new request. Both are in the response we
-already cache.
+**Both rows above were written about a feed this project no longer reads, and
+checking them on 2026-08-27 changed both answers.** They describe
+`api.warframestat.us/pc/syndicateMissions`; bounties moved to DE's own worldstate
+earlier the same day. A whole DE job is six fields and no more:
+
+```json
+{ "jobType": "/Lotus/Types/Gameplay/Venus/Jobs/VenusHelpingJobResource",
+  "rewards": "/Lotus/Types/Game/MissionDecks/VenusJobMissionRewards/VenusTierATableCRewards",
+  "masteryReq": 0, "minEnemyLevel": 5, "maxEnemyLevel": 15,
+  "xpAmounts": [430, 430, 430] }
+```
+
+**`rewardPoolDrops` does not exist — declined. [settled]** DE publish `rewards` as
+a **table path**, not a list of drops. WFCD's `rewardPoolDrops` is WFCD joining
+that path against DE's drop tables — the same two sources this project already
+holds and already joins itself, which is how the rotation letter is read. So the
+"cross-check against DE's static table" would be checking our join of DE against
+WFCD's join of DE. It confirms nothing that a disagreement could not equally
+blame on the third party. `official.py` sets `rewardPool: []` and says so.
+
+**`type` is blocked on a rule-9 decision, not on effort.** DE publish an
+identifier, not a name: `VenusHelpingJobResource`, `RescueBountyResc`,
+`AssassinateBountyCap`. The readable *"Reclaim What's Ours"* this row used to
+quote is **WFCD's own mapping table** on top of that identifier — and a mapping
+table lifted verbatim needs the owner's approval first and its licence read
+second (`PROJECT.md §2`). Three ways forward, and only the owner can pick:
+
+1. **Leave it.** The job on the board turns over every window — all 22 jobs share
+   one expiry — and the flavour name says nothing about what pays a relic. This
+   is the recommendation.
+2. **Derive a kind from DE's identifier ourselves**, by rule rather than by
+   table: `RescueBountyResc` → *Rescue*, `VenusCullJobAssassinate` → *Assassinate*.
+   Deterministic and ours, and still a fact about the current window rather than
+   about the tier.
+3. **Ask about WFCD's table** — approval, then licence.
+
+**One thing in `jobType` is worth having whatever is decided about names.**
+Isolation Vault bounties arrive with **no `jobType` at all**, which is DE's own
+signal for the vault family and cleaner than the level-matching used today.
+`official.py` notes it and deliberately does not act on it, because changing how
+the family is decided is its own change with its own risk to the rotations.
+
+**And `type` never reached the payload anyway.** It was read into the job record
+and dropped one step later, where the group row copies `letter`, `stages` and
+`minMR` and nothing else — so no build has ever emitted one, while
+`read_bounty_jobs`' docstring said it did. Measured: 0 of 24 groups carried a
+`type`, against 20 of 23 DE jobs carrying a `jobType`. The dead field and the
+wrong docstring are both gone; restoring it is four lines if option 2 or 3 wins.
 
 **`minMR` is Minimum Mastery Rank**, the account-wide progression rank — earned by
 levelling frames, weapons and Intrinsics and passing a test per rank, capped at 30

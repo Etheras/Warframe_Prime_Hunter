@@ -734,7 +734,13 @@ _TIER_TABLE = re.compile(r"Tier(\w+?)Table(\w+?)Rewards")
 def read_bounty_jobs(pools: dict, syndicate_missions, now: datetime | None = None) -> dict:
     """
     What the worldstate says about each bounty on offer, keyed by our own group
-    names. `{group: {"letter": "A", "stages": 4, "minMR": 2, "type": "..."}}`.
+    names. `{group: {"letter": "A", "stages": 4, "minMR": 2}}`.
+
+    This said `"type": "..."` until 2026-08-27 and was wrong for as long as it
+    said it: the field was read here and never copied into the group row below,
+    so no build has ever emitted one. Checked rather than assumed - 0 of 24
+    groups carried a `type` in the live payload while 20 of 23 DE jobs carried a
+    `jobType`.
 
     Two facts come out of this that nothing else can supply, and one that only
     confirms what we already knew:
@@ -782,7 +788,14 @@ def read_bounty_jobs(pools: dict, syndicate_missions, now: datetime | None = Non
                 "letter": m.group(2).upper(),
                 "stages": len(job.get("standingStages") or []) or None,
                 "minMR": job.get("minMR"),
-                "type": (job.get("type") or "").strip() or None,
+                # No `type`. It was carried here and dropped again three lines
+                # below, where the group row copies `letter`, `stages` and
+                # `minMR` and nothing else - so it never reached the payload and
+                # the docstring above said it did. DE publish `jobType` as a
+                # path identifier (`VenusHelpingJobResource`), not a name; the
+                # readable version is WFCD's own mapping table, which needs the
+                # owner's approval and a licence read before it could be used at
+                # all. See `TODO.md`.
             }
 
     out = {}
