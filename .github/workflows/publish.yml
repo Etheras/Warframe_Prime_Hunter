@@ -29,7 +29,7 @@ on:
     # can be delayed or dropped entirely under load, so ten minutes is a target
     # rather than a guarantee. And Pages allows on the order of ten deployments
     # an hour; six is comfortably inside that, three-minute polling would not be.
-    - cron: "*/10 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:        # run it by hand from the Actions tab
 
 # Which of the two a run is. A push, a manual run and the daily cron all rebuild
