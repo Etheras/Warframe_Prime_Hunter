@@ -112,6 +112,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | What the misses are worth, in Ducats | session |
+| What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
 
 **The first row is the one to take next**, and it is a decision rather than a
@@ -305,6 +306,66 @@ for whoever implements it:
 It is not free of the argument that keeps traces out of the score, either: Ducats
 buy from Baro, and what a Ducat is worth depends on whether you want anything he is
 selling.
+
+### What the misses are worth in Platinum, from warframe.market
+
+**Asked for by the owner 2026-08-27. Not started — recorded so it is not
+re-derived.**
+
+Fetch [warframe.market](https://warframe.market)'s API for the Platinum value of
+each part, and **carry it exactly as `ducats` is carried**: per part, on the
+payload, beside the Ducat figure the drawer already shows. The owner's spec for
+the number is *"the 95th percentile of quantity"*.
+
+**This is not a real-money violation, and the entry has to say so or it will be
+closed as one.** `PROJECT.md §2` lists *"Platinum bought from Digital Extremes"*
+as out of scope, and that is still right. The test that section actually states
+is **"can this be earned by playing, or must it be purchased?"** — and Platinum
+from **trading parts with other players** is earned: you farm the relic, you crack
+it, you sell the part. It is the same shape as Ducats, which are in scope for
+exactly that reason, and it is the other half of what a spare part is worth. What
+stays out is buying Platinum from DE with a card, which this would neither
+recommend nor price.
+
+Add that distinction to §2's table when this lands, because the current row reads
+as though all Platinum were out.
+
+**Three things to settle before writing any of it.**
+
+1. **What "95th percentile of quantity" means**, which has more than one reading
+   and the readings differ by a lot. The orders endpoint gives a list of live
+   sell orders, each with a price and a quantity. Candidates: take orders sorted
+   by price ascending, accumulate quantity, and read the price at 95% of the
+   total — which lands near the *top* of the range and is close to a robust
+   maximum; or discard the top 5% of quantity as outliers and take the highest
+   price that survives; or use the `/statistics` endpoint's closed-order history
+   instead of live orders, which is what actually sold rather than what is being
+   asked. **Ask the owner rather than picking** — the figure means different
+   things to a seller and to a valuer, and this one is going on screen.
+2. **Which orders count.** Live sell orders from online users is the usual answer;
+   including offline sellers inflates the price with orders nobody can fill.
+   Platform matters too — the API is per-platform and this project is PC.
+3. **What it is for.** Ducats have the same open question in the entry above:
+   the data is on the payload and *nothing in the ranking reads it*. If Platinum
+   is only ever a badge beside the Ducat badge, that is a small and honest
+   feature. If it is meant to reach the ranking, it inherits the whole argument
+   in *What the misses are worth, in Ducats* — what a Platinum is worth depends
+   on what you want to buy with it, exactly as a Ducat's does.
+
+**A new source tier, and the first one that is neither DE nor WFCD.** So it needs
+what the others got: read its `Cache-Control` before the first fetch and honour
+the window (`PROJECT.md §2`, *"Ask no more often than the source says to"*); check
+its terms and rate limits, since warframe.market **does** publish a rate limit
+where DE and WFCD publish none; and record it in the source table with what it
+supplies and what happens when it is unreachable. It is an API rather than a
+library, so it is ordinary work under rule 9 — but the licence question is
+sharper here than for a first-party feed, and the answer belongs in `NOTICE.md`.
+
+The join is the same one the Ducat entry warns about: reward rows are named
+`Nyx Prime Chassis Blueprint` where the part is `Chassis`, so it goes through
+`normalise_part` like everything else. Their item keys are slugs
+(`nyx_prime_chassis`), which is a third spelling and needs the same funnel rather
+than a route around it.
 
 ### Expected openings for everything, not for the worst one — measured, and it costs traces
 
