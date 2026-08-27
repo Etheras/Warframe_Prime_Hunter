@@ -185,6 +185,32 @@ The line that must not move: **nothing the site ships may depend on any of
 this.** No bundler, no framework, no runtime package. Node, Playwright and `gh`
 are all recommended, all optional, and each is skipped cleanly when absent.
 
+**An API is not a dependency; a library is.** Restated by the owner on
+2026-08-27, and the distinction is the useful part. Reading somebody's HTTP
+endpoint costs the project nothing at rest — the data arrives, the build parses
+it deterministically, and the artefact still opens from a USB stick with no
+network at all. Adding somebody's *code* is the thing that changes what this
+project is, and there are exactly three of those (Node, Playwright, `gh`), all
+optional, all test-time.
+
+So a new endpoint is ordinary work. **A new library, package, vendored file or
+copied implementation is not, and needs two things in this order:**
+
+1. **The owner's approval, asked for before it is written in.** Not after, and
+   not as a fait accompli in a commit that also does something else.
+2. **Its licence read** — actually read, and recorded in `NOTICE.md` beside the
+   others, with what it permits and what it obliges.
+
+The near miss that prompted this: the first-party worldstate work in `TODO.md`
+names [`WFCD/warframe-drop-data`](https://github.com/WFCD/warframe-drop-data) as
+a **reference to read**, because it shows how the raw worldstate is normalised.
+Reading how somebody solved a mapping and writing our own is fine and is what
+that entry means. Vendoring their tables, copying their parser, or adding their
+package is not, and would need both steps above first — including for a mapping
+table lifted verbatim, which is code wearing a data hat. `NOTICE.md` already
+credits WFCD for **data** under MIT / Apache-2.0; that credit does not extend
+itself to code nobody has checked.
+
 ### Showing a proposal before building it
 
 `temp_mockup.html` is a scratchpad at the repo root for **showing what a change
@@ -1003,6 +1029,33 @@ that stamp the banner outlived the refresh that cleared it: `refresh-data` finis
 data on disk was current, and the page went on saying it was behind for the rest of the
 hour. Reloading did not help, because the server held the stale answer, not the browser.
 
+**The banner names what is behind in the reader's words, and says how far.**
+Rewritten 2026-08-27, after the deployed site spent a morning telling strangers
+*"The last update could not reach api_events, api_fissures, api_syndicatemissions,
+api_vaulttrader, so an earlier copy is being shown."* Three faults in one
+sentence. Those are internal source keys, and no reader outside this repository
+knows what they are. They are four names for what is one thing to a reader — the
+live worldstate. And the heading, *"Showing older data"*, condemned the whole
+build when 167 items, 763 relics and every drop table beside them had been built
+minutes earlier and were current.
+
+It now says: **Live data is an older copy. Void Fissures, bounty rotations and
+Prime Resurgence could not be refreshed, so those are from a copy made 3 days
+ago. The catalogue, relics and drop tables are current.**
+
+Three deliberate parts. The keys map to feed names a player uses, and a key with
+no mapping is left un-named rather than guessed at — its presence is also what
+withdraws the closing sentence, which is only true while every reused source is
+one of the live four. The age comes from a new `meta.staleSince`, the mtime of
+the oldest reused copy, because *"an earlier copy"* read the same at ten minutes
+and at three days, and three days is the answer that matters. And the raw keys
+are still printed — to the owner only, who is the one party a source key helps.
+
+The whole message is `staleNotice` in `shared.js`, a pure function of the meta
+and the owner flag, with the DOM left to its caller. Every bug this banner has
+ever had was in what it said rather than where it was put, so what it says is a
+string a test can hold.
+
 **The banner also knows who is reading it, and does not guess.** The same warning is
 seen by whoever runs the server and by anyone they gave the address to, and only the
 first can act on it — so only the first is told to double-click `refresh-data.cmd`.
@@ -1029,8 +1082,9 @@ other becomes an automatic fallback.
 | **[DE Public Export](https://origin.warframe.com/PublicExport/index_en.txt.lzma)** | Catalogue cross-check — Primes that exist in game data | First party, refreshed on every game build. Catches a new Prime **before the wiki is edited** |
 | [wiki.warframe.com/w/Prime](https://wiki.warframe.com/w/Prime) | Categories and the (V)/(P)/(B)/(S)/Founder markers | The grouping you asked for; the export fills any gaps |
 | [api.warframestat.us/items](https://api.warframestat.us/items) | Component names, artwork filenames, vault state | Convenience layer; the drop table can reconstruct parts without it |
-| [`/pc/vaultTrader`](https://api.warframestat.us/pc/vaultTrader) | Live **Prime Resurgence** rotation | Proxies the game worldstate — DE's own `worldState.php` is 404 (see §7) |
-| [`/pc/syndicateMissions`](https://api.warframestat.us/pc/syndicateMissions) + [`/pc/events`](https://api.warframestat.us/pc/events) | Which **bounty rotation** is live, and whether the Ghoul Purge or Plague Star is running | Same proxy, same reason. The rotation letter is not published anywhere — it is derived by matching the bounties on offer against DE's table (§7) |
+| [`/pc/vaultTrader`](https://api.warframestat.us/pc/vaultTrader) | Live **Prime Resurgence** rotation | Proxies the game worldstate. **Down since 2026-08-27**, and a first-party route exists after all — see §7 gotcha 4 and `TODO.md` |
+| [`/pc/syndicateMissions`](https://api.warframestat.us/pc/syndicateMissions) + [`/pc/events`](https://api.warframestat.us/pc/events) | Which **bounty rotation** is live, and whether the Ghoul Purge or Plague Star is running | Same proxy, same outage, same replacement. The rotation letter is not published anywhere — it is derived by matching the bounties on offer against DE's table (§7) |
+| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **Not used yet.** The whole worldstate, first party — every feed the four rows above proxy | Found 2026-08-27. Raw shapes, so each consumer needs an adapter; `TODO.md` sizes them |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
 
@@ -3065,9 +3119,13 @@ These cost real debugging time — worth remembering.
 3. **The wiki's `(R)` Resurgence markers are stale** — the Prime page still lists the
    2021 debut rotation and carries an `{{UpdateMe}}` tag. Resurgence status comes from
    the live worldstate instead, matched on `uniqueName`.
-4. **DE's `worldState.php` is 404** on both `content.` and `origin.warframe.com`.
-   The warframestat `/pc` proxy is the only working route to the live worldstate, so
-   Resurgence is the one signal that is not first party.
+4. **DE's `worldState.php` is 404** on both `content.` and `origin.warframe.com`
+   — and **not on `api.warframe.com/cdn/`**, which serves the whole thing and was
+   doing so all along. Found 2026-08-27, when the warframestat `/pc` proxy started
+   answering `404 {"error":"No such worldstate field"}` on every platform and the
+   live feeds had nowhere else to go. Until then this gotcha said the proxy "is the
+   only working route", which is what two failed hosts had been read as proving.
+   `TODO.md` has the adapters that route needs; the proxy stays as the fallback.
 5. **DE's LZMA streams break Python's strict decoder.** `index_en.txt.lzma` is
    LZMA-alone with a declared size that `lzma.decompress` rejects as corrupt. Blank
    the 8-byte size field to `\xff` and trust the end marker — `official.decode_index`

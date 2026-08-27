@@ -54,7 +54,7 @@ import sources                                            # noqa: E402
 from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E402
                      DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_WANTED,
                      FISSURES, IMG_CDN,
-                     ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE,
+                     ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE,
                      SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
                      upstream_signature)
@@ -1244,6 +1244,15 @@ def main() -> int:
             "newCount": len(fresh) if prime_wikitext else 0,
             # refresh failed but an older copy was reused — data is slightly behind
             "stale": sorted(set(STALE)),
+            # When the oldest of those reused copies was actually written. The
+            # banner said "an earlier copy is being shown" for a copy ten minutes
+            # behind and for one ten days behind, which are not the same news.
+            # Absent when nothing was reused.
+            "staleSince": (
+                datetime.fromtimestamp(min(STALE_AGE.values()), timezone.utc)
+                .isoformat(timespec="seconds")
+                if STALE_AGE else None
+            ),
             # refresh failed with nothing cached — this data is genuinely absent
             "degraded": sorted(set(MISSING)),
             "sources": {

@@ -129,6 +129,9 @@ def write_etag(path: str, tag) -> None:
 #
 STALE: list[str] = []
 MISSING: list[str] = []
+# key -> mtime of the copy that was reused, so the page can say how far behind
+# it actually is rather than only that it is behind.
+STALE_AGE: dict[str, float] = {}
 
 
 def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
@@ -206,8 +209,15 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
     # warm: a previous copy exists, so this is only an alert
     if os.path.exists(path):
-        log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy")
+        age = time.time() - os.path.getmtime(path)
+        log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy"
+            f" ({int(age // 60)} min old)")
         STALE.append(key)
+        # How old the copy is, not merely that there is one. The banner reading
+        # this said "an earlier copy is being shown" whether the copy was ten
+        # minutes or ten days behind, which is the difference between "ignore
+        # this" and "do not trust the fissure list".
+        STALE_AGE[key] = os.path.getmtime(path)
         with gzip.open(path, "rb") as fh:
             return fh.read()
 

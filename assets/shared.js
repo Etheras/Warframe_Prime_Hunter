@@ -308,25 +308,115 @@
   /* ── is this data still current ──────────────────────────────────
      A failed refresh used to be a line in the footer, which nobody scrolls to.
      If the data is behind, say so above the fold and say what to do about it. */
+  /* What each source key actually feeds, in the reader's words.
+
+     The banner printed the keys themselves, so the deployed site told a stranger
+     *"could not reach api_events, api_fissures, api_syndicatemissions,
+     api_vaulttrader"* — four internal names for what is one thing to a reader,
+     none of which they can act on, under a heading that reads as though the
+     whole catalogue is behind. It was not: those four are the live worldstate,
+     and the 167 items, 763 relics and every drop table beside them were built
+     minutes earlier and current.
+
+     A key absent from this map is deliberately un-named rather than guessed at,
+     and its presence is what withdraws the "everything else is current" claim
+     below — that sentence is only true while every reused source is one of
+     these. */
+  const FEEDS = {
+    api_fissures: "Void Fissures",
+    api_syndicatemissions: "bounty rotations",
+    api_events: "bounty rotations",
+    api_vaulttrader: "Prime Resurgence",
+  };
+
+  /* Listed in this order rather than in the order the keys happen to arrive.
+     `meta.stale` is sorted alphabetically, which put `api_events` first and
+     produced "bounty rotations, Void Fissures and Prime Resurgence" — true, and
+     it reads like a machine. */
+  const FEED_ORDER = ["Void Fissures", "bounty rotations", "Prime Resurgence"];
+
+  function feedNames(keys) {
+    const hit = {};
+    (keys || []).forEach((k) => { if (FEEDS[k]) hit[FEEDS[k]] = true; });
+    return FEED_ORDER.filter((name) => hit[name]);
+  }
+
+  const listWords = (a) => (a.length < 2 ? (a[0] || "")
+    : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]);
+
+  /* How long ago, at the coarseness that matters. Minutes while the answer is
+     "ignore this", days by the time it is "do not trust the fissure list". */
+  function agoWords(iso, now) {
+    const t = iso ? Date.parse(iso) : NaN;
+    if (!isFinite(t)) return null;
+    const mins = Math.max(0, Math.round((now - t) / 60000));
+    if (mins < 90) return mins + " minute" + (mins === 1 ? "" : "s") + " ago";
+    const hours = Math.round(mins / 60);
+    if (hours < 36) return hours + " hour" + (hours === 1 ? "" : "s") + " ago";
+    const days = Math.round(hours / 24);
+    return days + " day" + (days === 1 ? "" : "s") + " ago";
+  }
+
+  /* The whole banner as text, with no DOM in sight, because every bug this has
+     ever had was in what it said rather than in where it was put. `yours` is
+     the owner answer the server stamps; `now` is passed so a test can hold the
+     clock still. Returns null when there is nothing worth saying. */
+  function staleNotice(meta, up, yours, now) {
+    const m = meta || {};
+    const stale = (m.stale || []).length ? m.stale : null;
+    const degraded = (m.degraded || []).length ? m.degraded : null;
+    const built = m.generated ? new Date(m.generated) : null;
+    const days = built ? Math.floor((now - built.getTime()) / 86400000) : 0;
+    const moved = up && up.stale && (up.moved || []).length ? up.moved : null;
+    const old = !stale && !degraded && !moved && days >= 14;
+    if (!stale && !degraded && !moved && !old) return null;
+
+    const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
+
+    if (moved) {
+      return { level: "warn",
+               html: "<b>Out of date.</b> Digital Extremes have published newer "
+                     + "data than this." + fix };
+    }
+    if (degraded) {
+      return { level: "bad",
+               html: "<b>Some data is missing.</b> This copy was built without "
+                     + esc(degraded.join(", "))
+                     + ", so items or drop locations may be absent." + fix };
+    }
+    if (stale) {
+      const feeds = feedNames(stale);
+      const liveOnly = stale.every((k) => Object.prototype.hasOwnProperty.call(FEEDS, k));
+      const when = agoWords(m.staleSince, now);
+      /* Named for the owner only. They are the one party who can look at a
+         source key and do something about it; to everyone else it is the same
+         noise the two-audience rule below already refuses to print. */
+      const which = yours ? " Reused: " + esc(stale.join(", ")) + "." : "";
+      return {
+        level: "warn",
+        html: "<b>Live data is an older copy.</b> "
+              + (feeds.length ? esc(listWords(feeds)) : "Some live data")
+              + " could not be refreshed, so " + (feeds.length ? "those are" : "it is")
+              + " from " + (when ? "a copy made " + esc(when) : "an earlier copy") + "."
+              + (liveOnly
+                 ? " The catalogue, relics and drop tables are current." : "")
+              + which + fix,
+      };
+    }
+    return { level: "warn",
+             html: "<b>This data is " + days + " days old.</b> Prime Resurgence "
+                   + "rotates every 28 days, and drop tables change with each "
+                   + "update." + fix };
+  }
+
   function staleBanner() { return once("staleBanner", drawStaleBanner); }
 
   function drawStaleBanner() {
-    const m = DATA.meta || {};
     /* The server checks upstream before serving the data file and plants the
        answer on it. Nothing is fetched from here - the page never talks to
        Digital Extremes, and does not know the check happened. Absent on
        file:// and on GitHub Pages, where no server ran. */
     const up = window.WFPRIME_UPSTREAM;
-    const stale = (m.stale || []).length ? m.stale : null;
-    const degraded = (m.degraded || []).length ? m.degraded : null;
-    const built = m.generated ? new Date(m.generated) : null;
-    const days = built ? Math.floor((Date.now() - built.getTime()) / 86400000) : 0;
-    const moved = up && up.stale && (up.moved || []).length ? up.moved : null;
-    const old = !stale && !degraded && !moved && days >= 14;
-    if (!stale && !degraded && !moved && !old) return;
-
-    const el = document.createElement("div");
-    el.className = "databar " + (degraded ? "bad" : "warn");
 
     /* Two audiences. Whoever runs the server can fix this and is told how, in
        the only terms that matter to them - the file they double-click. Anyone
@@ -347,20 +437,13 @@
     const yours = up && typeof up.owner === "boolean"
       ? up.owner
       : ["localhost", "127.0.0.1", "::1", ""].indexOf(location.hostname) >= 0;
-    const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
 
-    el.innerHTML = moved
-      ? "<b>Out of date.</b> Digital Extremes have published newer data than this." + fix
-      : degraded
-        ? "<b>Some data is missing.</b> This copy was built without " +
-          esc(degraded.join(", ")) + ", so items or drop locations may be absent." + fix
-        : stale
-          ? "<b>Showing older data.</b> The last update could not reach " +
-            esc(stale.join(", ")) + ", so an earlier copy is being shown" +
-            (days ? " (from " + days + " day" + (days === 1 ? "" : "s") + " ago)" : "") +
-            ". Vaulting and Resurgence may have moved on since." + fix
-          : "<b>This data is " + days + " days old.</b> Prime Resurgence rotates every " +
-            "28 days, and drop tables change with each update." + fix;
+    const notice = staleNotice(DATA.meta, up, yours, Date.now());
+    if (!notice) return;
+
+    const el = document.createElement("div");
+    el.className = "databar " + notice.level;
+    el.innerHTML = notice.html;
     const header = document.querySelector("header.topbar");
     if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
   }
@@ -791,7 +874,8 @@
   }
 
   window.WFPrimeShared = {
-    esc, count, $, $$, KEYS, load, save, showTip, staleBanner, wireFileBackup, squadOdds,
+    esc, count, $, $$, KEYS, load, save, showTip, staleBanner, staleNotice,
+    wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     masteryLabel, masteryTitle, masteryShown, masteryTyped,
     traceCap, traceCapped, TRACE_PIVOT, MR_TOP, wireMastery, siteFooter,

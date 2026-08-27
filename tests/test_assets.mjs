@@ -1001,6 +1001,68 @@ test("two callers of the fissure watcher share one poller and both are heard", a
                "and the list is spliced in place, because both pages hold a reference to it");
 });
 
+/* The banner's bugs have always been in what it says, never in where it was
+   put — so what it says is a string a test can hold, and this is the one that
+   holds it. The wording here shipped to GitHub Pages on 2026-08-27 reading
+   "could not reach api_events, api_fissures, api_syndicatemissions,
+   api_vaulttrader": four internal keys, to a stranger, under a heading that
+   implied the whole catalogue was behind. It was not. */
+test("a stale live feed is named for the reader, dated, and does not condemn the catalogue", () => {
+  const { S } = loadShared();
+  const NOW = Date.parse("2026-08-27T09:00:00Z");
+  const meta = {
+    generated: "2026-08-27T06:58:00Z",
+    stale: ["api_events", "api_fissures", "api_syndicatemissions", "api_vaulttrader"],
+    staleSince: "2026-08-27T03:05:00Z",
+    degraded: [],
+  };
+
+  const guest = S.staleNotice(meta, undefined, false, NOW);
+  assert.equal(guest.level, "warn", "a live feed being behind is not a broken build");
+  assert.ok(!/api_/.test(guest.html),
+            `no reader outside this repo knows what api_fissures is: ${guest.html}`);
+  assert.match(guest.html, /Void Fissures, bounty rotations and Prime Resurgence/,
+               "the four keys are three things, and each has a name people use");
+  assert.match(guest.html, /a copy made 6 hours ago/,
+               "how far behind is the whole question; the old text never said");
+  assert.match(guest.html, /catalogue, relics and drop tables are current/,
+               "167 items and 763 relics were built minutes ago and must not be implied stale");
+  assert.ok(!/refresh-data/.test(guest.html), "a guest cannot run anything");
+
+  /* The owner is the one party a source key helps, and the only one told how. */
+  const owner = S.staleNotice(meta, undefined, true, NOW);
+  assert.match(owner.html, /api_events, api_fissures, api_syndicatemissions, api_vaulttrader/);
+  assert.match(owner.html, /refresh-data/);
+
+  /* A source outside the live-worldstate set withdraws the reassurance rather
+     than being named wrongly — the claim is only true while every reused
+     source is one of the four. */
+  const wider = S.staleNotice({ ...meta, stale: meta.stale.concat(["api_items"]) },
+                              undefined, false, NOW);
+  assert.ok(!/are current/.test(wider.html),
+            "the catalogue's own source was reused, so nothing may promise it is current");
+
+  /* And with nothing wrong, the banner says nothing at all. */
+  assert.equal(S.staleNotice({ generated: "2026-08-27T06:58:00Z", stale: [], degraded: [] },
+                             undefined, false, NOW), null);
+});
+
+test("the banner's other three states still say their own thing", () => {
+  const { S } = loadShared();
+  const NOW = Date.parse("2026-08-27T09:00:00Z");
+  const fresh = "2026-08-27T06:58:00Z";
+
+  const moved = S.staleNotice({ generated: fresh }, { stale: true, moved: ["droptables"] }, false, NOW);
+  assert.match(moved.html, /Out of date/);
+
+  const degraded = S.staleNotice({ generated: fresh, degraded: ["api_items"] }, undefined, false, NOW);
+  assert.equal(degraded.level, "bad", "missing data is a different severity from late data");
+  assert.match(degraded.html, /Some data is missing/);
+
+  const old = S.staleNotice({ generated: "2026-07-01T00:00:00Z" }, undefined, false, NOW);
+  assert.match(old.html, /This data is 57 days old/);
+});
+
 test("load falls back rather than throwing on a corrupt store", () => {
   const { S, ctx } = loadShared();
   S.save(S.KEYS.parts, { "warframe-xaku-prime": { Chassis: 1 } });

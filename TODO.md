@@ -119,7 +119,12 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
+| The live worldstate has a first-party route after all | session — four adapters, and it retires the only third-party dependency |
+| A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
+| The planner ignores Prime Resurgence items on the farm list | session |
 | No feature-usability audit has ever been done | session — the first one, and it sets the shape for the rest |
+| Vaulted belongs directly below Prime Resurgence | small |
+| The single-letter shorthands say nothing the word beside them does not | small |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -681,6 +686,155 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
+### The live worldstate has a first-party route after all
+
+**Found 2026-08-27, by the owner, and it overturns a `[settled]` answer below.**
+*Prime Resurgence is the only non-first-party source* says there is no
+first-party route to find and nothing to do until DE publish one. There is one,
+and it is not new:
+
+```
+https://api.warframe.com/cdn/worldState.php     200, 127 KB, live
+```
+
+Verified the same day. It carries every feed the WarframeStat proxy serves us:
+`ActiveMissions` (21 entries — Void Fissures), `VoidStorms` (the Railjack ones),
+`SyndicateMissions` (38 — bounties), `Events` (34), and `PrimeVaultTraders`
+(Prime Resurgence). The two hosts `PROJECT.md §6` records as 404 —
+`content.warframe.com` and `origin.warframe.com`, both `/dynamic/worldState.php`
+— are still 404; nobody had tried `api.warframe.com/cdn/`.
+
+**This is why it matters today rather than in the abstract.** All four
+`api.warframestat.us/pc/*` endpoints have been answering `404 {"error":"No such
+worldstate field"}` since 2026-08-27 03:07 UTC — every platform, so the proxy is
+up and its worldstate ingestion is not. That is what put the *Live data is an
+older copy* banner on the deployed site, and there is currently no way to clear
+it. Taking this route retires the dependency instead of waiting it out.
+
+**It is not a URL swap, and that is the whole cost.** DE publish raw worldstate;
+WarframeStat publish a normalised shape, and the four consumers in
+`build_data.py` are written against the normalised one. Each needs an adapter:
+
+| Consumer | Raw shape | What the adapter has to resolve |
+|---|---|---|
+| fissures | `{Node: "SolNode106", Modifier: "VoidT1", MissionType: "MT_TERRITORY", Expiry: {$date:{$numberLong}}}` | node id → name (we already hold `ExportRegions_en.json` for enemy levels), `VoidT1..6` → Lith/Meso/Neo/Axi/Requiem/Omnia, `MT_*` → mission type, Steel Path flag, `VoidStorms` merged in |
+| Resurgence | `PrimeVaultTraders[0].Manifest[].ItemType` like `/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVRevenantPrimeSinglePack` | store-item path → Prime name. **The messiest by far** — those are pack names, not item names |
+| bounties | `SyndicateMissions[].{Tag, Expiry, Jobs[]}` | job type → the bounty families `derive_bounty_rotation` expects |
+| events | `Events[]` / `Goals[]` | the Ghoul and Plague Star detection in `find_live_events` |
+
+Mongo-style `{$date:{$numberLong}}` and `{$oid}` wrappers throughout, so a date
+helper first.
+
+**The blocker, and what softens it.** The honest reason not to write these on the
+day they were needed is that **the proxy is down, so there is no known-good
+output to check a new normaliser against** — building them blind is the guessing
+`PROJECT.md §2` refuses. What softens it, pointed out the same day:
+[`WFCD/warframe-drop-data`](https://github.com/WFCD/warframe-drop-data) and the
+WFCD parsers beside it are open source, so the mapping tables can be read from
+the reference implementation rather than inferred. That is a source to check
+against, which is most of what was missing. It does not remove the need to
+verify against live data once the proxy is back and the two can be diffed.
+
+**Read it; do not take it.** WFCD is a reference here, not a dependency — see
+`PROJECT.md §2` *"An API is not a dependency; a library is"*. Reading how they
+resolve `SolNode106` or `VoidT1` and writing our own is the point. Vendoring
+their tables, copying their parser or adding their package needs the owner's
+approval first and their licence read second, **including a mapping table lifted
+verbatim**, which is code wearing a data hat. `NOTICE.md` credits WFCD for data
+under MIT / Apache-2.0 and that credit does not stretch to cover code nobody has
+checked.
+
+**Do not delete the proxy when this lands.** `fetch_json` already takes several
+URLs and tries them in order, which is the shape this wants: first party first,
+proxy as the fallback, so a bad day at either end is survivable. That mechanism
+exists because `origin.warframe.com` answers a GitHub runner with 403 and
+`content.warframe.com` with 200 — the same lesson, already learnt once.
+
+### A backend refresh finds new fissures and the ranking does not move
+
+**Asked for 2026-08-27.** `watchFissures` re-reads `data/fissures.json` every ten
+minutes, on load and on `visibilitychange`, and splices the new list into the
+array both pages hold. The planner repaints its fissure **badges** from that.
+*Where to go* does not re-rank.
+
+**That is currently deliberate, which is what makes this more than a one-liner.**
+`PROJECT.md §7` — *"Badges only, deliberately"* — the fold uses a live fissure to
+choose which of several identical nodes to name, so re-running the ranking on a
+refresh would rename and reorder rows under whoever is reading them, for a reason
+that expires within the hour. It is the same call as never letting a fissure into
+the score.
+
+So this is a request to revisit a decision, not to fix an oversight, and it needs
+an answer to the thing that decision was protecting: **what happens to the reader
+mid-read?** Options worth weighing rather than one of them being assumed —
+re-rank in place and accept rows moving; re-rank but hold the order until the
+reader does something; or offer it, a *"3 new fissures — update the list"* affordance
+that re-ranks when pressed, which is the only one that cannot move anything under
+anyone. The last is more work and is probably right.
+
+Whatever is chosen, the collection view's *Still needed* panel reads the same
+list through the same `opts` and would need the same treatment, or the two go
+back to disagreeing about what is reachable — which they did once already.
+
+### The planner ignores Prime Resurgence items on the farm list
+
+**Asked for 2026-08-27.** Put a Prime Resurgence item on the farm list and the
+planner has nothing to say about it. *Where to go* is right to say nothing —
+Varzia sells those relics for Aya, they do not drop, and there is nowhere to go.
+But the relics still have to be **cracked**, and that half is a real farm the
+planner already knows how to describe for everything else.
+
+So: when a wanted item's route is Resurgence, the planner should show the
+Resurgence relics it needs and **where to crack them** — the fissure side of the
+page, not the node ranking. The two lists already exist and already split on
+exactly this question (*"Where to go"* ranks wanted relics per objective; *"How to
+crack them"* ranks openings to finish the relic), so this is the second list
+learning about a source the first one is correctly silent on.
+
+Worth stating plainly in the UI too, because a farm-list entry that produces no
+guidance currently reads as a bug: something has to say *"bought from Varzia for
+Aya — nothing to farm, but here is how to crack it."*
+
+`meta.resurgence` carries the window and Varzia's location, and the items already
+carry the Resurgence flag, so the data is in the payload. Note that the flag
+depends on `api_vaulttrader` — the feed that is down — so build this against the
+first-party route above, or against a cached copy, and do not let it silently
+show nothing when the flag is stale.
+
+### Vaulted belongs directly below Prime Resurgence
+
+**Asked for 2026-08-27.** The availability filters in the collection sidebar are
+in this order, measured on the page:
+
+```
+Farmable 29 · Railjack only 6 · Prime Resurgence 5 · Baro Ki'Teer 9
+· Other sources 4 · Vaulted 113 · Founder exclusive 3
+```
+
+Vaulted should sit **directly** below Prime Resurgence — above Baro Ki'Teer and
+Other sources, not merely somewhere beneath it, which it already is. The markup
+is `index.html` lines 76–86; nothing but the order changes.
+
+### The single-letter shorthands say nothing the word beside them does not
+
+**Asked for 2026-08-27.** Three places write a letter and then immediately write
+the word it stands for, so the letter carries no information:
+
+| Where | Now |
+|---|---|
+| `assets/app.js` `BADGE` | `R · RESURGENCE`, `V · VAULTED`, `B · BARO` |
+| `index.html` sidebar | `Prime Resurgence <em>(R)</em>`, `Baro Ki'Teer <em>(B)</em>`, `Vaulted <em>(V)</em>` |
+
+Drop the letters and the `<em>` wrappers; keep the words.
+
+**One the request did not name, and it is the same shape:** `perm` is
+`P · NEVER VAULTED`. Decide it with the other three rather than leaving one
+lonely letter behind — that is how a convention half-removed becomes a mystery.
+
+Check `STYLE.md` before touching the badge strings, and check the sidebar still
+lines up once the `<em>` goes: the counts are right-aligned in a column whose
+width came from labels that were longer.
+
 ### No feature-usability audit has ever been done
 
 **Added 2026-08-27**, when the monthly audit cadence was written down in
@@ -868,13 +1022,28 @@ collection, per-part progress, materials, the farm list, filters and planner opt
 Automatic sync would need a server and an account, which is exactly what this project
 avoids. Revisit only if a serverless option appears that keeps the data local.
 
-### Prime Resurgence is the only non-first-party source **[settled]**
+### Prime Resurgence is the only non-first-party source **[settled — overturned 2026-08-27]**
 
-Everything else comes from Digital Extremes directly. DE's own `worldState.php`
-returns 404 on both `content.` and `origin.warframe.com`, so the live Resurgence
-rotation comes via the WarframeStat proxy. **There is no first-party route to find** —
-nothing to do here until DE publishes one. Documented in `PROJECT.md §6` and left
-open only so the search can resume if that changes.
+**This answer was wrong and the work is open again**, above, under *The live
+worldstate has a first-party route after all*. Kept here rather than deleted
+because how it was wrong is the useful part.
+
+It said: DE's own `worldState.php` returns 404 on both `content.` and
+`origin.warframe.com`, so the live Resurgence rotation comes via the WarframeStat
+proxy, and **"there is no first-party route to find"** — nothing to do until DE
+publish one.
+
+Both 404s were true and are still true. The conclusion drawn from them was not:
+`https://api.warframe.com/cdn/worldState.php` serves the full worldstate, 127 KB,
+and was doing so all along. **Two hosts failing was read as the question being
+closed**, and it was written down as a settled answer, which is the form that
+stops anyone looking again. Nobody had tried a third host until the owner did, on
+the day the proxy went down and it mattered.
+
+The shape to take from it: *"we tried and could not find one"* is a report about
+the search, not about the world, and a `[settled]` tag on one of those is a claim
+the evidence does not support. Two of the four entries under this heading are of
+that kind.
 
 ### Enemy levels are missing for 31% of live-relic nodes **[partly reopened]**
 
