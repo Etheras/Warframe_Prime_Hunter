@@ -206,7 +206,7 @@ against 10.13:1.
   first in the list. Sorting has no such failure mode, needs no legend, and
   survives ties. Wanted parts sort rarest first, gold to bronze, left to right.
 - **A list that ranks on something says so in its heading.** *Where to go —
-  ranked on relics per objective*, *How to crack them — ranked on openings per
+  ranked on relics per reward*, *How to crack them — ranked on openings per
   part cleared*. Two lists side by side, each with one large unexplained number, is
   the confusion that splitting them was meant to end; the headings are what
   stops the split from just moving it.

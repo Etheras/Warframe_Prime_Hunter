@@ -1330,7 +1330,7 @@ page_test("Railjack is forced in when it is the only route, and says so", async 
   assert.deepEqual(errors, []);
 });
 
-page_test("minutes per objective re-sort the list, and are remembered", async () => {
+page_test("minutes per reward re-sort the list, and are remembered", async () => {
   /* The whole point of this option is that it changes the answer: ranking per
      run flatters anything long, and one player's timings moved Capture nodes up
      over a hundred places. A control that stores a number without moving a row
@@ -1342,8 +1342,8 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   const before = await order();
   assert.ok(before.length > 1, "need a ranking before there is anything to re-rank");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /[\d.]+\s*\nrelics \/ objective/,
-               "with nothing set, objective count is the default cost basis");
+               /[\d.]+\s*\nrelics \/ reward/,
+               "with nothing set, reward count is the default cost basis");
 
   // an endless mission made expensive per round has to fall behind a fast one
   await page.locator(".advanced > summary").click();
@@ -1372,9 +1372,9 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
   await page.locator(".advanced > summary").click();
   await page.locator("#effortClear").click();
   assert.deepEqual(await order(), before,
-                   "clearing puts the per-objective default back");
+                   "clearing puts the per-reward default back");
   assert.match(await page.locator("#planNodes .spot-score").first().innerText(),
-               /relics \/ objective/, "and says so again");
+               /relics \/ reward/, "and says so again");
 
   /* The default is a cost basis, not "no cost basis": a four-round Defense is
      costed four times a single-objective Capture even with every box empty.
@@ -1718,8 +1718,8 @@ page_test("the ranked number, the order and the heading all say the same thing",
 
   const byObjective = await read();
   assert.ok(byObjective.big.length > 2, "not enough rows ranked to compare an order");
-  assert.match(byObjective.heading, /per objective/);
-  assert.match(byObjective.unit, /objective/);
+  assert.match(byObjective.heading, /per reward/);
+  assert.match(byObjective.unit, /reward/);
   assert.deepEqual(byObjective.big, [...byObjective.big].sort((a, b) => b - a),
                    "the big numbers must be in descending order — that IS the order");
 
@@ -1734,7 +1734,7 @@ page_test("the ranked number, the order and the heading all say the same thing",
   assert.deepEqual(byRun.big, [...byRun.big].sort((a, b) => b - a),
                    "still sorted by the number now shown largest");
   assert.notDeepEqual(byRun.big, byObjective.big,
-                      "per run and per objective must not be the same number, or " +
+                      "per run and per reward must not be the same number, or " +
                       "this toggle is measuring one thing twice");
 
   // and it survives a reload, because it lives in the planner's saved options

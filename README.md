@@ -422,7 +422,7 @@ guess about your play. That is the default and it asks you for nothing.
 
 If you would rather rank on real time, open **Effort — optional** in the sidebar
 and put minutes against any mission type. One is enough; the whole list re-sorts,
-and the big number on each row changes from *per objective* to *per minute* to say
+and the big number on each row changes from *per reward* to *per minute* to say
 so. Types you leave blank are costed at the average of the ones you filled in and
 are drawn in amber on the row, so a borrowed number never looks like one of yours.
 

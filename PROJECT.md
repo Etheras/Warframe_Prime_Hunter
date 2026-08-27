@@ -44,7 +44,7 @@ both. Judge a change by whether it serves that shared dataset well.
 | Bank a part the moment it drops | Click it in the farm list; the plan re-ranks |
 | Know **which refinement** to take a relic to | Verdict chip on every relic row, chosen by bottleneck (§7) |
 | Fold **Forma** into the ranking | *Forma* have/want field in the planner sidebar, which reads and writes row one of the collection's materials list |
-| Say what a run costs you in real time | *Effort — optional* in the sidebar, minutes per objective per mission type (§7) |
+| Say what a run costs you in real time | *Effort — optional* in the sidebar, minutes per reward per mission type (§7) |
 
 Everything you enter lives in the browser's `localStorage`, across six keys —
 named once, in `assets/shared.js`, because both pages read and write them:
@@ -1986,7 +1986,7 @@ is a count of **reward draws**, not objectives — a Faceoff match is one run pa
 two — which is the same split `PER_REWARD` handles for Onslaught.
 
 **What it moved, measured over the live build.** Spy: five reachable nodes 4 → 3
-vaults, +33% per objective, Pago #124 → #83, and the C-only nodes keep their value
+vaults, +33% per reward, Pago #124 → #83, and the C-only nodes keep their value
 because the letters came with the cap. Caches: 24 of 38 rose and 14 fell, −4% to
 +6% depending on how a node splits between A and B. Faceoff: 6 rounds → 1 run,
 **+140%, to #1–#4**.
@@ -2068,7 +2068,7 @@ is one activity you replay on its own — its rate was divided by four and it sa
 accordingly. `objectivesOf` now names the heist and returns one run for it.
 
 That leaves `Bounty` carrying two units, which is the price of it being **our**
-label rather than DE's. The effort panel asks for minutes per objective per mission
+label rather than DE's. The effort panel asks for minutes per reward per mission
 type, and it takes the unit of the node with the *most* objectives, so a
 single-objective heist cannot relabel a form that is mostly stages and quietly make
 the number typed into it wrong by a factor of four. A plaster, and `TODO.md` keeps
@@ -2196,7 +2196,7 @@ when there is no time, and cracked in bulk at the weekend.
 
 | | Ranks on | Knows nothing about |
 |---|---|---|
-| **Where to go** | wanted relics per objective | what a relic turns into once opened |
+| **Where to go** | wanted relics per reward | what a relic turns into once opened |
 | **How to crack them** | openings to finish the relic | where the relic came from |
 
 Each heading says which quantity it ranks on, because two lists side by side with
@@ -2221,7 +2221,7 @@ Two consequences worth knowing:
   says `halved`. A judgement may move the ranking, never the fact.
 
 **Which of the two you are ranked on is now a control**, added 2026-08-24. Both
-count wanted relics and differ only in what they divide by — per objective (or per
+count wanted relics and differ only in what they divide by — per reward (or per
 minute once effort weights are given) against per run, cost ignored. They disagree
 whenever a long run is worth going on with, and the reordering is not subtle: on a
 four-Prime list, Stribog and Tiwaz top the per-objective list at 0.63 and leave the
@@ -2231,7 +2231,7 @@ Three rules the toggle has to keep, all of them `STYLE.md §5`. The number it ra
 on becomes the **big** one and the other drops to the faint line beneath — a sort
 that changed the order without moving the numbers would leave every row claiming an
 order it is not in. The **heading follows**, which also fixed a older lapse: it read
-*ranked on relics per objective* even after minutes were given and the rows had
+*ranked on relics per reward* even after minutes were given and the rows had
 switched to per minute. And the `+N more` tooltip follows too — it had been
 rendering the ranked count through the percentage formatter since the split, so the
 hidden rows showed `38%` where the visible ones showed `0.38`.
@@ -2241,7 +2241,7 @@ where it started. Everything in that sidebar is something the model needs to be
 told — how far you run, whether you have a squad, what an objective costs you —
 while this one only reorders the list in front of you, and a control belongs within
 sight of what it changes. Its options carry the unit rather than a label of their
-own (*per objective* becomes *per minute* with the heading), because on that line
+own (*per reward* becomes *per minute* with the heading), because on that line
 there is no room for a label and no need for one.
 
 **What is deliberately not offered is a sort on value.** `score` is on the row and
@@ -2498,7 +2498,7 @@ So the planner asks, under *Effort — optional* in the sidebar, and needs no an
 That default changed on 2026-08-14. It used to be per *run*, which is not a unit at
 all — a run is whatever you decide to make it, and the option directly above lets you
 decide differently. Against one player's own timings, costing per run is out by up to
-**9.6×** across mission types; costing per objective is out by **2.4×**, because a
+**9.6×** across mission types; costing per reward is out by **2.4×**, because a
 round, a vault and a bounty stage all take somewhere around 2.5 to 6 minutes. Four
 times closer to the truth, for free, and nobody has to agree with a number we shipped
 — an objective count is a fact about the mission, not an estimate of anybody's play.
@@ -2564,7 +2564,7 @@ Three decisions inside it are worth keeping:
   which would sort it straight to the top of a list it was never measured against.
   The borrowed number is drawn in `--odd` amber on the row so it is a guess you can
   see rather than one you cannot.
-- **The big number follows the ranking.** The headline reads *per objective* by
+- **The big number follows the ranking.** The headline reads *per reward* by
   default and *per minute* the moment any minutes are given, because the largest
   number in a row must always be the one the list is sorted by (`STYLE.md §5`).
   The faint line beneath keeps the per-run figure and what it was divided by, so
@@ -2826,6 +2826,64 @@ measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s tab
 quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
 it meets and the one that governs.
 
+### An objective is the thing that pays a reward, and nothing else
+
+**Settled by the owner 2026-08-27**, and it is the decision the cadence sweep of
+2026-08-26 was waiting on rather than a measurement.
+
+**The model's unit did not mean the same thing on any two rows.** The effort
+tooltip defined an objective as *"A Defense round, a Spy vault, a bounty stage"* —
+the thing that **pays a reward** — and 81 of the 236 live places were costed that
+way. But `PER_REWARD` charged Sanctuary Onslaught two zones per reward, which is
+the **player-visible sub-unit**, a different question. Both readings were in the
+code at once, and *per objective* is a cross-mission ranking: it divides by this
+unit to compare a Defense node with an Excavation one, so a unit meaning "3 waves"
+on one row and "1 dig" on the next is not a unit at all.
+
+The sweep is what made the inconsistency visible. Read off the wiki's
+[`Mission Rewards`](https://wiki.warframe.com/w/Mission_Rewards), six modes pay a
+reward for more than one objective — Defense per 3 waves, Survival per 5 minutes,
+Void Cascade per 4 Exolizers, Void Flood and Void Armageddon per 3, Defection per
+2 — and every one of them was charged 1. Onslaught was the only mode ever charged
+its sub-unit. **Onslaught was the outlier, not the model.**
+
+**The decision: one reward draw, on every row.** So the six stay at 1 — they were
+never wrong — and `PER_REWARD` is emptied, which brings Onslaught back with them.
+Its rate doubles and it moves up: **Elite Sanctuary Onslaught went from #38 to
+#14** in a ranking of 116 places over every farmable Prime. That reverses
+`d8b4484`, which corrected Onslaught's price under the other reading, and the
+reversal is the point rather than a regression.
+
+The word on screen changed with it: *per objective* is now **per reward**, in the
+sort control, the heading, the row label and the effort panel. It was called an
+objective while it meant two things, which is exactly how a vague word survives.
+
+**What is deliberately not claimed.** A reward is a *consistent* unit, not an
+*equal amount of work* — a Defense reward is three waves and an Excavation reward
+is one dig, and the sort tooltip now says so outright. The honest measure of work
+is the minute, and *per minute* already provides it the moment anyone gives effort
+weights. Against one player's own timings, per run is out by up to 9.6× across
+mission types and per reward by 2.4×; the 2.4× is exactly the size of this gap,
+and it is four times closer than the alternative while asking the player for
+nothing.
+
+**The rejected reading, recorded so it is not re-proposed.** Charging the
+player-visible sub-unit is more faithful to effort and was declined for two
+reasons. Survival has no countable atom at all — its criterion is five *minutes* —
+so it would have needed its own answer whatever the other five got. And a wave is
+not comparable to a dig, so the cross-mission division would still have been a
+guess, only a more elaborate one that looked more precise.
+
+`PER_REWARD` is kept as an empty table rather than deleted: it is the seam where a
+genuine exception would go — a mode that pays a reward for something other than
+completing its own objective once — and a test asserts it is empty, so an entry
+appearing there without a decision behind it fails.
+
+`FIXED_LENGTH` is untouched and is a different fact: how many objectives a run
+*has*, not how many buy one reward. Spy is three vaults paying A, B, C — three
+rewards for three objectives, cadence one. Retiring the cadence table must not
+empty the length table, and a test says so.
+
 ### The test suite puts `data/` back
 
 **Fixed 2026-08-27.** `test_offline_build` runs `python tools/build_data.py
@@ -3060,7 +3118,7 @@ which is not. It was silent about exactly the five Primes the collection view wa
 busy badging as available.
 
 **The two lists split on precisely this question, and the split was right all
-along.** *Where to go* ranks wanted relics per objective and needs no change to
+along.** *Where to go* ranks wanted relics per reward and needs no change to
 ignore these: it walks each relic's `sources`, and these have none. *How to crack
 them* ranks openings to finish a relic and knows nothing about where the relic
 came from — so one bought with farmed Aya belongs in it on the same terms as one

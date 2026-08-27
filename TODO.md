@@ -107,7 +107,7 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| Nine rotation-bearing mission types are still unverified | **session, and start here** — the wiki half is done; what is left is one decision that re-costs 75+ live nodes |
+| Seven rotation-bearing mission types are still unverified | small each, tedious — the unit question that gated this was settled 2026-08-27 |
 | A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest distortion with an agreed unit |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
@@ -125,6 +125,7 @@ ranking divides by means the same thing on every row.
 | Entry | Size |
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
+| The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
@@ -150,7 +151,7 @@ of a worklist, not of the click, and worth deciding on its own merits.
 | The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
 | Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
 
-*Nine rotation-bearing mission types* used to sit in this table waiting on "wiki
+*Seven rotation-bearing mission types* used to sit in this table waiting on "wiki
 checking; tedious, not blocked". **The wiki checking was done on 2026-08-26** and
 the entry moved up to *Model and ranking*, because what it is waiting on now is the
 owner, not the wiki. Seven mission types that carry no rotation confirmation at all
@@ -416,11 +417,11 @@ thumb on the scale*, and that sentence would have to stop being true.
 
 The planner costs every mission in "rounds" and assumes one round means the same
 everywhere. It does not. The largest part of this was answered on 2026-08-14 —
-effort is collected per objective and the default costs by objective count
+effort is collected per reward and the default costs by reward count
 (`PROJECT.md §7`) — and what is left is not a modelling gap but an ordinary
 unknown.
 
-### Nine rotation-bearing mission types are still unverified
+### Seven rotation-bearing mission types are still unverified
 
 Swept 2026-08-10. Of the 31 mission types in the data, 9 carry no rotation at all so
 the cycle never applies, 11 are confirmed A→A→B→C against the wiki (Defense,
@@ -519,32 +520,22 @@ Four of the eleven are genuinely one-for-one. Onslaught is already correct. **Si
 are not**, and two of those six are the largest modes in the dataset — Defense and
 Survival are 38 and 37 live nodes, more than any other.
 
-**But the number is not the decision, and this is why it is not a one-line fix.**
-The model's unit is inconsistent with itself, and the sweep is what exposed it:
+**The unit question this exposed was settled on 2026-08-27 and is closed.** The
+model was holding two readings at once — the effort tooltip called an objective
+*"A Defense round, a Spy vault, a bounty stage"*, the thing that pays a reward,
+while `PER_REWARD` charged Onslaught the player-visible sub-unit. The owner chose
+**one reward draw, on every row**: the six rows above are therefore right as they
+stand, `PER_REWARD` is emptied, and Onslaught comes back to its reward count —
+Elite Sanctuary Onslaught moved #38 → #14. The unit is called *per reward* on
+screen now. `PROJECT.md §7` has the reasoning, the rejected reading and why
+Survival's five minutes made it unworkable.
 
-- The effort tooltip in `plan.html` defines an objective as *"A Defense round, a
-  Spy vault, a bounty stage"* — the thing that **pays a reward**. Under that
-  reading every row above is 1 by definition, and it is **Onslaught's `PER_REWARD`
-  of 2 that is wrong**, not the other six.
-- The Onslaught fix took the opposite reading: it charged the **player-visible
-  sub-unit**, so a six-reward run became twelve zones. Under *that* reading Defense
-  is a wave, and the six rows above are under-costed by 3×, 5×, 4×, 3×, 3× and 2×.
-
-Both cannot hold. The reason it matters is that *per objective* is a **cross-mission
-ranking** — it divides by this unit to compare a Defense node with an Excavation
-node — so a unit that means "3 waves" on one row and "1 dig" on the next is not a
-unit. *Per minute* is unaffected once effort weights are given, which is the
-existing escape hatch and an argument for how much this is worth.
-
-**Survival will not fit either reading**: its criterion is 5 *minutes*, not a
-countable objective, so it has no player-visible atom to charge. Whatever is
-decided for the other five, Survival needs its own answer.
-
-**Not fixed here, deliberately** — picking a reading re-costs 75+ live nodes and
-reorders the planner, which is the owner's call, not a sweep's. The wiki half of
-this entry is now closed; what is left is the decision. The seven mission types
-that carry no rotation confirmation at all are still unverified and unaffected by
-it.
+**So this entry is down to its original question and nothing else: seven mission
+types carry no rotation confirmation at all.** `Key`, `Legacyte Harvest`, `Rush`,
+`Skirmish`, `Special`, `The Circuit` and `The Perita Rebellion` are assumed AABC
+without a wiki reading. `Spy` and `Caches` left that list when they were answered
+and fixed in `d8b4484`; `Bounty` left it as a wall clock. Tedious rather than
+hard, and no longer gating anything.
 
 ### `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones
 
@@ -809,6 +800,52 @@ Worth settling when it is built:
   the thing that makes them worth reading. `Lith 4` beats `Lith`.
 
 Not a defect: nothing on screen is wrong today, it is just long.
+
+### The shell-write guard lets `python - <<'EOF'` straight through
+
+**Found 2026-08-27, by walking through it three times without noticing.**
+`tools/guard_shell_writes.py` is the PreToolUse hook behind hard rule 1 — *never
+write source files through a shell* — and it does not see a program supplied on
+**stdin**. Measured against `blocked()` directly, with `assets/plan.js` as the
+target:
+
+| Form | Result |
+|---|---|
+| `echo x > assets/plan.js` | refused |
+| `sed -i … assets/plan.js` | refused |
+| `cat x \| tee assets/plan.js` | refused |
+| `python -c "open('assets/plan.js','w')…"` | refused |
+| `node -e "…writeFileSync('assets/plan.js'…)"` | refused |
+| `Set-Content assets/plan.js …` | refused |
+| **`python - <<'PY'` … `PY`** | **allowed** |
+| **`python < script.py`** | **allowed** |
+
+**The cause is one regex.** `INLINE_PROGRAM` matches
+`(?:python[0-9.]*|py|node|deno)\s+-\s*[ceEp]*\b` — it needs a flag letter after
+the `-`, so a bare `-` (read the program from stdin) never matches, and neither
+does `<`. Both are ordinary ways to hand an interpreter a program, and the
+heredoc form is the one an assistant reaches for when a script is more than a
+line long.
+
+**It was exercised, not theorised.** Three writes went through it that day —
+`TODO.md` twice and `assets/plan.js` once. Nothing was damaged and the files were
+checked afterwards, but the third attempt is the one that matters: the same form
+aimed at `tests/test_pages.mjs` **did** mangle its input, turning `\d` and `\/`
+into `d` and `/` before Python ever saw them. That failed loudly on an assertion
+rather than silently, by luck rather than by design — a regex is exactly the
+payload rule 1 exists for, and `\b` arriving as a backspace byte is the case the
+rule's own comment cites.
+
+**The fix is small**: let `INLINE_PROGRAM` accept a bare `-` and a `<` redirect
+into an interpreter. Worth doing carefully rather than quickly — the guard's job
+is to refuse, so a pattern that over-matches turns every `python -` invocation
+into a prompt, and `python - ` with no write in it is common enough to be
+annoying. The `WRITES` test already gates that and should carry the weight.
+
+**Worth knowing either way**: the guard covers `assets/*.{js,mjs,css}`,
+`tools/*.{py,ps1}`, everything under `tests/`, and any `.html`. Markdown is
+deliberately outside it, which is why `TODO.md` was never going to be refused —
+that part is correct, not a second gap.
 
 ### One Cambion Drift tier labels a different letter from the rest of its family
 

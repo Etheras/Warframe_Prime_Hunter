@@ -521,34 +521,40 @@
     Special: { count: 1, unit: "run",   pays: ["A", "B"] },
   };
 
-  /* ── how many objectives buy one reward ───────────────────────────
-     One, nearly everywhere: a Defense round pays a reward, a Spy vault pays a
-     reward. Onslaught does not. From `wiki.warframe.com/w/Sanctuary_Onslaught`,
-     *Rewards*: "Rewards are given per two successful zones in an AABC rotation
-     in both Sanctuary Onslaught and Elite Sanctuary Onslaught". The page maps
-     zones 2 and 10 to rotation A, 4 and 12 to A, 6 and 14 to B, 8 and 16 to C.
+  /* ── how many player objectives buy one reward: nothing, now ──────
+     **Empty on purpose since 2026-08-27, and the emptiness is the decision.**
 
-     The letters were already right without this, and that is worth saying
-     because it is what makes the fix a divisor and not a rewrite: `scorePlan`
-     takes exactly one reward per iteration, so its count is a reward index, and
-     rewards 1-6 come out A,A,B,C,A,A - exactly what those zones pay. What was
-     wrong was the price. That same reward count was then charged as the
-     objective count, so a twelve-zone run was costed at six and both Onslaught
-     nodes ranked at exactly twice their true rate, across the two nodes that
-     carry 29 of the 34 live relics.
+     It held one entry, `{"Sanctuary Onslaught": {count: 2, unit: "zone"}}`,
+     because the wiki gives Onslaught a reward per two zones and a six-reward run
+     is twelve zones. That was filed as a defect and fixed the day it was found —
+     and the sweep that followed showed it was the only mode ever charged that
+     way, while Defense pays per three waves, Survival per five minutes, Void
+     Cascade per four Exolizers, Void Flood and Void Armageddon per three, and
+     Defection per two. All six were charged one, and Onslaught two. The model's
+     unit did not mean the same thing on any two rows.
 
-     DE cannot supply this and never could. Their table publishes three rotation
-     headings per node and nothing else - the word "zone" does not appear in the
-     whole of it - so the cadence is ours to declare, the way the Disruption
-     pattern above is. Both Onslaught nodes share this mode string and the wiki
-     gives Elite no separate cadence, so one entry is right for both.
+     The owner settled it on 2026-08-27: **an objective is the thing that pays a
+     reward.** That is what the effort tooltip had always said it was, it is what
+     81 of the 236 live places were already costed as, and it makes the unit the
+     same everywhere for the first time. So the six stay at one — they were never
+     wrong — and Onslaught comes back to one with them. Its rate doubles and it
+     moves up the ranking, which is the reversal being chosen rather than a
+     regression: `d8b4484` corrected Onslaught's price under the other reading,
+     and this is the other reading being retired.
 
-     Deliberately not folded into FIXED_LENGTH above: that table says how many
-     objectives a run HAS, this one says how many of them buy one reward. Two
-     different facts, and a mission can need either without the other —
-     Onslaught has no fixed length and a cadence of two; Spy has a fixed length
-     of three and a cadence of one. */
-  const PER_REWARD = { "Sanctuary Onslaught": { count: 2, unit: "zone" } };
+     Kept as an empty table rather than deleted, because it is the seam where a
+     genuine exception would go: a mode that pays a reward for something other
+     than completing its own objective once. None exists today.
+
+     **The rejected reading, so it is not re-proposed.** Charging the
+     player-visible sub-unit — a wave, a dig, a zone — is more faithful to effort
+     and was declined for two reasons. Survival has no countable atom at all: its
+     criterion is five *minutes*, so it would need its own answer whatever the
+     other five got. And a wave is not comparable to a dig anyway, so the cross-
+     mission division that *per objective* performs would still be a guess, only
+     a more elaborate one. Effort that is really comparable is measured in
+     minutes, and *per minute* already does that as soon as anyone gives weights. */
+  const PER_REWARD = {};
 
   function objectivesOf(n) {
     if (isHeist(n)) return { count: 1, unit: "run" };
@@ -917,6 +923,10 @@
 
   window.WFPrimeRotation = {
     RUN_MODES, RUN_OVERHEAD, ROT_PATTERN, runValue, objectivesOf, objectivesText,
+    /* Exported so a test can assert it is EMPTY. That is the decision of
+       2026-08-27 rather than an oversight, and an entry appearing here without
+       one behind it is what the assertion is for. */
+    perReward: PER_REWARD,
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, awayText, traderWindow,
     stamp, anyClocked,

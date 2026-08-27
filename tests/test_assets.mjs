@@ -522,33 +522,65 @@ test("a fissure cannot talk a fixed-length mission into staying", () => {
   assert.equal(defense.mode, "bonus", "an endless fissure still pays for depth");
 });
 
-test("an Onslaught reward costs two zones, so the run is twice the objectives", () => {
-  /* The bug this guards: `rounds` counts *rewards*, and Onslaught pays one per
-     two zones, so charging the reward count as the objective count priced a
-     twelve-zone run at six and ranked both Onslaught nodes at exactly twice
-     their true rate. The letters were never wrong - only the price.
+test("every endless mission is costed at its reward count, Onslaught included", () => {
+  /* The unit, settled by the owner on 2026-08-27: **an objective is the thing
+     that pays a reward**, so the ranking divides by reward draws and by nothing
+     else. That makes the unit the same on every row, which is the only thing
+     that lets a Defense node be compared with an Excavation one at all.
 
-     Driven through `runValue` rather than handing `objectivesOf` a rounds
-     figure by hand: the point is what the model actually produces. The spread
-     comes first because `runValue` returns its own `mode` - the run mode - and
-     the mission type has to win. */
+     This test used to assert the opposite for one mode. `PER_REWARD` charged
+     Onslaught two zones per reward, so a six-reward run cost twelve — correct
+     under the reading that an objective is the player-visible sub-unit, and the
+     only mode ever charged that way. The sweep of 2026-08-26 found five more
+     that would have needed it (Defense per three waves, Survival per five
+     minutes, Void Cascade per four, Void Flood and Void Armageddon per three,
+     Defection per two) and all six were charged one. Onslaught was the outlier,
+     not the model.
+
+     So the reversal is deliberate: Onslaught's rate doubles and it moves up.
+     What is NOT claimed is that a reward is an equal amount of work — it is not,
+     and `plan.html` says so. Work is measured in minutes, and the effort weights
+     are where that lives.
+
+     Driven through `runValue` rather than handing `objectivesOf` a rounds figure
+     by hand: the point is what the model actually produces. The spread comes
+     first because `runValue` returns its own `mode` — the run mode — and the
+     mission type has to win. */
   const ROT = loadRotation();
   const rot = { A: 1, B: 0, C: 0, none: 0 };
 
   const eso = ROT.runValue(rot, "Sanctuary Onslaught", false, null);
   assert.equal(eso.rounds, 6, "six rewards, the same AABC run any endless node gets");
   assert.deepEqual(plain(ROT.objectivesOf({ ...eso, mode: "Sanctuary Onslaught" })),
-                   { count: 12, unit: "zone" },
-                   "six rewards is twelve zones - the wiki gives one reward per two");
+                   { count: 6, unit: "round" },
+                   "six rewards is six objectives — the zone cadence is not charged");
 
-  /* The control. Same rot map, same reward count, a mission that really does
-     pay per round: the two numbers stay equal, so the test above is about the
-     mission type and not about the arithmetic. */
+  /* The control: a mission that was never in the exception table. Same rot map,
+     same reward count, same answer — which is the whole point of the decision. */
   const def = ROT.runValue(rot, "Defense", false, null);
   assert.equal(def.rounds, 6);
   assert.deepEqual(plain(ROT.objectivesOf({ ...def, mode: "Defense" })),
                    { count: 6, unit: "round" },
-                   "a Defense round pays a reward, so rewards and objectives agree");
+                   "a Defense reward and an Onslaught reward now cost the same");
+
+  /* And the seam itself is empty. A future exception would be a mode that pays
+     a reward for something other than completing its own objective once; none
+     exists, and an entry appearing here without a decision behind it is the
+     thing this asserts against. */
+  assert.deepEqual(Object.keys(ROT.perReward || {}), [],
+                   "the cadence exception table is empty by decision, not by accident");
+
+  /* `FIXED_LENGTH` is a different fact and still full: it says how many
+     objectives a run HAS, not how many buy one reward. Spy is three vaults
+     paying A, B, C — three rewards for three objectives, cadence one.
+
+     `mode` is restored after the spread, as above: `runValue` reports the RUN
+     mode ("fixed") and `FIXED_LENGTH` is keyed on the mission type. */
+  const spy = ROT.runValue({ A: 0.2, B: 0.2, C: 0.2 }, "Spy", false, null,
+                           { A: 0.2, B: 0.2, C: 0.2 }, false);
+  assert.deepEqual(plain(ROT.objectivesOf({ ...spy, mode: "Spy" })),
+                   { count: 3, unit: "vault" },
+                   "a fixed length is not a cadence, and retiring one must not empty the other");
 });
 
 test("a Profit-Taker phase is one run, not four bounty stages", () => {
@@ -1191,7 +1223,11 @@ test("both pages name a run's cost with the same words", () => {
   assert.equal(cost("Spy", { A: 0.2, B: 0.2, C: 0.2 }), "3 vaults");
   assert.equal(cost("Caches", { A: 0.3, B: 0.19 }), "2 caches");
   assert.equal(cost("Defense", { A: 0.2, B: 0.2, C: 0.2 }), "6 rounds");
-  assert.equal(cost("Sanctuary Onslaught", { A: 0.2, B: 0.2, C: 0.2 }), "12 zones");
+  /* "12 zones" until 2026-08-27, when the cadence exception was retired and an
+     objective became one reward draw on every row. Onslaught reads like every
+     other endless mission now; the wiki's two-zones-per-reward is still true and
+     is no longer something the ranking charges for. */
+  assert.equal(cost("Sanctuary Onslaught", { A: 0.2, B: 0.2, C: 0.2 }), "6 rounds");
 
   /* A single whole mission reads as words, not as "1 run" -- that is the case
      that diverged, and Faceoff is the live instance of it. */

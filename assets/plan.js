@@ -135,7 +135,7 @@
      relics - and differ only in what they divide it by, which is the question
      the reader is actually asking:
 
-       rate   per objective, or per minute once minutes are given. How fast a
+       rate   per reward, or per minute once minutes are given. How fast a
               place fills the stack for the effort it costs. The default.
        run    per run, cost ignored. How much one trip hands over.
 
@@ -148,10 +148,15 @@
      the other list's question and mixing it back in is the thing the split of
      2026-08-14 exists to prevent (`PROJECT.md §7`). It stays on the row, one
      line down, where the two can be compared. */
+  /* *Reward*, not *objective*, since 2026-08-27. The word changed because the
+     thing it counts was settled: an objective is whatever pays a reward, so the
+     unit is one reward draw on every row — a Defense round, a Spy vault, a
+     bounty stage. It was called an objective while it meant two things at once,
+     which is exactly the sort of word that survives by being vague. */
   const SORTS = {
-    rate: { key: "rate", unit: (perMin) => "relics / " + (perMin ? "min" : "objective"),
-            heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "objective"),
-            option: (perMin) => "per " + (perMin ? "minute" : "objective") },
+    rate: { key: "rate", unit: (perMin) => "relics / " + (perMin ? "min" : "reward"),
+            heading: (perMin) => "ranked on relics per " + (perMin ? "minute" : "reward"),
+            option: (perMin) => "per " + (perMin ? "minute" : "reward") },
     /* `perRunAdj`, not `perRun`: the key the list SORTS on has to be the one
        carrying the cache penalty and the Radiant lift, or ranking per run quietly
        undoes both. See `n.adj`. */
@@ -165,9 +170,9 @@
   const haveOf = (id, name) => ST.owns(id, name);
 
   /* ── effort, supplied by the player and empty by default ──────────
-     Minutes for one *objective* of each mission type. Nothing is filled in to
-     begin with, and nothing has to be: the list is costed by objective *count*
-     until someone says what an objective costs them in minutes.
+     Minutes for one *reward* of each mission type. Nothing is filled in to
+     begin with, and nothing has to be: the list is costed by reward *count*
+     until someone says what a reward costs them in minutes.
 
      It exists because ranking per run flatters anything long. Against one
      player's own timings, costing per minute moved Capture and Exterminate
@@ -685,18 +690,28 @@
       n.objectives = o.count; n.unit = o.unit;
       n.minutes = mins ? mins.per(n.mode) * o.count : null;
       n.minutesAssumed = !!mins && mins.assumed(n.mode);
-      /* Costed per objective by default, per minute once anyone says what an
-         objective costs them.
+      /* Costed per reward by default, per minute once anyone says what a reward
+         costs them in minutes.
 
          Per *run* was the old default and it flatters anything long: a run is
          whatever you decide to make it, so it is not a unit at all. Against one
          player's own timings, costing per run is out by up to 9.6x across
-         mission types; per objective it is out by 2.4x, because a round, a
-         vault and a bounty stage all take somewhere around 2.5 to 6 minutes.
-         Four times closer to the truth, and it asks the player for nothing. */
+         mission types; per reward it is out by 2.4x, because a round, a vault
+         and a bounty stage all take somewhere around 2.5 to 6 minutes. Four
+         times closer to the truth, and it asks the player for nothing.
+
+         **A reward is a consistent unit, not an equal amount of work**, and the
+         2.4x is the size of that gap. A Defense reward is three waves and an
+         Excavation reward is one dig; the wiki's cadences run from one to five.
+         Charging those sub-units instead was considered and declined on
+         2026-08-27 — Survival's criterion is five *minutes* and has no countable
+         atom at all, and a wave is not comparable to a dig anyway, so it would
+         have been a more elaborate guess rather than a better one. The unit that
+         really is comparable is the minute, and that is what the effort weights
+         buy. `PROJECT.md §7`. */
       n.cost = n.minutes || o.count;
       /* ── the split ──────────────────────────────────────────────────
-         Where to go ranks on **relics per objective** - how fast this node
+         Where to go ranks on **relics per reward** - how fast this node
          fills the stack - and knows nothing about what a relic is worth once
          opened. That is the other list's question, and answering both with one
          number was why "runs to finish" could never be labelled honestly.
@@ -879,11 +894,13 @@
        is only what is true of THIS node. */
     const lines = [];
     if (n.rounds) {
-      /* The cost is read off `objectivesText`, never off `n.rounds`. They are
-         not the same number: `rounds` counts *rewards*, and Onslaught pays one
-         per two zones, so a six-reward run there is twelve objectives. Saying
-         "over 6 rounds" on a mission that has no rounds was half of that
-         defect - see `rotation.js` PER_REWARD. */
+      /* The cost is read off `objectivesText`, never off `n.rounds`. They were
+         not the same number while `PER_REWARD` had an entry in it — Onslaught
+         pays one reward per two zones, so a six-reward run was charged twelve.
+         `PER_REWARD` is empty since 2026-08-27 and the two now agree everywhere,
+         but the indirection stays: `FIXED_LENGTH` still makes them differ for
+         Spy, Caches and Faceoff, and "over 6 rounds" on a mission that has no
+         rounds was the other half of that defect. */
       lines.push(Object.keys(n.counts)
         .map((r) => "rot " + r + " ×" + n.counts[r]).join(", ") +
         " over " + objectivesText(n) + ".");
@@ -945,7 +962,7 @@
      clue which of them put the rows in this order.
 
      Since the two loops were split, the ranked number is the **count**: wanted
-     relics per objective. This list answers "where do I go to fill the stack",
+     relics per reward. This list answers "where do I go to fill the stack",
      and nothing more - what a relic turns into once opened is the other list's
      question. That is why the percentage moved down a line rather than away:
      they disagree often enough to be worth both. Mithra is worth 63.85% a run
@@ -994,7 +1011,7 @@
        adjusted made the same quantity read as two different numbers depending on
        which way the list happened to be sorted. */
     const alt = by.key === "perRunAdj"
-      ? n2(n.rate) + " / " + (perMin ? "min" : "objective")
+      ? n2(n.rate) + " / " + (perMin ? "min" : "reward")
       : n2(n.perRunAdj) + " a run";
 
     return `<div class="spot-score" data-tip="${esc(lines.join("\n"))}">
@@ -1153,7 +1170,7 @@
           ? `<b>${set.length} set.</b> Every other type is costed at their average, ` +
             `${n2(mean)} min — shown in amber on the row, so a borrowed number is ` +
             `never mistaken for one of yours.`
-          : `Nothing set, so every mission is costed by its <b>objective count</b> ` +
+          : `Nothing set, so every mission is costed by its <b>reward count</b> ` +
             `— four rounds, three vaults, one run. That is the default and it works. ` +
             `Fill in a single type and the whole list re-sorts on real minutes.`;
     }

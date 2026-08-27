@@ -107,11 +107,13 @@
 
     <details class="advanced gap-lg">
       <summary data-tip="Ranking per run flatters anything long. Against one player's own timings, ranking per minute moved Capture and Exterminate nodes up over a hundred places and dropped Spy by a factor of ten.&#10;&#10;That is too big to ignore and too personal to ship: the numbers depend on your gear and your progression, and so do the ratios between them. So they are yours to give, and blank until you do.">Effort — optional</summary>
-      <p class="hint">The list is already costed by <strong>objective count</strong> — four
+      <p class="hint">The list is already costed by <strong>reward count</strong> — four
         rounds, three vaults, one run — which stands in for time well enough to be the
-        default. Put real minutes on an objective here and it ranks on those instead.
+        default. Put real minutes on one reward here and it ranks on those instead.
         Not minutes per <em>run</em>: how far you take an endless mission is your own
-        choice, so an objective is the only unit that holds still.</p>
+        choice, so one reward is the only unit that holds still. A Defense reward is
+        three waves and a Survival reward is five minutes, so this is the question
+        the default cannot answer — which is why it is worth giving.</p>
       <div id="effortRows" class="effort"></div>
       <p class="hint" id="effortState"></p>
       <button class="mini" id="effortClear" hidden="hidden">clear all</button>
@@ -134,10 +136,10 @@
       </div>
 
       <div class="plan-head">
-        <h3 class="plan-h">Where to go <span class="plan-sub" id="planRankedOn">— ranked on relics per objective</span></h3>
+        <h3 class="plan-h">Where to go <span class="plan-sub" id="planRankedOn">— ranked on relics per reward</span></h3>
         <select id="p-sort" class="rank-by" aria-label="Rank places on"
-                data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per objective   how fast a place fills the stack for the effort it costs.&#10;                  A Defense round, a Spy vault, a bounty stage. Becomes&#10;                  per minute once you give effort weights in the sidebar.&#10;  Per run         how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;Whichever you pick is the big number on every row, because a row has to be sorted by the number it shows largest.">
-          <option value="rate">per objective</option>
+                data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per reward   how fast a place fills the stack for the effort it costs.&#10;               One reward draw: a Defense round, a Spy vault, a bounty&#10;               stage. Becomes per minute once you give effort weights.&#10;  Per run      how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;A reward is the same unit on every row, which is what lets two different missions be compared at all. It is not the same amount of WORK — a Defense reward is three waves and an Excavation reward is one dig. Give effort weights and the ranking switches to minutes, which is the only unit that really is comparable.&#10;&#10;Whichever you pick is the big number on every row, because a row has to be sorted by the number it shows largest.">
+          <option value="rate">per reward</option>
           <option value="run">per run</option>
         </select>
       </div>
