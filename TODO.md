@@ -747,13 +747,46 @@ original entry, kept because the sizing still applies to the two that are left.
 
 Both remaining feeds serve the bounty layer — `derive_bounty_rotation`,
 `find_live_events` and `read_bounty_jobs` — which is the most derived thing in
-the pipeline: the rotation letter is not published anywhere and is worked out by
-matching the bounties on offer against DE's own table. So this is the one place
-where an adapter can be subtly wrong and still look plausible, and the A/B that
-validated the first two is the thing to insist on: the cached
-`.cache/api_syndicatemissions.gz` and `.cache/api_events.gz` are known-good
-output, and a new adapter should reproduce the same rotation letter from the same
-day before it is trusted.
+the pipeline, and the one place an adapter can be subtly wrong and still look
+plausible.
+
+**A finding from 2026-08-27 that changes the shape of this work, and should be
+read before starting it.** This project says in several places that *"the
+rotation letter is not published anywhere"* and derives it by matching the
+reward pools on offer against DE's own tables, one vote per job. **DE do publish
+it.** Every bounty job carries a reward-table path, and the letter is in it:
+
+```
+/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/TierATableCRewards
+                                                            ^^^^^^
+```
+
+Measured across the whole cached window — 21 jobs — and it agrees with the vote
+exactly: **14 jobs say `TableC` and 7 say `TableA`**, against a derivation that
+produced `standard: C` and `vault: A` the same day. Ostrons and Solaris United
+are all C; Entrati carries both, 2 C and 7 A, which is precisely the standard
+and vault families the build already separates.
+
+So two completely independent methods agree, which is worth more than either on
+its own. It leaves a **decision rather than a puzzle**, and it is the owner's:
+
+- **Keep the vote and use the path as a cross-check.** Safest. The vote is
+  battle-tested and handles the family split; a disagreement between the two
+  becomes a loud signal that something upstream changed.
+- **Read the letter from the path.** Simpler and direct, but it still needs the
+  family split from somewhere — the path gives the letter, not whether a job is
+  a vault bounty, which today comes from matching `group_levels`.
+
+**Do not ship a partial adapter here.** `derive_bounty_rotation` reads
+`job.rewardPool`, a list of reward *names*, and DE publish a reward-table *path*
+instead; a job with no pool is skipped, so an adapter that fills in everything
+except the pool yields no votes, `checked: false`, and a planner that says the
+rotation is unknown. That is worse than today's stale-but-correct cached answer.
+Resolve the path to a pool, or read the letter from the path, or leave it.
+
+The A/B that validated the first two feeds applies here too and is now doubly
+available: `.cache/api_syndicatemissions.gz` and `.cache/api_events.gz` are
+known-good output, and the path letters above are a second oracle.
 
 The pattern the fissure adapter established is the
 one to copy: `official.fissures_from_worldstate` normalises DE's raw document
