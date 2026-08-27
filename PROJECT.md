@@ -2881,6 +2881,43 @@ is what `fell_back_to_cache` tracks.
 answers and the events follow it, so a build cannot mix bounties from one hour
 with events from another and present them as one board.
 
+#### Staleness is judged on the content, not only on the transport
+
+The owner's question, and it found the hole: *"a 60-minute stale worldstate from
+DE doesn't include the current fissures, so IT IS stale."* Quite so — and the
+chain above catches that only when the **request** visibly failed. `fetch` knows a
+403 happened; it cannot know that an edge served a stale object behind a `200`,
+and DE sit behind Akamai, so that is not a hypothetical shape.
+
+**They stamp it, so it can simply be asked.** Every worldstate carries `Time`, a
+unix timestamp of when DE generated it. `official.worldstate_age` reads it, and a
+document past `WORLDSTATE_MAX_AGE` is treated as a cached copy however it arrived
+— which routes it down the same chain, to the proxy first.
+
+The owner's alternative was to **measure how often the worldstate updates** and
+tune the refresh to that. Reading DE's own stamp is strictly better and is the
+same principle §2 already applies to `Cache-Control`: *their number, not one we
+invent*. It also answers a harder question than frequency would — not "how often
+does this change" but "how old is **this** copy", which is the one that matters
+when an edge is in the way.
+
+**The threshold is 15 minutes, and it is derived rather than picked.** Measured
+2026-08-28: a healthy fetch returned a document **36 seconds** old, against DE's
+declared `Cache-Control: max-age=23`; the scheduled refresh runs every ten
+minutes. Fifteen leaves room for a slow build, a clock a little out and a refresh
+that ran late, while staying far below the hour or two a fissure lasts — which is
+what this protects. It is a **detector, not a throttle**: `still_fresh` honours
+DE's 23 seconds and is what stops us asking too often; this decides whether what
+came back can be believed.
+
+**One thing it corrected immediately.** With the content check in place, an
+`--offline` build began reporting *"the proxy answered, the feeds are current"* —
+which is false with no network, because the proxy is served from cache too. The
+clearing of `de_worldstate` is guarded on `not args.offline` for that reason: the
+code written to stop a wrong claim had made one of its own, in the other
+direction. `staleSince` is also better for it — an offline build now dates the
+copy from **DE's stamp** rather than from our file's mtime.
+
 ### A run costs something before and after the part you count
 
 **Shipped 2026-08-27**, on the owner's measurements and their decision of

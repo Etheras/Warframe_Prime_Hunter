@@ -36,6 +36,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -937,6 +938,21 @@ def build_fissures(raw, now: datetime) -> list:
     return out
 
 
+# How old DE's worldstate may be, by its own `Time` stamp, and still count as a
+# live first-party answer.
+#
+# Not invented: DE declare `Cache-Control: max-age=23` on it, and a successful
+# fetch on 2026-08-28 returned a document 36 seconds old. The scheduled refresh
+# runs every ten minutes. So fifteen leaves room for a slow build, a clock a
+# little out, and a refresh that ran late, while still being far below the hour
+# or two a fissure lasts — which is the thing this protects.
+#
+# It is a *detector*, not a request throttle. `still_fresh` honours DE's 23
+# seconds and is what stops us asking too often; this decides whether what came
+# back can be believed.
+WORLDSTATE_MAX_AGE = 15 * 60
+
+
 def from_chain(what, de_fresh, proxy, de_cached):
     """
     One live feed, from the best source that answers.
@@ -1072,9 +1088,26 @@ def main() -> int:
     #
     # So a reused copy is deliberately NOT treated as a first-party answer: the
     # feeds ask the proxy first and fall back to it only if that fails too.
-    ws_stale = "de_worldstate" in STALE
+    #
+    # Staleness is judged on the **content**, not only on the transport. `fetch`
+    # knows whether the request failed; it cannot know that an edge served a
+    # stale object behind a `200`, and DE sit behind Akamai where that shape is
+    # not hypothetical. So DE's own `Time` stamp is read as well: measured
+    # 2026-08-28, a healthy answer is **36 seconds** old against a declared
+    # `Cache-Control: max-age=23`, so an hour-old document has been through
+    # something whatever the status code said.
+    ws_age = official.worldstate_age(worldstate or {})
+    ws_too_old = ws_age is not None and ws_age > WORLDSTATE_MAX_AGE
+    ws_stale = "de_worldstate" in STALE or ws_too_old
     ws_fresh = {} if ws_stale else (worldstate or {})
     ws_cached = worldstate or {}
+    if ws_too_old:
+        log(f"~ worldstate: Digital Extremes stamped it {int(ws_age // 60)} min ago,"
+            f" which is past the {WORLDSTATE_MAX_AGE // 60} min it can be and still"
+            f" be live — treating it as a cached copy")
+        if "de_worldstate" not in STALE:
+            STALE.append("de_worldstate")
+            STALE_AGE.setdefault("de_worldstate", time.time() - ws_age)
     if ws_stale:
         log("  worldstate: the copy is reused, so the proxy is asked before it")
     # Set only when a feed actually falls back to the cached copy. Without it
@@ -1191,7 +1224,13 @@ def main() -> int:
     # saying otherwise would be a second wrong claim in the other direction —
     # readers would be told to distrust data that is fine. The reused copy is
     # only news when something was actually built from it.
-    if ws_stale and not fell_back_to_cache:
+    #
+    # `not args.offline` matters: with no network the proxy is served from cache
+    # too, so "the proxy answered" is not evidence of anything being current. An
+    # offline build that cleared this would claim freshness it cannot have —
+    # which is the same wrong-in-the-other-direction mistake, made by the code
+    # that exists to prevent it.
+    if ws_stale and not fell_back_to_cache and not args.offline:
         while "de_worldstate" in STALE:
             STALE.remove("de_worldstate")
         STALE_AGE.pop("de_worldstate", None)

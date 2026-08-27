@@ -953,6 +953,46 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_the_worldstate_is_judged_on_its_own_timestamp() -> None:
+    """
+    Staleness is a fact about the **content**, not only about the transport.
+
+    Everything else this project knows about freshness comes from the request —
+    did it fail, how old is the file we wrote — and none of that can see an edge
+    cache serving a stale object behind a `200`. DE sit behind Akamai, so that
+    shape is not hypothetical. They stamp every worldstate with `Time`, so it can
+    be asked directly.
+
+    Measured 2026-08-28 for the threshold: a successful fetch returned a document
+    36 seconds old against a declared `Cache-Control: max-age=23`, and the
+    scheduled refresh runs every ten minutes — so fifteen leaves room for a slow
+    build and a clock a little out while staying far below the hour or two a
+    fissure lasts.
+    """
+    now = 1_787_861_317 + 3600            # an hour after the stamped document
+    stamped = {"Time": 1_787_861_317}
+
+    check("worldstate age: read from DE's own stamp",
+          official.worldstate_age(stamped, now), 3600.0)
+    check("worldstate age: seconds old is seconds old",
+          official.worldstate_age({"Time": now - 36}, now), 36.0)
+    check("worldstate age: a document from the future is not negative",
+          official.worldstate_age({"Time": now + 500}, now), 0.0)
+
+    for doc, why in (({}, "no Time at all"), ({"Time": None}, "a null Time"),
+                     ({"Time": "1787861317"}, "a string Time"),
+                     ({"Time": 0}, "a zero Time")):
+        check(f"worldstate age: {why} means unknown, not fresh",
+              official.worldstate_age(doc, now), None,
+              "None sends the caller to its other tests rather than asserting youth")
+
+    # And the threshold the build compares it against is the measured one.
+    check_true("worldstate age: the limit is minutes, not hours",
+               60 <= build_data.WORLDSTATE_MAX_AGE <= 30 * 60,
+               f"got {build_data.WORLDSTATE_MAX_AGE}s — a fissure lasts an hour or two, "
+               "so a limit near that protects nothing")
+
+
 def test_a_live_feed_asks_de_then_wfcd_then_its_own_cache() -> None:
     """
     **Digital Extremes, then WFCD, then our own cached copy. Always, in that
@@ -2771,6 +2811,7 @@ def main() -> int:
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
+                         test_the_worldstate_is_judged_on_its_own_timestamp,
                          test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,

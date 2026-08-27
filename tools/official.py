@@ -23,6 +23,7 @@ from __future__ import annotations
 import html as _html
 import lzma
 import re
+import time
 from datetime import datetime, timezone
 
 # ── drop table ────────────────────────────────────────────────────────────
@@ -457,6 +458,28 @@ def collect_prime_items(exports: dict[str, dict]) -> list[dict]:
                     "uniqueName": uniq, "productCategory": pc,
                 })
     return sorted(found.values(), key=lambda r: r["name"])
+
+
+def worldstate_age(doc: dict, now: float | None = None) -> float | None:
+    """
+    How old the worldstate says it is, in seconds. `None` if it does not say.
+
+    DE stamp every document with `Time`, a unix timestamp of when they generated
+    it, and that is a fact about the **content** rather than about our transport.
+    Everything else this project knows about freshness is about transport — did
+    the request fail, how old is the file we wrote — and transport cannot see an
+    edge cache serving a stale object behind a `200`. DE sit behind Akamai, so
+    that is not a hypothetical shape.
+
+    Measured 2026-08-28: a successful fetch returned a document **36 seconds**
+    old, against a declared `Cache-Control: max-age=23`. So a healthy answer is
+    seconds old, and anything approaching an hour has been through something.
+    """
+    stamp = (doc or {}).get("Time")
+    if not isinstance(stamp, (int, float)) or stamp <= 0:
+        return None
+    at = time.time() if now is None else now
+    return max(0.0, at - float(stamp))
 
 
 def prime_part_specs(exports: dict[str, dict]) -> dict[str, list[dict]]:
