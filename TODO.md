@@ -135,6 +135,7 @@ unit question — tedious rather than hard, and blocking nothing.
 | Entry | Size |
 |---|---|
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
+| Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale | session — intermittent, and the banner on the live site is the symptom |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
@@ -880,6 +881,55 @@ Worth settling when it is built:
   the thing that makes them worth reading. `Lith 4` beats `Lith`.
 
 Not a defect: nothing on screen is wrong today, it is just long.
+
+### Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale
+
+**Found 2026-08-27, from the banner on the deployed site**, which the owner asked
+about:
+
+> **Live data is an older copy.** Some live data could not be refreshed, so it is
+> from a copy made 78 minutes ago.
+
+**The banner is right, and nothing here is broken.** It is reporting a real
+refresh failure and reporting it accurately, which is what it is for. From the CI
+log of the successful build:
+
+```
+~ de_worldstate: refresh failed (HTTP Error 403: Forbidden) - reusing the cached copy (69 min old)
+```
+
+So the deployed site is serving a worldstate copy that was already 69 minutes old
+when the build ran, and the reader saw it nine minutes after that. Everything else
+refreshed: the item database, the export manifests, the drop tables and the wiki
+page all came down in the same run.
+
+**It is intermittent, not permanent**, and the evidence is in the failure itself:
+the cache it fell back on was 69 minutes old, so the build 69 minutes earlier
+*did* fetch successfully from the same runner. Something rejects some requests and
+not others.
+
+**What is not yet known, and would need measuring before any fix:**
+
+- **How often.** One log line is one data point. The rate matters: an occasional
+  403 against a document that changes every few minutes is cosmetic, and a
+  majority of runs failing means the live feeds on the deployed site are mostly
+  fiction. `gh run list` plus a grep over several builds' logs answers it.
+- **Why.** A 403 rather than a 429 points at the requester rather than the rate —
+  a datacentre IP range, or the user agent, or both. This project already knows
+  that `wiki.warframe.com` 403s anything that is not a browser, which is why
+  artwork comes from a CDN instead; the same shape of block on a cloud IP would
+  explain this exactly. It fetches fine from the owner's own machine, which fits.
+- **Whether the local scheduled task masks it.** `schedule.ps1` refreshes from the
+  owner's machine, where the fetch works. If that is what keeps the published data
+  current in practice, then CI has been degraded for longer than anyone noticed
+  and the banner has been telling the truth to nobody.
+
+**Do not "fix" it by retrying harder.** `PROJECT.md §2` — every request is
+somebody else's bandwidth, and a 403 is a refusal rather than a hiccup. If DE do
+not want requests from a cloud runner, the answer is to stop making them from
+there, not to make more of them. Options worth weighing: publish from the
+scheduled local refresh instead, accept the staleness and let the banner say so
+(which is the current behaviour and is honest), or ask DE.
 
 ### The shell-write guard lets `python - <<'EOF'` straight through
 
