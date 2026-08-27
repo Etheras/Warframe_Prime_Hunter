@@ -1400,6 +1400,145 @@ page_test("minutes per reward re-sort the list, and are remembered", async () =>
   assert.deepEqual(errors, []);
 });
 
+page_test("getting in and out is charged once a run, and only where minutes are given", async () => {
+  /* The largest known distortion in the per-minute ranking, measured by the
+     owner from their own runs: a mission start is about 20 seconds and an end
+     about 15, so 35 seconds whatever the run is. Because it is fixed it lands
+     almost entirely on the short missions — Capture's cost rises 38.9% and its
+     rate falls 28%, against 1.9% for Survival — so part of Capture's winning
+     margin was an accounting error.
+
+     Three things are asserted, and the second is the one that could silently be
+     wrong: that it is charged ONCE per run rather than once per objective. */
+  const { page, errors } = await open("/plan.html");
+  await wishFarmable(page, 4);
+
+  const setRun = (key, mins) => page.evaluate(([k, v]) => {
+    const el = [...document.querySelectorAll("#effortRunRows input")]
+      .find((x) => x.dataset.run === k);
+    if (!el) throw new Error("no overhead field " + k);
+    el.value = String(v);
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, [key, mins]);
+
+  const headline = () => page.evaluate(() => ({
+    unit: [...document.querySelector("#planNodes .spot-score").childNodes]
+      .filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join("").trim(),
+    top: Number(document.querySelector("#planNodes .spot-score b").textContent),
+  }));
+
+  /* An overhead on its own must not convert the default ranking. With no
+     per-type minutes the list is costed in reward *count*, and 35 seconds has no
+     meaning in rewards — a reward is anything from a 45-second Defense wave to a
+     five-minute Survival rotation. It is stored and it waits. */
+  const before = await headline();
+  assert.match(before.unit, /reward/, "the default is reward count, not minutes");
+  await setRun("runStart", 0.5);
+  await setRun("runEnd", 0.5);
+  const still = await headline();
+  assert.match(still.unit, /reward/,
+               "an overhead alone cannot turn a reward count into minutes");
+  assert.equal(still.top, before.top, "and it must not move a single figure");
+  assert.equal(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.plan.v1")).runStart), 0.5,
+    "it is kept, though — waiting is not discarding");
+
+  /* Now give one mission type real minutes, which is what unlocks per-minute
+     ranking, and read the arithmetic off a row that has several objectives. */
+  await page.locator(".advanced > summary").click();
+  const multi = await page.evaluate(() => {
+    const el = [...document.querySelectorAll("#planNodes .spot")]
+      .find((x) => /\b(\d+) (round|vault|cache|stage)s\b/.test(x.textContent));
+    if (!el) return null;
+    const m = el.textContent.match(/\b(\d+) (round|vault|cache|stage)s\b/);
+    const mode = [...document.querySelectorAll("#effortRows input")].map((i) => i.dataset.mode);
+    return { objectives: Number(m[1]),
+             where: el.querySelector(".spot-where").childNodes[0].textContent.trim(),
+             modes: mode };
+  });
+  assert.ok(multi && multi.objectives > 1, "need a multi-objective row to divide by");
+
+  // every type the same, so the per-type figure is known whichever row wins
+  const PER = 2;
+  await page.evaluate((per) => {
+    [...document.querySelectorAll("#effortRows input")].forEach((el) => {
+      el.value = String(per);
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }, PER);
+
+  const priced = await page.evaluate(() => {
+    const el = document.querySelector("#planNodes .spot");
+    const m = el.textContent.match(/\b(\d+) (?:round|vault|cache|stage)s\b/);
+    return { objectives: m ? Number(m[1]) : 1,
+             perRun: Number((el.querySelector(".spot-alt").textContent.match(/([\d.]+) a run/) || [])[1]),
+             headline: Number(el.querySelector(".spot-score b").textContent) };
+  });
+  const overhead = 1;                       // 0.5 in + 0.5 out
+  const expected = priced.perRun / (PER * priced.objectives + overhead);
+  assert.ok(Math.abs(priced.headline - expected) < 0.02,
+            `cost must be per×objectives + overhead ONCE: ${priced.perRun} over ` +
+            `(${PER}×${priced.objectives} + ${overhead}) = ${expected.toFixed(3)}, ` +
+            `row says ${priced.headline}`);
+  /* The failure this rules out: charging it per objective instead. On a
+     multi-objective row the two differ by a lot, which is why the row is
+     required to have more than one above. */
+  const perObjective = priced.perRun / ((PER + overhead) * priced.objectives);
+  assert.ok(Math.abs(priced.headline - perObjective) > 0.01,
+            "an overhead charged per objective would give the same answer here, " +
+            "so this row cannot tell the two apart — pick a longer one");
+
+  // and it survives a reload, like every other number in that panel
+  await page.reload({ waitUntil: "load" });
+  assert.equal(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.plan.v1")).runEnd), 0.5);
+
+  /* Clear all means all of it. A number left behind here would go on moving the
+     ranking after the reader believed they had reset it. */
+  await page.locator(".advanced > summary").click();
+  await page.locator("#effortClear").click();
+  const cleared = await page.evaluate(() => JSON.parse(localStorage.getItem("wfprimes.plan.v1")));
+  assert.equal(cleared.runStart, 0, "clear all has to clear the overhead too");
+  assert.equal(cleared.runEnd, 0);
+  assert.match((await headline()).unit, /reward/, "and the default comes back");
+
+  assert.deepEqual(errors, []);
+});
+
+page_test("the collection view is untouched by the planner's run overhead", async () => {
+  /* "Both pages agree" is a rule here, and this is a case where they legitimately
+     differ — worth asserting for that reason rather than despite it. The drawer
+     ranks per *run* and has no effort panel at all, so a number that only exists
+     to divide minutes by cannot reach it. If it ever does, the two pages have
+     started disagreeing about what a run costs. */
+  const { page, errors } = await open("/index.html");
+  const subject = await pickCard(page);
+  const read = async () => {
+    await page.locator(`[data-id="${subject.id}"]`).click();
+    const spots = await page.locator(".drawer .spot .spot-score b").allInnerTexts();
+    await page.keyboard.press("Escape");
+    return spots;
+  };
+
+  const before = await read();
+  assert.ok(before.length > 0, `${subject.name} has to offer somewhere to farm`);
+
+  await page.evaluate(() => {
+    const plan = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
+    plan.runStart = 5; plan.runEnd = 5;      // absurd on purpose
+    plan.minutes = { Capture: 1, Defense: 1, Survival: 1 };
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify(plan));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  assert.deepEqual(await read(), before,
+                   "ten minutes of overhead moved a figure on a page that has no " +
+                   "minutes in it at all");
+  assert.equal(await page.locator("#effortRunRows").count(), 0,
+               "and the collection view must not grow an effort panel by accident");
+  assert.deepEqual(errors, []);
+});
+
 page_test("the two pages agree about what is on the farm list", async () => {
   const { page } = await open("/index.html");
   const subject = await pickCard(page);                // any card will do

@@ -486,3 +486,23 @@ test("the traces option survives a backup round trip", () => {
                             CATALOGUE);
   assert.equal(out.plan.traces, true);
 });
+
+test("the run overhead survives a backup round trip, zero included", () => {
+  /* `runStart` and `runEnd` are the minutes a mission costs before and after the
+     part anyone counts. They are the player's own measurements — as expensive to
+     lose as the per-mission-type minutes beside them — so a backup has to carry
+     them, and an option missing from PLAN_OPTIONS is dropped on restore without
+     a word. That silence is what this guards.
+
+     Zero is asserted deliberately: it is a real answer meaning "I do not count
+     it", distinct from never having said. A round trip that turned a considered
+     0 back into blank would quietly re-add the overhead to somebody's ranking. */
+  const M = load();
+  for (const key of ["runStart", "runEnd"]) {
+    assert.ok(M.PLAN_OPTIONS.includes(key), `${key} is dropped on restore`);
+  }
+  const out = M.parseBackup(
+    { collected: [], plan: { runStart: 0.3333, runEnd: 0 } }, CATALOGUE);
+  assert.equal(out.plan.runStart, 0.3333, "20 seconds, kept to the precision given");
+  assert.equal(out.plan.runEnd, 0, "and a deliberate zero is not a missing value");
+});

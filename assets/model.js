@@ -238,8 +238,15 @@
      carrying an answer to it would be restoring a setting nothing reads. Old
      files still list it and are still valid - anything not named here is simply
      dropped, which is what this list is for. */
+  /* `runStart` and `runEnd` joined on 2026-08-27: the minutes a mission costs
+     before and after the part anyone counts — loading in, and getting out once
+     the objective is done. Two fields rather than one sum because they are two
+     different waits and a player timing themselves can measure them separately.
+     As expensive to lose as the twenty numbers already here, so a backup carries
+     them. */
   const PLAN_OPTIONS = ["squad", "event", "railjack", "aya", "traces",
-                        "minutes", "sort", "formaHave", "formaNeed"];
+                        "minutes", "runStart", "runEnd",
+                        "sort", "formaHave", "formaNeed"];
 
   function parseBackup(text, items) {
     const raw = typeof text === "string" ? JSON.parse(text) : text;

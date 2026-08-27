@@ -611,6 +611,11 @@ button,input,select,textarea{font:inherit;color:inherit}
    Full-width rows rather than a grid of boxes: the 290px planner sidebar wraps
    a grid raggedly and it reads as broken form controls (STYLE.md §5). */
 .effort{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+/* The run overhead sits below the per-type rows and is a different question -
+   what one objective costs, against what the run costs either side of them. A
+   rule rather than a gap, because the two groups are the same shape and would
+   otherwise read as one list with two odd entries at the bottom. */
+.effort-run{margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
 .effort-row{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}
 .effort-row .em-name{
   flex:1;min-width:0;color:var(--txt-dim);

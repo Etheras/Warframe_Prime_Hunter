@@ -200,15 +200,46 @@
     return clean;
   })(opts.minutes);
 
+  /* What a run costs before and after the part anyone counts: loading in, and
+     getting out once the objective is done. Sanitised the same way and for the
+     same reason — these reach `innerHTML` and arrive from a file the app invites
+     you to import. Zero is allowed here and is not allowed above: an unset
+     mission type has to be costed at the average of the others, but an overhead
+     of zero is a legitimate answer meaning "I do not count it". */
+  const overheadMin = (raw) => {
+    const v = Number(raw);
+    return isFinite(v) && v >= 0 ? v : 0;
+  };
+  opts.runStart = overheadMin(opts.runStart);
+  opts.runEnd = overheadMin(opts.runEnd);
+
   const minutesSet = () => Object.keys(opts.minutes);
 
+  /* Effort is per-objective minutes plus a flat cost charged **once per run**.
+     Measured by the owner from their own runs: a mission start is about 20
+     seconds and an end about 15, so 35 seconds whatever the run is — and because
+     it is fixed, the error it corrects lands almost entirely on the short ones.
+     Capture's cost rises 38.9% and its rate falls 28%, against 1.9% for
+     Survival, so part of Capture's winning margin was an accounting error.
+
+     `overhead` is exposed separately from `per` because the two are charged
+     differently: `per` multiplies by the objective count, this is added once.
+     Folding it into `per` would charge it per round, which is the opposite of
+     the point. */
   function effort() {
     const set = minutesSet();
+    const overhead = opts.runStart + opts.runEnd;
+    /* No per-mode minutes means no per-minute ranking, even with an overhead
+       given. 35 seconds has no meaning in objective *count* — a round is
+       anything from a 45-second Defense wave to a five-minute Survival rotation
+       — so an overhead alone cannot convert the default ranking into a
+       per-minute one. It waits for the numbers it can be added to. */
     if (!set.length) return null;
     const mean = set.reduce((s, m) => s + opts.minutes[m], 0) / set.length;
     return {
       per: (mode) => opts.minutes[mode] || mean,
       assumed: (mode) => !opts.minutes[mode],
+      overhead,
     };
   }
 
@@ -688,7 +719,10 @@
 
       const o = ROT.objectivesOf(n);
       n.objectives = o.count; n.unit = o.unit;
-      n.minutes = mins ? mins.per(n.mode) * o.count : null;
+      /* `+ overhead`, once, not per objective: a run is entered and left exactly
+         once however far you take it. This is the whole of the fixed-cost fix
+         and it is deliberately the only place it is applied. */
+      n.minutes = mins ? mins.per(n.mode) * o.count + mins.overhead : null;
       n.minutesAssumed = !!mins && mins.assumed(n.mode);
       /* Costed per reward by default, per minute once anyone says what a reward
          costs them in minutes.
@@ -1160,22 +1194,60 @@
         </label>`).join("")
       : `<p class="hint">Nothing on your list yet, so there is nothing to weigh.</p>`;
 
+    /* The fixed cost of a run, charged once however far you take it. Rendered
+       below the per-type rows and separated from them, because it is a different
+       question: those ask what one objective costs, these ask what the run costs
+       before and after any of them.
+
+       Two fields rather than one sum, at the owner's direction: they are two
+       different waits and a player timing themselves can measure them
+       separately. `data-run` rather than `data-mode` so the one change handler
+       can tell them apart from a mission type — a mode called "start" would
+       otherwise be indistinguishable. */
+    const overheadBox = $("#effortRunRows");
+    if (overheadBox) {
+      overheadBox.innerHTML = !modes.length ? "" : [
+        ["runStart", "Getting in", "loading and travel before the objective"],
+        ["runEnd", "Getting out", "extraction and the results screen"],
+      ].map(([key, label, why]) => `<label class="effort-row${opts[key] ? " set" : ""}">
+          <span class="em-name" data-tip="${esc(why)}">${esc(label)}</span>
+          <input type="number" min="0" step="0.25" placeholder="—" inputmode="decimal"
+                 value="${opts[key] || ""}" data-run="${esc(key)}"
+                 aria-label="minutes ${esc(label.toLowerCase())} of a mission" />
+          <span class="em-unit">min / run</span>
+        </label>`).join("");
+    }
+
     const set = minutesSet();
     const mean = set.length
       ? set.reduce((s, m) => s + opts.minutes[m], 0) / set.length : 0;
     const note = $("#effortState");
     if (note) {
+      const over = opts.runStart + opts.runEnd;
+      /* The overhead is stated only where it can do something. With no per-type
+         minutes the list is costed in reward count, and 35 seconds has no
+         meaning in rewards — so a number typed there is being kept, not used,
+         and saying so is the difference between a control that waits and one
+         that is broken. */
+      const overNote = over > 0
+        ? ` Every run also costs <b>${n2(over)} min</b> in getting in and out, ` +
+          `charged once however far you take it.`
+        : "";
       note.innerHTML = !modes.length ? ""
         : set.length
           ? `<b>${set.length} set.</b> Every other type is costed at their average, ` +
             `${n2(mean)} min — shown in amber on the row, so a borrowed number is ` +
-            `never mistaken for one of yours.`
+            `never mistaken for one of yours.` + overNote
           : `Nothing set, so every mission is costed by its <b>reward count</b> ` +
             `— four rounds, three vaults, one run. That is the default and it works. ` +
-            `Fill in a single type and the whole list re-sorts on real minutes.`;
+            `Fill in a single type and the whole list re-sorts on real minutes.` +
+            (over > 0
+              ? ` Getting in and out is saved and waits for them: a flat ${n2(over)} min ` +
+                `cannot be charged against a reward count.`
+              : "");
     }
     const clear = $("#effortClear");
-    if (clear) clear.hidden = !set.length;
+    if (clear) clear.hidden = !set.length && !(opts.runStart + opts.runEnd);
   }
 
   function render() {
@@ -1760,10 +1832,33 @@
         });
       });
     }
+    /* The run overhead, wired the same way and separately. `data-run` rather
+       than `data-mode`, so a mission type could never collide with one of these
+       two keys. Zero is kept rather than deleted: it is a real answer meaning "I
+       do not count it", and it differs from blank only in that the row stops
+       being highlighted — which is exactly what a reader who typed 0 expects. */
+    const runBox = $("#effortRunRows");
+    if (runBox) {
+      runBox.addEventListener("change", (e) => {
+        const el = e.target.closest("input[data-run]");
+        if (!el) return;
+        const key = el.dataset.run;
+        const v = Number(el.value);
+        opts[key] = el.value.trim() !== "" && isFinite(v) && v >= 0 ? v : 0;
+        save(KEY_PLAN, opts);
+        render();
+        $$("#effortRunRows input").forEach((x) => {
+          if (x.dataset.run === key) { x.focus(); x.select(); }
+        });
+      });
+    }
     const clear = $("#effortClear");
     if (clear) {
       clear.addEventListener("click", () => {
-        opts.minutes = {}; save(KEY_PLAN, opts); render();
+        // everything the panel holds, including the overhead - the button says
+        // "clear all" and a number it left behind would keep moving the ranking
+        opts.minutes = {}; opts.runStart = 0; opts.runEnd = 0;
+        save(KEY_PLAN, opts); render();
       });
     }
   }

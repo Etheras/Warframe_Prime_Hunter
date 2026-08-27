@@ -108,9 +108,9 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | Size |
 |---|---|
 | Seven rotation-bearing mission types are still unverified | small each, tedious — the unit question that gated this was settled 2026-08-27 |
-| A run's fixed cost is not priced, so Capture wins everything | session — measured, and the largest distortion with an agreed unit |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
+| Two relics that pay the same part are counted as two | session — the owner's, 2026-08-27; reproduced, and it inflates the top of the ranking |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -283,6 +283,73 @@ The control is the other half. The crosshair is a two-state `role="checkbox"`
 (`STYLE.md §6`: green owned, teal queued), and a third state needs either a
 different control or a modifier — plus a line in `STYLE.md`, since a new colour with
 a new meaning is exactly what that document exists to arbitrate.
+
+### Two relics that pay the same part are counted as two
+
+**Found by the owner 2026-08-27, from the ranking, and reproduced exactly.** Two
+observations that turn out to be one gap:
+
+> *Shouldn't Axi D6, because of 30%, be above Axi A21? And shouldn't Taranis,
+> whose relics need 3 golden parts + Aya, be above Apollo which has only 1.5
+> parts — because the Cedo Prime Barrel is a duplicate from the 2 relics?*
+
+**Reproduced**, by banking every part of Cedo, Dual Zoren, Gyre and Quassus Prime
+except the four still wanted: *Where to go* ranked **Apollo 1.57 at #1** and
+**Taranis 1.23 at #2**, per run, matching the screenshots.
+
+**The cause.** Apollo's two wanted relics are `Axi D6` and `Axi A21`, and both
+carry **Cedo Prime Barrel**:
+
+| Relic | Its wanted contents |
+|---|---|
+| `Axi D6` | Cedo Prime Barrel *(Uncommon)*, Dual Zoren Prime Blade *(Rare)* |
+| `Axi A21` | Cedo Prime Barrel *(Uncommon)* |
+
+So Apollo's two relics cover **two** distinct parts, not three — and `Axi A21`
+adds nothing `Axi D6` does not already cover. Taranis's two relics are `Lith G14`
+(Gyre Prime Neuroptics) and `Lith Q3` (Quassus Prime Blade **×2**): three
+part-instances, no overlap, and Aya besides.
+
+**Where it happens, exactly.** In the node loop in `plan.js`, a node accumulates
+`n.rot[slot] += chance × value` and `n.cnt[slot] += chance` **once per relic
+source**, with nothing asking whether two relics at that node pay the same wanted
+part. `n.perRun` is built from that sum. The crack list is half-immune and that is
+the tell: `clears` counts *distinct* parts **within one relic**, so the dedup
+exists — it simply never runs **across** relics.
+
+**How widespread the condition is.** Measured over the live data: of the **234**
+nodes dropping two or more unvaulted relics, **231 have at least one part carried
+by two of them.** Summing each relic's part list against the distinct union
+overstates by up to **1.46×** (Elite Sanctuary Onslaught, 150 part-slots over 103
+distinct; then Plague Star 1.43×, Terrorem 1.37×). Apollo (Lua) carries 14 live
+relics with 11 shared parts, Cedo Prime Barrel among them. **The condition is
+near-universal; whether it bites depends on which of the shared parts you still
+want**, which is why it shows up plainly on a narrow farm list and hides on a
+wide one.
+
+**What is not wrong, so the fix does not overreach.** The row label says *relics /
+run* and 1.57 wanted relics a run is literally true — a run that hands you both
+D6 and A21 has handed you two relics you wanted. The defect is that the ranking
+uses that figure as a proxy for **progress**, and as progress it double-counts.
+Likewise `Axi D6` really is displayed above `Axi A21`; the surprise is that they
+*tie* on openings-per-part-cleared while one of them is redundant given the other.
+
+**Three ways to fix it, none chosen:**
+
+1. **Deduplicate the wanted parts per node.** Value a node on the union of parts
+   its relics can still clear rather than the sum. Most faithful, and it makes the
+   node figure stop being a relic count — so the label has to change with it, the
+   way *per objective* became *per reward*.
+2. **Discount a relic by what a better relic at the same node already covers.**
+   Keeps the relic count honest and re-ranks the crack list, which is where the
+   A21-versus-D6 surprise actually lives.
+3. **Say it on the row rather than score it.** A node whose relics overlap could
+   carry a note; cheapest, changes no number, and leaves the ranking overstating.
+
+Worth settling first: **whether the fix belongs to the node ranking, the crack
+list, or both** — the two observations come from one cause but surface in two
+lists, and the project's standing rule is that those two lists answer different
+questions and must not be merged into one score.
 
 ### What the misses are worth, in Ducats
 
@@ -556,120 +623,6 @@ nodes, so the run-length choice is unaffected and the ranked cost is now right
 either way. That is why it was not resolved in the same pass — there was no
 pressure to guess. It matters the moment a second cadence lands, since a mission
 paying one reward per four objectives would be charged an eight-objective restart.
-
-### A run's fixed cost is not priced, so Capture wins everything
-
-**Faceoff now sits at #1 for exactly this reason, and the owner has ruled it
-stays — 2026-08-25.** Correcting its length moved it from #14 to the top: a match
-pays one each of rotation A and B, 22 relics at 8.33%, so 1.83 wanted relics for
-one objective. It is a one-objective mission ranked against one-objective
-missions, which is what Capture already is, and singling Faceoff out would be
-patching the symptom on one row. **Do not special-case it.** If the fixed cost of
-entering a mission is ever priced, Faceoff and Capture move together or not at
-all.
-
-
-**Measured by the owner from their own runs, 2026-08-24, and it is the largest
-known distortion in the per-minute ranking.** Effort is collected per *objective*
-and the cost of a run is `minutes-per-objective × objectives` — nothing else. So a
-Capture costs exactly its 1.5 minutes and a six-round Survival exactly its 30, as
-though walking in and walking out were free. They are not, and the error is not
-spread evenly: it is a fixed cost, so it lands almost entirely on the short ones.
-
-The owner's figures: a mission **start is about 20 seconds** and a mission **end
-about 15**, so **35 seconds a run**, whatever the run is. Against their own
-measured per-objective times:
-
-| Mission type | min/obj | objectives | costed now | with +35s | cost rises | its rate falls |
-|---|---|---|---|---|---|---|
-| Capture | 1.5 | 1 run | 1.50 | 2.08 | **+38.9%** | **−28.0%** |
-| Exterminate | 2.5 | 1 run | 2.50 | 3.08 | +23.3% | −18.9% |
-| Sabotage | 5.5 | 1 run | 5.50 | 6.08 | +10.6% | −9.6% |
-| Mobile Defense | 6 | 1 run | 6.00 | 6.58 | +9.7% | −8.9% |
-| Defense | 3.5 | 6 rounds | 21.00 | 21.58 | +2.8% | −2.7% |
-| Spy | 10 | 3 vaults | 30.00 | 30.58 | +1.9% | −1.9% |
-| Survival · Interception · Disruption | 5 | 6 rounds | 30.00 | 30.58 | +1.9% | −1.9% |
-
-A twenty-eight per cent correction on Capture against two per cent on Survival is
-the whole of the complaint: **Capture wins by a large margin, and part of that
-margin is an accounting error.**
-
-**The shape asked for.** Two more fields in the effort panel, filled in by hand
-like the rest — *minutes to start a mission* and *minutes to leave one* — kept
-apart rather than summed into one, because they are two different waits and a
-player timing themselves can measure them separately. Blank by default, on the
-same principle as every other number in that panel. Added once per run:
-
-```
-minutes = per(mode) × objectives + start + end
-```
-
-Both belong in `PLAN_OPTIONS` so a backup carries them; they are as expensive to
-lose as the twenty numbers already there.
-
-**Only the per-minute ranking can use them.** With the effort panel empty the list
-is costed in objective *count*, and 35 seconds has no meaning in objectives — a
-round is anything from a 45-second Defense wave to a five-minute Survival rotation.
-So this changes the ranking exactly when minutes are given and does nothing before
-that, which is the same bargain the rest of the effort model makes.
-
-**It leaves two overheads in two units, and that wants thinking about.**
-`ROT.RUN_OVERHEAD` already exists — two *rounds*, in `rotation.js` — and it is what
-makes staying worth it when the model chooses how far to run a node. It is
-deliberately unit-free so both pages reach the same answer and so that answer does
-not move when somebody types into the effort panel (`PROJECT.md §7`). These new
-fields are minutes, and they price the same real thing. The options, in order of
-how much they disturb:
-
-1. **Leave both.** The rounds figure decides *how to play* a node; the minutes
-   figure decides *what it costs* once played. Two questions, two answers, and the
-   pages still agree. Simplest, and slightly embarrassing to explain.
-2. **Feed the minutes into the mode choice when they exist**, keeping the rounds
-   figure as the fallback. More accurate, and it reintroduces exactly the
-   divergence §7 argues against — the collection view has no effort panel, so the
-   two pages would then disagree about how long a run is.
-3. **Derive the rounds figure from the minutes** where both are known, so there is
-   one number with one meaning. Most honest, most work, and it still has to answer
-   what the collection view does.
-
-**Decided by the owner, 2026-08-25: (1), and it is not a starting point.** Add the
-two fields, charge a **flat overhead once per run**, and keep the objective-count
-ranking **agnostic to it** — the overhead is the player's own number and lives on
-the player's side of the model. Options (2) and (3) are closed, not deferred.
-
-The reasoning, which is stronger than *"simplest"*: the two overheads are not two
-units for one quantity, they are **two different quantities**.
-
-- `RUN_OVERHEAD` is **comparative**. It exists only at `rotation.js:363`, where each
-  candidate way of playing a node is scored `value / (rounds + 2)`, and it is
-  discarded the moment a plan wins — nothing consumes it afterwards, and the export
-  at `rotation.js:717` is read by no caller, only by a test asserting its value. Its
-  absolute size barely matters; only the ratio between two plans at the same node
-  does, which is why its own comment can admit it "over-charges the long ones and
-  under-charges the short ones" without that being a defect.
-- The start/end minutes are **absolute**. They are the real price of one run, and
-  they are charged once, to the cost the ranking divides by.
-
-So 35 seconds is not two rounds, and was never meant to be. `rotation.js:311`
-already gives the reason the constant is kept in rounds: a minutes figure "could
-only be applied where minutes have been given — and then the two pages would
-disagree about how long a run is the moment somebody typed into the effort panel. A
-choice about how to play a node should be a fact about the node."
-
-**Rejected in the same decision:** folding `RUN_OVERHEAD` into `n.cost`
-(`plan.js:587`) to price restarts in the default objective view "for free". It was
-raised on 2026-08-25 on the grounds that two rounds *does* have meaning in
-objectives where 35 seconds does not. It pushes a comparative constant into an
-absolute price, and it makes the objective ranking silently change cost basis the
-moment anyone types a minute into the effort panel. The paragraph above stands as
-written: the objective view stays overhead-free, **by choice rather than by
-impossibility**, and that is the correction this entry needed.
-
-**What to check when it lands.** The collection view ranks per *run* and has no
-effort panel, so it should be untouched — worth asserting, since "both pages agree"
-is a rule here and this is a case where they legitimately differ. And the row's
-`relics / min` label stays honest: the minutes it divides by become the true cost
-of a run, which is what the label already claims.
 
 ### Our four invented "mission types" leak into the ranking
 

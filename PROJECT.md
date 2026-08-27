@@ -2826,6 +2826,68 @@ measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s tab
 quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
 it meets and the one that governs.
 
+### A run costs something before and after the part you count
+
+**Shipped 2026-08-27**, on the owner's measurements and their decision of
+2026-08-25 about which shape to build.
+
+Effort was collected per objective and the cost of a run was
+`minutes-per-objective × objectives` and nothing else — as though walking in and
+walking out were free. They are not, and the error is not spread evenly: it is a
+**fixed** cost, so it lands almost entirely on the short missions.
+
+The owner's own figures: a mission **start is about 20 seconds** and an **end
+about 15**, so **35 seconds a run** whatever the run is. Reproduced by the shipped
+model against their measured per-objective times:
+
+| Mission type | min/obj | objectives | costed now | with +35s | cost rises | its rate falls |
+|---|---|---|---|---|---|---|
+| Capture | 1.5 | 1 run | 1.50 | 2.08 | **+38.9%** | **−28.0%** |
+| Exterminate | 2.5 | 1 run | 2.50 | 3.08 | +23.3% | −18.9% |
+| Sabotage | 5.5 | 1 run | 5.50 | 6.08 | +10.6% | −9.6% |
+| Mobile Defense | 6 | 1 run | 6.00 | 6.58 | +9.7% | −8.9% |
+| Defense | 3.5 | 6 rounds | 21.00 | 21.58 | +2.8% | −2.7% |
+| Spy | 10 | 3 vaults | 30.00 | 30.58 | +1.9% | −1.9% |
+| Survival · Interception · Disruption | 5 | 6 rounds | 30.00 | 30.58 | +1.9% | −1.9% |
+
+Twenty-eight per cent on Capture against two on Survival is the whole of it:
+**Capture was winning by a margin part of which was an accounting error.** Checked
+end to end on the real page with those timings entered — Ukko, a Capture node,
+falls 28.4%.
+
+**Two fields, not one sum.** *Getting in* and *getting out* sit below the
+per-type rows, separated by a rule because they answer a different question. They
+are two different waits and a player timing themselves can measure them
+separately. Both live in `PLAN_OPTIONS`, so a backup carries them; they are as
+expensive to lose as the numbers beside them, and a considered **zero** survives
+the round trip distinct from never having answered.
+
+**Charged once per run, never per objective.** That is the whole arithmetic —
+`per(mode) × objectives + overhead` — and it is the one thing here that could be
+silently wrong, since on a single-objective row the two are identical. A test
+requires a multi-objective row and asserts the two apart.
+
+**It does nothing until per-type minutes exist, deliberately.** With the panel
+empty the list is costed in reward *count*, and 35 seconds has no meaning in
+rewards — a reward is anything from a 45-second Defense wave to a five-minute
+Survival rotation. So an overhead on its own is stored, says so in the panel's
+own note, and waits. The same bargain the rest of the effort model makes.
+
+**`RUN_OVERHEAD` stays as it is, in rounds** — option (1) of the three the owner
+was offered, and it is not a starting point. The two are not two units for one
+quantity, they are two different quantities. `RUN_OVERHEAD` is **comparative**: it
+exists only where each candidate way of playing a node is scored `value /
+(rounds + 2)`, and it is discarded the moment a plan wins. Its absolute size
+barely matters, only the ratio between two plans at the same node. The start and
+end minutes are **absolute** — the real price of one run, charged once to the cost
+the ranking divides by. So 35 seconds is not two rounds and was never meant to be.
+
+**The collection view is untouched, and that is asserted.** It ranks per *run* and
+has no effort panel, so a number that exists only to divide minutes by cannot
+reach it. "Both pages agree" is a rule here, which is exactly why a case where
+they legitimately differ is worth pinning: a test sets ten absurd minutes of
+overhead and requires every figure in the drawer to be unmoved.
+
 ### An objective is the thing that pays a reward, and nothing else
 
 **Settled by the owner 2026-08-27**, and it is the decision the cadence sweep of
