@@ -143,6 +143,68 @@ def write_etag(path: str, tag) -> None:
         pass
 
 
+# ── honouring the freshness each source declares ──────────────────────────
+#
+# `PROJECT.md §2` — "Ask no more often than the source says to". A server that
+# sends `Cache-Control: max-age=86400` is telling us this changes about daily,
+# and asking every ten minutes anyway is 144 pointless requests a day on
+# somebody's bandwidth. Their number rather than one we invent: they are the
+# only party who knows it, and it updates itself when they change their mind.
+#
+# Stored beside the body like the validator, and for the same reasons.
+
+def maxage_path(path: str) -> str:
+    return path + ".maxage"
+
+
+def read_maxage(path: str) -> float | None:
+    try:
+        with open(maxage_path(path), encoding="utf-8") as fh:
+            return float(fh.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def write_maxage(path: str, header: str | None) -> None:
+    """Record `max-age` from a `Cache-Control`, or forget any we held.
+
+    `no-cache` and `no-store` are not a `max-age` of zero to us: they mean
+    *revalidate*, which the conditional request already does in a header
+    exchange with no body. So they leave nothing behind and the ETag path
+    handles them.
+    """
+    seconds = None
+    if header and "no-store" not in header and "no-cache" not in header:
+        found = re.search(r"max-age\s*=\s*(\d+)", header)
+        if found:
+            seconds = int(found.group(1))
+    try:
+        if seconds:
+            with open(maxage_path(path), "w", encoding="utf-8") as fh:
+                fh.write(str(seconds))
+        elif os.path.exists(maxage_path(path)):
+            os.remove(maxage_path(path))
+    except OSError:
+        pass
+
+
+def still_fresh(path: str) -> bool:
+    """Is the cached copy still inside the window the source declared?
+
+    False whenever anything is missing or unreadable — a lost sidecar costs one
+    request, and asking is always the safe direction.
+    """
+    if not os.path.exists(path):
+        return False
+    window = read_maxage(path)
+    if not window:
+        return False
+    try:
+        return (time.time() - os.path.getmtime(path)) < window
+    except OSError:
+        return False
+
+
 # A failed fetch means two very different things, and they are tracked apart:
 #
 #   STALE   - the refresh failed but a previous copy exists, so the build
@@ -219,6 +281,13 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
+    # Inside the window the source itself declared, so do not ask again. This is
+    # the whole of "Ask no more often than the source says to" — the drop table
+    # says `max-age=86400` and was being asked every ten minutes.
+    if still_fresh(path):
+        with gzip.open(path, "rb") as fh:
+            return fh.read()
+
     urls = [url] if isinstance(url, str) else list(url)
     last_err = None
     prior = read_etag(path)
@@ -239,10 +308,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     if resp.headers.get("Content-Encoding") == "gzip":
                         raw = gzip.decompress(raw)
                     tag = resp.headers.get("ETag")
+                    freshness = resp.headers.get("Cache-Control")
                 os.makedirs(CACHE_DIR, exist_ok=True)
                 with gzip.open(path, "wb") as fh:
                     fh.write(raw)
                 write_etag(path, tag)
+                write_maxage(path, freshness)
                 return raw
             except urllib.error.HTTPError as exc:
                 # 304 is a success: the server has confirmed what we hold is
@@ -306,6 +377,37 @@ def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
         return None
 
 
+def head_cached(url: str, key: str) -> dict:
+    """`head`, but not more often than the source says to.
+
+    The drop table is the case this exists for. It declares `max-age=86400` —
+    about daily, which matches a page whose `Last-Modified` moves every month or
+    two — and `--if-changed` was sending it a HEAD every ten minutes, 144 times
+    inside a window Digital Extremes had already answered.
+
+    Cheap as a HEAD is, that is still asking somebody the same question 143 times
+    after they answered it. The reply is kept beside the body like any other, and
+    re-asked when their own window expires.
+    """
+    path = cache_path(key)
+    if still_fresh(path):
+        try:
+            with gzip.open(path, "rb") as fh:
+                return json.loads(fh.read().decode("utf-8"))
+        except (OSError, ValueError):
+            pass                                  # unreadable: just ask again
+    headers = head(url)
+    if headers:
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with gzip.open(path, "wb") as fh:
+                fh.write(json.dumps(headers).encode("utf-8"))
+            write_maxage(path, headers.get("cache-control"))
+        except OSError:
+            pass
+    return headers
+
+
 def head(url: str) -> dict:
     """Cheap freshness probe — returns {} rather than raising."""
     try:
@@ -343,7 +445,7 @@ def upstream_signature(offline: bool = False) -> dict:
     except Exception:
         pass
 
-    h = head(OFFICIAL_DROPTABLES)
+    h = head_cached(OFFICIAL_DROPTABLES, "head_droptables")
     sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
 
     # First party, and the same document the build itself reads. This asked the

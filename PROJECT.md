@@ -261,6 +261,29 @@ Small in absolute terms and not the point: the drop-table HEAD fired 144 times
 inside a window DE themselves declare as one day. Small and thoughtless is still
 thoughtless.
 
+**And it is enforced rather than merely stated, since 2026-08-27.** The rule sat
+written down for a few hours while nothing obeyed it, which the owner noticed and
+asked about — a rule in a document that no code reads is a preference, not a
+rule.
+
+`fetch` now records `max-age` beside the body, like the validator, and returns
+the cached copy without a request while that window holds. `head_cached` does the
+same for the one probe that was a bare HEAD. Measured on two back-to-back
+freshness probes: **three requests, then one.** The remaining one is the export
+index, which is `no-cache` and revalidates by ETag into a 304 with no body —
+exactly what it should do.
+
+Per ten-minute cycle in the steady state that leaves: the worldstate is asked
+(its window is 28 seconds, so ten minutes is well past it), the export index is
+revalidated, and **the drop table is asked once a day instead of 144 times.**
+
+Two details are deliberate. `no-cache` and `no-store` leave **no** window behind
+rather than a zero one, because they mean *revalidate* and the conditional
+request already does that for free — treating them as `max-age=0` would work but
+would quietly bypass the ETag path. And anything missing or unreadable — no
+sidecar, a bad number, a vanished file — means **ask**: a lost sidecar costs one
+request, while assuming freshness costs correctness.
+
 **`robots.txt`, checked the same day:** `www.warframe.com` disallows only account
 and admin paths, so `/droptables` is permitted; `api.warframe.com` and
 `content.warframe.com` serve none. Nothing we fetch is disallowed. Re-check it if

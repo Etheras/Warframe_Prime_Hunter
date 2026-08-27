@@ -966,6 +966,52 @@ def test_artwork_prefers_digital_extremes() -> None:
           artwork.local_name(DE_TEXTURES + "/a/../../etc/passwd!00_x"), "passwd")
 
 
+def test_a_source_is_not_asked_inside_its_own_window() -> None:
+    """
+    `PROJECT.md §2` — "Ask no more often than the source says to". A cached copy
+    inside the `max-age` its source declared is served without a request at all.
+
+    The drop table is why this exists: it says `max-age=86400`, which matches a
+    page whose `Last-Modified` moves every month or two, and `--if-changed` was
+    sending it a HEAD every ten minutes — 144 times inside a window Digital
+    Extremes had already answered. Measured after: two back-to-back freshness
+    probes cost three requests and then one.
+
+    `no-cache` is deliberately not a `max-age` of zero. It means *revalidate*,
+    which the conditional request already does in a header exchange with no body,
+    so it must leave no window behind or the ETag path would be skipped.
+    """
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-maxage-")
+    try:
+        path = os.path.join(tmp, "probe.gz")
+        with open(path, "wb") as fh:
+            fh.write(b"body")
+
+        sources.write_maxage(path, "public, max-age=86400")
+        check("freshness: a max-age is remembered", sources.read_maxage(path), 86400.0)
+        check_true("freshness: and a copy inside it is not re-asked for",
+                   sources.still_fresh(path))
+
+        old = time.time() - 90000                      # older than the window
+        os.utime(path, (old, old))
+        check_true("freshness: a copy past it is asked for again",
+                   not sources.still_fresh(path))
+
+        for header in ("no-cache", "no-store, max-age=600", None, "public"):
+            sources.write_maxage(path, header)
+            check(f"freshness: {header!r} leaves no window", sources.read_maxage(path), None,
+                  "no-cache means revalidate, which the ETag already does")
+
+        # A missing sidecar costs one request, never a wrong answer.
+        sources.write_maxage(path, "max-age=86400")
+        os.remove(sources.maxage_path(path))
+        check_true("freshness: a lost sidecar means ask, not assume",
+                   not sources.still_fresh(path))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_an_impossible_304_is_treated_as_stale() -> None:
     """
     A `304` says the server has confirmed what we hold is current, and `fetch`
@@ -2354,6 +2400,7 @@ def main() -> int:
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
+                         test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_fissures_read_from_the_first_party_worldstate,
