@@ -123,7 +123,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| The live worldstate has a first-party route after all | session — four adapters, and it retires the only third-party dependency |
+| The live worldstate has a first-party route — three feeds still to move | session — fissures shipped 2026-08-27; Resurgence, bounties and events remain |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
@@ -737,7 +737,22 @@ and the drop tables disagree about `Chassis` versus `Chassis Blueprint`, so a
 third spelling arriving from DE needs to go through the same funnel rather than
 around it.
 
-### The live worldstate has a first-party route after all
+### The live worldstate has a first-party route — three feeds still to move
+
+**Fissures moved on 2026-08-27 and work; Resurgence, bounties and events have
+not.** What follows is the original entry, kept because the sizing still applies
+to the three that are left. The pattern the fissure adapter established is the
+one to copy: `official.fissures_from_worldstate` normalises DE's raw document
+into exactly the shape the WFCD proxy produced, so the two stay interchangeable
+and either can be the fallback for the other, and `build_data` prefers DE and
+asks the proxy only when first party yields nothing usable.
+
+**One finding from doing it, which will bite the other three.** DE's region
+export carries **no `CrewBattleNode*` rows at all**, so Railjack storm nodes
+cannot be named from first-party data — 12 of 31 fissures. They are emitted with
+`node: None`, counted in the build log, and dropped. The WFCD proxy can name
+them, so this is a genuine case for the fallback tier rather than a defect. If
+you find a first-party route to Proxima node names, it closes.
 
 **Found 2026-08-27, by the owner, and it overturns a `[settled]` answer below.**
 *Prime Resurgence is the only non-first-party source* says there is no

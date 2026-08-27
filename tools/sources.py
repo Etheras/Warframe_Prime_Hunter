@@ -87,6 +87,16 @@ EXPORT_WANTED = ["ExportWarframes_en.json", "ExportWeapons_en.json",
 # `raw.githubusercontent.com/wfcd/warframe-items/...`.
 DE_TEXTURES = "https://content.warframe.com/PublicExport"
 
+# The live worldstate, first party. Carries every feed the four `/pc/*` proxy
+# endpoints above serve: ActiveMissions and VoidStorms (fissures),
+# SyndicateMissions and Events (bounties), PrimeVaultTraders (Resurgence).
+#
+# `Cache-Control: max-age=28` — DE built this to be polled, so a ten-minute build
+# is well inside what they ask for. The two hosts `PROJECT.md §6` records as 404
+# are `/dynamic/worldState.php` on content. and origin.warframe.com; those are
+# still 404 and this is a third host nobody had tried until 2026-08-27.
+WORLDSTATE = "https://api.warframe.com/cdn/worldState.php"
+
 STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 
 

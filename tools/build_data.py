@@ -55,7 +55,7 @@ from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E40
                      DROP_FILES, EXPORT_INDEX_HOSTS, EXPORT_MANIFEST, EXPORT_WANTED,
                      DE_TEXTURES, FISSURES, IMG_CDN,
                      ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE,
-                     SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WIKI_RAW,
+                     SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WORLDSTATE, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
                      upstream_signature)
 from artwork import cache_images                          # noqa: E402
@@ -144,7 +144,7 @@ def acquire_export(offline: bool):
         # the count that matters rather than the number: keep the two paths
         # agreeing, and keep the test that says so.
         log(f"! public export index unavailable ({exc})")
-        return [], {}, None, {}
+        return [], {}, None, {"textures": {}, "nodeNames": {}}
 
     exports = {}
     for want in EXPORT_WANTED:
@@ -179,10 +179,14 @@ def acquire_export(offline: bool):
                 for row in (exports.get("ExportManifest.json", {}).get("Manifest") or [])
                 if row.get("uniqueName") and row.get("textureLocation")}
 
+    # A named bag rather than a fifth and sixth positional value. The tuple grew
+    # once for textures and would have grown again for node names a day later;
+    # everything derived from these manifests goes in here from now on, so the
+    # shape the caller unpacks stops moving.
     return (official.collect_prime_items(exports),
             official.node_levels(exports),
             hashlib.sha256(blob).hexdigest()[:16],
-            textures)
+            {"textures": textures, "nodeNames": official.node_names(exports)})
 
 
 
@@ -881,13 +885,37 @@ def main() -> int:
     # from a CDN sitting in front of a failing origin reads as good news, and
     # this shipped a three-day-old empty list for three days without a word —
     # `stale_if_older` carries the measurement.
-    log("api: void fissures running right now")
-    fissures_raw = fetch_json(FISSURES, "api_fissures", args.offline,
-                              critical=False, optional=True,
-                              max_age=3 * 3600)
+    log("worldstate: void fissures running right now")
+    worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
+                            critical=False, optional=True, max_age=3 * 3600)
 
     log("export: DE public item manifest")
-    export_primes, node_levels, export_hash, textures = acquire_export(off)
+    export_primes, node_levels, export_hash, export_extra = acquire_export(off)
+    textures = export_extra.get("textures") or {}
+
+    # Normalised here rather than beside the fetch, because naming a node needs
+    # DE's region export and that arrives on the line above. First party first:
+    # the worldstate is DE's own, and the proxy is asked only if it gave us
+    # nothing usable.
+    fissures_raw = official.fissures_from_worldstate(
+        worldstate or {}, export_extra.get("nodeNames") or {})
+    named = [f for f in fissures_raw if f.get("node")]
+    if named:
+        # Storms are dropped rather than mourned: DE publish no CrewBattleNode
+        # row in their region export, so there is no name to give them. Say how
+        # many went, because a shorter list with no explanation is how a broken
+        # feed looks exactly like a quiet evening.
+        lost = len(fissures_raw) - len(named)
+        log(f"  worldstate: {len(named)} fissures from Digital Extremes"
+            + (f", {lost} Railjack storm(s) unnamed and dropped" if lost else ""))
+        fissures_raw = named
+    else:
+        # First party gave nothing usable, so ask the proxy — which is the whole
+        # point of keeping it. It normalises the same document and can name the
+        # Proxima nodes DE's export omits.
+        log("  worldstate: nothing usable from DE, falling back to the WFCD proxy")
+        fissures_raw = fetch_json(FISSURES, "api_fissures", args.offline,
+                                  critical=False, optional=True, max_age=3 * 3600)
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)

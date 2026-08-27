@@ -23,6 +23,7 @@ from __future__ import annotations
 import html as _html
 import lzma
 import re
+from datetime import datetime, timezone
 
 # ── drop table ────────────────────────────────────────────────────────────
 
@@ -456,3 +457,107 @@ def collect_prime_items(exports: dict[str, dict]) -> list[dict]:
                     "uniqueName": uniq, "productCategory": pc,
                 })
     return sorted(found.values(), key=lambda r: r["name"])
+
+
+# ── the live worldstate, read from Digital Extremes directly ───────────────
+#
+# `api.warframe.com/cdn/worldState.php` is first party and carries every feed we
+# used to take from the WFCD proxy. It publishes the game's own vocabulary rather
+# than a normalised one, so these turn it into the shape `build_fissures` already
+# consumes — the same shape WFCD produce, deliberately, so the two are
+# interchangeable and either can be the fallback for the other.
+#
+# Nothing here is copied from WFCD. The mapping is derived from DE's own export:
+# `ExportRegions_en.json` names every node, and the tier names are the five the
+# game itself shows.
+
+# `Modifier` on a mission, `ActiveMissionTier` on a storm. Requiem and Omnia are
+# included because the payload's own allowlist decides what survives, and it is
+# better for that decision to sit in one place than to be pre-filtered here.
+VOID_TIERS = {
+    "VoidT1": "Lith",
+    "VoidT2": "Meso",
+    "VoidT3": "Neo",
+    "VoidT4": "Axi",
+    "VoidT5": "Requiem",
+    "VoidT6": "Omnia",
+}
+
+
+def node_names(exports: dict[str, dict]) -> dict[str, str]:
+    """`SolNode196` -> `"Charybdis (Sedna)"`, from DE's own region export.
+
+    The format is WFCD's, because matching it is the point: the payload and both
+    pages already speak it, and a second spelling would be a second thing to keep
+    in step.
+
+    Proxima is **not** in here and cannot be: `ExportRegions_en.json` carries no
+    `CrewBattleNode*` rows at all, which is the same gap that leaves Railjack
+    enemy levels unknown. Callers get nothing for a storm node rather than a
+    guess.
+    """
+    out: dict[str, str] = {}
+    payload = exports.get("ExportRegions_en.json") or {}
+    for rows in payload.values():
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            uniq = str(row.get("uniqueName") or "")
+            name = str(row.get("name") or "").strip()
+            system = str(row.get("systemName") or "").strip()
+            if uniq and name:
+                out[uniq] = f"{name} ({system})" if system else name
+    return out
+
+
+def _worldstate_instant(value) -> str | None:
+    """DE wrap every time as `{"$date": {"$numberLong": "<ms>"}}`."""
+    try:
+        ms = int(((value or {}).get("$date") or {}).get("$numberLong"))
+    except (TypeError, ValueError):
+        return None
+    return datetime.fromtimestamp(ms / 1000, timezone.utc).isoformat(
+        timespec="milliseconds").replace("+00:00", "Z")
+
+
+def fissures_from_worldstate(doc: dict, names: dict[str, str]) -> list[dict]:
+    """DE's raw worldstate -> the fissure list, in the shape the build consumes.
+
+    Two sources inside the one document, and they are different missions rather
+    than a flag on the same one: `ActiveMissions` is the star chart, `VoidStorms`
+    is Railjack, with its tier under a different key.
+
+    **Storms come back without a node name and that is deliberate.** DE publish
+    no `CrewBattleNode*` in their region export, so there is nothing to resolve
+    the id against; emitting the id itself would put `CrewBattleNode522` on a
+    card, and inventing a name is worse. They are returned with `node: None` so a
+    caller can count what it is missing rather than silently seeing a shorter
+    list — `build_fissures` drops them, and the WFCD proxy remains the only route
+    to a named storm.
+    """
+    out = []
+    for entry in (doc.get("ActiveMissions") or []):
+        tier = VOID_TIERS.get(str(entry.get("Modifier") or ""))
+        ends = _worldstate_instant(entry.get("Expiry"))
+        if not tier or not ends:
+            continue
+        out.append({
+            "node": names.get(str(entry.get("Node") or "")),
+            "tier": tier,
+            "expiry": ends,
+            "isHard": bool(entry.get("Hard")),
+            "isStorm": False,
+        })
+    for entry in (doc.get("VoidStorms") or []):
+        tier = VOID_TIERS.get(str(entry.get("ActiveMissionTier") or ""))
+        ends = _worldstate_instant(entry.get("Expiry"))
+        if not tier or not ends:
+            continue
+        out.append({
+            "node": names.get(str(entry.get("Node") or "")),
+            "tier": tier,
+            "expiry": ends,
+            "isHard": False,
+            "isStorm": True,
+        })
+    return out

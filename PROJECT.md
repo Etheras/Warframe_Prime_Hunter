@@ -1197,7 +1197,7 @@ other becomes an automatic fallback.
 | [api.warframestat.us/items](https://api.warframestat.us/items) | Component names, artwork filenames, vault state | Convenience layer; the drop table can reconstruct parts without it |
 | [`/pc/vaultTrader`](https://api.warframestat.us/pc/vaultTrader) | Live **Prime Resurgence** rotation | Proxies the game worldstate. **Down since 2026-08-27**, and a first-party route exists after all — see §7 gotcha 4 and `TODO.md` |
 | [`/pc/syndicateMissions`](https://api.warframestat.us/pc/syndicateMissions) + [`/pc/events`](https://api.warframestat.us/pc/events) | Which **bounty rotation** is live, and whether the Ghoul Purge or Plague Star is running | Same proxy, same outage, same replacement. The rotation letter is not published anywhere — it is derived by matching the bounties on offer against DE's table (§7) |
-| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **Not used yet.** The whole worldstate, first party — every feed the four rows above proxy | Found 2026-08-27. Raw shapes, so each consumer needs an adapter; `TODO.md` sizes them |
+| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **Void Fissures**, first party, since 2026-08-27. Also carries Resurgence, bounties and events, which have not moved yet | `max-age=28`. Raw shapes, so each consumer needs an adapter; `TODO.md` sizes the three that remain |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
 
@@ -2594,6 +2594,44 @@ its `(V)` `(P)` `(B)` `(S)` markers. So the intended precedence is *first party 
 everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
+
+### Fissures come from Digital Extremes now
+
+**Shipped 2026-08-27**, the day the WFCD proxy's fissure endpoint had been
+404-ing for three days and the deployed planner had been showing none.
+
+`api.warframe.com/cdn/worldState.php` is DE's own worldstate. Fissures live in it
+twice over, as two different kinds of mission rather than a flag on one:
+`ActiveMissions` is the star chart, `VoidStorms` is Railjack with its tier under
+a different key. `official.fissures_from_worldstate` turns both into **exactly
+the shape the WFCD proxy produced** — `node`, `tier`, `expiry`, `isHard`,
+`isStorm` — and that is the design decision worth keeping: the two are
+interchangeable, so either can be the fallback for the other, and `build_fissures`
+downstream never learns which answered.
+
+Nothing is copied from WFCD. The node mapping comes from DE's own
+`ExportRegions_en.json` — `SolNode196` → `"Charybdis (Sedna)"` — and the format
+is WFCD's because *matching* it is the point: the payload and both pages already
+speak it, and a second spelling would be a second thing to keep in step. The tier
+table is the six the game itself shows.
+
+**Railjack storms cannot be named, and are dropped rather than guessed.** DE ship
+no `CrewBattleNode*` row in the region export — 0 of 269 — which is the same gap
+that leaves Railjack enemy levels unknown. Twelve of thirty-one fissures were
+storms on the day this landed. They come out of the adapter with `node: None`,
+the build says how many went, and they are dropped; putting `CrewBattleNode522`
+on a card would be worse, and inventing a name worse still. The proxy can name
+them, so this is the fallback tier earning its place rather than a defect.
+
+**`max-age=28`.** DE built this endpoint to be polled, so a ten-minute build is
+comfortably inside what they ask for — see *"Ask no more often than the source
+says to"*.
+
+One thing this cost, worth recording because it is the failure mode of writing a
+parser against a live source: the first draft of the test asserted an expiry four
+hours out, and the parser was right. Epoch arithmetic is not eyeballable. It was
+checked three ways before the test was changed to match — which is the only safe
+direction to resolve that disagreement, and the opposite of what is tempting.
 
 ### Artwork is first party, and that retired two hosts
 

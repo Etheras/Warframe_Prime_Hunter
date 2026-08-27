@@ -801,6 +801,74 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_fissures_read_from_the_first_party_worldstate() -> None:
+    """
+    DE publish the worldstate at api.warframe.com/cdn/worldState.php and we read
+    the fissures straight from it. The output has to be the shape the WFCD proxy
+    produced, to the letter, because `build_fissures` consumes it either way and
+    the two must stay interchangeable — whichever is the fallback for the other.
+
+    The node format is the one that matters and is easiest to get subtly wrong:
+    `"Charybdis (Sedna)"`, name then system in brackets. Both pages and the
+    payload already speak it, and a second spelling would be a second thing to
+    keep in step.
+
+    Frozen inputs rather than the live document: what is asserted is the
+    mapping, and a test that fetched the worldstate would assert the weather.
+    """
+    regions = {"ExportRegions_en.json": {"ExportRegions": [
+        {"uniqueName": "SolNode196", "name": "Charybdis", "systemName": "Sedna"},
+        {"uniqueName": "SolNode1", "name": "Galatea", "systemName": "Neptune"},
+        {"uniqueName": "SolNodeNoSystem", "name": "Somewhere", "systemName": ""},
+    ]}}
+    names = official.node_names(regions)
+    check("worldstate: a node id becomes name and system",
+          names.get("SolNode196"), "Charybdis (Sedna)")
+    check("worldstate: no system means no empty brackets",
+          names.get("SolNodeNoSystem"), "Somewhere")
+    check("worldstate: Proxima is absent and stays absent",
+          names.get("CrewBattleNode522"), None,
+          "DE ship no CrewBattleNode rows; inventing one would be worse than none")
+
+    # 2026-08-27T07:30:25.511Z — checked three ways rather than eyeballed, after
+    # a first draft of this test asserted a time four hours out and the parser
+    # turned out to be the one telling the truth.
+    ms = 1787815825511
+    doc = {
+        "ActiveMissions": [
+            {"Node": "SolNode196", "Modifier": "VoidT4",
+             "Expiry": {"$date": {"$numberLong": str(ms)}}, "Hard": True},
+            {"Node": "SolNode1", "Modifier": "VoidT1",
+             "Expiry": {"$date": {"$numberLong": str(ms)}}},
+            # unusable, and each for its own reason
+            {"Node": "SolNode1", "Modifier": "VoidT9",
+             "Expiry": {"$date": {"$numberLong": str(ms)}}},
+            {"Node": "SolNode1", "Modifier": "VoidT1"},
+        ],
+        "VoidStorms": [
+            {"Node": "CrewBattleNode522", "ActiveMissionTier": "VoidT1",
+             "Expiry": {"$date": {"$numberLong": str(ms)}}},
+        ],
+    }
+    got = official.fissures_from_worldstate(doc, names)
+    check("worldstate: an unknown tier and a missing expiry are both dropped",
+          len(got), 3, "two of the four ActiveMissions are unusable")
+    check("worldstate: a star-chart fissure comes out in the proxy's shape",
+          got[0], {"node": "Charybdis (Sedna)", "tier": "Axi",
+                   "expiry": "2026-08-27T07:30:25.511Z",
+                   "isHard": True, "isStorm": False})
+    check("worldstate: Hard is a flag by absence, not a false",
+          got[1]["isHard"], False)
+    check("worldstate: a storm is a storm, and unnamed",
+          (got[2]["isStorm"], got[2]["node"], got[2]["tier"]), (True, None, "Lith"))
+
+    # ...and the build drops the unnamed one rather than shipping an id.
+    live = build_data.build_fissures(
+        got, datetime.datetime(2026, 8, 27, 6, 0, tzinfo=datetime.timezone.utc))
+    check("worldstate: only named fissures reach the payload",
+          sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
+
+
 def test_artwork_prefers_digital_extremes() -> None:
     """
     Artwork is first party since 2026-08-27. DE's `ExportManifest.json` gives a
@@ -920,9 +988,14 @@ def test_an_unreadable_export_index_degrades_instead_of_crashing() -> None:
         # number is not the point and never was: the two paths have to agree, and
         # this is what says so out loud when one of them grows.
         check("export: gives up with the four values the caller unpacks", len(got), 4)
-        primes, levels, digest, textures = got           # the line that used to raise
+        primes, levels, digest, extra = got              # the line that used to raise
         check("export: and they are empty rather than wrong",
-              (primes, levels, digest, textures), ([], {}, None, {}))
+              (primes, levels, digest), ([], {}, None))
+        # The fourth is a named bag so the tuple stops growing — but it must
+        # still carry every key the caller reads, or the giving-up path trades a
+        # ValueError for a KeyError and nothing is gained.
+        check("export: and the bag has the keys the caller reads, empty",
+              extra, {"textures": {}, "nodeNames": {}})
     finally:
         build_data.fetch = real
 
@@ -2233,6 +2306,7 @@ def main() -> int:
                          test_a_blocked_host_is_routed_around,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
+                         test_fissures_read_from_the_first_party_worldstate,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
