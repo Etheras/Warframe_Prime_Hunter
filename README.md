@@ -426,6 +426,14 @@ and the big number on each row changes from *per reward* to *per minute* to say
 so. Types you leave blank are costed at the average of the ones you filled in and
 are drawn in amber on the row, so a borrowed number never looks like one of yours.
 
+Underneath those, two more: **getting in** and **getting out** — the part of a run
+that costs the same however far you take it, charged once rather than per round.
+Because it is fixed, it falls almost entirely on short missions: about 35 seconds
+a run makes a Capture cost 39% more and its rate drop 28%, against 2% for a
+six-round Survival. Both are kept separate because they are two different waits,
+and both wait until some mission type above them has minutes of its own — seconds
+cannot be charged against a reward count.
+
 Why it is worth filling in: against one player's own timings, ranking per minute
 moved Capture and Exterminate nodes up over a hundred places and dropped Spy by a
 factor of ten. That is far too big to ignore and far too personal to ship a default

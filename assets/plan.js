@@ -1425,8 +1425,16 @@
           /* A borrowed number stays visible even after the corner was cut back:
              a guess you can see beats a guess you cannot. */
           n.minutesAssumed ? ` · <span class="est" data-tip="${esc(
-            "No minutes set for " + n.mode + ", so it is costed at the average\n" +
-            "of the types you did set.")
+            "No minutes set for " + n.mode + ", so its reward is costed at the\n" +
+            "average of the types you did set." +
+            /* Said only when there is one. The figure on the chip is the whole
+               cost of the run, and once an overhead exists that is no longer
+               all of it "costed at the average" - a sentence that explains a
+               number has to explain the number actually shown. */
+            (opts.runStart + opts.runEnd > 0
+              ? "\nGetting in and out adds " + n2(opts.runStart + opts.runEnd) +
+                " min on top, once."
+              : ""))
           }">est. ${n2(n.minutes)} min</span>` : ""}${
           n.aya ? ` · <span class="aya" data-tip="${esc(
             "Drops Aya at " + pct(n.aya / 100) + " a reward, counted as " +
