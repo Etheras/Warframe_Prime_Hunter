@@ -738,10 +738,21 @@ def test_offline_build() -> None:
             shutil.copy2(saved_log, changelog)
         shutil.rmtree(keep, ignore_errors=True)
 
+    # Every file that existed before must be byte-identical after. Files that did
+    # NOT exist before are allowed to exist now, and that is not a loophole — it
+    # is the case CI runs in. A fresh checkout has no `data/` at all (it is
+    # generated and gitignored), the suite runs before the build step, and
+    # leaving a built payload behind there destroys no freshness markers because
+    # there were none. Deleting it instead would break the ordering the entry
+    # warned about: `test_built_payload` and the bundle checks read `data/` and
+    # benefit from it existing.
+    #
     # Asserted rather than assumed: a restore that quietly did nothing would
     # leave exactly the state this test exists to prevent, and look like a pass.
-    check("offline build: leaves data/ as it found it", _tree_state(data_dir, changelog),
-          before, "the freshness markers this run overwrote were not put back")
+    after = _tree_state(data_dir, changelog)
+    check("offline build: leaves data/ as it found it",
+          {name: after.get(name) for name in before}, before,
+          "the freshness markers this run overwrote were not put back")
 
 
 def test_parts_are_digital_extremes_own_numbers() -> None:
