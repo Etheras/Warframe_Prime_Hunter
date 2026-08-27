@@ -520,6 +520,22 @@ def _worldstate_instant(value) -> str | None:
         timespec="milliseconds").replace("+00:00", "Z")
 
 
+def rotation_letter(path: str) -> str | None:
+    """The rotation letter a bounty's reward-table path states outright.
+
+        /Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/TierATableCRewards
+                                                                    ^^^^^^
+
+    `Tier` is the level bracket and `Table` is the rotation; only the second is
+    wanted, which is the trap in reading this by eye. Anything outside A/B/C is
+    refused rather than passed through, because this feeds the letter the page
+    counts down with and a stray value there is worse than none.
+    """
+    found = re.search(r"Table([A-Z])Rewards\b", str(path or ""))
+    letter = found.group(1) if found else None
+    return letter if letter in ("A", "B", "C") else None
+
+
 def vault_trader_from_worldstate(doc: dict) -> dict | None:
     """DE's raw worldstate -> Varzia's stock, in the shape the build consumes.
 

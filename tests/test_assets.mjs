@@ -1047,6 +1047,37 @@ test("a stale live feed is named for the reader, dated, and does not condemn the
                              undefined, false, NOW), null);
 });
 
+/* Two independent readings of the bounty rotation letter agree today. The day
+   they stop is the day something moved upstream — a renamed reward table, a
+   changed sequence — and a countdown labelled with a letter nobody can vouch for
+   is worse than no countdown. So it is said out loud, and above staleness,
+   because late data is a nuisance while a ranking built on the wrong rotation is
+   simply wrong. */
+test("the bounty rotation disagreeing with itself raises the banner on its own", () => {
+  const { S } = loadShared();
+  const NOW = Date.parse("2026-08-27T09:00:00Z");
+  const meta = (agrees) => ({
+    generated: "2026-08-27T08:50:00Z", stale: [], degraded: [],
+    bounties: { families: {
+      standard: { letter: "C", crossCheck: { vote: agrees ? "C" : "A", agrees } },
+      vault: { letter: "A", crossCheck: { vote: "A", agrees: true } },
+    } },
+  });
+
+  assert.equal(S.staleNotice(meta(true), undefined, false, NOW), null,
+               "agreeing is the ordinary case and must stay silent");
+
+  const split = S.staleNotice(meta(false), undefined, false, NOW);
+  assert.ok(split, "a fresh build can still be ranking bounties for the wrong rotation");
+  assert.equal(split.level, "bad", "this is wrong data, not late data");
+  assert.match(split.html, /bounty rotation is uncertain/i);
+  assert.match(split.html, /label it <b>C<\/b>/, "says what DE printed");
+  assert.match(split.html, /say <b>A<\/b>/, "and what the rewards implied");
+  assert.ok(!/meta\.bounties/.test(split.html), "a guest cannot go and look");
+  assert.match(S.staleNotice(meta(false), undefined, true, NOW).html, /meta\.bounties/,
+               "the owner can");
+});
+
 test("the banner's other three states still say their own thing", () => {
   const { S } = loadShared();
   const NOW = Date.parse("2026-08-27T09:00:00Z");

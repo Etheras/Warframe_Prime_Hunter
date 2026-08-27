@@ -869,6 +869,32 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
 
 
+def test_the_rotation_letter_is_read_then_cross_checked() -> None:
+    """
+    The letter Digital Extremes print on each bounty is the primary reading, and
+    matching the rewards on offer against their own tables is the cross-check.
+    Two independent methods; the day they disagree, the page says so.
+
+    The gate below is the part that matters and the part I nearly shipped
+    without. A tier that publishes only table A says `TableA` every hour of every
+    day, because that is its only table — read as a rotation letter it is a
+    confident answer to a question nobody asked. Level 100-100 and Level 40-60
+    Cambion Drift are exactly that, and on the reading this was written against
+    they were five of twenty-one jobs: enough to swing a family had the rest been
+    closer. So the label is only believed from a tier publishing all three,
+    which is the same gate the vote already applied.
+    """
+    check("rotation: the letter is the Table, never the Tier",
+          official.rotation_letter(
+              "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/TierATableCRewards"),
+          "C", "Tier is the level bracket; reading it instead is the obvious slip")
+    check("rotation: anything outside A/B/C is refused",
+          [official.rotation_letter(p) for p in
+           ("/x/TierATableZRewards", "/x/TableCRewardsExtra", "", None, "/x/TierC")],
+          [None, None, None, None, None],
+          "a stray letter would reach the countdown the page draws")
+
+
 def test_resurgence_reads_from_the_first_party_worldstate() -> None:
     """
     Varzia's stock, from DE's own worldstate rather than the WFCD proxy.
@@ -2405,6 +2431,7 @@ def main() -> int:
                          test_artwork_prefers_digital_extremes,
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,
+                         test_the_rotation_letter_is_read_then_cross_checked,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,

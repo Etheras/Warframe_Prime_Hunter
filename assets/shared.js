@@ -368,8 +368,14 @@
     const built = m.generated ? new Date(m.generated) : null;
     const days = built ? Math.floor((now - built.getTime()) / 86400000) : 0;
     const moved = up && up.stale && (up.moved || []).length ? up.moved : null;
+    /* Two independent readings of the bounty rotation letter disagreeing is its
+       own reason to speak, so it is counted before the "nothing to say" guard
+       rather than after it — an otherwise perfectly fresh build can still be
+       ranking bounties for the wrong rotation. */
+    const split = Object.keys((m.bounties || {}).families || {})
+      .filter((f) => (m.bounties.families[f].crossCheck || {}).agrees === false);
     const old = !stale && !degraded && !moved && days >= 14;
-    if (!stale && !degraded && !moved && !old) return null;
+    if (!stale && !degraded && !moved && !old && !split.length) return null;
 
     const fix = yours ? " Double-click <code>refresh-data.cmd</code> to update it." : "";
 
@@ -384,6 +390,29 @@
                      + esc(degraded.join(", "))
                      + ", so items or drop locations may be absent." + fix };
     }
+    /* Two independent readings of the bounty rotation letter — the one DE print
+       on each job, and the one derived by matching the rewards on offer against
+       their own tables. They agree, and the day they stop is the day something
+       upstream moved: a renamed reward table, a changed sequence, a tier that
+       gained or lost a rotation. Averaging that away would leave a countdown
+       labelled with a letter nobody can vouch for, which is worse than no
+       countdown — so it is said out loud instead.
+
+       Deliberately above `stale`: late data is a nuisance, a ranking built on
+       the wrong rotation is wrong. */
+    if (split.length) {
+      const one = m.bounties.families[split[0]];
+      return {
+        level: "bad",
+        html: "<b>The bounty rotation is uncertain.</b> Two readings of which "
+              + "rotation is live disagree — Digital Extremes label it <b>"
+              + esc(String(one.letter)) + "</b>, while the rewards on offer say <b>"
+              + esc(String((one.crossCheck || {}).vote)) + "</b>. Bounty rows may "
+              + "be ranked for the wrong rotation until this is looked at."
+              + (yours ? " Something changed upstream; see <code>meta.bounties</code>." : ""),
+      };
+    }
+
     if (stale) {
       const feeds = feedNames(stale);
       const liveOnly = stale.every((k) => Object.prototype.hasOwnProperty.call(FEEDS, k));

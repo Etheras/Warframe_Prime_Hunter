@@ -2651,6 +2651,48 @@ everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
 
+### The rotation letter is read, then cross-checked, and says so if the two differ
+
+**Decided by the owner and shipped 2026-08-27.** This project had said for months
+that the bounty rotation letter *"is not published anywhere"* and derived it by
+matching the rewards on offer against DE's own tables, one vote per job. DE do
+publish it: every bounty job carries a reward-table path, and the letter is in it.
+
+```
+/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/TierATableCRewards
+                                                            ^^^^^^
+```
+
+**`Tier` is the level bracket and `Table` is the rotation.** Reading the first is
+the obvious slip and a test asserts against it.
+
+So the label is now the primary reading and the vote is the cross-check. Two
+independent methods, and they agreed on the day this landed — `standard: C` from
+16 of 17 labelled jobs, with the vote also saying `C`; `vault: A`, 8 of 8, vote
+`A`. Two methods agreeing is worth more than either alone.
+
+**The gate is the part that matters, and it was nearly missed.** A tier that
+publishes only table A says `TableA` every hour of every day, because that is its
+only table — read as a rotation letter it is a confident answer to a question
+nobody asked. *Level 100-100* and *Level 40-60 Cambion Drift* are exactly that,
+and in the first working version they were **five of twenty-one jobs**: enough to
+swing a family had the rest been closer. The label is therefore believed only
+from a tier publishing all three letters, which is the same gate the vote had
+applied all along and for the same reason. The first draft applied it to the vote
+and not the label, produced a plausible answer, and was wrong.
+
+**And the day they disagree, the page says so.** `meta.bounties.families[…]`
+carries `from` and `crossCheck`, and `staleNotice` raises the existing databar —
+`bad`, above staleness, because late data is a nuisance while a ranking built on
+the wrong rotation is simply wrong. Averaging the two would leave a countdown
+labelled with a letter nobody can vouch for. It reuses the banner rather than
+inventing a second one, at the owner's direction: new text, no new machinery.
+
+**Independent of where the feed comes from.** The letter is read off the
+reward-table path, which is the same string whether DE or the WFCD proxy supplied
+the document — so this works today, on the proxy, and will keep working when the
+bounty adapter lands.
+
 ### Prime Resurgence comes from Digital Extremes now
 
 **Shipped 2026-08-27**, the same day as the fissures and by the same pattern.

@@ -506,6 +506,7 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
     sequence; the page walks it forward from `windowEnd`.
     """
     votes: dict[str, dict[str, int]] = {}
+    labels: dict[str, dict[str, int]] = {}
     ends: dict[str, list[str]] = {}
     now = now or datetime.now(timezone.utc)
     offering = [e for e in syndicate_missions or []
@@ -516,30 +517,62 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
         for job in entry.get("jobs") or []:
             live = set(job.get("rewardPool") or [])
             levels = job.get("enemyLevels") or []
-            if not live or not levels:
+            label = official.rotation_letter(job.get("uniqueName"))
+            if not levels:
                 continue
             for group, rotations in (pools.get(sid) or {}).items():
-                # Only a bounty publishing all three letters can distinguish
-                # them. A couple of tiers publish two - Level 30-40 Cambion
-                # Drift is one - and there a single subset hit says nothing
-                # about which letter is up, only that one of the two tables it
-                # does publish happens to cover today's rewards.
+                # The family comes from the levels and nothing else, which is
+                # why it is settled before either method runs: the label states
+                # the table and says nothing about whether this is a vault
+                # bounty, and Deimos offers both at once.
+                if official.group_levels(group) != list(levels):
+                    continue
+                fam = bounty_family(group)
+
+                # Only a bounty publishing all three letters can name one, and
+                # that gate is the *label's* too, not just the vote's. Level
+                # 100-100 and Level 40-60 Cambion Drift publish table A alone,
+                # so their path says `TableA` every hour of every day and means
+                # only "this tier has one table" — read as a rotation letter it
+                # is a confident answer to a question that was never asked. That
+                # is five of twenty-one jobs on the reading this was written
+                # against, enough to have swung a family had the split been
+                # closer.
                 if set(rotations) != set(SEQUENCE):
                     continue
-                if official.group_levels(group) != list(levels):
+
+                # Primary: the letter DE print on the job.
+                if label:
+                    labels.setdefault(fam, {})
+                    labels[fam][label] = labels[fam].get(label, 0) + 1
+                    if entry.get("expiry"):
+                        ends.setdefault(fam, []).append(entry["expiry"])
+
+                # Cross-check: match what is on offer against what each letter
+                # pays. A single subset hit on a tier publishing two tables says
+                # nothing about which letter is up, only that one of the two
+                # happens to cover today's rewards - so ties abstain.
+                if not live:
                     continue
                 hits = [rot for rot, names in rotations.items() if live <= names]
                 if len(hits) != 1:
                     continue                      # ambiguous: abstain
-                fam = bounty_family(group)
                 votes.setdefault(fam, {})
                 votes[fam][hits[0]] = votes[fam].get(hits[0], 0) + 1
-                if entry.get("expiry"):
+                if not label and entry.get("expiry"):
                     ends.setdefault(fam, []).append(entry["expiry"])
 
+    def top(tally):
+        return max(tally, key=lambda k: (tally[k], k)) if tally else None
+
     families = {}
-    for fam, tally in votes.items():
-        letter = max(tally, key=lambda k: (tally[k], k))
+    for fam in sorted(set(labels) | set(votes)):
+        label_tally, vote_tally = labels.get(fam) or {}, votes.get(fam) or {}
+        from_label, from_vote = top(label_tally), top(vote_tally)
+        letter = from_label or from_vote
+        if letter is None:
+            continue
+        tally = label_tally if from_label else vote_tally
         families[fam] = {
             "letter": letter,
             # when this letter stops being the live one; the page counts down to
@@ -547,6 +580,13 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
             "windowEnd": min(ends[fam]) if ends.get(fam) else None,
             "votes": tally[letter],
             "of": sum(tally.values()),
+            # Which method answered, and whether the other agreed. Two
+            # independent readings that agree is worth more than either alone;
+            # the interesting case is the day they stop agreeing, and that is
+            # what the page raises a banner about rather than quietly averaging.
+            "from": "label" if from_label else "vote",
+            "crossCheck": ({"vote": from_vote, "agrees": from_vote == from_label}
+                           if from_label and from_vote else None),
         }
     return families
 

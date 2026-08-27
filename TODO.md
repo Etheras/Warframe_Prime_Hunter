@@ -124,6 +124,7 @@ ranking divides by means the same thing on every row.
 | Entry | Size |
 |---|---|
 | The live worldstate has a first-party route — two feeds still to move | session — fissures and Resurgence shipped 2026-08-27; bounties and events remain |
+| One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
@@ -738,6 +739,34 @@ and the drop tables disagree about `Chassis` versus `Chassis Blueprint`, so a
 third spelling arriving from DE needs to go through the same funnel rather than
 around it.
 
+### One Cambion Drift tier labels a different letter from the rest of its family
+
+**Found 2026-08-27**, while implementing the rotation-letter cross-check, and
+left alone because it does not change today's answer and the fix is not obvious.
+
+With the three-table gate applied, the standard family reads **16 of 17** jobs as
+`C`. The one dissenter is a job at levels `[25, 30]` whose reward-table path says
+`TableA`, matched to *Level 25 - 30 Cambion Drift Bounty* — a group that does
+publish all three tables, so the gate does not exclude it and its label is a
+genuine claim.
+
+**The suspicion is that it is filed in the wrong family.** Its rewards read as
+Isolation Vault — Ayatan Amber Star, Carnis Mandible — while the family is
+decided purely by matching `group_levels`, and an Isolation Vault bounty sharing
+levels with a Cambion Drift tier would land in `standard` regardless of what it
+actually is. If that is right, the vault family is under-counted by one and the
+standard family carries a stray.
+
+**Why it is not urgent.** Sixteen against one is not close, the cross-check
+agrees on `C`, and the vote abstains on that job entirely rather than dissenting
+— so nothing shipped is wrong today. What it costs is margin: a family decided
+16–1 is one upstream change away from being decided 9–8.
+
+Worth checking against a live window rather than the cached one, since a single
+reading cannot tell a misfiled job from a genuinely different phase on Deimos.
+If Deimos really does run its own rotation phase, the family split is too coarse
+and that is a larger and more interesting problem than a misfiled bounty.
+
 ### The live worldstate has a first-party route — two feeds still to move
 
 **Fissures and Prime Resurgence moved on 2026-08-27 and work; bounties
@@ -767,15 +796,11 @@ produced `standard: C` and `vault: A` the same day. Ostrons and Solaris United
 are all C; Entrati carries both, 2 C and 7 A, which is precisely the standard
 and vault families the build already separates.
 
-So two completely independent methods agree, which is worth more than either on
-its own. It leaves a **decision rather than a puzzle**, and it is the owner's:
-
-- **Keep the vote and use the path as a cross-check.** Safest. The vote is
-  battle-tested and handles the family split; a disagreement between the two
-  becomes a loud signal that something upstream changed.
-- **Read the letter from the path.** Simpler and direct, but it still needs the
-  family split from somewhere — the path gives the letter, not whether a job is
-  a vault bounty, which today comes from matching `group_levels`.
+**Settled by the owner on 2026-08-27 and shipped the same day: read the label,
+cross-check with the vote, and raise a banner if they ever disagree.** See
+`PROJECT.md §7`. The rest of this entry is what is still outstanding — the DE
+adapters for these two feeds — and the letter change is independent of it,
+because it reads the same reward-table path whether the proxy or DE supplied it.
 
 **Do not ship a partial adapter here.** `derive_bounty_rotation` reads
 `job.rewardPool`, a list of reward *names*, and DE publish a reward-table *path*
