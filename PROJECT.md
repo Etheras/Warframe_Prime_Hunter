@@ -2826,6 +2826,45 @@ measures **7.82:1**, above the 7:1 AAA floor for small text — `STYLE.md`'s tab
 quotes the same token at 7.00:1 against `--panel-2`, which is the worst surface
 it meets and the one that governs.
 
+### The test suite puts `data/` back
+
+**Fixed 2026-08-27.** `test_offline_build` runs `python tools/build_data.py
+--offline` twice, to check the build is deterministic, with `cwd=ROOT` — so every
+full test run rewrote the repository's real `data/`.
+
+Nothing is *lost* by that: `data/` is generated and gitignored. What was lost is
+**the truth about freshness, silently.** An offline build reads every source from
+the cache without marking anything stale — correctly, because `--offline` asks for
+exactly that — so `meta.stale` comes back `[]` and `meta.staleSince` `null`
+however the network is really doing. A payload that knew it was behind was
+replaced by one that claimed it was fresh, and the staleness banner went quiet.
+
+That cost two wrong readings in a single afternoon: a build stamped `stale: []`
+was taken as evidence the API was healthy, and later a rebuilt payload with no
+stale markers was read as an outage having ended. It had not — the suite had run
+in between. Both were caught only by checking the endpoint by hand, which is the
+check the banner exists to save.
+
+It cost a third on the day it was fixed, in a different disguise. A deliberate
+one-character mutation was made to `official.py` to prove a new test could fail,
+the suite was run, and the mutation reverted — and the suite then failed against a
+`data/` that had been rebuilt *from the mutated source* and left behind. The
+failure looked exactly like the revert not having worked.
+
+**Snapshot and restore, in a `finally`, with the restore asserted.** The test
+copies `data/` and `CHANGELOG.md` aside, runs the real command the real way, and
+puts them back whether it passed, failed or threw. Then it checks the tree hashes
+match what it found — because a restore that quietly did nothing would leave
+precisely the state this exists to prevent, and would look like a pass.
+
+Building into a temp directory was the other option and was declined: `DATA_DIR`
+is derived from the tool's own location rather than from the working directory, so
+pointing it elsewhere means inventing a flag for the tests' benefit, and this
+test's whole value is that it runs the real command the real way.
+
+Same family as the rule about `localhost:8777`: **a test that quietly rewrites
+the working state will mislead somebody, and this one already had, three times.**
+
 ### What a Prime is built from is Digital Extremes' own answer now
 
 **Shipped 2026-08-27**, and it was the largest remaining WFCD dependency in the

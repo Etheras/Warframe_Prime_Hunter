@@ -650,31 +650,98 @@ def test_built_payload() -> None:
 # integration
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _tree_state(*paths: str) -> dict[str, str]:
+    """Size and mtime of everything under `paths`, for "did we put it back?"."""
+    import hashlib                                          # noqa: PLC0415
+    out: dict[str, str] = {}
+    for path in paths:
+        if os.path.isfile(path):
+            with open(path, "rb") as fh:
+                out[os.path.basename(path)] = hashlib.sha256(fh.read()).hexdigest()[:16]
+        elif os.path.isdir(path):
+            for entry in sorted(os.listdir(path)):
+                full = os.path.join(path, entry)
+                if os.path.isfile(full):
+                    with open(full, "rb") as fh:
+                        out[entry] = hashlib.sha256(fh.read()).hexdigest()[:16]
+    return out
+
+
 def test_offline_build() -> None:
     """
     A rebuild from the warm cache must succeed and be deterministic. This is the
     path --if-changed takes on every scheduled run.
+
+    **It writes the repository's real `data/`, so it puts it back.** Until
+    2026-08-27 it did not, and that was not a tidiness problem: an offline build
+    reads every source from the cache without marking anything stale — correctly,
+    because `--offline` asks for exactly that — so `meta.stale` comes back `[]`
+    and `meta.staleSince` `null` however the network is really doing. Every full
+    test run therefore replaced a payload that knew it was behind with one that
+    said it was fresh, and the staleness banner went quiet. That cost two wrong
+    readings in one afternoon: a build stamped `stale: []` was taken as evidence
+    the API was healthy, and later a rebuilt payload with no stale markers was
+    read as an outage having ended. It had not; the suite had run in between.
+
+    It also caught a mutation test out on the day this was written. A deliberate
+    one-character change to `official.py` was made, the suite run, the change
+    reverted — and the suite then failed against a `data/` that had been rebuilt
+    from the mutated source and left behind. The failure looked like the revert
+    not working.
+
+    Snapshot-and-restore rather than building into a temp directory: this test's
+    whole point is that the real command, run the real way, works and is
+    deterministic, and `DATA_DIR` is derived from the tool's own location rather
+    than from the working directory, so there is nowhere else to point it without
+    inventing a flag for the tests' benefit.
     """
     if not os.path.isdir(os.path.join(ROOT, ".cache")):
         print("  skip offline build (no warm cache)")
         return
-    r = subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
-                       cwd=ROOT, capture_output=True, text=True)
-    check("offline build: exits 0", r.returncode, 0, r.stderr[-400:])
 
-    first = read_json(os.path.join(ROOT, "data", "prime-data.json"))
-    subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
-                   cwd=ROOT, capture_output=True, text=True)
-    second = read_json(os.path.join(ROOT, "data", "prime-data.json"))
-    for d in (first, second):
-        d["meta"].pop("generated", None)
-        # The fissure list is filtered against the clock by design, so a fissure
-        # closing between these two builds is the feature working, not the build
-        # being non-deterministic. Left in, it would fail about one run in two
-        # hundred and look like a real fault every time.
-        d.pop("fissures", None)
-    check("offline build: deterministic", first == second,  True,
-          "two builds from the same cache must agree")
+    data_dir = os.path.join(ROOT, "data")
+    changelog = os.path.join(ROOT, "CHANGELOG.md")   # appended to on a change
+    before = _tree_state(data_dir, changelog)
+    keep = tempfile.mkdtemp(prefix="primehunter-data-")
+    try:
+        if os.path.isdir(data_dir):
+            shutil.copytree(data_dir, os.path.join(keep, "data"))
+        if os.path.isfile(changelog):
+            shutil.copy2(changelog, os.path.join(keep, "CHANGELOG.md"))
+
+        r = subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
+                           cwd=ROOT, capture_output=True, text=True)
+        check("offline build: exits 0", r.returncode, 0, r.stderr[-400:])
+
+        first = read_json(os.path.join(data_dir, "prime-data.json"))
+        subprocess.run([sys.executable, "tools/build_data.py", "--offline"],
+                       cwd=ROOT, capture_output=True, text=True)
+        second = read_json(os.path.join(data_dir, "prime-data.json"))
+        for d in (first, second):
+            d["meta"].pop("generated", None)
+            # The fissure list is filtered against the clock by design, so a
+            # fissure closing between these two builds is the feature working,
+            # not the build being non-deterministic. Left in, it would fail about
+            # one run in two hundred and look like a real fault every time.
+            d.pop("fissures", None)
+        check("offline build: deterministic", first == second,  True,
+              "two builds from the same cache must agree")
+    finally:
+        # `finally`, because a failed assertion above must not leave the owner's
+        # freshness markers overwritten — that is the whole defect.
+        saved = os.path.join(keep, "data")
+        if os.path.isdir(saved):
+            shutil.rmtree(data_dir, ignore_errors=True)
+            shutil.copytree(saved, data_dir)
+        saved_log = os.path.join(keep, "CHANGELOG.md")
+        if os.path.isfile(saved_log):
+            shutil.copy2(saved_log, changelog)
+        shutil.rmtree(keep, ignore_errors=True)
+
+    # Asserted rather than assumed: a restore that quietly did nothing would
+    # leave exactly the state this test exists to prevent, and look like a pass.
+    check("offline build: leaves data/ as it found it", _tree_state(data_dir, changelog),
+          before, "the freshness markers this run overwrote were not put back")
 
 
 def test_parts_are_digital_extremes_own_numbers() -> None:

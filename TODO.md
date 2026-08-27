@@ -127,7 +127,6 @@ ranking divides by means the same thing on every row.
 | *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
-| Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
@@ -879,45 +878,6 @@ been hunted**: it needed two consecutive full runs to appear once, and only a fe
 full runs have happened since. Leave this entry open until somebody runs the
 suite enough times to say. If it does recur, the fifty-contexts theory is dead
 and the next suspect is the per-assertion detail this entry already asks for.
-
-### Running the tests rebuilds `data/` underneath you
-
-**Found 2026-08-27**, after it caused the same confusion twice in one session.
-`test_offline_build` runs `python tools/build_data.py --offline` — twice, to
-check determinism — with `cwd=ROOT`, so it writes the repository's real
-`data/prime-data.js`. Every full test run therefore replaces whatever was built
-there with an offline rebuild.
-
-Nothing is lost: `data/` is generated and gitignored. What is lost is **the
-truth about freshness**, and silently. An offline build reads every source from
-the cache without marking anything stale — correctly, because `--offline` is a
-request for exactly that — so `meta.stale` comes back `[]` and `meta.staleSince`
-`null` no matter what the network is doing. Load the page after a test run and
-the banner is gone, whatever the real state of the feeds.
-
-That cost two wrong readings here on one afternoon: a build stamped `stale: []`
-was taken as evidence the API was healthy, and later a rebuilt-at-07:43 payload
-with no stale markers was taken as the outage having ended. It had not; the test
-suite had simply run in between. Both were caught, but only by going and
-checking the endpoint by hand — which is the check the banner exists to save.
-
-**The fix is to stop it writing there**, not to remember the footgun. Build into
-a temp directory and compare, the way `test_clone_and_build` already does, or
-save and restore `data/` around it. Watch the ordering: `test_built_payload` and
-the bundle checks read `data/` and currently benefit from it existing, so
-whatever replaces this has to leave a dataset behind or run after them.
-
-Related in spirit to the rule about `localStorage` on 8777: a test that quietly
-rewrites the owner's working state is a test that will mislead somebody, and it
-has.
-
-**It is not, however, a race.** The runner walks its groups strictly in order and
-one test at a time, so `test_offline_build` finishes long before the browser group
-starts and nothing reads `data/` while it is being written. That explanation was
-written into this entry on 2026-08-27 and deleted the same hour, once the loop in
-`main()` was actually read. It is recorded here only because it is a plausible
-story that survives a glance and dies on inspection — see the separate entry on
-the page tests flaking, which is the real observation it was invented to explain.
 
 ### A backend refresh finds new fissures and the ranking does not move
 
