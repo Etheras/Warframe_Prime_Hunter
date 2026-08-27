@@ -133,11 +133,17 @@ it is load-bearing rather than pedantic. On 2026-08-24 the WFCD worldstate proxy
 began returning 404 and stayed down for days while DE's own worldstate was
 served, complete, the entire time.
 
-- **[warframe-drop-data](https://github.com/WFCD/warframe-drop-data)** — MIT
-  licensed. DE's official drop tables, parsed into JSON, used as Warframe Prime
-  Hunter's automatic fallback when warframe.com is unreachable.
+- **[warframe-drop-data](https://github.com/WFCD/warframe-drop-data)** — **MIT**
+  licensed, © 2017 Christopher Kaster. DE's official drop tables, parsed into
+  JSON, used as Warframe Prime Hunter's automatic fallback when warframe.com is
+  unreachable.
+- **[warframe-items](https://github.com/WFCD/warframe-items)** — **MIT**
+  licensed, © 2017 Kaptard. Not requested by name, and credited because it is
+  reached anyway: `cdn.warframestat.us/img/<file>` answers **301** to
+  `raw.githubusercontent.com/wfcd/warframe-items/master/data/img/<file>`, so this
+  repository is where the artwork a visitor's browser loads actually comes from.
 - **[warframe-status](https://github.com/WFCD/warframe-status)** —
-  Apache-2.0 licensed. Powers `api.warframestat.us`, used for item metadata,
+  **MIT** licensed, © 2017 nspacestd. Powers `api.warframestat.us`, used for item metadata,
   component lists, artwork filenames, and four reads of the game worldstate: the
   live Prime Resurgence rotation (`/pc/vaultTrader`), which bounties are on offer
   and therefore which rotation letter is live (`/pc/syndicateMissions`), which

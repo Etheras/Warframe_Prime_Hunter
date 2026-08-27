@@ -208,8 +208,8 @@ Reading how somebody solved a mapping and writing our own is fine and is what
 that entry means. Vendoring their tables, copying their parser, or adding their
 package is not, and would need both steps above first — including for a mapping
 table lifted verbatim, which is code wearing a data hat. `NOTICE.md` already
-credits WFCD for **data** under MIT / Apache-2.0; that credit does not extend
-itself to code nobody has checked.
+credits WFCD for **data** under MIT; that credit does not extend itself to code
+nobody has checked.
 
 ### Showing a proposal before building it
 

@@ -689,7 +689,10 @@
       link("https://wiki.warframe.com/w/Prime", "WARFRAME Wiki") +
       " (CC BY-SA); item and worldstate data via " +
       link("https://github.com/WFCD", "WFCD") +
-      " (MIT / Apache-2.0). Warframe Prime Hunter's own code is MIT licensed." +
+      /* MIT, checked against the LICENSE files on 2026-08-27. This said
+         "MIT / Apache-2.0" until then, on every page and on the deployed site:
+         all three WFCD repositories we touch are MIT. */
+      " (MIT). Warframe Prime Hunter's own code is MIT licensed." +
       "</p>";
     feet.forEach((foot) => { foot.innerHTML = html; });
   }

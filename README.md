@@ -778,7 +778,7 @@ fan works. That policy sets three practical limits:
 Warframe Prime Hunter satisfies all three, and the site footer says so on every page.
 
 Data sources and their licences (catalogue from the WARFRAME Wiki under CC BY-SA,
-item and worldstate data from WFCD under MIT and Apache-2.0) are listed in
+item and worldstate data from WFCD under MIT) are listed in
 [NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
 fresh on every build, so nothing is redistributed from here.
 
