@@ -2650,6 +2650,49 @@ everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
 
+### The opening view is now "what is left to go and get"
+
+**Five defaults moved on 2026-08-27**, at the owner's direction, and they all
+point the same way. None of them removes anything: every one is a control the
+reader already has, and **a saved value wins over all of them**, so only somebody
+opening the app for the first time sees the change.
+
+| Control | Was | Now | Why |
+|---|---|---|---|
+| Planner — *Include Railjack* | off | **on** | It gates whether Proxima is ranked at all, and six Primes have no route that is not Railjack. Off, the planner silently declines to rank the only places they can be farmed |
+| Collection — *Founder exclusive* | shown | **hidden** | Three items, unobtainable since 2013 |
+| Collection — *Other sources* | shown | **hidden** | Four items, none of them a relic farm — a quest, an event, a vendor |
+| Collection — *Show collected* | on | **off** | What you already own is the one thing you cannot make progress on |
+| Drawer — *Hide collected* | off | **on** | The drawer is a worklist, and a banked part is not work |
+
+`Show not collected` deliberately stays on, so the page is never empty by
+default. The two remain independent — unticking both still shows nothing, which
+is the reader's own doing and is left possible.
+
+**Two tests moved with these, and both were the same mistake in different
+clothes**: an assertion that depended on a default rather than on the thing it
+was testing.
+
+*The default sort* used **Excalibur Prime** as its discriminator — deliberately,
+because alphabetically it leads Styanax and by date it comes last, so an
+alphabetical comparator cannot pass. Excalibur is Founder-exclusive and is now
+hidden, so the test ticks that filter rather than swapping in whichever pair
+happens to be visible, which would be choosing the subject with the code under
+test.
+
+*Banking a part keeps the focus* is the more interesting one, because the new
+default reintroduces the **shape** of a bug this project already fixed: with
+*Hide collected* on, banking a part removes it, and the button holding the focus
+goes with it. The original guarantee is tested exactly as written, with the
+checkbox turned off; and the default's own path is asserted separately —
+the part may vanish, but the focus must land on a button **inside the drawer**
+rather than falling back to `<body>`. That second assertion is new coverage the
+old default never needed.
+
+Both tests click through `evaluate`, because the real `<input>` sits under a
+styled `<span>` and Playwright's actionability check waits forever on it. Worth
+knowing before writing the next one: `.check()` on these does not fail, it hangs.
+
 ### Obtainable is not owned, and a Prime with no way in still has an answer
 
 **Shipped 2026-08-27**, immediately after the Resurgence fix and generalising it

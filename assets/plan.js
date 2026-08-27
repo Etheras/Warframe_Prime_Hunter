@@ -113,7 +113,13 @@
        common case is the ticked one and leaving it off would make the app
        almost always understate a Radiant source. Untick it if you are sitting
        on a pile. */
-    { squad: false, event: false, railjack: false, aya: true, traces: true,
+    /* `railjack` on by default since 2026-08-27, at the owner's direction. It
+       gates whether Proxima nodes are ranked at all, and six Primes have no
+       route that is not Railjack — with it off the planner silently declines to
+       rank the only places those can be farmed, which is the shape of omission
+       this project has had to fix before. Anyone without a ship unticks it once
+       and the choice is saved. */
+    { squad: false, event: false, railjack: true, aya: true, traces: true,
       minutes: {}, sort: "rate" },
     load(KEY_PLAN, {}));
 

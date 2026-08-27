@@ -156,9 +156,24 @@
   const rotSlot = (r) =>
     ({ A: "A", B: "B", C: "C" }[String(r || "").toUpperCase()] || "none");
   const state = {
-    avail: { farmable: true, railjack: true, resurgence: true, baro: true, special: true,
-             vaulted: true, founder: true },
-    showCollected: true,
+    /* Defaults changed 2026-08-27, at the owner's direction, and they all point
+       the same way: the page opens on **what is left to go and get**.
+
+       `special` and `founder` are off because neither is farmable — a quest, an
+       event, a vendor, or a pack that has not been buyable since 2013. They are
+       real and stay one tick away; they are just not an answer to "what should I
+       do next", which is what an opening view should be about.
+
+       `showCollected` is off for the same reason: what you already own is the
+       one thing you cannot make progress on. `showMissing` stays on, so the
+       page is never empty by default — and the two are independent, so unticking
+       both still shows nothing, which is the reader's own doing and is left
+       possible.
+
+       Only defaults moved. A saved value wins over every one of these. */
+    avail: { farmable: true, railjack: true, resurgence: true, baro: true, special: false,
+             vaulted: true, founder: false },
+    showCollected: false,
     showMissing: true,
     cats: new Set(CATEGORIES),
     sort: "cat",
@@ -173,7 +188,10 @@
        Only the default moves. A saved value is still restored, so anybody who
        has already chosen keeps their choice. */
     hideVaultedRelics: true,
-    hideOwnedParts: false,
+    /* On by default from the same day and for the same reason as `hideVaulted`
+       beside it: the drawer is a worklist, and a part you have already banked is
+       not work. The count stays on the label, so nothing goes missing quietly. */
+    hideOwnedParts: true,
     squad: false,
   };
 

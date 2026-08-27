@@ -132,6 +132,21 @@ page_test("banking a part keeps the focus on the button that was clicked", async
      first card that has more than one part counter in its drawer. */
   const { page, errors } = await open("/index.html");
   await page.locator("[data-id]").first().click();
+
+  /* *Hide collected* is on by default since 2026-08-27, which removes a part
+     from the list the moment it is banked — so the button that was pressed is
+     legitimately gone and cannot hold anything. Turned off here so the original
+     guarantee is tested exactly as written; the default's own behaviour is
+     asserted below, because "the part vanished" must still not mean "the
+     keyboard was thrown back to the top of the page". */
+  /* Clicked through `evaluate`: the real input sits under a styled span, so
+     Playwright's own actionability check never sees it and simply waits. */
+  const setHideOwned = (on) => page.evaluate((want) => {
+    const el = document.querySelector("#hideOwned");
+    if (el && el.checked !== want) el.click();
+  }, on);
+  await setHideOwned(false);
+
   const own = page.locator("#drawerBody .part-own");
   assert.ok(await own.count() > 1, "the first card must have parts to bank");
 
@@ -147,6 +162,24 @@ page_test("banking a part keeps the focus on the button that was clicked", async
   assert.equal(focused.tag, "BUTTON",
                "the focus must not fall back to the body, or the keyboard is lost");
   assert.equal(focused.part, part, "and it must still be the counter that was pressed");
+
+  /* Now the default's path: banking a part makes it disappear, and the focus has
+     to land on something in the drawer rather than on <body>. This is the same
+     bug the paragraph at the top of this test describes, reachable by a new
+     route, which is why it is asserted rather than assumed. */
+  await setHideOwned(true);
+  const still = page.locator("#drawerBody .part-own");
+  if (await still.count() > 1) {
+    await still.nth(0).focus();
+    await page.keyboard.press("Enter");
+    const after = await page.evaluate(() => {
+      const el = document.activeElement;
+      return { tag: el && el.tagName, inDrawer: !!(el && el.closest("#drawerBody")) };
+    });
+    assert.equal(after.tag, "BUTTON",
+                 "hiding the banked part must not cost the keyboard its place");
+    assert.ok(after.inDrawer, "and the focus must stay inside the drawer it was in");
+  }
 
   const stored = await page.evaluate(() => localStorage.getItem("wfprimes.parts.v1"));
   assert.ok(stored && stored.includes(part), `${part} was pressed and not saved`);
@@ -306,6 +339,17 @@ page_test("the default sort groups by category and leads with the newest", async
      the discriminator on purpose: alphabetically Excalibur leads, by date it
      comes last, so the old comparator cannot pass this. */
   const { page, errors } = await open("/index.html");
+
+  /* Excalibur Prime is Founder-exclusive, and *Founder exclusive* is off by
+     default since 2026-08-27 — so the discriminator this test is built on is no
+     longer on screen unless it is asked for. Ticking it keeps the named subject
+     the comment above explains rather than swapping in whichever pair happens to
+     be visible, which would be picking the subject with the code under test. */
+  await page.evaluate(() => {
+    // the real input sits under a styled span, so click it directly
+    const el = document.querySelector("#f-founder");
+    if (el && !el.checked) el.click();
+  });
 
   const raw = await page.evaluate(() => {
     const pick = (n) => {
