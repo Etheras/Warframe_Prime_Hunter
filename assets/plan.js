@@ -1402,10 +1402,28 @@
          a real-money product and are no part of this. */
       const rec = RELICS[rname] || {};
       const varzia = rec.resurgence
+        /* "may be at Varzia", not "from Varzia". She stocks a curated handful
+           of relics per rotation — six on the shelf as this was written — and
+           **Digital Extremes do not publish which ones**: `vaultTrader`'s
+           inventory carries her packs, items and cosmetics and not one relic
+           row. So this list is every vaulted relic holding a part of a Prime
+           she is currently offering, which is a superset of her shelf and was
+           being shown as though it were her shelf.
+
+           Nothing in the drop tables separates the two: `Lith T13`, which she
+           stocks, and `Lith P8`, which she does not, are the same shape — six
+           rewards, a Forma, parts of offered and unoffered Primes alike.
+           Measured 2026-08-27, and it is why this says "may" until the proper
+           fix in `TODO.md` lands. Same rule as Baro's window: a wrong yes
+           claims something is buyable when it is not. */
         ? `<span class="from-varzia" data-tip="${esc(
-            "Prime Resurgence. This relic does not drop — buy it from Varzia at " +
-            "Maroo's Bazaar for Aya, which is farmed.\n" +
-            "That is why nowhere is listed under Where to go.")}">from Varzia</span>`
+            "Prime Resurgence. This relic does not drop — if Varzia has it, " +
+            "she sells it at Maroo's Bazaar for Aya, which is farmed.\n" +
+            "That is why nowhere is listed under Where to go.\n\n" +
+            "Digital Extremes do not publish her relic stock, so this is every " +
+            "vaulted relic holding a part of a Prime she is offering. Her actual " +
+            "shelf is a handful of those — check it in game before spending.")}">` +
+          `may be at Varzia</span>`
         : rec.vaulted
           /* Only ever reached for a Prime with no way in at all — see
              `stranded`. The refinement beside it is the point of showing the

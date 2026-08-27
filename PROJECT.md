@@ -2693,6 +2693,66 @@ Both tests click through `evaluate`, because the real `<input>` sits under a
 styled `<span>` and Playwright's actionability check waits forever on it. Worth
 knowing before writing the next one: `.check()` on these does not fail, it hangs.
 
+#### The tests start cold, and say which box they need
+
+The first answer to the six broken tests was to seed one everything-on state
+into `wfprimes.filters.v1` before every page load. It fixed them in one place,
+and it was **replaced on 2026-08-27** at the owner's direction, because of what
+it fixed them *with*: every test then ran against a screen no reader ever sees,
+and a test could depend on *Vaulted* being on without anywhere saying so. The
+state a test needs is part of what the test is asserting. It belongs in the test.
+
+What replaced it is two rules and no seed.
+
+**Every page opens on a cold profile.** `open()` makes its own browser context —
+empty `localStorage`, nothing carried in — and the test harness closes it the
+moment that test ends, pass, fail or throw. The only saved state anywhere is
+state a test wrote deliberately, for as long as that test runs. Closing the
+context is what clears it, rather than removing keys by name: it takes
+everything, including whatever the page wrote that nobody thought about. This
+also fixed a quieter leak — contexts were being made and never closed, so a full
+run finished holding fifty live profiles.
+
+**A test that depends on a filter says so, on that filter.** `setCheck` reads the
+box and moves it only if it is not already where this test needs it, which is an
+intention rather than a flip — and that distinction is load-bearing for *Baro
+Ki'Teer*, whose default is decided by the calendar rather than by us. A test that
+blindly clicked it would pass twelve days a fortnight and fail the other two.
+
+**A test with no preference does not name a subject.** This is the half that was
+still latent after the first fix. Half the broken tests had named a Prime for no
+reason beyond needing one — `warframe-xaku-prime`, `Nyx Prime`, `Caliban Prime`
+— and a name is a claim the test cannot back, with an expiry date attached: DE
+vault six Primes a quarter. Those now ask the payload for a Prime with the
+property they need, chosen from the cards actually on screen. `pickCard` does it
+for the collection, `wishFarmable` for the planner.
+
+The latent case is worth spelling out, because it is the shape that survives a
+careless fix. *A card whose relic drops only on Railjack still says where* chose
+"the first item with a relic that drops only on Proxima" and asserted on the
+**best** spot in its drawer. With *Railjack* on that is Nyx Prime and it holds.
+Hide that bucket and the first such item is **Lex Prime**, which has a
+Proxima-only relic *and* live routes on Mars and Sedna — so its best spot is an
+ordinary node carrying no badge, `.demand` never renders, and `innerText` waits
+out a full thirty seconds rather than failing. The subject cannot simply be
+narrowed to "every route is Proxima" either: **no Prime qualifies.** Nyx, Valkyr,
+Cernos and Venka reach the rest of their relics at Railjack nodes on ordinary
+planets — Beacon Shield Ring is on Venus — and telling those from Lex Prime's
+Mars means naming the node list `isRailjack` holds, which is picking the subject
+with the code under test by the back door.
+
+So the assertion moved to what the subject actually guarantees: the Proxima row
+is **offered** somewhere in the list, and it carries the badge. That is the bug
+the test was written for — filtering Railjack out left the card with no farm
+section at all — and unlike the old form it does not depend on the ranking order.
+
+**Verified by moving the defaults, not by reading the code.** With the
+pre-2026-08-27 defaults restored (everything on screen) every test passes; with
+*Railjack* and *Resurgence* defaulted off as well, every test passes; and with
+`hideVaultedRelics` flipped, **exactly one** fails — *the drawer hides vaulted
+relics by default*, whose entire subject is that default. A test about a default
+is the one kind that should fail when the default moves.
+
 ### Obtainable is not owned, and a Prime with no way in still has an answer
 
 **Shipped 2026-08-27**, immediately after the Resurgence fix and generalising it

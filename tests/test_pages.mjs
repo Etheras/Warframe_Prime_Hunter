@@ -83,49 +83,172 @@ test.after(async () => {
   server?.close();
 });
 
-/* Everything on screen: every availability bucket, collected and not, nothing
-   hidden in the drawer.
+/* Every page here opens exactly as it ships, on a cold profile. A context is
+   its own browser as far as storage is concerned — empty localStorage, no
+   cookies, nothing carried in — and one is made per test and closed the moment
+   that test ends. So the app is never seen part-way through somebody else's
+   session, and the only saved state anywhere is state a test wrote on purpose,
+   for as long as that test is running.
 
-   Seeded before load by `open`, and it is the reason a test can name a subject
-   and expect to find it. A test that says `page.locator('[data-id="…"]')` is
-   asserting something about that card, not about whether the app happens to
-   show it today — and the app's defaults move: on 2026-08-27 five of them did,
-   *Vaulted* among them, which alone hides 113 of 167 Primes. Six tests failed
-   that afternoon, every one of them for the same non-reason: they had inherited
-   a default instead of stating what they needed.
+   That is the whole of the arrangement, and it is why `open` takes no options:
+   there is no state to opt out of. A test that needs a farm list, a rank or a
+   restored backup writes one, asserts on it, and it goes when the profile does.
 
-   So the rule is: **a test that is not about the defaults must set its own
-   state.** This is that state, in one place, so the next default to move breaks
-   nothing that is not actually about it.
+   Nothing is seeded ahead of load and no test inherits a state some other test
+   wanted, which leaves two rules and only two:
 
-   A test that *is* about the defaults passes `{ asShipped: true }` and gets the
-   app exactly as a first-time reader would — and those tests are supposed to
-   fail when a default changes. That is their whole job. */
-const seedFilters = (target) => target.addInitScript((f) => {
-  try {
-    if (!localStorage.getItem("wfprimes.filters.v1")) {
-      localStorage.setItem("wfprimes.filters.v1", JSON.stringify(f));
+   1. **A test that depends on a filter says so, on that filter.** `setCheck`
+      reads the box and moves it only if it is not already where this test needs
+      it — an intention rather than a flip, so it reads the same whether the
+      default is on, off, or (like *Baro Ki'Teer*) decided by the calendar.
+   2. **A test with no preference picks its subject from what is on screen**,
+      on a property of the raw payload. `pickCard` does that; see its note.
+
+   The alternative was tried first and is worth naming, because it looks tidier
+   and is worse: seeding one everything-on state into `wfprimes.filters.v1`
+   before the first load. It fixed the six failures of 2026-08-27 in one place —
+   and it did so by making every test run against a screen no reader ever sees,
+   so a test could quietly depend on *Vaulted* being on and never say which of
+   the seven buckets it actually needed. The state a test needs is part of what
+   it is asserting, and it belongs in the test.
+
+   The five defaults that moved that afternoon are why this matters. *Vaulted*
+   alone hides 113 of 167 Primes, *Founder* three more, and *Baro Ki'Teer* opens
+   only the two days a fortnight he is on a relay — so 40 of 167 items are on
+   screen as this file runs, and a test that names a Prime without saying which
+   box shows it is asserting something about today's calendar. */
+
+/* The real `<input>` sits under a styled `<span>` that swallows the pointer, so
+   Playwright's own actionability check never sees it: `.check()` waits out the
+   full timeout and reports a hang rather than a failure. Clicked through the
+   page instead, and only when the box is not already where it is wanted. */
+const setCheck = (target, selector, want) => target.evaluate(([sel, on]) => {
+  const el = document.querySelector(sel);
+  if (!el) throw new Error("no checkbox matches " + sel);
+  if (el.checked !== on) el.click();
+  return el.checked;
+}, [selector, want]);
+
+/* Several at once, in a fixed order so a re-render between two of them cannot
+   change what the next one reads. */
+async function setChecks(page, wanted) {
+  for (const [sel, on] of Object.entries(wanted)) {
+    const got = await setCheck(page, sel, on);
+    assert.equal(got, on, `${sel} would not go ${on ? "on" : "off"}`);
+  }
+}
+
+/* The whole catalogue, for the one test that is about the whole catalogue.
+   Everything else should be asking for the single box it depends on. */
+const AVAILABILITY = ["#f-farmable", "#f-railjack", "#f-resurgence", "#f-vaulted",
+                      "#f-baro", "#f-special", "#f-founder"];
+const showEverything = (page) => setChecks(page,
+  Object.fromEntries([...AVAILABILITY, "#f-collected", "#f-missing"].map((s) => [s, true])));
+
+/* The ids the grid is actually rendering, in the order it renders them. */
+const shownIds = (page) => page.evaluate(() =>
+  [...document.querySelectorAll("#grid .card[data-id]")].map((el) => el.dataset.id));
+
+/* A subject for a test that has no preference beyond needing *a card, with
+   enough parts to work with*: the first one the page is showing whose payload
+   entry qualifies.
+
+   `page.locator("[data-id]").first()` was doing this job, and it is an
+   assumption about the sort order wearing a subject's clothes — it holds while
+   the newest Warframe has four parts and stops holding the day a one-part item
+   leads the grid. Naming a Prime outright is the other wrong answer: a name is
+   a claim that this particular Prime matters, and DE vault six of them a
+   quarter. Neither is picked with the code under test — `parts.length` is raw
+   payload, and the candidates are read off the DOM rather than out of a
+   filter reimplemented here. */
+async function pickCard(page, minParts) {
+  const want = minParts || 1;
+  const ids = await shownIds(page);
+  assert.ok(ids.length, "the grid rendered no cards at all");
+  const found = await page.evaluate(([shown, n]) => {
+    const by = new Map((window.WFPRIME_DATA.items || []).map((i) => [i.id, i]));
+    for (const id of shown) {
+      const it = by.get(id);
+      if (it && (it.parts || []).length >= n) {
+        return { id: it.id, name: it.name, parts: it.parts.length };
+      }
     }
-  } catch (e) { /* file:// can refuse storage */ }
-}, SHOW_EVERYTHING);
+    return null;
+  }, [ids, want]);
+  assert.ok(found, `none of the ${ids.length} cards on screen has ${want} parts ` +
+                   `to work with — widen the filters or pick a different property`);
+  return found;
+}
 
-const SHOW_EVERYTHING = {
-  avail: { farmable: true, railjack: true, resurgence: true, baro: true,
-           special: true, vaulted: true, founder: true },
-  showCollected: true,
-  showMissing: true,
-  hideVaultedRelics: false,
-  hideOwnedParts: false,
-};
+/* The planner's version of the same idea. A test that only needs *something to
+   rank* wants Primes whose relics are still dropping, and `farmableRelics` is a
+   raw payload field — so this asks the data rather than naming a Prime, because
+   which ones are farmable is precisely what DE change every quarter and a named
+   one is a test with an expiry date on it.
 
-async function open(page_url, opts) {
-  const page = await (await browser.newContext()).newPage();
+   Writes the farm list and reloads, which is how the planner picks it up. */
+async function wishFarmable(page, count) {
+  const want = count || 1;
+  const picked = await page.evaluate((n) => {
+    const items = (window.WFPRIME_DATA.items || [])
+      .filter((i) => (i.farmableRelics || []).length).slice(0, n);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(items.map((i) => i.id)));
+    return items.map((i) => ({ id: i.id, name: i.name, parts: (i.parts || []).length }));
+  }, want);
+  assert.equal(picked.length, want,
+               `wanted ${want} Prime(s) with relics still dropping, found ${picked.length}`);
+  await page.reload({ waitUntil: "load" });
+  return picked;
+}
+
+/* A ranked row that is NOT already a fissure, for the tests that open one and
+   watch the badge arrive. The feed is live and currently carries dozens, so
+   "the top row" is a coin toss every time it comes back up — this reads the
+   shipped list instead of assuming it is empty. Returns DE's own name for the
+   node, which is the key the badge is matched on. */
+async function quietRow(page) {
+  const key = await page.evaluate(() => {
+    const live = new Set((window.WFPRIME_DATA.fissures || []).map((f) => f.node));
+    for (const el of document.querySelectorAll("#planNodes .spot")) {
+      const slot = el.querySelector(".fissure-slot");
+      const node = slot && slot.dataset.node;
+      if (node && !live.has(node)) return node;
+    }
+    return null;
+  });
+  assert.ok(key, "every ranked node already carries a fissure, so there is none " +
+                 "left to watch one open on");
+  return key;
+}
+
+const rowFor = (page, key) => page.locator("#planNodes .spot")
+  .filter({ has: page.locator(`.fissure-slot[data-node="${key}"]`) }).first();
+
+/* A cold profile, and a note of it so the test that asked for it can be made to
+   clean it up. Every context in this file comes from here — `browser.newPage()`
+   makes one implicitly and gives you no handle to close it, which is how a
+   run ended holding fifty live profiles' worth of somebody's saved collection. */
+const opened = [];
+async function newProfile(options) {
+  const context = await browser.newContext(options || {});
+  opened.push(context);
+  return context;
+}
+
+/* Closing the context is what clears the state, rather than reaching into
+   localStorage and removing keys: it takes everything, including whatever the
+   page wrote that the test never thought about. Errors are swallowed because a
+   context a test has already closed itself is exactly the right outcome. */
+async function closeProfiles() {
+  const all = opened.splice(0, opened.length);
+  await Promise.all(all.map((c) => c.close().catch(() => {})));
+}
+
+async function open(page_url) {
+  const page = await (await newProfile()).newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  if (!(opts && opts.asShipped)) {
-    await seedFilters(page);
-  }
   await page.goto(origin + page_url, { waitUntil: "load" });
   return { page, errors };
 }
@@ -133,21 +256,39 @@ async function open(page_url, opts) {
 /* The option is passed only when there is a reason to skip. node:test checks
    whether `skip` is *present*, not whether it is truthy, so `{ skip: null }`
    silently skips the lot - which it duly did, reporting eight passes as eight
-   skips with no reason given. */
-const page_test = (name, fn) => (why ? test(name, { skip: why }, fn) : test(name, fn));
+   skips with no reason given.
+
+   The `finally` is the other half of the cold-start rule: whatever profiles
+   this test opened are gone before the next one starts, whether it passed,
+   failed or threw. Doing it here rather than in each test keeps it off the
+   fifty places that would each have to remember. */
+const runClean = (fn) => async (t) => {
+  try { await fn(t); } finally { await closeProfiles(); }
+};
+const page_test = (name, fn) =>
+  (why ? test(name, { skip: why }, fn) : test(name, runClean(fn)));
 
 // ── the collection view ────────────────────────────────────────────────────
 
 page_test("the collection renders, with no errors on the console", async () => {
+  /* The one test that wants every card, so it is the one test that turns every
+     box on. It opens on 40 of 167 as shipped — deliberately, because the page
+     opens on what is left to go and get — and this is a claim about the
+     catalogue rather than about the opening view, so it asks for the lot. */
   const { page, errors } = await open("/index.html");
-  const cards = await page.locator("[data-id]").count();
-  assert.ok(cards > 100, `expected a full catalogue, got ${cards} cards`);
+  await showEverything(page);
+  const total = await page.evaluate(() => window.WFPRIME_DATA.items.length);
+  const cards = await page.locator("#grid .card[data-id]").count();
+  assert.ok(total > 100, `the payload itself is short, at ${total} items`);
+  assert.equal(cards, total,
+               `with every bucket ticked the grid is the catalogue: ${cards} of ${total}`);
   assert.deepEqual(errors, []);
 });
 
 page_test("ticking a part is saved, and survives a reload", async () => {
   const { page } = await open("/index.html");
-  await page.locator("[data-id]").first().click();               // open the drawer
+  const subject = await pickCard(page);                          // any card will do
+  await page.locator(`[data-id="${subject.id}"]`).click();        // open the drawer
   await page.getByRole("button", { name: /add to farm list/i }).click();
 
   const saved = await page.evaluate(() => localStorage.getItem("wfprimes.wishlist.v1"));
@@ -166,27 +307,28 @@ page_test("banking a part keeps the focus on the button that was clicked", async
      ticking three parts from the keyboard meant tabbing in from the top of the
      page three times over.
 
-     The subject is picked by markup rather than by anything app.js decides: the
-     first card that has more than one part counter in its drawer. */
+     No preference about which Prime: the subject is the first card on screen
+     with two parts or more, read off the payload rather than off whichever card
+     the sort happens to lead with. */
   const { page, errors } = await open("/index.html");
-  await page.locator("[data-id]").first().click();
+  const subject = await pickCard(page, 2);
+  await page.locator(`[data-id="${subject.id}"]`).click();
 
   /* *Hide collected* is on by default since 2026-08-27, which removes a part
      from the list the moment it is banked — so the button that was pressed is
      legitimately gone and cannot hold anything. Turned off here so the original
      guarantee is tested exactly as written; the default's own behaviour is
      asserted below, because "the part vanished" must still not mean "the
-     keyboard was thrown back to the top of the page". */
-  /* Clicked through `evaluate`: the real input sits under a styled span, so
-     Playwright's own actionability check never sees it and simply waits. */
-  const setHideOwned = (on) => page.evaluate((want) => {
-    const el = document.querySelector("#hideOwned");
-    if (el && el.checked !== want) el.click();
-  }, on);
+     keyboard was thrown back to the top of the page".
+
+     `#hideOwned` lives in the drawer rather than the sidebar, so it exists only
+     once a card is open — which is why this is set here and not on load. */
+  const setHideOwned = (on) => setCheck(page, "#hideOwned", on);
   await setHideOwned(false);
 
   const own = page.locator("#drawerBody .part-own");
-  assert.ok(await own.count() > 1, "the first card must have parts to bank");
+  assert.equal(await own.count(), subject.parts,
+               `${subject.name} has ${subject.parts} parts and the drawer must offer them all`);
 
   const btn = own.nth(1);
   const part = await btn.getAttribute("data-part");
@@ -240,22 +382,24 @@ page_test("a Prime with two sources survives unticking either of them", async ()
   assert.ok(flags && flags.farmable && flags.baro,
             "Lex Prime is the subject because it is farmable and a Baro item");
 
+  /* Both of its boxes on before anything is measured. *Baro Ki'Teer* opens only
+     while he is actually on a relay — two days a fortnight — so its default is
+     a fact about the calendar rather than about this test, and asking for the
+     state outright is what makes this run the same in either week. */
+  await setChecks(page, { "#f-farmable": true, "#f-baro": true });
+
   const card = page.locator('[data-id="secondary-lex-prime"]');
   await page.locator("#search").fill("Lex Prime");
   assert.equal(await card.count(), 1, "it has to be on screen before anything is unticked");
 
-  /* Clicked in the page: the real checkbox sits under a styled span that
-     swallows the pointer, which is how the fissure test drives one too. */
-  const box = (id) => page.evaluate((s) => document.querySelector(s).click(), "#" + id);
-
-  await box("f-farmable");
+  await setCheck(page, "#f-farmable", false);
   assert.equal(await card.count(), 1,
                "Baro is still ticked and still sells it, so it must stay");
-  await box("f-baro");
+  await setCheck(page, "#f-baro", false);
   assert.equal(await card.count(), 0,
                "with both of its sources unticked it must finally go");
 
-  await box("f-baro");
+  await setCheck(page, "#f-baro", true);
   assert.equal(await card.count(), 1, "and come back when either one returns");
   assert.deepEqual(errors, []);
 });
@@ -266,8 +410,13 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
      was nowhere to record having one of the two. Three clicks completed a
      four-part item.
 
-     Named subject: Aklex Prime is built from two Lex Primes. */
+     Named subject, and one of the few that earns it: the assertion below is
+     Aklex Prime's own part list, spelled out, because the point is that the
+     sub-weapon is named once and asked for twice. */
   const { page, errors } = await open("/index.html");
+  /* Aklex Prime is a Baro item and nothing else, so it is on screen exactly
+     while he is — ask for the box rather than for the fortnight. */
+  await setCheck(page, "#f-baro", true);
   await page.locator("#search").fill("Aklex Prime");
   await page.locator('[data-id="secondary-aklex-prime"]').click();
 
@@ -289,9 +438,10 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
 
   /* And the card says where a built weapon actually comes from. Scoped to the
      part it belongs to rather than taking the first `.relic-none` on the card:
-     Aklex is vaulted, `Hide vaulted` is on by default since 2026-08-27, and the
-     Blueprint's "every relic is vaulted" note now sits above this one. Both are
-     correct; only the selector was picking by position. */
+     every relic that drops an Aklex part is vaulted, `Hide vaulted` in the
+     drawer is on by default since 2026-08-27, and the Blueprint's "every relic
+     is vaulted" note now sits above this one. Both are correct; only the
+     selector was picking by position. */
     const note = await page.locator("#drawerBody .part")
     .filter({ has: page.locator('[data-part="Lex Prime"]') })
     .locator(".relic-none").innerText();
@@ -309,7 +459,8 @@ page_test("a tooltip appears on hover and says something", async () => {
 
 page_test("the backup dialog opens and carries the collection", async () => {
   const { page } = await open("/index.html");
-  await page.locator("[data-id]").first().click();
+  const subject = await pickCard(page);                // any card will do
+  await page.locator(`[data-id="${subject.id}"]`).click();
   await page.getByRole("button", { name: /mark as collected/i }).click();
   await page.keyboard.press("Escape");
   await page.locator("#dataBtn").click();
@@ -325,7 +476,8 @@ page_test("a backup exported from one page restores on the other", async () => {
   // their own copies of that validation, and the planner's was weaker - so the
   // same file restored differently depending on where you pasted it.
   const { page } = await open("/index.html");
-  await page.locator("[data-id]").first().click();
+  const subject = await pickCard(page);                // any card will do
+  await page.locator(`[data-id="${subject.id}"]`).click();
   await page.getByRole("button", { name: /mark as collected/i }).click();
   await page.getByRole("button", { name: /add to farm list/i }).click();
   await page.keyboard.press("Escape");
@@ -334,8 +486,9 @@ page_test("a backup exported from one page restores on the other", async () => {
   const expected = JSON.parse(backup);
   assert.ok(expected.collected.length >= 1, "nothing was collected to export");
 
-  // a clean slate, then restore from the planner
-  const fresh = await (await browser.newContext()).newPage();
+  // a clean slate, then restore from the planner - its own profile, so "clean"
+  // is a fact about the browser rather than something this test has to arrange
+  const fresh = await (await newProfile()).newPage();
   await fresh.goto(origin + "/plan.html", { waitUntil: "load" });
   await fresh.locator("#dataBtn").click();
   await fresh.locator("#dataArea").fill(backup);
@@ -378,16 +531,14 @@ page_test("the default sort groups by category and leads with the newest", async
      comes last, so the old comparator cannot pass this. */
   const { page, errors } = await open("/index.html");
 
-  /* Excalibur Prime is Founder-exclusive, and *Founder exclusive* is off by
-     default since 2026-08-27 — so the discriminator this test is built on is no
-     longer on screen unless it is asked for. Ticking it keeps the named subject
-     the comment above explains rather than swapping in whichever pair happens to
-     be visible, which would be picking the subject with the code under test. */
-  await page.evaluate(() => {
-    // the real input sits under a styled span, so click it directly
-    const el = document.querySelector("#f-founder");
-    if (el && !el.checked) el.click();
-  });
+  /* Both of this test's subjects are behind a box that is off by default since
+     2026-08-27: Excalibur Prime is Founder-exclusive, and Kavasa Prime Collar —
+     the one undated item, and the whole of the last assertion — is vaulted.
+     Asked for by name here rather than swapping in whichever pair happens to be
+     on screen, because "the alphabet must disagree with the dates" is a property
+     of this pair and picking a visible one instead would be choosing the
+     subject with the comparator under test. */
+  await setChecks(page, { "#f-founder": true, "#f-vaulted": true });
 
   const raw = await page.evaluate(() => {
     const pick = (n) => {
@@ -676,13 +827,11 @@ page_test("the materials checklist keeps what you type in it", async () => {
 
 page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   const { page, errors } = await open("/plan.html");
-  await page.evaluate(() => {
-    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
-  });
-  await page.reload({ waitUntil: "load" });
+  const [subject] = await wishFarmable(page);          // any farmable Prime will do
 
   const spots = page.locator(".spot");
-  assert.ok(await spots.count() > 0, "a wanted Prime with live relics must rank somewhere");
+  assert.ok(await spots.count() > 0,
+            `${subject.name}'s relics are still dropping, so it must rank somewhere`);
   const first = await spots.first().innerText();
   assert.match(first, /[\d.]+\s*\nrelics \//, "every row carries its ranked figure");
   assert.deepEqual(errors, []);
@@ -752,33 +901,49 @@ page_test("the never-vaulted badge splits, because it means two things", async (
      them without a ship. Saying "its relics keep dropping indefinitely" to
      someone with no Railjack is the failure being pinned here. */
   const { page } = await open("/index.html");
-  const split = await page.evaluate(() => {
+  /* The two halves of the marker are the two buckets, so those are the two
+     boxes this test asks for: a never-vaulted Prime is *Farmable* unless a ship
+     is the only way to it, in which case it is *Railjack*. Which is the split
+     itself, restated as a filter — so a test about the split that did not tick
+     both would be one default away from having nothing to open. */
+  await setChecks(page, { "#f-farmable": true, "#f-railjack": true });
+  /* The split itself is a claim about the whole payload, so it is counted over
+     the whole payload. Only the two cards this then opens have to be on screen,
+     and those are picked from what the page is showing rather than named — the
+     marker covers fourteen Primes and any of them would do. */
+  const split = await page.evaluate((shown) => {
     const D = window.WFPRIME_DATA, R = window.WFPrimeRotation;
+    const on = new Set(shown);
     const marked = D.items.filter((i) => (i.flags || {}).permanent);
-    const rj = marked.filter((i) => R.railjackOnly(i, D.relics)).map((i) => i.name);
-    return { marked: marked.length, rj: rj.sort() };
-  });
+    const isRj = (i) => R.railjackOnly(i, D.relics);
+    const pick = (list) => {
+      const it = list.find((i) => on.has(i.id));
+      return it ? { id: it.id, name: it.name } : {};
+    };
+    return {
+      marked: marked.length,
+      rj: marked.filter(isRj).map((i) => i.name).sort(),
+      needsShip: pick(marked.filter(isRj)),
+      plain: pick(marked.filter((i) => !isRj(i))),
+    };
+  }, await shownIds(page));
   assert.ok(split.marked > split.rj.length && split.rj.length > 0,
             "both halves of the marker have to exist, or there is nothing to split");
   assert.ok(split.rj.every((n) => /Prime$/.test(n)));
+  assert.ok(split.needsShip.id && split.plain.id,
+            "one of each half has to be on screen to open — got " +
+            JSON.stringify({ needsShip: split.needsShip, plain: split.plain }));
 
-  const shows = async (name, badge) => {
-    const it = await page.evaluate((n) =>
-      (window.WFPRIME_DATA.items.find((i) => i.name === n) || {}).id, name);
-    await page.locator(`[data-id="${it}"]`).click();
+  const shows = async (it, badge) => {
+    await page.locator(`[data-id="${it.id}"]`).click();
     const text = await page.locator(".d-badges").innerText();
     await page.locator(".drawer-close").click();
     return text.includes(badge);
   };
-  assert.ok(await shows(split.rj[0], "RAILJACK ONLY"),
-            `${split.rj[0]} can only be farmed with a ship and the card must say so`);
-
-  const plain = await page.evaluate((rj) => {
-    const D = window.WFPRIME_DATA;
-    return (D.items.find((i) => (i.flags || {}).permanent && !rj.includes(i.name)) || {}).name;
-  }, split.rj);
-  assert.ok(await shows(plain, "NEVER VAULTED"),
-            `${plain} really is never vaulted, and must keep saying so`);
+  assert.ok(await shows(split.needsShip, "RAILJACK ONLY"),
+            `${split.needsShip.name} can only be farmed with a ship and the card must say so`);
+  assert.ok(await shows(split.plain, "NEVER VAULTED"),
+            `${split.plain.name} really is never vaulted, and must keep saying so`);
 });
 
 page_test("a card whose relic drops only on Railjack still says where", async () => {
@@ -790,32 +955,72 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   const { page, errors } = await open("/index.html");
   /* Chosen by planet name, not by isRailjack. Picking the subject with the
      function under test makes the case vacuous - break the classifier, find no
-     subject, return early, go green having checked nothing. */
-  const only = await page.evaluate(() => {
+     subject, return early, go green having checked nothing.
+
+     Chosen from the cards on screen, too, and the box that puts them there is
+     ticked outright rather than assumed: these six Primes are the whole of the
+     *Railjack* bucket, so that checkbox is precisely the one this test depends
+     on and precisely the one it should be saying it needs. */
+  await setCheck(page, "#f-railjack", true);
+  const only = await page.evaluate((shown) => {
     const D = window.WFPRIME_DATA;
+    const on = new Set(shown);
     const proxima = (s) => /Proxima/i.test(s.planet || "");
     for (const it of D.items) {
+      if (!on.has(it.id)) continue;
       for (const p of it.parts || []) {
         for (const r of p.relics || []) {
           const rec = D.relics[r.relic];
           if (!rec || rec.vaulted || !(rec.sources || []).length) continue;
-          if (rec.sources.every(proxima)) return { id: it.id, relic: r.relic };
+          if (rec.sources.every(proxima)) return { id: it.id, name: it.name, relic: r.relic };
         }
       }
     }
     return null;
-  });
-  assert.ok(only, "no live relic drops only on Proxima - if that is really true " +
-                  "now, delete this test rather than letting it pass empty");
+  }, await shownIds(page));
+  assert.ok(only, "no live relic on screen drops only on Proxima - if that is " +
+                  "really true now, delete this test rather than letting it pass empty");
 
   await page.locator(`[data-id="${only.id}"]`).click();
   const spots = page.locator(".drawer .spot");
   assert.ok(await spots.count() > 0,
-            `${only.id} can only be farmed on Railjack, and the card offered nowhere`);
+            `${only.name} needs Proxima for ${only.relic}, and the card offered nowhere`);
+
+  /* The claim is that the Proxima spot is *offered*, not that it is the best
+     one, and that distinction is load-bearing rather than a weakening.
+
+     `spots.first()` was the assertion, and it held only while the subject was a
+     Prime with no other route: five items have a Proxima-only relic and Lex
+     Prime is one of them, with Mars and Sedna live at the same time — so its
+     best spot is an ordinary node with no badge at all, `.demand` never
+     appears, and `innerText` waits out its full thirty seconds rather than
+     failing. Measured, by hiding the *Railjack* bucket so Lex was the first
+     subject left: thirty seconds, no message worth reading.
+
+     Nor can the subject simply be narrowed to "every route is Proxima": no
+     Prime qualifies. Nyx, Valkyr, Cernos and Venka reach the rest of their
+     relics at Railjack nodes on ORDINARY planets - Beacon Shield Ring is on
+     Venus - and telling those from Lex Prime's Mars means naming the node
+     list `isRailjack` holds, which is picking the subject with the code under
+     test by the back door. */
+  const more = page.locator("#moreSpots");
+  if (await more.count()) await more.click();          // past the top eight
+  /* A row reads "Flexa (Caches) — Veil Proxima": node, mode, then planet. The
+     planet is the half that matters here and it is the last of the three, so
+     this matches the word rather than a shape around it. */
+  const proximaSpot = spots.filter({ hasText: /Proxima/ }).first();
+  assert.ok(await proximaSpot.count() > 0,
+            `${only.relic} drops nowhere but Proxima, so ${only.name}'s card has ` +
+            `to offer a Proxima node somewhere in its list`);
+  assert.equal(await proximaSpot.locator(".demand").count(), 1,
+               "a Proxima row must carry a badge - counted rather than read, " +
+               "because innerText on a locator that never appears hangs for " +
+               "thirty seconds instead of failing");
   // innerText, not textContent: the badge is uppercased in CSS, and what the
   // reader sees is the thing worth pinning
-  assert.match(await spots.first().locator(".demand").innerText(), /^RAILJACK$/,
-               "a node that needs a ship has to say so, since it is the only option");
+  assert.match(await proximaSpot.locator(".demand").innerText(), /^RAILJACK$/,
+               "a node that needs a ship has to say so, since for this relic it " +
+               "is the only option");
   assert.deepEqual(errors, []);
 });
 
@@ -828,12 +1033,13 @@ page_test("the server decides who is told how to fix stale data", async () => {
 
      Injected before the page scripts run, which is where serve.py puts it. */
   const banner = async (upstream) => {
-    const page = await browser.newPage();
+    /* A profile each, so the three readers below are three strangers rather
+       than one browser being told three different things in turn. */
+    const page = await (await newProfile()).newPage();
     await page.addInitScript((u) => { window.WFPRIME_UPSTREAM = u; }, upstream);
     await page.goto(origin + "/index.html", { waitUntil: "load" });
     const el = page.locator(".databar");
     const text = await el.count() ? await el.first().innerText() : "";
-    await page.close();
     return text;
   };
   const stale = { ok: true, stale: true, moved: ["droptables"] };
@@ -1064,10 +1270,7 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
      over a hundred places. A control that stores a number without moving a row
      would look like it worked. */
   const { page, errors } = await open("/plan.html");
-  await page.evaluate(() => {
-    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(["warframe-xaku-prime"]));
-  });
-  await page.reload({ waitUntil: "load" });
+  await wishFarmable(page);                            // any farmable Prime will do
 
   const order = () => page.locator("#planNodes .spot-where").allInnerTexts();
   const before = await order();
@@ -1133,10 +1336,12 @@ page_test("minutes per objective re-sort the list, and are remembered", async ()
 
 page_test("the two pages agree about what is on the farm list", async () => {
   const { page } = await open("/index.html");
-  await page.locator("[data-id]").first().click();
+  const subject = await pickCard(page);                // any card will do
+  await page.locator(`[data-id="${subject.id}"]`).click();
   await page.getByRole("button", { name: /add to farm list/i }).click();
   const id = JSON.parse(await page.evaluate(
     () => localStorage.getItem("wfprimes.wishlist.v1")))[0];
+  assert.equal(id, subject.id, "the card that was banked is the one that was stored");
 
   await page.goto(origin + "/plan.html", { waitUntil: "load" });
   const list = await page.locator("#wishlist").innerText();
@@ -1170,14 +1375,10 @@ page_test("a ranked node says when it is a fissure, and stops saying so", async 
      real feed would have to be re-fetched to make anything expire, and the test
      would then be about the network. The node is read off the row the planner
      ranked rather than chosen here, so this cannot quietly pass by marking a
-     node nobody is being sent to. */
+     node nobody is being sent to — and the Prime is whichever one the data
+     offers, because nothing here is about any particular Prime. */
   const { page, errors } = await open("/plan.html");
-  await page.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
-    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
-  });
-  await page.reload({ waitUntil: "load" });
+  await wishFarmable(page);
 
   const first = page.locator("#planNodes .spot").first();
   assert.ok(await first.count() > 0, "nothing ranked, so there is no row to mark");
@@ -1226,17 +1427,16 @@ page_test("the planner catches up the moment the tab comes back", async () => {
      and NOTHING else is touched, so a badge appearing can only have come from
      the page catching itself up. */
   const { page, errors } = await open("/plan.html");
-  await page.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
-    if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
-  });
-  await page.reload({ waitUntil: "load" });
+  await wishFarmable(page);
 
-  const first = page.locator("#planNodes .spot").first();
-  assert.ok(await first.count() > 0, "nothing ranked, so there is no row to mark");
-  const key = await first.locator(".fissure-slot").getAttribute("data-node");
-  assert.equal(await first.locator(".tag.fissure").count(), 0,
+  assert.ok(await page.locator("#planNodes .spot").count() > 0,
+            "nothing ranked, so there is no row to mark");
+  /* A row with no fissure on it yet — the feed is live and carries dozens, so
+     the top row is a coin toss and "nothing should claim one" would fail on
+     the truth. */
+  const key = await quietRow(page);
+  const row = rowFor(page, key);
+  assert.equal(await row.locator(".tag.fissure").count(), 0,
                "no fissure has been planted yet, so nothing should claim one");
 
   await page.evaluate((n) => {
@@ -1247,7 +1447,7 @@ page_test("the planner catches up the moment the tab comes back", async () => {
     document.dispatchEvent(new Event("visibilitychange"));
   }, key);
 
-  assert.equal(await first.locator(".tag.fissure").count(), 1,
+  assert.equal(await rowFor(page, key).locator(".tag.fissure").count(), 1,
                "coming back to the tab has to refresh what the clock decides");
   assert.deepEqual(errors, []);
 });
@@ -1262,24 +1462,36 @@ page_test("the collection view names the node that is a fissure, as the planner 
      this cannot quietly pass by folding nothing: the member a fissure is planted
      at is one the page itself said was in the group and did not name. */
   const { page, errors } = await open("/index.html");
-  const card = page.locator('[data-id="warframe-caliban-prime"]');
-  assert.equal(await card.count(), 1, "the named subject has left the catalogue");
-  await card.click();
 
-  const same = page.locator("#drawerBody .spot .same").first();
-  await same.waitFor({ timeout: 5000 });
-  const group = await same.evaluate((el) => ({
-    tip: el.dataset.tip,
-    named: el.closest(".spot").querySelector(".spot-where").childNodes[0].textContent.trim(),
-  }));
-  assert.ok(group.tip, "this test needs a folded group and the drawer showed none");
-
-  // "  Cinxia (Ceres)  lvl 12–17" -> "Cinxia (Ceres)", skipping the named one
-  const members = group.tip.split("\n")
+  /* No preference about which Prime: the subject is the first card on screen
+     whose drawer folds a group with a member it did not name, which is the only
+     shape the question can be asked in at all. Both the group and its members
+     are read off the rendered tooltip rather than worked out here, so this
+     cannot quietly pass by folding nothing. */
+  // "  Cinxia (Ceres)  lvl 12–17" -> "Cinxia (Ceres)"
+  const membersOf = (tip) => (tip || "").split("\n")
     .map((l) => (l.match(/^\s{2}(.+?\s\(.+?\))\s/) || [])[1])
     .filter(Boolean);
-  const other = members.find((m) => !m.startsWith(group.named + " "));
-  assert.ok(other, `every member of the group is the one already named: ${members}`);
+
+  let subject = null, group = null, other = null;
+  for (const id of await shownIds(page)) {
+    await page.locator(`[data-id="${id}"]`).click();
+    const folded = await page.locator("#drawerBody .spot .same").first()
+      .waitFor({ timeout: 3000 }).then(() => true, () => false);
+    if (folded) {
+      const g = await page.locator("#drawerBody .spot .same").first().evaluate((el) => ({
+        tip: el.dataset.tip,
+        named: el.closest(".spot").querySelector(".spot-where").childNodes[0].textContent.trim(),
+      }));
+      const alt = membersOf(g.tip).find((m) => !m.startsWith(g.named + " "));
+      if (alt) { subject = id; group = g; other = alt; break; }
+    }
+    await page.keyboard.press("Escape");
+  }
+  assert.ok(subject, "no card on screen folds a group with a second member, so " +
+                     "there is nowhere for a fissure to move the pick to");
+  assert.ok(group.tip, "this test needs a folded group and the drawer showed none");
+  const card = page.locator(`[data-id="${subject}"]`);
 
   await page.evaluate((n) => {
     window.WFPRIME_DATA.fissures.splice(0, window.WFPRIME_DATA.fissures.length, {
@@ -1308,17 +1520,18 @@ page_test("banking the last part does not claim the Prime — a button does", as
      was over while the blueprint was still in the foundry.
 
      The parts are read off the page rather than counted here, so an item whose
-     part list changes upstream cannot make this pass by finding nothing. */
+     part list changes upstream cannot make this pass by finding nothing, and
+     the Prime is whichever one the data offers — nothing here is about any
+     particular one, only about a farm list that can be finished. */
   const { page, errors } = await open("/plan.html");
-  const id = await page.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
-    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    return it.id;
-  });
-  await page.reload({ waitUntil: "load" });
+  const [subject] = await wishFarmable(page);
+  const id = subject.id;
+  assert.ok(subject.parts > 1, `${subject.name} has ${subject.parts} part(s) — ` +
+                               `this needs one that takes several to finish`);
 
   const parts = page.locator("#wishlist .wish-part");
-  assert.ok(await parts.count() > 1, "the subject needs parts left to bank");
+  assert.equal(await parts.count(), subject.parts,
+               "the subject needs every one of its parts left to bank");
 
   // bank them one at a time; each click redraws the list, so re-query each time
   for (let guard = 0; guard < 20 && await parts.count() > 0; guard++) {
@@ -1367,29 +1580,27 @@ page_test("a part banked on the planner reaches an open collection tab", async (
      One browser context, two pages: `storage` fires between tabs of the same
      origin in the same profile, and the helper above makes a fresh context per
      page, which would put them in different profiles and fire nothing. */
-  const context = await browser.newContext();
-  // Its own context, so it misses the seeding `open` does — and its subject is
-  // "the first item with two or more parts", which is vaulted and hidden by
-  // default. Seeded here for the same reason and in the same way.
-  await seedFilters(context);
+  const context = await newProfile();
   const collection = await context.newPage();
   const planner = await context.newPage();
   const errors = [];
   for (const p of [collection, planner]) p.on("pageerror", (e) => errors.push(String(e)));
 
   await collection.goto(origin + "/index.html", { waitUntil: "load" });
-  const id = await collection.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.parts.length >= 2);
-    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    return it.id;
-  });
+  /* "The first item in the payload with two or more parts" was the subject, and
+     that is a different Prime from the first one the page is SHOWING — it was
+     vaulted, so the card the count is read off never rendered. Picked from the
+     grid instead, which is the same helper every other card here uses. */
+  const subject = await pickCard(collection, 2);
+  const id = subject.id;
+  await collection.evaluate((x) =>
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([x])), id);
   await collection.reload({ waitUntil: "load" });
   await planner.goto(origin + "/plan.html", { waitUntil: "load" });
 
   const card = collection.locator(`[data-id="${id}"] .card-prog`);
-  assert.equal((await card.innerText()).trim(), "0/" + await collection.evaluate(
-    (x) => window.WFPRIME_DATA.items.find((i) => i.id === x).parts.length, id),
-    "nothing is banked yet");
+  assert.equal((await card.innerText()).trim(), `0/${subject.parts}`,
+               "nothing is banked yet");
 
   await planner.locator("#wishlist .wish-part").first().click();
 
@@ -1536,17 +1747,12 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
      The node is read off the row the planner ranked, so this cannot pass by
      marking somewhere nobody is being sent. */
   const { page, errors } = await open("/plan.html");
-  await page.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Nyx Prime");
-    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
-  });
-  await page.reload({ waitUntil: "load" });
+  await wishFarmable(page);
 
-  const first = page.locator("#planNodes .spot").first();
-  const key = await first.locator(".fissure-slot").getAttribute("data-node");
-  assert.ok(key, "no row to mark");
-  assert.equal(await first.locator(".tag.fissure").count(), 0,
+  assert.ok(await page.locator("#planNodes .spot").count() > 0, "no row to mark");
+  const key = await quietRow(page);
+  const row = rowFor(page, key);
+  assert.equal(await row.locator(".tag.fissure").count(), 0,
                "nothing is running there yet, so nothing should claim one");
 
   await page.route("**/data/fissures.json", (route) => route.fulfill({
@@ -1560,9 +1766,9 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
   }));
   // the same thing returning to the tab does, without waiting ten minutes
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  await page.locator(".tag.fissure").first().waitFor({ timeout: 5000 });
+  await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
 
-  const said = await first.locator(".tag.fissure").innerText();
+  const said = await rowFor(page, key).locator(".tag.fissure").innerText();
   assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
   assert.deepEqual(errors, []);
 });
@@ -1889,11 +2095,14 @@ page_test("the collection drawer can show more than its eight best places", asyn
      chosen on the raw drop tables for that reason. */
   const { page, errors } = await open("/index.html");
 
-  const subject = await page.evaluate(() => {
+  const subject = await page.evaluate((shown) => {
     const D = window.WFPRIME_DATA, R = D.relics || {};
-    // the item with the most distinct places behind it, so the fold is real
+    const on = new Set(shown);
+    // the card on screen with the most distinct places behind it, so the fold
+    // is real - and on screen, because the drawer is what is being opened
     let best = null;
     for (const it of D.items || []) {
+      if (!on.has(it.id)) continue;
       const nodes = new Set();
       for (const p of it.parts || []) {
         for (const r of p.relics || []) {
@@ -1905,9 +2114,10 @@ page_test("the collection drawer can show more than its eight best places", asyn
       if (!best || nodes.size > best.places) best = { id: it.id, name: it.name, places: nodes.size };
     }
     return best;
-  });
+  }, await shownIds(page));
   assert.ok(subject && subject.places > 8,
-            `no item has more than eight places behind it (${JSON.stringify(subject)})`);
+            `no card on screen has more than eight places behind it ` +
+            `(${JSON.stringify(subject)})`);
 
   await page.evaluate((id) => {
     document.querySelector(`[data-id="${id}"]`).click();
@@ -2044,7 +2254,19 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.ok(await rows.count() > 0,
             `${subject} is in Resurgence and its relics are buyable, so they must be crackable`);
   assert.equal(await page.locator("#planRelics .from-varzia").count(), await rows.count(),
-               "every row here comes from Varzia, and a row that does not say so reads as a drop");
+               "every row here needs Varzia, and a row that does not say so reads as a drop");
+
+  /* And it must not claim more than DE publish. Varzia's shelf is a curated
+     handful — six the day this was written — and `vaultTrader` carries her
+     packs and not one relic row, so this list is every vaulted relic holding a
+     part of an offered Prime: a superset. Saying "from Varzia" presented a
+     superset as a shelf and sent the reader to Maroo's for a relic that is not
+     there. See TODO.md; the list itself still needs a source. */
+  const badge = page.locator("#planRelics .from-varzia").first();
+  assert.match(await badge.innerText(), /may be at Varzia/i,
+               "the badge has to hedge, because which of these she stocks is unpublished");
+  assert.match(await badge.getAttribute("data-tip"), /do not publish/i,
+               "and the tooltip has to say why, or the hedge reads as vagueness");
 
   assert.equal(await page.locator("#planNodes .spot").count(), 0,
                "these relics have no sources, so ranking a place to run them would be invented");
@@ -2097,13 +2319,14 @@ page_test("the drawer hides vaulted relics by default, and says so rather than s
      you can actually go and get. Safe to default on only because the empty case
      answers itself — which is what this asserts, because a silently empty part
      is the failure this default could otherwise introduce. */
-  const { page, errors } = await open("/index.html", { asShipped: true });
-  await page.evaluate(() => {
-    // Vaulted is hidden by default too, and Ash Prime is vaulted — this test is
-    // about the drawer's default, so show the card without touching that.
-    const el = document.querySelector("#f-vaulted");
-    if (el && !el.checked) el.click();
-  });
+  const { page, errors } = await open("/index.html");
+  /* *Vaulted* is a sidebar default and `#hideVaulted` is a drawer default, and
+     this test is about the second one. So the first is ticked on outright — the
+     named subject has to be on screen before its drawer can be opened — and
+     `#hideVaulted` is deliberately left exactly as it ships, because it is what
+     is being asserted. A test about a default is the one kind that should fail
+     when that default moves; that is its whole job. */
+  await setCheck(page, "#f-vaulted", true);
   await page.locator('[data-id="warframe-ash-prime"]').click();
   assert.equal(await page.locator("#hideVaulted").isChecked(), true,
                "the default moved, and a saved choice still wins over it");
@@ -2131,10 +2354,10 @@ const BUNDLE = path.join(ROOT, "dist", "warframe-prime-hunter.html");
 const bundleWhy = why
   || (fs.existsSync(BUNDLE) ? null : "no single-file build yet (run tools/bundle.py)");
 const bundle_test = (name, fn) =>
-  (bundleWhy ? test(name, { skip: bundleWhy }, fn) : test(name, fn));
+  (bundleWhy ? test(name, { skip: bundleWhy }, fn) : test(name, runClean(fn)));
 
 async function openBundle(options) {
-  const page = await (await browser.newContext(options || {})).newPage();
+  const page = await (await newProfile(options)).newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
