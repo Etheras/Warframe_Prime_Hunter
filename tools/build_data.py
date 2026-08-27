@@ -860,12 +860,24 @@ def main() -> int:
     log("api: item database (name, image, vault state, components)")
     items_raw = fetch_json(ITEMS_API, "api_items", off, critical=False) or []
 
+    # One document, several feeds. DE publish the whole worldstate in one place
+    # and it is `max-age=28`, so it is fetched once here and read by everything
+    # below that used to have its own endpoint on the proxy.
+    log("worldstate: Digital Extremes' live worldstate")
+    worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
+                            critical=False, optional=True, max_age=3 * 3600)
+
     log("api: Varzia / vault trader (live Prime Resurgence rotation)")
-    try:
-        vault_trader = fetch_json(VAULT_TRADER, "api_vaulttrader", off)
-    except SystemExit:
-        log("! vault trader unavailable - Resurgence flags will be empty")
-        vault_trader = {}
+    vault_trader = official.vault_trader_from_worldstate(worldstate or {})
+    if vault_trader:
+        log(f"  worldstate: Varzia is selling {len(vault_trader['inventory'])} packs")
+    else:
+        log("  worldstate: no vault trader from DE, falling back to the WFCD proxy")
+        try:
+            vault_trader = fetch_json(VAULT_TRADER, "api_vaulttrader", off)
+        except SystemExit:
+            log("! vault trader unavailable - Resurgence flags will be empty")
+            vault_trader = {}
 
     # Optional on purpose: without these the planner says the bounty rotation is
     # unknown and treats the limited-time bounties as not running, which is a
@@ -885,10 +897,6 @@ def main() -> int:
     # from a CDN sitting in front of a failing origin reads as good news, and
     # this shipped a three-day-old empty list for three days without a word —
     # `stale_if_older` carries the measurement.
-    log("worldstate: void fissures running right now")
-    worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
-                            critical=False, optional=True, max_age=3 * 3600)
-
     log("export: DE public item manifest")
     export_primes, node_levels, export_hash, export_extra = acquire_export(off)
     textures = export_extra.get("textures") or {}

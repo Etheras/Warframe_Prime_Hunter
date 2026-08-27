@@ -2595,6 +2595,36 @@ everything DE actually publish, WFCD for the availability metadata they do not,
 and the wiki for what only editors maintain* — not *first party for everything*,
 which is not on offer.
 
+### Prime Resurgence comes from Digital Extremes now
+
+**Shipped 2026-08-27**, the same day as the fissures and by the same pattern.
+`PrimeVaultTraders[0].Manifest` is Varzia's rotating stock, and DE's `ItemType`
+is the very path the proxy was republishing — so `build_resurgence_set`, which
+matches on `uniqueName` with a substring test, needed no change at all.
+
+**Checked by running both routes through the same function on the same day.**
+The cached WFCD copy and DE's raw document produced **the same five Primes**.
+That is the A/B this project had been unable to do since the proxy went down, and
+the cached response turned out to be the missing reference all along.
+
+**`Manifest` only, never `EvergreenManifest`.** The rotating stock is what *Prime
+Resurgence* means here and what the proxy published. The evergreen list is 82
+items on sale from Varzia permanently; folding them in would flag a third of the
+catalogue as *back this rotation* and make the badge meaningless. Whether those
+82 deserve a badge of their own is a real question and a different one.
+
+**`character` and `location` are absent from DE's document and are not invented.**
+Their `Node` is `TradeHUB1`, which the region export does not name. Nothing needs
+them: the drawer writes *Varzia* itself and already defaults the place to Maroo's
+Bazaar, so the adapter returns the window and the stock and stays quiet about the
+rest.
+
+**`upstream_signature` moved with it**, which matters more than it looks.
+`--if-changed` runs every ten minutes and its Resurgence fingerprint asked the
+WFCD proxy — so for three days every freshness check spent three attempts and two
+sleeps failing against a 404, a probe costing more than the rebuild it exists to
+avoid. It now reads the same first-party document the build does.
+
 ### Fissures come from Digital Extremes now
 
 **Shipped 2026-08-27**, the day the WFCD proxy's fissure endpoint had been

@@ -520,6 +520,44 @@ def _worldstate_instant(value) -> str | None:
         timespec="milliseconds").replace("+00:00", "Z")
 
 
+def vault_trader_from_worldstate(doc: dict) -> dict | None:
+    """DE's raw worldstate -> Varzia's stock, in the shape the build consumes.
+
+    `build_resurgence_set` matches on `uniqueName` with a substring test, and
+    DE's `ItemType` is the same path the proxy was republishing — so this is
+    mostly a rename. Checked by running both through that function on the same
+    day: the WFCD copy and DE's raw document produce **the same five Primes**.
+
+    **`Manifest` only, not `EvergreenManifest`.** The rotating stock is what
+    *Prime Resurgence* means here and what the proxy published; the evergreen 82
+    are on sale from Varzia permanently, so folding them in would flag a third of
+    the catalogue as "back this rotation" and make the badge meaningless. Whether
+    they deserve a badge of their own is a separate question and not this one.
+
+    `character` and `location` are absent from DE's document — `Node` is
+    `TradeHUB1`, which their region export does not name — and are deliberately
+    not invented. Nothing needs them: the drawer writes *Varzia* itself and
+    already defaults the place to Maroo's Bazaar.
+    """
+    trader = (doc.get("PrimeVaultTraders") or [None])[0]
+    if not isinstance(trader, dict):
+        return None
+    inventory = []
+    for row in (trader.get("Manifest") or []):
+        item = str(row.get("ItemType") or "")
+        if not item:
+            continue
+        inventory.append({"uniqueName": item, "item": "",
+                          "ducats": row.get("PrimePrice")})
+    if not inventory:
+        return None
+    return {
+        "inventory": inventory,
+        "activation": _worldstate_instant(trader.get("Activation")),
+        "expiry": _worldstate_instant(trader.get("Expiry")),
+    }
+
+
 def fissures_from_worldstate(doc: dict, names: dict[str, str]) -> list[dict]:
     """DE's raw worldstate -> the fissure list, in the shape the build consumes.
 

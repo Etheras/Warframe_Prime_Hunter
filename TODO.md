@@ -123,7 +123,7 @@ ranking divides by means the same thing on every row.
 
 | Entry | Size |
 |---|---|
-| The live worldstate has a first-party route — three feeds still to move | session — fissures shipped 2026-08-27; Resurgence, bounties and events remain |
+| The live worldstate has a first-party route — two feeds still to move | session — fissures and Resurgence shipped 2026-08-27; bounties and events remain |
 | Parts, quantities and Ducats are all published first party | session — the largest remaining WFCD dependency in the data; do it after the worldstate |
 | The page tests flake in a full run and pass on their own | session — cause not established; the gate before every push should not do this |
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
@@ -738,11 +738,24 @@ and the drop tables disagree about `Chassis` versus `Chassis Blueprint`, so a
 third spelling arriving from DE needs to go through the same funnel rather than
 around it.
 
-### The live worldstate has a first-party route — three feeds still to move
+### The live worldstate has a first-party route — two feeds still to move
 
-**Fissures moved on 2026-08-27 and work; Resurgence, bounties and events have
-not.** What follows is the original entry, kept because the sizing still applies
-to the three that are left. The pattern the fissure adapter established is the
+**Fissures and Prime Resurgence moved on 2026-08-27 and work; bounties
+(`SyndicateMissions`) and events (`Events`) have not.** What follows is the
+original entry, kept because the sizing still applies to the two that are left.
+`PROJECT.md §7` has how the two that landed were done and checked.
+
+Both remaining feeds serve the bounty layer — `derive_bounty_rotation`,
+`find_live_events` and `read_bounty_jobs` — which is the most derived thing in
+the pipeline: the rotation letter is not published anywhere and is worked out by
+matching the bounties on offer against DE's own table. So this is the one place
+where an adapter can be subtly wrong and still look plausible, and the A/B that
+validated the first two is the thing to insist on: the cached
+`.cache/api_syndicatemissions.gz` and `.cache/api_events.gz` are known-good
+output, and a new adapter should reproduce the same rotation letter from the same
+day before it is trusted.
+
+The pattern the fissure adapter established is the
 one to copy: `official.fissures_from_worldstate` normalises DE's raw document
 into exactly the shape the WFCD proxy produced, so the two stay interchangeable
 and either can be the fallback for the other, and `build_data` prefers DE and

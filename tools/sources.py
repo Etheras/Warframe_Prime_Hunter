@@ -346,9 +346,17 @@ def upstream_signature(offline: bool = False) -> dict:
     h = head(OFFICIAL_DROPTABLES)
     sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
 
+    # First party, and the same document the build itself reads. This asked the
+    # WFCD proxy until 2026-08-27, which meant every ten-minute freshness check
+    # spent three attempts and two sleeps failing against an endpoint that had
+    # been 404 for three days — a fingerprint that cost more than the rebuild it
+    # was meant to avoid.
     try:
-        vt = fetch_json(VAULT_TRADER, "api_vaulttrader", offline)
-        sig["resurgence"] = str(vt.get("expiry") or "?")
+        doc = fetch_json(WORLDSTATE, "de_worldstate", offline,
+                         critical=False, optional=True)
+        trader = ((doc or {}).get("PrimeVaultTraders") or [{}])[0]
+        expiry = ((trader.get("Expiry") or {}).get("$date") or {}).get("$numberLong")
+        sig["resurgence"] = str(expiry or "?")
     except Exception:
         pass
 

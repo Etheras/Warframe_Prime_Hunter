@@ -869,6 +869,56 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
 
 
+def test_resurgence_reads_from_the_first_party_worldstate() -> None:
+    """
+    Varzia's stock, from DE's own worldstate rather than the WFCD proxy.
+
+    `build_resurgence_set` matches on `uniqueName` with a substring test, and
+    DE's `ItemType` is the very path the proxy was republishing — so the two
+    routes were checked against each other on live data the day this landed and
+    produced the same five Primes. What is asserted here is the mapping and the
+    two decisions inside it.
+    """
+    ms = 1787815825511                       # 2026-08-27T07:30:25.511Z
+    doc = {"PrimeVaultTraders": [{
+        "Node": "TradeHUB1",
+        "Activation": {"$date": {"$numberLong": str(ms)}},
+        "Expiry": {"$date": {"$numberLong": str(ms)}},
+        "Manifest": [
+            {"ItemType": "/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVRevenantPrimeSinglePack",
+             "PrimePrice": 6},
+            {"ItemType": ""},                       # dropped
+        ],
+        "EvergreenManifest": [
+            {"ItemType": "/Lotus/StoreItems/Weapons/Tenno/Rifle/BratonPrime", "PrimePrice": 1},
+        ],
+    }]}
+    got = official.vault_trader_from_worldstate(doc)
+    check("resurgence: the rotating stock comes across", len(got["inventory"]), 1,
+          "an entry with no ItemType is dropped rather than shipped empty")
+    check("resurgence: as a uniqueName the matcher already understands",
+          got["inventory"][0]["uniqueName"],
+          "/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVRevenantPrimeSinglePack")
+    check("resurgence: and the window DE publish", got["expiry"], "2026-08-27T07:30:25.511Z")
+
+    # The evergreen 82 are on sale permanently, so folding them in would flag a
+    # third of the catalogue as "back this rotation" and mean nothing.
+    check("resurgence: the evergreen stock is deliberately not in it",
+          [r for r in got["inventory"] if "Braton" in r["uniqueName"]], [])
+
+    # And the matcher gets what it needs out of it, end to end.
+    active, window = build_data.build_resurgence_set(got, ["Revenant Prime", "Braton Prime"])
+    check("resurgence: a pack name still identifies its Prime",
+          sorted(active), ["Revenant Prime"])
+    check("resurgence: character and location are left absent, not invented",
+          (window["character"], window["location"]), (None, None),
+          "the drawer writes Varzia itself and defaults the place")
+
+    check("resurgence: no trader in the document is None, not an empty shell",
+          official.vault_trader_from_worldstate({"PrimeVaultTraders": []}), None,
+          "None is what makes the caller fall back to the proxy")
+
+
 def test_artwork_prefers_digital_extremes() -> None:
     """
     Artwork is first party since 2026-08-27. DE's `ExportManifest.json` gives a
@@ -2307,6 +2357,7 @@ def main() -> int:
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_fissures_read_from_the_first_party_worldstate,
+                         test_resurgence_reads_from_the_first_party_worldstate,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
