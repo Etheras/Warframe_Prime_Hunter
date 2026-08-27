@@ -533,6 +533,16 @@ def test_built_payload() -> None:
     # ducats are a fixed game value, published per component - not a guess
     parts = [p for i in D["items"] for p in (i.get("parts") or [])]
     withd = [p for p in parts if p.get("ducats")]
+    # Which source answered each live feed.
+    feeds = D["meta"].get("feeds") or {}
+    check("payload: every live feed says where it came from",
+          sorted(feeds), ["bounties", "fissures", "vaultTrader"],
+          "the 403 only happens on the runner, so the artefact is the only place "
+          "the answer is true of the site people read")
+    check("payload: and names a source the chain can actually return",
+          sorted({v for v in feeds.values()} - {"worldstate", "proxy", "cache", "none"}),
+          [])
+
     check_true("payload: ducat values present", len(withd) > len(parts) * 0.9,
                "Baro's price per spare part; deterministic, so it should be near-total")
     check("payload: ducats are the known values",

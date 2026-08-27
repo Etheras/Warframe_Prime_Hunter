@@ -1115,6 +1115,14 @@ def main() -> int:
     # proxy having answered means the data IS current, whatever `fetch` had to
     # do to discover that.
     fell_back_to_cache = False
+    # Which source actually answered each live feed, carried on the payload.
+    #
+    # The build log has said this since the chain shipped, and a log nobody reads
+    # is not monitoring: the 403 only happens on the runner, so the one place the
+    # answer matters is the published artefact, and that is where this puts it.
+    # `curl …/data/prime-data.js | head` now says whether the deployed site is on
+    # first-party data, without anyone opening a CI log.
+    feed_source: dict[str, str] = {}
 
     log("api: Varzia / vault trader (live Prime Resurgence rotation)")
     vault_trader, src = from_chain(
@@ -1123,6 +1131,7 @@ def main() -> int:
         lambda: fetch_json(VAULT_TRADER, "api_vaulttrader", off,
                            critical=False, optional=True),
         lambda: official.vault_trader_from_worldstate(ws_cached))
+    feed_source["vaultTrader"] = src or "none"
     if src == "worldstate":
         log(f"  worldstate: Varzia is selling {len(vault_trader['inventory'])} packs")
     elif src == "proxy":
@@ -1147,6 +1156,7 @@ def main() -> int:
         lambda: fetch_json(SYNDICATE_MISSIONS, "api_syndicatemissions",
                            off, critical=False, optional=True),
         lambda: official.syndicate_missions_from_worldstate(ws_cached))
+    feed_source["bounties"] = src or "none"
     if src == "worldstate":
         world_events = official.events_from_worldstate(ws_fresh)
         jobs = sum(len(s["jobs"]) for s in syndicate_missions)
@@ -1202,6 +1212,7 @@ def main() -> int:
         lambda: fetch_json(FISSURES, "api_fissures", args.offline,
                            critical=False, optional=True, max_age=3 * 3600),
         lambda: named_fissures(ws_cached)[0])
+    feed_source["fissures"] = src or "none"
     if src == "worldstate":
         # Storms are dropped rather than mourned: DE publish no CrewBattleNode
         # row in their region export, so there is no name to give them. Say how
@@ -1230,6 +1241,7 @@ def main() -> int:
     # offline build that cleared this would claim freshness it cannot have —
     # which is the same wrong-in-the-other-direction mistake, made by the code
     # that exists to prevent it.
+    log("  feeds: " + ", ".join(f"{k} from {v}" for k, v in sorted(feed_source.items())))
     if ws_stale and not fell_back_to_cache and not args.offline:
         while "de_worldstate" in STALE:
             STALE.remove("de_worldstate")
@@ -1699,6 +1711,18 @@ def main() -> int:
             "refinements": REFINEMENTS,
             "dropSource": drop_source,
             "newCount": len(fresh) if prime_wikitext else 0,
+            # Which source answered each live feed: "worldstate" (Digital
+            # Extremes), "proxy" (WFCD), "cache" (our copy of DE's worldstate),
+            # or "none". The chain is DE -> WFCD -> cache and this is the record
+            # of where it stopped.
+            #
+            # On the payload rather than only in the build log, because the
+            # failure it reports happens on the GitHub runner and nowhere else —
+            # DE 403 a datacentre address and answer this machine normally, so a
+            # local build can never observe it. The deployed artefact is the only
+            # place the answer is true of the site people read, and a log nobody
+            # opens is not monitoring.
+            "feeds": feed_source,
             # refresh failed but an older copy was reused — data is slightly behind
             "stale": sorted(set(STALE)),
             # When the oldest of those reused copies was actually written. The
