@@ -501,12 +501,20 @@ Serving the check on another port is better still, because a different origin
 cannot reach those keys at all: `test_pages.mjs` serves on port `0` for exactly
 this reason, and `vorframe-plain` on 8781 is the ready-made one for a quick look.
 
-### Two audits, monthly, and only if something changed
+### Two audits, monthly, postponed rather than skipped
 
-**A full security audit and a full feature-usability audit, once a month each,
-skipped whenever there have been no commits since the last one.** The condition is
-half the rule: auditing an unchanged tree produces a document saying nothing
-changed, and a habit of producing those is how the real one stops being read.
+**A full security audit and a full feature-usability audit, once a month each.**
+If **no commits** have landed in the month since the last one, that audit is
+**postponed to the following month** — not skipped, and not marked done. The
+condition is half the rule: auditing an unchanged tree produces a document saying
+nothing changed, and a habit of producing those is how the real one stops being
+read.
+
+Postponed rather than skipped matters because the two words keep different books.
+A skipped audit leaves no trace and the next reader cannot tell a quiet month
+from a forgotten one; a postponed one moves its due date forward and stays
+visible. So the date below always moves, whether the audit ran or was deferred,
+and it always says which.
 
 They are separate passes because they ask different questions and nothing in the
 suite asks either.
@@ -525,16 +533,38 @@ every suite stayed green. Neither was found by running anything; both were found
 by someone going and looking.
 
 **Include the built file and the deployed site, not just the two pages.** That is
-the lesson of 2026-08-27 and it is the cheapest part of the rule to skip.
+the lesson of 2026-08-27 and it is the cheapest part of the rule to skip: four
+artefacts — the collection view, the planner, `dist/warframe-prime-hunter.html`
+and the published site — and seven defects lived in the third of those for as
+long as it had existed, because nothing ever opened it. **A phone-width pass
+belongs in the same sweep**; one test covers the sidebar at that width and
+nothing covers the rest.
 
-**How to tell one is due.** Each audit is recorded here with its date, so the
-answer is that date plus a month, and `git log --oneline --since=<that date>`
-being non-empty. As of 2026-08-27:
+**Record an audit the way the 2026-08-26 security review was recorded.** What was
+examined and **declined** goes in `PROJECT.md §7`, so the question is not re-asked
+from scratch by the next person who notices the same thing; what is outstanding
+gets an entry in `TODO.md`. Then move the date in the table below, so the next one
+knows when it is due.
 
-- **Security** — last done 2026-08-26, an outside review of ten findings; two
-  declined and recorded in §7, eight in `TODO.md`. Next due **2026-09-26**.
-- **Feature usability** — **never done.** The first one is outstanding, and it has
-  an entry in `TODO.md` rather than a date here.
+**How to tell one is due.** Each audit keeps a date here. Due is that date plus a
+month; whether it *runs* then is `git log --oneline --since=<that date>` being
+non-empty. If it is empty, move the date on a month and write *(postponed, no
+commits)* beside it.
+
+**The clock starts 2026-08-27**, by the owner's decision, and both are baselined
+there together:
+
+| Audit | Baselined | Next due |
+|---|---|---|
+| Security | 2026-08-27 | **2026-09-27** |
+| Feature usability | 2026-08-27 | **2026-09-27** |
+
+Neither baseline is a claim that an audit ran that day. It is a starting line,
+chosen so the two run on one cadence instead of drifting a day apart forever. The
+nearest thing to a real data point sits just behind it — an outside security
+review on 2026-08-26, ten findings, two declined and recorded in §7 and eight in
+`TODO.md` — and feature usability has genuinely never been done, which makes
+2026-09-27 its first.
 
 ---
 

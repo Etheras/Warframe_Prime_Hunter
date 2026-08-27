@@ -56,8 +56,12 @@ fix. It is settled and gone too — neither page corrects such a file now, both
 report it in the same words, and `PROJECT.md §7` has why the reasoning behind the
 old behaviour was wrong about its own cause.
 
-**What is left of those two days is one row**, and it is process rather than code:
-no feature-usability audit has ever been done, and one is now due monthly.
+**Neither is what those two days left behind.** That is a cadence rather than a
+backlog row: a security audit and a feature-usability audit, monthly, both
+baselined 2026-08-27 and both next due 2026-09-27, postponed a month whenever no
+commits have landed. It lives in `PROJECT.md §2` and has no entry here, because a
+recurring obligation is not outstanding work — it is due on a date, and that date
+is written where the rule is.
 
 *Size* is honest rather than optimistic: **small** is a few lines and one file,
 **session** is an afternoon including the test, **large** touches the pipeline, the
@@ -123,7 +127,6 @@ ranking divides by means the same thing on every row.
 | Running the tests rebuilds `data/` underneath you | small — but mind the test ordering that depends on it |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | The planner ignores Prime Resurgence items on the farm list | session |
-| No feature-usability audit has ever been done | session — the first one, and it sets the shape for the rest |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | The Void Trace cap past rank 30 is our extrapolation, not the wiki's | small — an unchecked number already on screen |
 | A priority flag on the farm list | session |
@@ -830,30 +833,6 @@ carry the Resurgence flag, so the data is in the payload. Note that the flag
 depends on `api_vaulttrader` — the feed that is down — so build this against the
 first-party route above, or against a cached copy, and do not let it silently
 show nothing when the flag is stale.
-
-### No feature-usability audit has ever been done
-
-**Added 2026-08-27**, when the monthly audit cadence was written down in
-`PROJECT.md §2`. A full security audit and a full feature-usability audit are due
-once a month each, skipped whenever nothing has been committed since the last one.
-Security has been done — an outside review on 2026-08-26. Usability never has, so
-the first one is outstanding, and it is the one that sets the shape the rest copy.
-
-The question it asks is not the one the suite asks. Every test here answers *"does
-it still do what it did"*; this asks whether each feature can be **found,
-understood and finished** by someone who did not build it. Both defect families
-this project has actually shipped were of the second kind and neither was found by
-running anything.
-
-Cover all three artefacts, not the two pages: the collection view, the planner, the
-single file in `dist/`, and the deployed site. Skipping the built file is what let
-seven defects live in it for as long as it had existed. A phone-width pass belongs
-in the same sweep — one test covers the sidebar and nothing covers the rest.
-
-Record it the way the security review was recorded: what was examined and
-**declined** goes in `PROJECT.md §7` so the question is not re-asked from scratch;
-what is outstanding gets an entry here. Then date it in `PROJECT.md §2` so the next
-one knows when it is due.
 
 ### The rest of the player facts the header could hold
 
