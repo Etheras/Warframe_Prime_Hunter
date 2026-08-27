@@ -211,6 +211,67 @@ table lifted verbatim, which is code wearing a data hat. `NOTICE.md` already
 credits WFCD for **data** under MIT; that credit does not extend itself to code
 nobody has checked.
 
+### Ask no more often than the source says to
+
+**Every request this project makes is somebody else's bandwidth, given for
+free.** Digital Extremes and WFCD both publish openly and neither charges, gates
+or authenticates us. That is hospitality, and the way to keep it is to take less
+of it than we are offered.
+
+**The rule: honour each source's own `Cache-Control: max-age`.** Do not
+re-request a document before the freshness window the server itself declared has
+expired — serve it from our own cache instead. Not a number we invent, not a
+number we tune: theirs.
+
+Three reasons it is that rule rather than a polite constant.
+
+It is **their** answer to the question, and they are the only party who knows it.
+A 24-hour `max-age` on the drop tables is DE saying *this changes about daily*;
+a 28-second one on the worldstate is DE saying *poll this, it moves*. Guessing a
+single interval for both would be wrong twice.
+
+It is **ordinary HTTP**, not a bespoke throttle. Every cache in the world already
+behaves this way, and the code that implements it is a comparison against a file
+mtime.
+
+And it **keeps working when they change their minds.** A number in our source has
+to be noticed and re-tuned; a number in their header updates itself.
+
+What they publish, measured 2026-08-27 — no source sends `X-RateLimit-*`, none
+sends `Retry-After`, and there is no usage policy in the WFCD READMEs or on
+`docs.warframestat.us`, so these headers are the whole of the stated policy:
+
+| Source | Says | Meaning |
+|---|---|---|
+| `api.warframe.com/cdn/worldState.php` | `max-age=28` | built to be polled |
+| `www.warframe.com/droptables` | `max-age=86400` | about daily |
+| `content.warframe.com/PublicExport/index_en.txt.lzma` | `no-cache` + `ETag` | always revalidate, and it answers 304 |
+| `api.warframestat.us/items` | `max-age=120` | |
+| `drops.warframestat.us/data/*` | `max-age=600` | |
+
+`no-cache` is not `no-store` and does not mean *ask constantly*: it means
+*revalidate before reusing*, which a conditional request does in a header
+exchange with no body. **Always send `If-None-Match` when an ETag is held.** We
+already do, and it is the cheapest possible way to be current.
+
+**Where we stood when the rule was written.** About four requests per ten-minute
+cycle — one conditional GET and one HEAD to DE, two GETs to WFCD — with the
+local scheduled task and CI each running it, so roughly 1,150 a day between them.
+Small in absolute terms and not the point: the drop-table HEAD fired 144 times
+inside a window DE themselves declare as one day. Small and thoughtless is still
+thoughtless.
+
+**`robots.txt`, checked the same day:** `www.warframe.com` disallows only account
+and admin paths, so `/droptables` is permitted; `api.warframe.com` and
+`content.warframe.com` serve none. Nothing we fetch is disallowed. Re-check it if
+a new path is ever added — a 404 on `robots.txt` is permission by silence, and
+silence can end.
+
+**One request that is never cheap: the artwork.** A page load fetches one image
+per card, 167 of them, from somebody else's CDN. `--with-images` exists precisely
+so a local copy can serve them instead, and it is the polite build for anything
+long-lived.
+
 ### Showing a proposal before building it
 
 `temp_mockup.html` is a scratchpad at the repo root for **showing what a change
