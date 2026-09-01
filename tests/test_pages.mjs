@@ -2586,9 +2586,15 @@ page_test("ranking per run does not undo the thumbs on the scale", async () => {
 
      The subject is a node that hands relics over Radiant, picked on the raw
      `refinement` field rather than by asking the code under test. It is also the
-     first end-to-end check that the 25% reaches a ranked number at all: none of
-     these nodes appears in the eight rows ranked per objective, but ESO does
-     appear ranked per run, which is the only view that can see it. */
+     first end-to-end check that the 25% reaches a ranked number at all.
+
+     **It used to read the subject out of the eight visible rows**, on the claim
+     that "ESO appears ranked per run, which is the only view that can see it".
+     That was true until 2026-09-01, when the six-round run became a 4-man
+     premade's option and every per-run figure that depended on it fell — ESO
+     included, straight out of the top eight. Where the subject ranks is not
+     what this test is about, so it expands the list and finds it wherever it
+     is. A test that needs a subject on screen should put it on screen. */
   const { page, errors } = await open("/plan.html");
 
   const subject = await page.evaluate(() => {
@@ -2634,8 +2640,16 @@ page_test("ranking per run does not undo the thumbs on the scale", async () => {
              lift: (tip.match(/Ranked figures \+(\d+)%/) || [])[1] };
   }, node);
 
+  const expand = async () => {
+    const more = page.locator("#moreNodes");
+    if (await more.count() && (await more.getAttribute("aria-expanded")) === "false") {
+      await more.click();
+    }
+  };
+  await expand();
+
   const on = await readRow(subject.node);
-  assert.ok(on, `${subject.node} is not among the rows ranked per run`);
+  assert.ok(on, `${subject.node} is not among the rows ranked per run, expanded`);
   assert.ok(on.raw, "could not read the raw count out of the tooltip");
   assert.ok(on.saysLift, "a row carrying the bonus must say so");
   assert.equal(on.lift, "25");

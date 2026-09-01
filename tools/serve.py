@@ -399,6 +399,98 @@ def allowed(rel: str, peer: str | None = None) -> bool:
 _SALT = os.urandom(16)
 RATE_BURST = 60          # requests a client may make back to back
 RATE_PER_SEC = 10.0      # and the rate it refills at afterwards
+
+# How many connections may be in flight at once, counted at accept.
+#
+# The token bucket above and the handler's 30-second timeout are both real and
+# both act too late for this particular shape: the bucket runs inside `do_GET`,
+# *after* a complete request line and headers have been parsed, so a connection
+# that never sends them is never counted at all; and the timeout bounds how long
+# each thread lives, not how many there are. A client opening connections and
+# saying nothing meets neither. The review opened 80 at once and all 80 were
+# accepted.
+#
+# 64 is chosen against what the site actually does. It speaks HTTP/1.0, so every
+# request is its own connection — a cold page load is nine files plus up to 167
+# images — but browsers cap themselves at around six concurrent connections per
+# host, so even several tabs at once stay far below this. It is a ceiling on
+# absurdity rather than a budget anyone should feel.
+#
+# **Largely moot, and built anyway.** The server binds loopback only since
+# 2026-09-01, so the only thing that can open 64 stalled connections is a
+# process already on this machine, which has easier things to do. This is a
+# property of the code rather than a live exposure, and it matters again the
+# moment these files sit behind something that does listen more widely — which
+# `README.md` explains how to do.
+MAX_CONNECTIONS = 64
+
+
+class SiteServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    """
+    Threaded, because a single-threaded server is taken down by one client
+    opening a socket and never finishing its request — measured: a second client
+    waited the full timeout.
+
+    At module level rather than inside `main`, so the suite can stand one up on
+    port 0 and actually open sockets at it. A connection ceiling is not a thing
+    that can be checked by reading a parser.
+
+    `timeout` here is inherited noise and is left only because `handle_request`
+    reads it. It is **not** what releases a stalled connection — that is the
+    handler's own `timeout`, set on `SiteHandler`. This comment claimed
+    otherwise until 2026-08-26: `BaseServer.serve_forever` says "Ignores
+    self.timeout" in its own docstring, so for the whole life of this server the
+    class attribute did nothing at all.
+    """
+
+    daemon_threads = True
+    allow_reuse_address = True
+    timeout = 30
+    # A slightly deeper listen backlog than the stdlib's 5, so an ordinary burst
+    # — a cold page load opening its images — waits in the kernel rather than
+    # meeting the ceiling. The queue absorbs bursts; the semaphore stops floods.
+    # They are different jobs and both are wanted.
+    request_queue_size = 32
+    max_connections = MAX_CONNECTIONS
+
+    def __init__(self, *a, **kw):
+        # Per instance, not per class: the suite builds several, and a shared
+        # semaphore would leak slots between them.
+        self._slots = threading.BoundedSemaphore(self.max_connections)
+        super().__init__(*a, **kw)
+
+    def process_request(self, request, client_address):
+        """
+        Counted at **accept** — before a thread exists and before a single byte
+        has been read — which is the whole point. Every other protection in this
+        file runs after a request has been parsed, so none of them sees a client
+        that opens a socket and then says nothing.
+        """
+        if not self._slots.acquire(blocking=False):
+            # Refused on the accept thread rather than by spawning one more to
+            # say no with, and written straight to the socket for the same
+            # reason: building a handler is the work being declined.
+            STATS["limited"] += 1
+            try:
+                request.sendall(
+                    b"HTTP/1.0 503 Service Unavailable\r\n"
+                    b"Retry-After: 5\r\n"
+                    b"Content-Length: 0\r\n"
+                    b"Connection: close\r\n\r\n")
+            except OSError:
+                pass              # already gone, which is the usual case here
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        # `finally`, because a slot never released is a slot gone for the life
+        # of the process, and 64 of those is a server that accepts nothing. The
+        # same lesson as the freshness flag a few hundred lines up.
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
 _buckets: dict = {}
 _bucket_lock = threading.Lock()
 STATS = {"served": 0, "refused": 0, "limited": 0}
@@ -673,23 +765,10 @@ def main() -> int:
     url = f"http://localhost:{port}"
     handler = functools.partial(SiteHandler, directory=ROOT)
 
-    # Threaded, because the single-threaded server could be taken down by one
-    # client opening a socket and never finishing its request - measured: a
-    # second client waited the full timeout.
-    #
-    # The timeout that does that job is on the HANDLER and is set on SiteHandler
-    # itself; `Server.timeout` is left here only because `handle_request` reads
-    # it. It is not what releases a stalled connection, and this comment claimed
-    # it was until 2026-08-26: `BaseServer.serve_forever` says "Ignores
-    # self.timeout" in its own docstring, so for the whole life of this server
-    # the class attribute below did nothing at all.
-    class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
-        daemon_threads = True
-        allow_reuse_address = True
-        timeout = 30
-
+    # Threading, the connection ceiling and the timeout that releases a stalled
+    # socket all live on `SiteServer` above, which is where their reasoning is.
     try:
-        httpd = Server((host, port), handler)
+        httpd = SiteServer((host, port), handler)
     except OSError as exc:
         print(f"Could not start a server on {host}:{port} — {exc}")
         return 1

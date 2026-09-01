@@ -157,7 +157,6 @@ Five things worth carrying forward, because none was in the findings:
 
 | Entry | Size |
 |---|---|
-| The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
 
@@ -291,36 +290,6 @@ being found by shape rather than by position (`a67b6d5`, `4947bca`). The
 *shape* of the cadence test is still wrong and keeps its own entry — *The
 schedule tests assert equality where they should assert a ceiling* — but being
 wrong is not the same as being red, and it is no longer red.
-
-### The server caps requests, but not connections
-
-`tools/serve.py` runs `ThreadingMixIn` with `daemon_threads = True` and no
-ceiling on how many threads it will make. The two protections that exist both
-act too late to help:
-
-- the **token bucket** (`RATE_BURST = 60`, `RATE_PER_SEC = 10.0`, line 296-297)
-  runs inside `do_GET`/`do_HEAD` — after a complete request line and headers
-  have been parsed, so a connection that never sends them is never counted;
-- the **30-second socket timeout** on the handler (line 350) bounds how long
-  each thread lives, not how many there are.
-
-The review opened 80 partial requests at once; all 80 were accepted, and a
-normal request still returned 200 — so this is a resource question rather than a
-denial of service that has been demonstrated.
-
-**Mostly answered by removing LAN mode on 2026-09-01**, and the entry is kept
-rather than deleted because the answer is "the reachable attacker is gone", not
-"the code is fixed". The server binds loopback only now, so the only thing that
-can open 80 stalled connections is a process already running on this machine —
-which has easier things to do. What is left is the shape of the code rather than
-an exposure, and it matters again the moment anyone puts these files behind
-something that does listen more widely, which the README now tells them how to
-do.
-
-A semaphore taken at accept, with a short queue and a 503-and-close when full,
-is the shape the review asks for. **Keep both existing protections** — they
-solve different parts of it, and the comments in that file record what each one
-was measured to do.
 
 ### The published site can be framed, and only the host can stop it
 

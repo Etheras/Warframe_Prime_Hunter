@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+import functools
 import json
 import os
 import re
@@ -39,6 +40,7 @@ import sys
 import tempfile
 import time
 import traceback
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -2677,6 +2679,91 @@ def test_serving_a_page_starts_one_upstream_check_not_one_each() -> None:
         serve._freshness.update(saved)
 
 
+def test_the_server_caps_connections_not_just_requests() -> None:
+    """
+    Two protections already existed and both act too late for this shape. The
+    token bucket runs inside `do_GET` — *after* a request line and headers have
+    been parsed — so a client that opens a socket and says nothing is never
+    counted; and the handler's 30-second timeout bounds how long each thread
+    lives, not how many there are. The first review opened 80 partial requests
+    and all 80 were accepted.
+
+    `SiteServer` counts at **accept** now, before a thread exists and before a
+    byte is read. Three properties, and the third is the one that makes this
+    safe to ship: the ceiling holds, the excess is told to go away rather than
+    left hanging, and **slots come back** — a semaphore that leaks is a server
+    that ends up accepting nothing at all, which is a worse outage than the one
+    being prevented.
+
+    Real sockets on port 0, because a connection ceiling is not a thing that can
+    be checked by reading a parser. A small `max_connections` keeps it quick and
+    keeps Windows out of its socket-buffer trouble.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import socket
+    import threading as thr
+    import serve
+
+    class Tiny(serve.SiteServer):
+        max_connections = 4
+
+    handler = functools.partial(serve.SiteHandler, directory=ROOT)
+    httpd = Tiny(("127.0.0.1", 0), handler)
+    port = httpd.server_address[1]
+    thr.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    held, refused = [], 0
+    try:
+        # Open more than the ceiling and send nothing at all — the exact shape
+        # neither existing protection can see.
+        for _ in range(Tiny.max_connections + 4):
+            s = socket.create_connection(("127.0.0.1", port), timeout=5)
+            held.append(s)
+
+        # The ones past the ceiling are answered and closed rather than parked.
+        for s in held:
+            s.settimeout(1.5)
+            try:
+                first = s.recv(64)
+            except (socket.timeout, TimeoutError):
+                first = b""       # accepted and waiting for a request: correct
+            if first.startswith(b"HTTP/1.0 503"):
+                refused += 1
+        check_true("connections: the ones past the ceiling are refused",
+                   refused >= 1,
+                   f"opened {len(held)} against a ceiling of "
+                   f"{Tiny.max_connections} and none was turned away")
+        check_true("connections: and refusing says so with a status, not silence",
+                   refused >= 1)
+
+        # Now let them all go, and check the ceiling was a ceiling rather than a
+        # one-way door. This is the assertion that catches a leaked semaphore.
+        for s in held:
+            s.close()
+        held.clear()
+        deadline = time.time() + 10
+        body = None
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/index.html", timeout=3) as r:
+                    body = r.status
+                break
+            except Exception:                              # noqa: BLE001
+                time.sleep(0.2)
+        check("connections: an ordinary request works again afterwards", body, 200,
+              "slots are not coming back - the semaphore leaks, and this server "
+              "will refuse everything once it has seen enough connections")
+    finally:
+        for s in held:
+            try:
+                s.close()
+            except OSError:
+                pass
+        httpd.shutdown()
+        httpd.server_close()
+
+
 def test_the_ci_probe_asks_about_the_source_that_refuses() -> None:
     """
     *Probe the data sources* exists to record which upstreams answer a datacentre
@@ -3488,6 +3575,7 @@ def main() -> int:
                          test_a_check_that_dies_still_lowers_the_flag,
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
+                         test_the_server_caps_connections_not_just_requests,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_wiki_can_still_be_built_from_the_docs,

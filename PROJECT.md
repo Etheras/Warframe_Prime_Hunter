@@ -4733,6 +4733,48 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### Connections are counted at accept, where the other two protections cannot
+
+**Shipped 2026-09-01**, the last security finding with a fix in this repository.
+Two protections already existed and both act too late for one particular shape:
+
+- the **token bucket** runs inside `do_GET` — after a request line and headers
+  have been parsed — so a client that opens a socket and *says nothing* is never
+  counted at all;
+- the **30-second handler timeout** bounds how long each thread lives, not how
+  many there are.
+
+The first review opened 80 partial requests at once and all 80 were accepted.
+`SiteServer.process_request` now takes a slot from a `BoundedSemaphore` at
+**accept**, before a thread exists and before a byte is read, and answers the
+excess with `503` and a close rather than parking it. Both existing protections
+stay: they solve different parts of this, and the file records what each was
+measured to do.
+
+**64, chosen against what the site actually does.** It speaks HTTP/1.0, so every
+request is its own connection — a cold page load is nine files plus up to 167
+images — but browsers cap themselves at about six concurrent per host, so even
+several tabs stay far below. `request_queue_size` went to 32 in the same pass:
+the listen backlog absorbs ordinary bursts, the semaphore stops floods, and
+those are different jobs.
+
+**Releasing is the part that had to be right.** The slot comes back in a
+`finally` on `process_request_thread`, because a semaphore that leaks turns into
+a server that accepts nothing at all — a worse outage than the one being
+prevented, and arrived at by trying to fix it. The test asserts that third
+property explicitly, not just the ceiling.
+
+`SiteServer` moved to module level to make any of this testable. A connection
+ceiling cannot be checked by reading a parser, so the test stands a real server
+on port 0 with a ceiling of four, opens eight silent sockets, and checks the
+excess is refused and that an ordinary request works once they close.
+
+**Largely moot, and built anyway.** The server binds loopback only since
+2026-09-01, so the only thing that can open 64 stalled connections is a process
+already on this machine. This is a property of the code rather than a live
+exposure — and it matters again the moment these files sit behind something that
+does listen more widely, which `README.md` explains how to do.
+
 ### The feed log is untracked, because tracking it broke what it is for
 
 **Shipped 2026-09-01.** `data/feed-log.json` was deliberately committed on
