@@ -138,6 +138,7 @@ unit question — tedious rather than hard, and blocking nothing.
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
+| The schedule tests assert equality where they should assert a ceiling | small — the owner's, 2026-09-01; they blocked a temporary cadence change |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
@@ -1076,6 +1077,54 @@ Worth checking against a live window rather than the cached one, since a single
 reading cannot tell a misfiled job from a genuinely different phase on Deimos.
 If Deimos really does run its own rotation phase, the family split is too coarse
 and that is a larger and more interesting problem than a misfiled bounty.
+
+### The schedule tests assert equality where they should assert a ceiling
+
+**Asked for by the owner 2026-09-01, after the tests got in the way of a change
+they had every right to make.** Documented, not implemented.
+
+Four numbers describe the refresh cadence and the suite currently requires **all
+four to be the same integer**: the CI cron (`publish.yml`), the Windows task
+(`schedule.ps1`), the cron-job script (`schedule.sh`) and the page's own fissure
+poll (`FISSURE_REFRESH_MS`). Move one and the suite goes red — which is what
+happened when the owner set the CI cron to 15 minutes for a few days to measure
+how often DE answer without leaning on WFCD. Nothing was wrong; the numbers had
+simply stopped matching.
+
+**Equality is the wrong shape.** These are four independent schedulers with
+different constraints — GitHub's cron is best-effort with a five-minute floor and
+a deployment budget, a Windows task runs on a machine that may be asleep, the page
+poll costs one request to our own origin — and there is no reason they must agree
+to the minute. Requiring it makes the test an obstacle to any deliberate change
+rather than a guard against an accidental one.
+
+**And the thing worth guarding is not freshness, it is response time.** The
+current checks reason about how *fresh the data* is; what actually matters is how
+long it takes a change at the source to reach a reader's screen. That is the sum
+of the pieces, not any one of them:
+
+```
+worst case = build interval + page poll interval  (+ whatever CI drops)
+```
+
+So the rule wants to be a **maximum threshold on that sum**, failing only when it
+crosses a stated ceiling. Something like *"a fissure must be discoverable within
+half its shortest observed life"* — measured 2026-08-27 at 60 minutes shortest,
+median 88 — which at 10 + 10 leaves plenty of headroom and would have let the
+owner's 15 pass without a word.
+
+Worth settling when it is built:
+
+- **What the ceiling is, and from what evidence.** A number pulled out of the air
+  is no better than the equality it replaces. The fissure-duration measurement is
+  the obvious basis and is already in `PROJECT.md`.
+- **Whether the page poll belongs in the sum at all.** It reads our own origin, so
+  it costs nobody else anything, and a page polling faster than the site updates
+  is merely redundant rather than wrong. It may deserve its own much looser rule.
+- **What to do about dropped CI runs.** GitHub queues and drops schedules under
+  load, so the real interval is not the cron string. If the ceiling is meant to be
+  honest, the feed log now on the deployed site can say what the *observed*
+  interval is, which is a better input than the declared one.
 
 ### The page tests flake in a full run and pass on their own
 
