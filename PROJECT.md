@@ -4733,6 +4733,43 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### The Void Trace cap holds at Mastery Rank 30, and says whose guess that is
+
+**The owner's decision, 2026-09-01.** The wiki gives the cap as
+`(Mastery Rank × 50) + 100` and works two examples, MR13 = 750 and MR30 = 1600.
+Its table stops at 30. `Void Traces` and `Mastery Rank` were read on 2026-08-27
+and `Void Traces` again on 2026-09-01: Legendary is unaddressed on all three
+readings.
+
+`traceCap` used to keep counting, so LR1 read 1650. **It now holds at 1600.**
+
+**Neither number is sourced, so the question is which way to be wrong.** That is
+the whole of the reasoning and it is worth stating, because "be conservative" on
+its own is a slogan. The planner uses this figure for exactly one thing: whether
+the reader can afford Radiants. Understating the cap advises caution that was not
+needed. Overstating it advises a refinement the player **cannot actually pay
+for** — a wrong answer they act on and then cannot complete. The costs are not
+symmetric, so the low guess wins.
+
+**And it is attributed.** The badge said *"our own continuation of the formula"*,
+which was accurate while the number was extrapolated and would have been quietly
+wrong afterwards: it is no longer a continuation of anything. It now says the
+wiki is silent, that the cap is held at the MR30 figure, that this is the
+owner's assumption rather than something DE publish, and — the part a Legendary
+reader actually needs — that if Legendary ranks do raise it, theirs is higher
+than shown. The line quoting the formula is suppressed above 30 for the same
+reason: naming `(rank × 50) + 100` beside a number that no longer comes from it
+is how a guess acquires a pedigree.
+
+Pinned at three Legendary ranks rather than one, because a plateau that holds
+for LR1 alone is an off-by-one wearing a plateau's clothes, plus a check that
+holding never means going *backwards* at the boundary. Read off the real page at
+LR5 rather than trusted from the source.
+
+**What would still settle it is unchanged and is not a wiki page**: one Legendary
+player reading their own cap in game. `TODO.md` no longer asks anyone to check
+the wiki a fourth time.
+
 ### The cadence test asserts a ceiling on response time, not four equal numbers
 
 **Shipped 2026-09-01, at the owner's request, after the test got in the way of a

@@ -786,20 +786,35 @@ page_test("the rank badge states the Void Trace cap it implies", async () => {
   assert.match(rich, /Hunter/, "and the badge names the rank DE gives it");
   assert.doesNotMatch(rich, /cannot hold more/, "750 clears the switch's 500 comfortably");
 
-  /* Past 30 the formula is ours: the wiki states it, works MR13 and MR30, and
-     stops — re-checked on `Void Traces` and `Mastery Rank` on 2026-08-27, and
-     Legendary is absent from both. So the badge marks the figure as an estimate
-     at those ranks rather than showing it as though it were known, and does not
-     say so at ranks the wiki actually covers. */
+  /* Past 30 the wiki says nothing — read on `Void Traces` and `Mastery Rank` on
+     2026-08-27 and on `Void Traces` again on 2026-09-01, Legendary unaddressed
+     each time. The cap therefore HOLDS at the MR30 figure rather than counting
+     on, the owner's decision of 2026-09-01; it used to read 1650 here, which was
+     the arithmetic's answer to a question nobody has answered.
+
+     Three things are asserted and the third is the one that matters most to a
+     reader: the number, that it is named as an assumption rather than as
+     something DE publish, and **which way it errs** — a Legendary player whose
+     real cap is higher needs to know that, or a conservative guess silently
+     becomes a wrong instruction. */
   await setRank(31);
   const legendary = await tip();
-  assert.match(legendary, /1650/, "the continuation is still shown — it is our best answer");
-  assert.match(legendary, /not a figure the wiki states|estimate/i,
-               "and a Legendary reader is told the number is ours, not the wiki's");
+  assert.match(legendary, /1600/, "LR1 holds at the MR30 cap");
+  assert.doesNotMatch(legendary, /1650/, "and does not keep counting");
+  assert.match(legendary, /assumption/i,
+               "a Legendary reader is told this is a guess, not a published figure");
+  assert.match(legendary, /higher than this/i,
+               "and told which way it is wrong if it is wrong — the cap can only "
+               + "be understated, never overstated");
+  assert.doesNotMatch(legendary, /rank × 50|rank x 50/i,
+                      "the formula must not be quoted beside a number it no "
+                      + "longer produces");
 
   await setRank(30);
-  assert.doesNotMatch(await tip(), /estimate/i,
+  const known = await tip();
+  assert.doesNotMatch(known, /assumption/i,
                       "MR30 is the wiki's own worked example, so nothing to hedge");
+  assert.match(known, /1600/, "and it is the figure the plateau holds at");
 
   await setRank(8);
   const poor = await tip();

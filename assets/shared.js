@@ -858,18 +858,28 @@
 
   /* `wiki.warframe.com/w/Void_Traces`: "This cap is determined by one's Mastery
      Rank using the formula: (Mastery Rank × 50) + 100." The page's own worked
-     examples are MR13 = 750 and MR30 = 1600, and both fall out of this. A
-     Legendary rank keeps counting from 30, so LR1 is 31 and the same formula
-     carries - that continuation is ours rather than the wiki's, which stops its
-     table at 30.
+     examples are MR13 = 750 and MR30 = 1600, and both fall out of this. The
+     wiki's table stops at 30 and Legendary is absent from it - re-checked on
+     `Void Traces` and `Mastery Rank` on 2026-08-27, and on `Void Traces` again
+     on 2026-09-01, where Legendary is still unaddressed. Three readings, same
+     nothing.
 
-     Re-checked 2026-08-27 on both `Void Traces` and `Mastery Rank`: Legendary is
-     absent from both pages, so the continuation is still unsourced. The badge
-     now says so at those ranks rather than presenting the number as known -
-     which is the only half of this that can be fixed without a Legendary player
-     reading their own cap in game. */
+     **So past 30 it PLATEAUS at 1600, by the owner's decision of 2026-09-01.**
+     It used to keep counting - LR1 read 1650 - which was the arithmetic's
+     answer rather than anybody's. Neither is sourced; the difference is that a
+     plateau is the conservative one. Understating a cap costs a Legendary
+     reader nothing: the planner only uses this to say whether Radiants are
+     affordable, so a low answer advises caution it did not need to, while a
+     high one would advise a refinement the player cannot actually pay for.
+
+     **It is the owner's assumption and the badge says so in those words**, not
+     "our continuation of the formula" - because it is no longer a continuation
+     of anything, and attributing a guess to a formula is how a guess stops
+     looking like one. One Legendary player reading their own cap in game
+     settles it; `TODO.md` has that and says to stop asking the wiki. */
   function traceCap(mr) {
-    return mr == null ? null : mr * 50 + 100;
+    if (mr == null) return null;
+    return Math.min(mr, MR_TOP) * 50 + 100;
   }
 
   /* A Radiant costs 100 traces, and the planner's "Short on Void Traces?"
@@ -942,19 +952,28 @@
           "you. It never hides anything: a bounty above your rank can still be " +
           "played when a squadmate starts it."
         : masteryLabel(mr) + " — " + masteryTitle(mr) + ".\n\n" +
-          "Void Trace cap " + cap + " — (rank × 50) + 100.\n" +
+          /* The formula is only quoted where it is actually what produced the
+             number. Above 30 the cap is held rather than computed, so naming
+             `(rank × 50) + 100` there would be describing arithmetic the figure
+             no longer comes from — the exact way a guess acquires a pedigree. */
+          "Void Trace cap " + cap +
+          (mr > MR_TOP ? " — held at the Mastery Rank 30 cap.\n"
+                       : " — (rank × 50) + 100.\n") +
           "A Radiant costs 100, so that is " + Math.floor(cap / 100) + " of them." +
-          /* Past 30 the formula is ours. The wiki states it and works MR13 and
-             MR30, and stops - re-checked on `Void Traces` and `Mastery Rank`,
-             2026-08-27, and Legendary is absent from both. So a Legendary
-             reader is told the number is an extrapolation rather than shown it
-             as though it were known. DE could cap storage at the MR30 value, or
-             step Legendary differently, and either would make this wrong with
-             nothing here to catch it. `TODO.md` has what would settle it: one
-             Legendary player reading their own cap in game. */
+          /* Past 30 the number is an assumption, and it is named as one. The
+             wiki states the formula and works MR13 and MR30, then stops; three
+             readings have found Legendary unaddressed. Rather than let the
+             arithmetic answer a question nobody has answered, the cap holds at
+             the MR30 figure — and a Legendary reader is told whose guess that
+             is, because "our continuation of the formula" made it sound
+             derived. It is not derived. It is a choice, and the conservative
+             one. `TODO.md` has what would settle it: one Legendary player
+             reading their own cap in game. */
           (mr > MR_TOP
-            ? "\n\nPast Mastery Rank 30 this is our own continuation of the " +
-              "formula, not a figure the wiki states — treat it as an estimate."
+            ? "\n\nPast Mastery Rank 30 the wiki says nothing about the cap, so " +
+              "this holds at the Mastery Rank 30 figure. That is the owner's " +
+              "assumption rather than a number Digital Extremes publish — if " +
+              "Legendary ranks do raise it, yours is higher than this."
             : "") +
           (traceCapped(mr)
             ? "\n\nAt this rank you cannot hold more than " + TRACE_PIVOT + ", so the " +

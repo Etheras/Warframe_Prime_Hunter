@@ -244,6 +244,22 @@ test("the Void Trace cap is the wiki's formula, and matches its worked examples"
   assert.equal(S.traceCap(0), 100, "Unranked still holds a hundred");
   assert.equal(S.traceCap(null), null, "an unset rank has no cap, rather than 100");
 
+  /* Past 30 the wiki says nothing, and the cap holds rather than keeps counting
+     — the owner's decision of 2026-09-01. It used to extrapolate, so LR1 read
+     1650; that was the arithmetic's answer to a question nobody has answered.
+
+     Neither number is sourced. What makes the plateau the right guess is which
+     way it is wrong if it is wrong: the planner uses this only to say whether
+     Radiants are affordable, so understating a cap advises caution that was not
+     needed, while overstating it advises a refinement the player cannot pay for.
+     Asserted at three Legendary ranks, because a plateau that only holds for one
+     of them is an off-by-one rather than a plateau. */
+  assert.equal(S.traceCap(31), 1600, "LR1 holds at the MR30 cap, it does not read 1650");
+  assert.equal(S.traceCap(35), 1600, "and it is still holding five ranks later");
+  assert.equal(S.traceCap(99), 1600, "and it never resumes counting");
+  assert.ok(S.traceCap(31) >= S.traceCap(30),
+            "holding must never mean going BACKWARDS at the boundary");
+
   /* A Radiant is 100 traces and the planner's switch splits at five of them.
      MR8 caps at exactly 500, so "over 500" first becomes reachable at MR9 -
      the boundary is the whole point of the note the planner prints. */
