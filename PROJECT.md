@@ -610,6 +610,22 @@ because of a bug that actually happened, and says which in its docstring.
 runner with no cache agrees. It has earned its place: the local suite passed while
 CI was red for two commits.
 
+**Afterwards, though — not instead of finishing.** Decided 2026-09-01: **a push
+ends the turn.** Do not hold a session open on `gh run watch`, a poll, or a sleep
+waiting for Actions or a Pages deploy to go green. The owner is emailed when a run
+fails, so a session watching the run duplicates a notification they already have
+and spends their time doing it; one Pages deploy ran to 4m52s with the turn held
+open for it. The result is read at the **start of the next piece of work** — a
+`gh run list --limit 5` before anything else — or when the owner says something
+broke.
+
+The distinction that matters: the full local suite runs **before** the push and is
+the gate, because it is the thing that can still stop a bad commit. CI runs after
+and reports; nothing is waiting on the answer, so nobody should be either. A
+single non-blocking `gh run list` in the same breath as the push is fine and often
+catches an immediate configuration failure — it is the *waiting* that was the
+mistake, not the looking.
+
 **Expect CI to pass fewer checks than a local run, and do not read the gap as a
 failure** — four groups skip there for four different reasons: `built payload` (the
 suite runs before the build step, so `data/` does not exist yet), `task
