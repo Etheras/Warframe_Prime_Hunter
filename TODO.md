@@ -110,6 +110,7 @@ What is left of the entry is two fields and a warning about one of them.
 | Seven rotation-bearing mission types are still unverified | small each, tedious — the unit question that gated this was settled 2026-08-27 |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
+| Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
 | Two relics that pay the same part are counted as two | session — the owner's, 2026-08-27; reproduced, and it inflates the top of the ranking |
 | Six rounds is not a plan a random squad can run | small — the owner's, 2026-08-27; an availability rule, not a thumb; it moves 45 of 66 endless rows |
 | What the misses are worth, in Ducats | session |
@@ -293,6 +294,48 @@ The control is the other half. The crosshair is a two-state `role="checkbox"`
 (`STYLE.md §6`: green owned, teal queued), and a third state needs either a
 different control or a modifier — plus a line in `STYLE.md`, since a new colour with
 a new meaning is exactly what that document exists to arbitrate.
+
+### Baro's relics should be crackable, the way Varzia's are
+
+**Asked for by the owner 2026-09-01.** Baro Ki'Teer should behave like Prime
+Resurgence: **you buy the relic from him, and it then appears in *How to crack
+them*** with a refinement and an openings figure, like any other relic you hold a
+route to.
+
+**The pattern already exists and is shipped**, which is most of why this is worth
+doing. A Resurgence relic is vaulted by definition — that is what being in
+Resurgence means — so `rec.vaulted` alone dropped every one of them out of the
+plan, and a Resurgence Prime produced a planner with nothing to say. The fix was
+to let a relic reach the crack list when it is *obtainable* rather than when it
+*drops*, and to badge the row with where it comes from: `from-varzia` on the row,
+no ranked node underneath, and a sentence saying why there is nowhere to run.
+Baro wants exactly that shape with a different badge.
+
+**Why it is not a one-line change.** Two things differ from Varzia:
+
+- **Varzia's shelf is known and Baro's is not.** DE publish neither directly, but
+  Varzia's rotation is recoverable from the relic naming — `...VoidProjection<Rotation>Vault...`
+  against the packs she is selling — and that is how her six are found. Baro has
+  no equivalent: `PrimeVaultTraders` carries her; `VoidTraders` carries him, and
+  his `Manifest` was **measured empty between visits** on 2026-08-27. Whether it
+  names relics while he is present is still unknown, and the window to find out
+  is the two days a fortnight he is on a relay. **Check it 2026-09-04 to 09-06.**
+- **He is only there two days a fortnight.** Varzia is continuous, so her relics
+  are always buyable; Baro's are buyable now or in twelve days. A crack list that
+  says "buy it from Baro" while he is away is the same wrong-`true` the
+  availability filter already avoids — `meta.baro` ships his window and the page
+  decides against its own clock, so the row has that fact available and should use
+  it.
+
+**So the order of work is:** read his manifest while he is here, and only then
+decide whether this is "the relics he is selling today" or the weaker "the relics
+he is known to sell sometimes". The first is worth building; the second may not
+be, since the wiki marker `flags.baro` already covers *sometimes* and nine items
+sit behind it.
+
+Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
+which is the same question one level down — when a relic you cannot farm is still
+worth showing.
 
 ### Two relics that pay the same part are counted as two
 
