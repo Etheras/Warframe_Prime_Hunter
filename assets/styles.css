@@ -880,8 +880,13 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
 /* The top heading sits close to the summary above it; the two below it get the
    full gap. Keyed on the wrapper rather than `:first-of-type`, which stopped
    meaning "the first one" the moment that heading gained a parent — it then
-   matched *How to crack them* instead and pulled it up by twenty pixels. */
-.plan-head .plan-h{margin-top:6px}
+   matched *How to crack them* instead and pulled it up by twenty pixels.
+   **And keyed on `.plan-head-top` rather than `.plan-head` since 2026-09-01**,
+   because *How to crack them* gained the same wrapper the day it got its tier
+   tabs — which would have reproduced that exact bug, from the exact rule whose
+   comment describes it. A selector naming a layout is not a selector naming a
+   position; this one needed to say which heading it meant. */
+.plan-head-top .plan-h{margin-top:6px}
 /* Each list ranks on its own quantity and says which in its heading, because
    two lists side by side with one unexplained big number each is the confusion
    the split was meant to end. */
@@ -893,8 +898,17 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
    this one only changes how the list in front of you is ordered. A control and
    the thing it reorders should be able to see each other.
    The heading takes the space it needs and this keeps to the right of it. */
-.plan-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
-.plan-head .plan-h{flex:1;min-width:0}
+/* `wrap` since 2026-09-01, when the second of these gained a strip of tier
+   tabs. Without it the row cannot break: the strip is `flex:0 0 auto` and about
+   500px wide, so in the planner's own column the heading was squeezed to
+   **width 0** and its text spilled 181px down the page while the strip
+   overflowed to the right. Measured, not guessed — it does not show at desktop
+   width, which is why it wants a note rather than a tidier value. */
+.plan-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;
+}
+.plan-head .plan-h{flex:1 1 auto;min-width:0}
 /* `select.` rather than `.`: `[data-tip]{cursor:help}` is declared later in this
    file, so at equal specificity it wins on order and would turn this control's
    pointer into a question mark. One tag name outranks it without moving the rule
@@ -916,6 +930,52 @@ select.rank-by{
 }
 select.rank-by:hover{border-color:var(--gold-dim)}
 select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12)}
+
+/* The tier tabs over *How to crack them*, on the heading's line for the same
+   reason `.rank-by` is: a control and the list it changes should be able to see
+   each other (STYLE.md 5). They narrow the list and never re-order it, so they
+   sit beside a heading whose sentence stays true whichever tab is pressed —
+   unlike `.rank-by`, which has to keep step with the words next to it.
+
+   Gold for the pressed one, like every other control here, so it borrows no new
+   meaning (STYLE.md 1). Wraps rather than scrolls: at most six controls, and a
+   narrow planner column should drop them to a second line rather than hide
+   them behind a scrollbar nobody looks for. */
+/* `1 1 auto` rather than `0 0 auto`: on a wide screen it keeps to the right of
+   the heading, and on a narrow one it takes the line it has wrapped onto
+   instead of sitting in a 500px column of its own. */
+.tier-tabs{
+  flex:1 1 auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.tier-tab{
+  padding:4px 9px;
+  background:var(--panel-2);
+  /* A control, so it takes the brightness a control takes — the quiet comes
+     from its size and its border, exactly as on `.rank-by` above. */
+  color:var(--txt);
+  border:1px solid var(--line);border-radius:6px;
+  font:inherit;font-size:11.5px;line-height:1.2;
+  cursor:pointer;outline:none;
+}
+.tier-tab:hover{border-color:var(--gold-dim)}
+.tier-tab:focus-visible{
+  border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,180,91,.12);
+}
+/* `aria-pressed` rather than a class: the state is already in the attribute the
+   screen reader reads, and keeping the paint on the same source stops the two
+   from disagreeing the way a duplicated `.active` class eventually does. */
+.tier-tab[aria-pressed="true"]{
+  background:var(--gold);border-color:var(--gold);color:#1a1408;font-weight:600;
+}
+/* The count is the thing that makes a tab worth reading — `Lith 4` beats
+   `Lith`. Dimmed so it reads as an annotation on the name rather than a second
+   word competing with it. */
+.tier-tab .n,.tier-tabs .mini-check .n{margin-left:5px;opacity:.6}
+.tier-tab[aria-pressed="true"] .n{opacity:.75}
+/* Varzia's box keeps the row's height rather than the checkbox's own, so the
+   strip does not step up and down as she comes and goes with the farm list. */
+.tier-tabs .mini-check{padding:4px 7px;margin:0;font-size:11.5px}
 
 /* add-to-list search */
 .search-wrap{position:relative}

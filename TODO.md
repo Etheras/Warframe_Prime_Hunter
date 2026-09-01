@@ -182,7 +182,6 @@ unit question — tedious rather than hard, and blocking nothing.
 
 | Entry | Size |
 |---|---|
-| *How to crack them* is one long list, and wants tier tabs past about fifteen rows | session — the owner's, 2026-08-27; a filter, not a re-rank |
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
@@ -681,6 +680,17 @@ he is known to sell sometimes". The first is worth building; the second may not
 be, since the wiki marker `flags.baro` already covers *sometimes* and nine items
 sit behind it.
 
+**The place he goes now exists**, which takes a piece off this. *How to crack
+them* gained a control strip on 2026-09-01 — tier tabs, and a checkbox per
+errand shown only when that errand is on the list: `Varzia 6` and `Trade 717`.
+Baro is a third errand in exactly that shape, so the interface half is a few
+lines rather than a design. What is still missing is the only hard part, and it
+is unchanged: **there is no such thing as a Baro relic in the payload.**
+`flags.baro` sits on nine *items* and means "he sometimes sells this Prime", so
+a box built on it would sit beside Varzia's answering a visibly different
+question. That is why it was left out rather than approximated — see
+`PROJECT.md §7`.
+
 Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still
 worth showing.
@@ -1172,40 +1182,6 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 `PROJECT.md §7` has it. `n.perRun` itself stays the raw count DE's tables imply
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
-
-### *How to crack them* is one long list, and wants tier tabs past about fifteen rows
-
-**Asked for by the owner 2026-08-27. Not for now — recorded so it is not
-re-derived.**
-
-`#planRelics` renders every relic worth cracking as one flat list, ranked on
-openings per part cleared. That is the right order and it stops being readable
-somewhere around fifteen rows: a wide farm list produces dozens, and a reader
-who has decided to run Lith fissures this evening has to scan past every Meso,
-Neo and Axi row to find the four that matter to them.
-
-**The proposal is a tier filter above the list: `All | Lith | Meso | Neo | Axi`.**
-Which is a filter and not a re-rank — the surviving rows keep the order and the
-figures they already have. Same shape as the *Show all N places* expander, and
-for the same reason: the default answer stays the best one, and the control only
-narrows what is on screen.
-
-Worth settling when it is built:
-
-- **The threshold.** *"More than about fifteen"* is the owner's figure. Showing
-  the tabs only past a threshold keeps them out of the way of a one-Prime farm
-  list, and it is one more piece of state that can be wrong; showing them always
-  is simpler and costs a row of chrome nobody with four relics needs.
-- **A tier with nothing in it.** Either the tab is absent or it is present and
-  disabled. Absent is fewer lies; disabled tells the reader that tier really has
-  no relics rather than that the tab moved.
-- **Whether it is remembered.** The availability filters are, the drawer's
-  eight-place fold deliberately is not. This is closer to the fold — a question
-  about the list you are looking at now — so probably not.
-- **The counts.** The sidebar's availability boxes carry a count each and it is
-  the thing that makes them worth reading. `Lith 4` beats `Lith`.
-
-Not a defect: nothing on screen is wrong today, it is just long.
 
 ### Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale
 

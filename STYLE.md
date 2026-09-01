@@ -319,6 +319,26 @@ short of Void Traces is not an error.
 question is the point; two shapes chosen at random is what this section exists to
 prevent.
 
+**A worked example of that rule, added 2026-09-01.** *How to crack them* carries
+two kinds of narrowing at once and they take two shapes. Which relic **tier** to
+show is a choice between four, so it is a strip of tabs with the chosen one gold.
+Whether to include an **errand** — Varzia's shelf, or the relics only a trade can
+get — is an include-X question each time, so each is a `.mini-check`. Putting the
+errands into the tab strip would have read as five tiers, one of which is a
+person.
+
+Both obey *only offer a control for something in front of you*: a tier with no
+relics gets no tab, and an errand nobody's list has gets no box. The counts are
+what make them worth reading — `Lith 10`, `Trade 717` — and they count the whole
+list rather than what the current selection leaves, or a tab would report on
+itself.
+
+**A control on a heading's line must let that line wrap.** The strip is about
+500px; in the planner's own column, a `.plan-head` that could not wrap squeezed
+the heading to zero width and spilled its text down the page while the strip
+overflowed sideways. It does not show at desktop width, which is exactly why it
+is written down here.
+
 **Verifying one of these is awkward and worth knowing about.** A switch is mostly
 CSS transitions, and the Browser pane does not composite a hidden tab — so
 `getComputedStyle` returns a colour frozen part-way through the transition, no

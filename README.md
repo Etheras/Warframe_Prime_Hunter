@@ -322,6 +322,16 @@ bottlenecks, and a single number covering both answered neither:
 
 Neither list knows anything about the other's question, which is the point.
 
+**How to crack them narrows.** Above it sit a tier strip — `All · Lith · Meso ·
+Neo · Axi`, each with its count — and a checkbox for each kind of errand on the
+list: **Varzia**, for the relics she sells for Aya, and **Trade**, for relics
+belonging to Primes with no way in at all. A tier with nothing in it gets no tab,
+and an errand you do not have gets no box. They only narrow what is on screen —
+the surviving rows keep the order and the figures they already had — and nothing
+is remembered between visits, because this is a question about the evening rather
+than about what you collect. With every Prime on the farm list that is 757 rows;
+unticking **Trade** leaves 40, and a tier tab leaves about ten.
+
 Two relics at one place can pay only the same parts of your list, and then the
 weaker one is not really a second chance at anything — it clears a part the
 other one already clears. Those relics are counted at **a quarter**, and the row

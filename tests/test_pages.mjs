@@ -903,6 +903,182 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("the crack list narrows by tier without re-ranking itself", async () => {
+  /* Asked for by the owner 2026-08-27, built 2026-09-01. The list is ranked
+     correctly and stops being readable long before it stops being right: with
+     every Prime on the farm list it holds 757 rows.
+
+     What is under test is that it is a **filter** — the surviving rows keep the
+     order they already had. A control that quietly re-ranked would be a
+     different feature wearing this one's clothes. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    localStorage.setItem("wfprimes.wishlist.v1",
+      JSON.stringify(window.WFPRIME_DATA.items.map((i) => i.id)));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const names = () => page.evaluate(() =>
+    [...document.querySelectorAll("#planRelics .relic-row .relic-name")]
+      .map((el) => el.childNodes[0].textContent.trim()));
+
+  const all = await names();
+  assert.ok(all.length > 20, `expected a long list to narrow, got ${all.length}`);
+
+  /* The subject is whichever tier the page is offering, not a named one: which
+     tiers exist is payload, and a tier with nothing in it gets no tab at all. */
+  const tier = await page.evaluate(() => {
+    const t = document.querySelector("#relicFilters .tier-tab[data-tier]:not([data-tier=''])");
+    return t ? t.dataset.tier : null;
+  });
+  assert.ok(tier, "a list this long must offer at least one tier tab");
+
+  await page.click(`#relicFilters .tier-tab[data-tier="${tier}"]`);
+  const shown = await names();
+  assert.ok(shown.length, `${tier} was offered as a tab, so it must have rows`);
+  assert.ok(shown.length < all.length, "a filter that hides nothing is not a filter");
+  assert.ok(shown.every((n) => n.startsWith(tier + " ")),
+            `every surviving row must be ${tier}`);
+
+  /* The order, which is the actual claim. */
+  assert.deepEqual(shown, all.filter((n) => n.startsWith(tier + " ")),
+                   "the surviving rows must keep the order they had");
+  assert.deepEqual(errors, []);
+});
+
+page_test("pressing a tier tab does not throw away the reader's focus", async () => {
+  /* `STYLE.md §6`: a control must not rebuild the container it lives in.
+     `innerHTML` on the strip would destroy the button being pressed, drop the
+     focus to `<body>` and return a keyboard reader to the top of the page —
+     which is why the strip and the list are painted by separate functions and
+     only the list is repainted here. This is the test that keeps them separate. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    localStorage.setItem("wfprimes.wishlist.v1",
+      JSON.stringify(window.WFPRIME_DATA.items.map((i) => i.id)));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const tier = await page.evaluate(() => {
+    const t = document.querySelector("#relicFilters .tier-tab[data-tier]:not([data-tier=''])");
+    return t ? t.dataset.tier : null;
+  });
+  assert.ok(tier, "no tier tab to press");
+  const sel = `#relicFilters .tier-tab[data-tier="${tier}"]`;
+
+  const held = await page.evaluate((s) => {
+    const el = document.querySelector(s);
+    el.focus();
+    el.click();
+    return document.activeElement === el;
+  }, sel);
+  assert.ok(held, "the pressed tab still has the focus after the list repaints");
+
+  /* And the strip itself survived, which is the same fact from the other side:
+     an unrelated control keeps the state the reader gave it. */
+  const pressed = await page.getAttribute(sel, "aria-pressed");
+  assert.equal(pressed, "true", "the press is recorded on the button that was pressed");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a tier with nothing in it gets no tab", async () => {
+  /* `STYLE.md §6` — only offer a control for something in front of you, the
+     same rule that keeps the effort panel to the mission types actually ranked.
+     Written after a mutation went unnoticed: showing all four tiers regardless
+     passed every other test here, because a full farm list has all four.
+
+     The subject is a Prime whose relics miss at least one tier, found in the
+     payload — which tiers a Prime spans is raw data, and any named Prime would
+     rot the next time DE vault something. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const TIERS = ["Lith", "Meso", "Neo", "Axi"];
+    for (const it of D.items) {
+      const relics = [...new Set((it.parts || [])
+        .flatMap((p) => (p.relics || []).map((r) => r.relic)))]
+        .filter((n) => D.relics[n]);
+      /* Relics that certainly reach the list: still dropping, or on Varzia's
+         shelf. Requiring at least one still dropping also rules out the
+         `stranded` case, where a Prime with no route at all has its vaulted
+         relics let through for the trade list — so this set is exactly what
+         will be rendered, without restating the filter that renders it.
+
+         The first draft of this test asked only "does the payload know these
+         relics", picked a Baro-flagged Prime whose relics are all vaulted, and
+         asserted against a list that was empty. Membership is not the same
+         question as existence. */
+      const live = relics.filter((n) => !D.relics[n].vaulted);
+      if (!live.length) continue;
+      const reaching = relics.filter((n) => !D.relics[n].vaulted || D.relics[n].resurgence);
+      const tiers = [...new Set(reaching.map((n) => n.split(" ")[0]))];
+      if (tiers.length && tiers.length < TIERS.length) {
+        localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+        return { name: it.name, tiers: TIERS.filter((t) => tiers.includes(t)) };
+      }
+    }
+    return null;
+  });
+  assert.ok(subject, "no Prime with live relics spans fewer than four tiers — " +
+                     "pick another property rather than letting this pass vacuously");
+  await page.reload({ waitUntil: "load" });
+
+  const offered = await page.evaluate(() =>
+    [...document.querySelectorAll("#relicFilters .tier-tab")]
+      .map((b) => b.dataset.tier).filter(Boolean));
+  assert.deepEqual(offered, subject.tiers,
+    `${subject.name} has relics in ${subject.tiers.join(", ")} only, so those are ` +
+    "the only tabs — and in that order, because a control that rearranges " +
+    "itself under the reader is the other half of the same rule");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the errand boxes appear only when there is that errand to hide", async () => {
+  /* `STYLE.md §6` — only offer a control for something in front of you. Varzia
+     sells six relics and only sometimes ones you want; the trade-only rows
+     exist only for Primes with no route at all. Measured on the page rather
+     than reasoned about: with every Prime wanted the list is 34 farmable, 6 of
+     Varzia's and 717 trade-only.
+
+     Both subjects come from the payload. A farm list of Primes that are still
+     dropping has no trade-only relics in it, and that absence is the assertion. */
+  const { page, errors } = await open("/plan.html");
+  const boxes = () => page.evaluate(() =>
+    [...document.querySelectorAll("#relicFilters .mini-check input")].map((i) => i.id));
+
+  await wishFarmable(page, 3);
+  assert.deepEqual(await boxes(), [],
+    "a farm list of farmable Primes has neither errand, so neither box belongs");
+
+  /* Now a Prime with no way in at all — every relic vaulted, not on Varzia's
+     shelf, and no other route. Its whole crack list is trade-only. */
+  const stranded = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const found = D.items.find((it) => {
+      const f = it.flags || {};
+      if (f.baro || f.special || f.founder || f.permanent) return false;
+      const rs = (it.parts || []).flatMap((p) => (p.relics || []).map((r) => r.relic));
+      return rs.length && rs.every((n) =>
+        D.relics[n] && D.relics[n].vaulted && !D.relics[n].resurgence);
+    });
+    if (found) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([found.id]));
+    return found ? found.name : null;
+  });
+  assert.ok(stranded, "no Prime in the payload is fully stranded — pick another property");
+  await page.reload({ waitUntil: "load" });
+  assert.deepEqual(await boxes(), ["p-trade"],
+                   `${stranded} has only trade-only relics, so only that box belongs`);
+
+  /* And unticking it says why the list is empty, rather than blaming the vault
+     for a decision the reader just made. */
+  await page.click("#relicFilters .mini-check:has(#p-trade)");
+  assert.equal(await page.locator("#planRelics .relic-row").count(), 0);
+  const hint = await page.locator("#planRelics .hint").innerText();
+  assert.match(hint, /hidden by the controls/,
+               "an empty list caused by a filter must not read as an empty vault");
+  assert.deepEqual(errors, []);
+});
+
 page_test("a relic that pays nothing another already does is discounted, and says so", async () => {
   /* The owner found this from the ranking on 2026-09-01: Apollo (Lua) sat at
      the top on 1.57 wanted relics a run, and its two relics covered two parts

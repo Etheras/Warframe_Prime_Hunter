@@ -131,6 +131,29 @@
      stop meaning "the top of the ranking is the answer". Resets on reload. */
   let expandNodes = false;
 
+  /* Which relic tier *How to crack them* is showing, and whether Varzia's shelf
+     is among it. `null` means every tier, which is the default and the honest
+     answer — the control only narrows what is on screen and never re-ranks, so
+     the best answer is still the one you get without touching it.
+
+     Not saved, for the same reason `expandNodes` is not: `opts` holds
+     assumptions about the player and every one of them changes what the model
+     concludes, while these two change only how much of the conclusion is
+     visible. A tier silently still selected from last week would make the list
+     look short for a reason nobody could see. The availability filters on the
+     collection page are remembered because they answer "what am I collecting";
+     this answers "what am I doing this evening". */
+  let relicTier = null;
+  let showVarzia = true;
+  /* Trade-only relics default **on**, which is the existing behaviour rather
+     than a new opinion. They are on the list deliberately — a Prime with no way
+     in at all still has a real answer to "which relics do I trade for, and at
+     what refinement", and returning an empty page to that reads as a fault.
+     Hiding them by default would quietly undo that decision; offering the
+     control lets a reader deciding what to crack tonight put them away without
+     anyone deciding on their behalf. */
+  let showTrade = true;
+
   /* Which number puts the rows in order. Both count the same thing - wanted
      relics - and differ only in what they divide it by, which is the question
      the reader is actually asking:
@@ -1286,6 +1309,203 @@
     if (clear) clear.hidden = !set.length && !(opts.runStart + opts.runEnd);
   }
 
+  /* ── How to crack them, and the two controls above it ─────────────
+     The ranked pairs as `render` last computed them, before any narrowing.
+     Held here so the list can be repainted without rebuilding the strip the
+     reader is standing in — see `paintRelicList`. */
+  let relicRows = [];
+  const TIERS = ["Lith", "Meso", "Neo", "Axi"];
+  const tierOf = (rname) => String(rname).split(" ")[0];
+  const isVarzia = (rname) => !!(RELICS[rname] || {}).resurgence;
+  /* Vaulted, not on Varzia's shelf, and here only because the Prime has no
+     route at all — the `stranded` case. Same test the row badge uses. */
+  const isTrade = (rname) => {
+    const rec = RELICS[rname] || {};
+    return !!rec.vaulted && !rec.resurgence;
+  };
+
+  /* The strip of controls on the heading's line. Rebuilt only when the plan
+     itself changes, never when a tab is pressed: `innerHTML` here would destroy
+     the button that was just clicked and drop the focus to `<body>`, which is
+     `STYLE.md §6`'s "a control must not rebuild the container it lives in". */
+  function paintRelicFilters() {
+    const bar = $("#relicFilters");
+    if (!bar) return;
+    /* Counts over the whole list, never over what is currently shown: a tab
+       reading `Lith 4` has to mean four Lith relics exist, not four that
+       survive the tab already pressed. */
+    const tierCount = {};
+    let varziaCount = 0, tradeCount = 0;
+    relicRows.forEach(([rname]) => {
+      tierCount[tierOf(rname)] = (tierCount[tierOf(rname)] || 0) + 1;
+      if (isVarzia(rname)) varziaCount += 1;
+      if (isTrade(rname)) tradeCount += 1;
+    });
+    /* A tier that was selected and then emptied — the last Lith Prime came off
+       the farm list — would leave an empty panel and no way to read why. The
+       selection falls back to every tier rather than leaving the reader to
+       discover that the tab they pressed is now a dead end. */
+    if (relicTier && !tierCount[relicTier]) relicTier = null;
+
+    /* **Only tiers with something in them get a tab**, per `STYLE.md §6` —
+       "only offer a control for something in front of you", the same rule that
+       keeps the effort panel to the mission types actually ranked. Fixed
+       Lith→Meso→Neo→Axi order rather than sorted by count, because §6 also
+       forbids a control that rearranges itself under the reader.
+
+       One tier means no tabs at all: `All` and `Lith` side by side, both
+       selecting the same rows, is a control with nothing to control. */
+    const tabs = TIERS.filter((t) => tierCount[t]).map((t) =>
+      `<button type="button" class="tier-tab" data-tier="${t}"` +
+      ` aria-pressed="${relicTier === t ? "true" : "false"}">${t}` +
+      `<span class="n">${tierCount[t]}</span></button>`);
+
+    /* Varzia is a checkbox where the tiers are tabs, and that is deliberate:
+       `STYLE.md §6` gives a checkbox to *include this* and another shape to
+       *which of these*. Her relics are an errand you either want on the list or
+       do not; a tier is a choice between four. One control shape per kind of
+       question.
+
+       Shown only when she has something here — six relics at most, and none at
+       all whenever the farm list wants nothing from her rotation.
+
+       **Baro Ki'Teer belongs beside her and is deliberately absent.** There is
+       no such thing as a Baro relic in this payload: `flags.baro` sits on nine
+       *items* and means "he sometimes sells this Prime". A control filtering on
+       that, next to one filtering Varzia's actual shelf, would answer a visibly
+       different question in the same shape — the near-miss this project keeps
+       having to undo. His shelf has to be read while he is on a relay; see
+       `TODO.md`. When it can be, it is one more entry in this strip. */
+    bar.innerHTML = (tabs.length > 1
+      ? `<button type="button" class="tier-tab" data-tier=""` +
+        ` aria-pressed="${relicTier ? "false" : "true"}">All` +
+        `<span class="n">${relicRows.length}</span></button>` + tabs.join("")
+      : "") +
+      (varziaCount
+        ? `<label class="mini-check" data-tip="${esc(
+            "Varzia sells these for Aya at Maroo's Bazaar — they do not drop, so\n" +
+            "they have nowhere to send you under Where to go.\n\n" +
+            "Untick to see only what you can farm this evening.")}">` +
+          `<input type="checkbox" id="p-varzia"${showVarzia ? ' checked="checked"' : ""} />` +
+          `<span class="box"></span><span class="lbl">Varzia` +
+          `<span class="n">${varziaCount}</span></span></label>`
+        : "") +
+      /* The one that actually shortens the list, which was not obvious until it
+         was measured: with every Prime on the farm list the crack list holds
+         **34 farmable, 6 of Varzia's and 717 trade-only**. The trade rows are
+         there on purpose — a Prime with no way in still has a real answer — but
+         they are an answer to a different question from "what do I crack
+         tonight", and burying the 34 under 717 of them serves neither. */
+      (tradeCount
+        ? `<label class="mini-check" data-tip="${esc(
+            "Relics for Primes with no way in at all — vaulted, not on Varzia's\n" +
+            "shelf, no Baro or quest route. Another player has to trade you one,\n" +
+            "and the refinement beside each is what to take it to.\n\n" +
+            "Untick to leave only what you can go and get.")}">` +
+          `<input type="checkbox" id="p-trade"${showTrade ? ' checked="checked"' : ""} />` +
+          `<span class="box"></span><span class="lbl">Trade` +
+          `<span class="n">${tradeCount}</span></span></label>`
+        : "");
+  }
+
+  /* One row of the crack list. Module level rather than inline in the map so
+     the list can be repainted from the filter handlers without `render()`. */
+  function relicRowHtml([rname, p]) {
+    // background = the action (which refinement); chips = each part's rarity
+    // Rarest first, so position carries "this is the hard one" — no marker
+    // needed. A highlight had to pick a winner even when two parts were
+    // equally scarce, and that choice was arbitrary.
+    const RAR_ORDER = { Rare: 0, Uncommon: 1, Common: 2 };
+    /* `qty` is how many of that part you STILL need, not how many the recipe
+       asks for. The two differ the moment you bank one of a pair, and it is
+       the still-needed figure the rest of the row is already built on — the
+       openings number beside it prices exactly this many. Showing the recipe
+       figure instead would put "×2" next to the cost of fetching one. The
+       *Still needed* panel below uses the same rule and the same `×N`. */
+    const parts = p.entries
+      .filter((e) => !e.bonus)
+      .map((e) => ({ label: e.label, rar: rarityOf(e.chances),
+                     qty: e.stillNeed || 1 }))
+      .sort((a, b) => (RAR_ORDER[a.rar] ?? 9) - (RAR_ORDER[b.rar] ?? 9) ||
+                      a.label.localeCompare(b.label));
+    /* Where the relic itself comes from, said only when it is not the usual
+       answer. A Resurgence relic does not drop anywhere — Varzia sells it for
+       Aya — so without this the row looks like every other and sends the
+       reader to *Where to go*, which is correctly silent about it. Aya is
+       farmed, so this is a route rather than a purchase; Regal Aya packs are
+       a real-money product and are no part of this. */
+    const rec = RELICS[rname] || {};
+    const varzia = rec.resurgence
+      /* This is her actual shelf now, not every relic that holds a part of a
+         Prime she is offering. It said "from Varzia" over the second list
+         until 2026-08-27 — 88 relics against the six she was really selling —
+         so the badge is worth stating plainly again only because the build
+         reads the shelf off DE's own relic naming. See `build_varzia_relics`
+         in `tools/build_data.py`, and `PROJECT.md` for why the obvious place
+         to look does not have it. */
+      ? `<span class="from-varzia" data-tip="${esc(
+          "Prime Resurgence. This relic does not drop — buy it from Varzia at " +
+          "Maroo's Bazaar for Aya, which is farmed.\n" +
+          "That is why nowhere is listed under Where to go.\n\n" +
+          "This is the rotation she is selling now, so the list changes when " +
+          "the rotation does.")}">from Varzia</span>`
+      : rec.vaulted
+        /* Only ever reached for a Prime with no way in at all — see
+           `stranded`. The refinement beside it is the point of showing the
+           row: it is the one thing here you can still decide, and it is the
+           same advice it would carry if the relic were dropping. */
+        ? `<span class="from-trade" data-tip="${esc(
+            "Vaulted, and this Prime has no other route — no drop, no Baro, " +
+            "no quest.\nSo this relic has to be traded for, and the refinement " +
+            "beside it is what to take it to once you have one.")}">trade for it</span>`
+        : "";
+    return `<div class="relic-row ref-row-${esc(p.refinement)}">
+      <span class="relic-name">${esc(rname)}${varzia}</span>
+      <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
+            data-tip="${esc(
+              "Take it to " + p.refinement + ", chosen to clear the scarcest\n" +
+              "thing you want fastest — not for the best hit rate.")}"
+        >${esc(p.refinement)}</span>
+      <span class="chances" data-tip="${esc(
+        isFinite(p.openings)
+          ? p.openings.toFixed(1) + " openings to clear all " + p.clears +
+            " thing" + (p.clears === 1 ? "" : "s") + " you want from it.\n" +
+            pct(p.value) + " of openings pay out something wanted."
+          : "Nothing wanted here can drop at any refinement.\nSorted last.")
+        }"><b>${
+        isFinite(p.perPart) ? p.perPart.toFixed(1) : "∞"
+      }</b><span class="chances-alt">${
+        isFinite(p.openings) ? p.openings.toFixed(1) + " openings · " + p.clears +
+          (p.clears === 1 ? " part" : " parts") : "never finishes"
+      }</span></span>
+    </div>
+    <div class="relic-parts">${
+      parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}${
+        x.qty > 1 ? `<span class="qty">×${x.qty}</span>` : ""
+      }</span>`).join("")
+    }</div>`;
+  }
+
+  function paintRelicList() {
+    const rp = relicRows.filter(([rname]) =>
+      (!relicTier || tierOf(rname) === relicTier) &&
+      (showVarzia || !isVarzia(rname)) &&
+      (showTrade || !isTrade(rname)));
+    $("#planRelics").innerHTML = rp.length ? rp.map(relicRowHtml).join("")
+      /* Two different silences, and saying the wrong one is worse than saying
+         nothing. "Nothing can be got right now" is a fact about the vault; an
+         empty list because the reader unticked Varzia is a fact about the
+         control they just pressed, and telling them the vault is empty would
+         send them looking for a problem that is not there. */
+      : relicRows.length
+        ? `<p class="hint">Nothing here matches what you have narrowed to —
+           ${relicRows.length} relic${relicRows.length === 1 ? "" : "s"} ${
+           relicRows.length === 1 ? "is" : "are"} hidden by the controls
+           above.</p>`
+        : `<p class="hint">None of the relics you need can be got right now —
+           they are vaulted, and not in this Prime Resurgence rotation either.</p>`;
+  }
+
   function render() {
     renderWishlist();
     const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
@@ -1551,7 +1771,7 @@
       if (!rec.vaulted) return 0;
       return rec.resurgence ? 1 : 2;
     };
-    const rp = Array.from(relicPlan.entries()).sort((a, b) => {
+    const rpAll = Array.from(relicPlan.entries()).sort((a, b) => {
       const ar = errand(a[0]), br = errand(b[0]);
       if (ar !== br) return ar - br;
       const ap = isFinite(a[1].perPart) ? a[1].perPart : Infinity;
@@ -1559,82 +1779,35 @@
       if (Math.abs(ap - bp) > 1e-9) return ap - bp;
       return b[1].value - a[1].value;
     });
-    $("#planRelics").innerHTML = rp.length ? rp.map(([rname, p]) => {
-      // background = the action (which refinement); chips = each part's rarity
-      // Rarest first, so position carries "this is the hard one" — no marker
-      // needed. A highlight had to pick a winner even when two parts were
-      // equally scarce, and that choice was arbitrary.
-      const RAR_ORDER = { Rare: 0, Uncommon: 1, Common: 2 };
-      /* `qty` is how many of that part you STILL need, not how many the recipe
-         asks for. The two differ the moment you bank one of a pair, and it is
-         the still-needed figure the rest of the row is already built on — the
-         openings number beside it prices exactly this many. Showing the recipe
-         figure instead would put "×2" next to the cost of fetching one. The
-         *Still needed* panel below uses the same rule and the same `×N`. */
-      const parts = p.entries
-        .filter((e) => !e.bonus)
-        .map((e) => ({ label: e.label, rar: rarityOf(e.chances),
-                       qty: e.stillNeed || 1 }))
-        .sort((a, b) => (RAR_ORDER[a.rar] ?? 9) - (RAR_ORDER[b.rar] ?? 9) ||
-                        a.label.localeCompare(b.label));
-      /* Where the relic itself comes from, said only when it is not the usual
-         answer. A Resurgence relic does not drop anywhere — Varzia sells it for
-         Aya — so without this the row looks like every other and sends the
-         reader to *Where to go*, which is correctly silent about it. Aya is
-         farmed, so this is a route rather than a purchase; Regal Aya packs are
-         a real-money product and are no part of this. */
-      const rec = RELICS[rname] || {};
-      const varzia = rec.resurgence
-        /* This is her actual shelf now, not every relic that holds a part of a
-           Prime she is offering. It said "from Varzia" over the second list
-           until 2026-08-27 — 88 relics against the six she was really selling —
-           so the badge is worth stating plainly again only because the build
-           reads the shelf off DE's own relic naming. See `build_varzia_relics`
-           in `tools/build_data.py`, and `PROJECT.md` for why the obvious place
-           to look does not have it. */
-        ? `<span class="from-varzia" data-tip="${esc(
-            "Prime Resurgence. This relic does not drop — buy it from Varzia at " +
-            "Maroo's Bazaar for Aya, which is farmed.\n" +
-            "That is why nowhere is listed under Where to go.\n\n" +
-            "This is the rotation she is selling now, so the list changes when " +
-            "the rotation does.")}">from Varzia</span>`
-        : rec.vaulted
-          /* Only ever reached for a Prime with no way in at all — see
-             `stranded`. The refinement beside it is the point of showing the
-             row: it is the one thing here you can still decide, and it is the
-             same advice it would carry if the relic were dropping. */
-          ? `<span class="from-trade" data-tip="${esc(
-              "Vaulted, and this Prime has no other route — no drop, no Baro, " +
-              "no quest.\nSo this relic has to be traded for, and the refinement " +
-              "beside it is what to take it to once you have one.")}">trade for it</span>`
-          : "";
-      return `<div class="relic-row ref-row-${esc(p.refinement)}">
-        <span class="relic-name">${esc(rname)}${varzia}</span>
-        <span class="advice ${p.refinement === "Intact" ? "intact" : "radiant"}"
-              data-tip="${esc(
-                "Take it to " + p.refinement + ", chosen to clear the scarcest\n" +
-                "thing you want fastest — not for the best hit rate.")}"
-          >${esc(p.refinement)}</span>
-        <span class="chances" data-tip="${esc(
-          isFinite(p.openings)
-            ? p.openings.toFixed(1) + " openings to clear all " + p.clears +
-              " thing" + (p.clears === 1 ? "" : "s") + " you want from it.\n" +
-              pct(p.value) + " of openings pay out something wanted."
-            : "Nothing wanted here can drop at any refinement.\nSorted last.")
-          }"><b>${
-          isFinite(p.perPart) ? p.perPart.toFixed(1) : "∞"
-        }</b><span class="chances-alt">${
-          isFinite(p.openings) ? p.openings.toFixed(1) + " openings · " + p.clears +
-            (p.clears === 1 ? " part" : " parts") : "never finishes"
-        }</span></span>
-      </div>
-      <div class="relic-parts">${
-        parts.map((x) => `<span class="part-chip ${esc(x.rar)}">${esc(x.label)}${
-          x.qty > 1 ? `<span class="qty">×${x.qty}</span>` : ""
-        }</span>`).join("")
-      }</div>`;
-    }).join("") : `<p class="hint">None of the relics you need can be got right now —
-      they are vaulted, and not in this Prime Resurgence rotation either.</p>`;
+
+    /* ── narrowing the list, without re-ranking it ────────────────────
+       Asked for by the owner 2026-08-27 and built 2026-09-01. The list is
+       ranked correctly and stops being *readable* somewhere past fifteen rows:
+       a reader who has decided to run Lith fissures tonight should not have to
+       scan every Meso, Neo and Axi row to find the four that matter.
+
+       A filter, never a re-rank. Whatever survives keeps the order and the
+       figures it already had, which is the same bargain the *Show all N places*
+       expander makes — the default answer stays the best one and the control
+       only narrows what is on screen.
+
+       **Measured on the page, after a probe got it wrong.** A scratchpad
+       reimplementation of the membership rule said the list was bounded at 40
+       rows, because it quietly dropped the `stranded` relics this list keeps on
+       purpose. The real figure, read off the rendered DOM with every Prime on
+       the farm list, is **757: 34 farmable, 6 of Varzia's, 717 trade-only** —
+       and the tiers split it 195/188/188/186. Worth recording as a method
+       rather than a number: the app is the only authority on what the app
+       shows, and a probe that re-states a filter will eventually re-state it
+       differently.
+
+       Two calls rather than one, and the split is the point: the strip is
+       rebuilt only here, where the plan itself changed, while the list can be
+       repainted on its own when a tab is pressed. Rebuilding the strip on a
+       press would destroy the button under the reader's finger. */
+    relicRows = rpAll;
+    paintRelicFilters();
+    paintRelicList();
 
     paintFissures();
 
@@ -1878,6 +2051,39 @@
         render();
         const again = $("#moreNodes");
         if (again) again.focus();
+      });
+    }
+  }
+
+  /* The tier tabs and Varzia's box, on the container that survives a render.
+     Same arrangement as the expander above and for the same reason.
+
+     **`paintRelicList()` rather than `render()`**, and that is the whole of what
+     makes this safe: these controls live in `#relicFilters`, and a full render
+     rewrites that element — destroying the button that was just pressed, which
+     sends the focus to `<body>` and returns a keyboard reader to the top of the
+     page (`STYLE.md §6`). Narrowing the list changes only the list, so only the
+     list is rebuilt and the strip the reader is standing in is left alone.
+
+     The pressed state is moved in place afterwards for the same reason. */
+  {
+    const bar = $("#relicFilters");
+    if (bar) {
+      bar.addEventListener("click", (e) => {
+        const tab = e.target.closest(".tier-tab");
+        if (!tab) return;
+        relicTier = tab.dataset.tier || null;
+        $$("#relicFilters .tier-tab").forEach((b) => {
+          b.setAttribute("aria-pressed",
+            (b.dataset.tier || null) === relicTier ? "true" : "false");
+        });
+        paintRelicList();
+      });
+      bar.addEventListener("change", (e) => {
+        if (e.target.id === "p-varzia") showVarzia = e.target.checked;
+        else if (e.target.id === "p-trade") showTrade = e.target.checked;
+        else return;
+        paintRelicList();
       });
     }
   }

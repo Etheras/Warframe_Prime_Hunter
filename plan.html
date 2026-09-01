@@ -142,7 +142,7 @@
         <div class="result-count" id="planSummary"></div>
       </div>
 
-      <div class="plan-head">
+      <div class="plan-head plan-head-top">
         <h3 class="plan-h">Where to go <span class="plan-sub" id="planRankedOn">— ranked on relics per reward</span></h3>
         <select id="p-sort" class="rank-by" aria-label="Rank places on"
                 data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per reward   how fast a place fills the stack for the effort it costs.&#10;               One reward draw: a Defense round, a Spy vault, a bounty&#10;               stage. Becomes per minute once you give effort weights.&#10;  Per run      how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;A reward is the same unit on every row, which is what lets two different missions be compared at all. It is not the same amount of WORK — a Defense reward is three waves and an Excavation reward is one dig. Give effort weights and the ranking switches to minutes, which is the only unit that really is comparable.&#10;&#10;Whichever you pick is the big number on every row, because a row has to be sorted by the number it shows largest.">
@@ -152,7 +152,10 @@
       </div>
       <div id="planNodes" class="spots"></div>
 
-      <h3 class="plan-h">How to crack them <span class="plan-sub">— ranked on openings per part cleared</span></h3>
+      <div class="plan-head">
+        <h3 class="plan-h">How to crack them <span class="plan-sub">— ranked on openings per part cleared</span></h3>
+        <div class="tier-tabs" id="relicFilters" role="group" aria-label="Narrow the relic list"></div>
+      </div>
       <div id="planRelics"></div>
 
       <h3 class="plan-h">Still needed</h3>

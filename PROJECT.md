@@ -4351,6 +4351,79 @@ What survives, with the corrections the re-check forced:
   statement about credentials and about the generated payload, and does not hold
   literally while this file is there. `TODO.md` carries the cleanup.
 
+### *How to crack them* narrows, and the strip says what it is hiding
+
+**Asked for by the owner 2026-08-27, built 2026-09-01.** The list is ranked
+correctly and stops being *readable* long before it stops being right. A tier
+strip sits on the heading's line — `All · Lith · Meso · Neo · Axi`, each with its
+count — and beside it one checkbox per **errand**, shown only when that errand is
+on the list.
+
+**A filter, never a re-rank**, and a page test asserts exactly that: whatever
+survives keeps the order it had. Same bargain the *Show all N places* expander
+makes — the default answer stays the best one and the control only narrows what
+is on screen.
+
+**The measurement changed the feature, and it is the reason to measure.** The
+backlog entry said "a wide farm list produces dozens". A scratchpad probe agreed
+and said the list was bounded at **40 rows**. Both were wrong: read off the
+rendered page with every Prime on the farm list, it is **757 — 34 farmable, 6 of
+Varzia's, and 717 trade-only**. The probe had quietly dropped the `stranded`
+relics this list keeps on purpose, which is the whole reason those 717 exist.
+
+So the control that matters most was not the one that was asked for. `Trade 717`
+takes the list from 757 to 40 in one click; the tier tabs then take it to about
+ten. Varzia's six were never the noise. **The trade rows stay on by default** —
+they are there because a Prime with no way in still has a real answer to "which
+relics do I trade for, and at what refinement", and hiding them by default would
+quietly undo that decision rather than offer it.
+
+Four things settled while building, three of them by `STYLE.md` rather than by
+preference:
+
+- **A tier with nothing in it gets no tab.** §6 — only offer a control for
+  something in front of you, the rule that keeps the effort panel to the mission
+  types actually ranked. The entry had proposed present-but-disabled; the house
+  rule is older and better. Order stays Lith→Meso→Neo→Axi rather than sorting by
+  count, because §6 also forbids a control that rearranges itself.
+- **Tabs for the tier, a checkbox for each errand.** §6 gives a checkbox to
+  *include this* and another shape to *which of these*. One control shape per
+  kind of question.
+- **On the heading's line.** §5 — a control and the list it changes have to be
+  able to see each other, and the sidebar is where the *model's* assumptions
+  live. This changes only what is displayed.
+- **Not remembered**, like the eight-place fold and unlike the availability
+  filters. Those answer "what am I collecting"; this answers "what am I doing
+  this evening".
+
+**Baro Ki'Teer is deliberately absent from a strip he obviously belongs in.**
+There is no such thing as a Baro relic in the payload: `flags.baro` sits on nine
+*items* and means "he sometimes sells this Prime". A box built on that, next to
+one built on Varzia's actual shelf, would answer a visibly different question in
+an identical shape. His manifest measures empty between visits and has to be read
+while he is on a relay — `TODO.md` carries it, and the strip is now the thing it
+plugs into.
+
+**Two defects found by building it**, both invisible at desktop width and both
+now fixed with tests or notes:
+
+- `.plan-head` could not wrap. The strip is about 500px, so in the planner's own
+  column the heading was squeezed to **width 0** with its text spilling 181px
+  down the page while the strip overflowed to the right.
+- `.plan-head .plan-h{margin-top:6px}` existed to pull the *top* heading close to
+  the summary above it, and its own comment records it once having wrongly
+  matched *How to crack them*. Giving that heading the same wrapper would have
+  reproduced that exact bug from the exact rule that documents it; the selector
+  is now `.plan-head-top`.
+
+And one about testing, worth more than either: **the first draft of the
+empty-tier test picked a Prime whose relics never reach the list**, asserted
+against an empty page, and failed. Membership is not existence — the same
+mistake the probe made an hour earlier, in a different file, for the same
+reason. Both are recorded because the pattern is the point: *the app is the only
+authority on what the app shows*, and anything that restates one of its filters
+will eventually restate it differently.
+
 ### Nine actions pinned to commit SHAs
 
 **Shipped 2026-09-01**, the first recommendation of the security re-review of
