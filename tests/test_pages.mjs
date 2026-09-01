@@ -51,10 +51,24 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript",
    about the wire, and the DOM cannot answer it. */
 const hits = [];
 
+/* What `upstream.json` answers, set by whichever test is asking. serve.py
+   generates that endpoint rather than reading a file, so there is nothing on
+   disk for the static server below to find - and the one behaviour that needs
+   it, the banner learning the answer after the page has painted, cannot be
+   tested at all without something at that URL. null means "no such endpoint",
+   which is the static-host and file:// case. */
+let upstreamAnswer = null;
+
 function serve() {
   const server = http.createServer((req, res) => {
     const rel = decodeURIComponent(req.url.split("?")[0]).replace(/^\/+/, "") || "index.html";
     hits.push(rel);
+    if (rel === "upstream.json") {
+      if (!upstreamAnswer) { res.writeHead(404).end("no"); return; }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(upstreamAnswer));
+      return;
+    }
     const full = path.join(ROOT, rel);
     if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
       res.writeHead(404).end("no");
@@ -1454,6 +1468,72 @@ page_test("the server decides who is told how to fix stale data", async () => {
   const noServer = await banner(undefined);
   assert.ok(!/Out of date/.test(noServer),
             `nothing checked upstream, so nothing may claim it moved: ${noServer}`);
+});
+
+page_test("the banner learns an upstream answer that arrives after the page has", async () => {
+  /* Serve-then-refresh, from the reader's side. The server no longer blocks the
+     data file while it asks Digital Extremes whether they have moved on, so on
+     a cold first load the answer planted on the payload is `checking: true` and
+     the real one lands a moment later. Before 2026-09-01 the page had no way to
+     hear it: the banner was drawn once from whatever was on `window`.
+
+     The whole point of the change is that the first paint is not delayed, so
+     both halves are asserted - nothing claimed at load, and the claim appearing
+     without a reload. Checking only the second half would pass just as well if
+     the server had gone back to blocking. */
+  upstreamAnswer = { ok: true, stale: true, moved: ["droptables"], owner: true };
+  try {
+    const page = await (await newProfile()).newPage();
+    await page.addInitScript(() => {
+      window.WFPRIME_UPSTREAM = { ok: null, stale: false, checking: true, owner: true };
+    });
+    await page.goto(origin + "/index.html", { waitUntil: "load" });
+
+    /* Nothing about upstream yet. `.databar` may well exist for a different
+       reason - a build a fortnight old raises it on its own - so this asserts
+       on what the bar says rather than on whether there is one. */
+    const atLoad = await page.locator(".databar").count()
+      ? await page.locator(".databar").first().innerText() : "";
+    assert.ok(!/Out of date/.test(atLoad),
+              `no check had returned yet, so nothing may claim it moved: ${atLoad}`);
+
+    /* And then it arrives, with no reload and nothing clicked. */
+    await page.locator("#upstreamBar").filter({ hasText: "Out of date" })
+      .waitFor({ timeout: 15000 });
+    const after = await page.locator("#upstreamBar").innerText();
+    assert.match(after, /refresh-data/,
+                 "the late answer carried owner: true, so it must say how to fix it");
+    assert.equal(await page.locator("#upstreamBar").count(), 1,
+                 "redrawing must replace the bar, not stack a second one under it");
+  } finally {
+    upstreamAnswer = null;
+  }
+});
+
+page_test("a page stops asking once the upstream check has settled", async () => {
+  /* The poll is bounded twice over: it stops on the first settled answer, and
+     gives up after a dozen tries either way. A banner is an advisory, and a
+     page that polls a dead server all afternoon to draw one has its priorities
+     wrong - which is the failure mode a poll with no ceiling has by default. */
+  upstreamAnswer = { ok: true, stale: false, moved: [], owner: true };
+  try {
+    const page = await (await newProfile()).newPage();
+    await page.addInitScript(() => {
+      window.WFPRIME_UPSTREAM = { ok: null, stale: false, checking: true, owner: true };
+    });
+    await page.goto(origin + "/index.html", { waitUntil: "load" });
+    await page.waitForFunction(
+      () => window.WFPRIME_UPSTREAM && !window.WFPRIME_UPSTREAM.checking,
+      null, { timeout: 15000 });
+
+    hits.length = 0;
+    await page.waitForTimeout(3000);          // four poll intervals, and then some
+    const polls = hits.filter((h) => h === "upstream.json").length;
+    assert.equal(polls, 0,
+                 `settled means settled; it asked ${polls} more times`);
+  } finally {
+    upstreamAnswer = null;
+  }
 });
 
 page_test("a Steel Path node is ranked, and says so on the row", async () => {

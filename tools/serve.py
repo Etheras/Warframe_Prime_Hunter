@@ -83,13 +83,40 @@ def pick_port(host: str) -> int:
                      f"{BASE_PORT + PORT_TRIES - 1}. Close something and retry.")
 
 
-# Upstream freshness, checked by the server before it hands over stale data.
+# Upstream freshness: whether Digital Extremes have moved on since this build.
 #
-# The browser is not involved and does not know this happens. It asks for the
-# data file as usual; we check whether Digital Extremes have moved on since the
-# build, and plant the answer on the file as we serve it. That request blocks
-# while the check runs, which is a deliberate trade - a slow first load beats
-# quietly serving data you have no reason to trust.
+# The answer is planted on the data file as it is served, and the page reads it
+# from there. Nothing is fetched from the browser to DE - see the CORS note
+# below for why that is not merely a preference.
+#
+# **Serve first, then refresh.** Until 2026-09-01 the request for the data file
+# blocked while the check ran, argued as a deliberate trade: a slow first load
+# beats quietly serving data you have no reason to trust. The argument was about
+# *one* check and the code did *n* of them. `freshness()` took the lock, found
+# no cached answer, released the lock and only then went upstream - so every
+# request arriving before the first check finished started its own, and three
+# tabs opened together made three sets of the same three upstream requests, each
+# writing the same `.cache/*.gz` bodies underneath a build that might be reading
+# them. The hourly throttle worked perfectly from the second check onwards and
+# did nothing at all about the first.
+#
+# So `freshness()` never blocks now. It answers with what is known, starts one
+# background check if none is running, and marks the answer `checking` so the
+# page knows to ask again. Two things follow:
+#
+#   * **The stampede is gone by construction**, not by a lock held longer. The
+#     `running` flag is set under the lock before the thread starts, so a second
+#     request finds it set and starts nothing. Asking DE three times because
+#     three tabs opened at once is precisely what "ask no more often than the
+#     source says to" exists to prevent.
+#   * **The page learns the answer late**, which it could not before. `freshness`
+#     is served again from `upstream.json`, and `shared.js` polls that only while
+#     `checking` is true, then redraws the banner in place.
+#
+# The first load is now fast and briefly says nothing about upstream, where
+# before it was slow and said something. That is the trade being made, and it is
+# only defensible because the banner corrects itself within a second or two - a
+# page that never asked again would be strictly worse than the blocking version.
 #
 # It could not be done from the page anyway: warframe.com and the artwork CDN
 # send no CORS headers, so a cross-origin fetch fails outright and a no-cors one
@@ -110,7 +137,9 @@ def pick_port(host: str) -> int:
 # and a blackholed network costs one slow load per hour per process rather than
 # one per request.
 FRESHNESS_TTL = 3600
-_freshness: dict = {"checked": 0.0, "stamp": 0.0, "body": None}
+# `running` is the single-flight flag and is the whole of the fix: it is raised
+# under the lock by whoever starts the check, so nobody else starts one.
+_freshness: dict = {"checked": 0.0, "stamp": 0.0, "body": None, "running": False}
 _freshness_lock = threading.Lock()
 
 
@@ -136,13 +165,15 @@ def state_stamp() -> float:
         return 0.0                                        # no state yet: check
 
 
-def freshness() -> dict:
-    stamp = state_stamp()
-    with _freshness_lock:
-        age = time.time() - _freshness["checked"]
-        if (_freshness["body"] is not None and age < FRESHNESS_TTL
-                and _freshness["stamp"] == stamp):
-            return _freshness["body"]
+def _check_upstream(stamp: float) -> None:
+    """
+    The check itself, on a background thread and never on a request's.
+
+    Exactly one of these runs at a time; `freshness()` guarantees it by raising
+    `running` under the lock before starting the thread. `finally` lowers it
+    whatever happens, because a flag left raised by an exception would mean the
+    banner never updates again for the life of the process.
+    """
     try:
         import sources
         sig = sources.upstream_signature(False)
@@ -158,7 +189,40 @@ def freshness() -> dict:
         _freshness["checked"] = time.time()
         _freshness["stamp"] = stamp
         _freshness["body"] = body
-    return body
+        _freshness["running"] = False
+
+
+def freshness() -> dict:
+    """
+    What is known about upstream right now. Never blocks, never goes upstream.
+
+    Three answers, and the page distinguishes them: a body with `checking`
+    absent is settled; `checking: true` on a body means the last answer is being
+    refreshed behind this response; `checking: true` with `ok: null` means
+    nothing is known yet, which is the state a cold first load gets.
+    """
+    stamp = state_stamp()
+    with _freshness_lock:
+        age = time.time() - _freshness["checked"]
+        settled = (_freshness["body"] is not None and age < FRESHNESS_TTL
+                   and _freshness["stamp"] == stamp)
+        if settled:
+            return _freshness["body"]
+        known = _freshness["body"]
+        start = not _freshness["running"]
+        if start:
+            # Raised here, inside the lock, so the request that arrives a
+            # microsecond later finds it up and starts nothing.
+            _freshness["running"] = True
+    if start:
+        threading.Thread(target=_check_upstream, args=(stamp,),
+                         daemon=True).start()
+    # What we have, plus the fact that a better answer is coming. `known` is a
+    # previous check that has aged out of the TTL: still worth showing, and far
+    # better than a blank while the refresh runs.
+    if known is not None:
+        return dict(known, checking=True)
+    return {"ok": None, "stale": False, "checking": True}
 
 
 # Exactly what the site asks for, and nothing else. The pages request nine
@@ -178,6 +242,12 @@ ALLOWED_FILES = frozenset({
     # Same origin and nothing else: this is what keeps `connect-src 'self'` a
     # true statement about the site rather than a formality.
     "data/fissures.json",
+    # The upstream-freshness answer on its own. **Generated, not a file on
+    # disk** - `do_GET` answers it before the file machinery is reached - and it
+    # is listed here anyway so that this set stays the single answer to "what
+    # does this server hand out". A page polls it only while the first check is
+    # still running; see the serve-first-then-refresh note above.
+    "upstream.json",
 })
 ALLOWED_DIRS = ("assets/img/",)          # artwork, named from the item data
 
@@ -461,11 +531,38 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
             return ""
         return rel.replace(os.sep, "/")
 
+    def _upstream_body(self) -> bytes:
+        """
+        The freshness answer on its own, for the poll.
+
+        `owner` is stamped per request for the same reason it is on the data
+        file: it is the one part of this that differs between peers, and the
+        page cannot work it out for itself.
+        """
+        return json.dumps(dict(freshness(),
+                               owner=is_loopback(self.client_address[0]))
+                          ).encode("utf-8")
+
+    def _serve_upstream(self, body: bool = True) -> None:
+        blob = self._upstream_body()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(blob)))
+        self.end_headers()
+        STATS["served"] += 1
+        if body:
+            self.wfile.write(blob)
+
     def do_HEAD(self):                                    # noqa: N802
         if not allow_request(self.client_address[0]):
             return self._too_many()
-        if not allowed(self._relative(), self.client_address[0]):
+        rel = self._relative()
+        if not allowed(rel, self.client_address[0]):
             return self._reject()
+        if rel == "upstream.json":
+            # Generated rather than read, so it has to be answered here too -
+            # the file server underneath would 404 a name with nothing on disk.
+            return self._serve_upstream(body=False)
         super().do_HEAD()
 
     def do_GET(self):                                     # noqa: N802
@@ -478,8 +575,12 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
         if not allowed(rel, self.client_address[0]):
             return self._reject()
 
-        # The dataset is the one request worth checking before answering: asked
-        # for once per page load, and the thing that would be stale.
+        if rel == "upstream.json":
+            return self._serve_upstream()
+
+        # The dataset carries the answer as it stands when the page loads, which
+        # on a cold start is "a check is running". `freshness()` does not block
+        # for it any more; the page polls upstream.json until it settles.
         if rel == "data/prime-data.js":
             path = os.path.join(ROOT, "data", "prime-data.js")
             if os.path.exists(path):

@@ -2297,7 +2297,10 @@ def test_server_serves_only_the_site() -> None:
     # twenty-one lines of output.
     wanted = ("index.html", "plan.html", "assets/app.js", "assets/plan.js",
               "assets/rotation.js", "assets/shared.js", "assets/model.js",
-              "assets/styles.css", "data/prime-data.js",
+              "assets/styles.css", "data/prime-data.js", "data/fissures.json",
+              # Generated rather than a file on disk, and on the allowlist all
+              # the same so this set stays the one answer to what is served.
+              "upstream.json",
               "assets/img/AshPrime.png")
     check("serves every file the pages ask for",
           [p for p in wanted if not serve.allowed(p)], [])
@@ -2565,6 +2568,89 @@ def test_server_serves_only_the_site() -> None:
           "the two artwork onerror attributes are why this exists")
 
 
+def test_serving_a_page_starts_one_upstream_check_not_one_each() -> None:
+    """
+    `freshness()` used to take the lock, find no cached answer, **release the
+    lock**, and only then go upstream. So every request arriving before the
+    first check finished started its own: three tabs opened together made three
+    sets of the same three upstream requests, each writing the same
+    `.cache/*.gz` bodies and `.etag` sidecars underneath a build that might be
+    reading them. The hourly throttle worked perfectly from the second check
+    onwards and did nothing whatever about the first.
+
+    Two properties, and holding the lock across the check - the smaller fix this
+    replaced - would give the second without the first:
+
+      * no request waits for an upstream check, ever
+      * twelve simultaneous requests cause one check, not twelve
+
+    The check is stalled on an event rather than on a sleep, so the window this
+    races in is held open deliberately instead of being hoped for.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import threading
+    import serve
+
+    calls = []
+    entered = threading.Event()
+    release = threading.Event()
+
+    def stalled_signature(offline=False):
+        calls.append(offline)
+        entered.set()
+        release.wait(20)
+        return {"exportIndex": "0123456789abcdef"}
+
+    real_signature = sources.upstream_signature
+    saved = dict(serve._freshness)
+    try:
+        sources.upstream_signature = stalled_signature
+        serve._freshness.update(checked=0.0, stamp=0.0, body=None, running=False)
+
+        answers, waits = [], []
+        def ask() -> None:
+            began = time.time()
+            answers.append(serve.freshness())
+            waits.append(time.time() - began)
+
+        askers = [threading.Thread(target=ask) for _ in range(12)]
+        for t in askers:
+            t.start()
+        for t in askers:
+            t.join(20)
+
+        check("freshness: every request is answered", len(answers), 12)
+        check_true("freshness: and not one of them waits for the check",
+                   waits and max(waits) < 2.0,
+                   f"slowest was {max(waits) if waits else 0:.1f}s, and the "
+                   f"check has not even returned yet - it is blocking again")
+        check("freshness: each says an answer is still coming",
+              [a for a in answers if not a.get("checking")], [],
+              "without this the page has no reason to ask again, and the "
+              "banner never learns anything")
+
+        check_true("freshness: the check actually started", entered.wait(10))
+        check("freshness: twelve requests, one check", len(calls), 1,
+              "asking DE once per open tab is exactly what the hourly "
+              "throttle never covered")
+
+        release.set()
+        for _ in range(200):                  # the worker publishes and lowers it
+            if not serve._freshness["running"]:
+                break
+            time.sleep(0.05)
+        settled = serve.freshness()
+        check_true("freshness: the answer settles once the check returns",
+                   settled.get("ok") is True and not settled.get("checking"),
+                   f"still {settled}")
+        check("freshness: and a settled answer is not re-checked", len(calls), 1,
+              "the TTL is what makes a reload free")
+    finally:
+        release.set()
+        sources.upstream_signature = real_signature
+        serve._freshness.update(saved)
+
+
 def test_the_wiki_can_still_be_built_from_the_docs() -> None:
     """
     The GitHub wiki is generated from README.md, PROJECT.md and TODO.md, and it
@@ -2811,6 +2897,12 @@ def test_a_refresh_clears_the_stale_banner() -> None:
 
     Two properties, because either alone would pass a broken fix: the stamp has
     to track the file, and the cache has to act on the stamp.
+
+    Since 2026-09-01 the check runs on a background thread and `freshness()`
+    returns before it finishes, so every read below settles first. The
+    properties are unchanged - that a read *triggers* a check, that a reload
+    inside the hour does not, and that a rebuild re-checks whatever the clock
+    says - and only the moment the answer is readable has moved.
     """
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     import serve
@@ -2855,18 +2947,28 @@ def test_a_refresh_clears_the_stale_banner() -> None:
         sources.upstream_signature = lambda offline=False: (calls.append(1), signature)[1]
         sources.load_state = lambda: stored
         serve.state_stamp = lambda: stamps[0]
-        serve._freshness.update({"checked": 0.0, "stamp": 0.0, "body": None})
+        serve._freshness.update({"checked": 0.0, "stamp": 0.0, "body": None,
+                                 "running": False})
+
+        def settled() -> dict:
+            """Ask, then wait for the background check to publish its answer."""
+            body = serve.freshness()
+            for _ in range(200):
+                if not serve._freshness["running"]:
+                    break
+                time.sleep(0.05)
+            return serve.freshness() if body.get("checking") else body
 
         check("freshness: the first read checks upstream",
-              (serve.freshness()["stale"], len(calls)), (True, 1))
+              (settled()["stale"], len(calls)), (True, 1))
         check("freshness: a reload within the hour does not ask again",
-              (serve.freshness()["stale"], len(calls)), (True, 1),
+              (settled()["stale"], len(calls)), (True, 1),
               "the throttle exists to spare DE, and must still hold")
 
         stored = {"signature": dict(signature)}     # refresh-data has just run
         stamps[0] = 2000.0
         check("freshness: a rebuild is re-checked at once, hour or no hour",
-              (serve.freshness()["stale"], len(calls)), (False, 2),
+              (settled()["stale"], len(calls)), (False, 2),
               "the banner used to outlive the refresh that cleared it")
     finally:
         sources.upstream_signature, sources.load_state = real_sig, real_state
@@ -3201,6 +3303,7 @@ def main() -> int:
                          test_the_guard_refuses_shell_writes_to_source,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
+                         test_serving_a_page_starts_one_upstream_check_not_one_each,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_wiki_can_still_be_built_from_the_docs,

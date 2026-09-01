@@ -117,6 +117,14 @@ runs no build**, **the unbounded downloads and decompression, now a ceiling per
 source at twice what it measures**, and **LAN mode, which was removed rather
 than documented** — the review offered "say so" or "add HTTPS" and the owner
 took neither, so `serve.py` is loopback-only and refuses to bind anything else.
+
+**An eighth shipped in half.** The freshness stampede is gone —
+serve-then-refresh, one background check, the page polling until it settles —
+and what the fix *guards rather than removes* keeps the entry: page serving
+still writes the builder's cache. The entry was renarrowed rather than deleted,
+which is the honest shape when a finding had two bullets and one of them
+shipped.
+
 Five things worth carrying forward, because none was in the findings:
 
 - **The footer could not have been fixed by correcting the footer.** The payload
@@ -149,7 +157,7 @@ Five things worth carrying forward, because none was in the findings:
 
 | Entry | Size |
 |---|---|
-| Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
+| Serving a page still writes the builder's cache | small — a read-only mode on `fetch`; the stampede half of this shipped |
 | The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
@@ -314,42 +322,38 @@ CI clone already takes, so nothing should change. The deployed log is the record
 the *"how often do DE answer"* question is measured from and its loss would be
 silent, which is the only reason to look rather than assume.
 
-### Serving a page can start the same upstream check several times over
+### Serving a page still writes the builder's cache
 
-`freshness()` in `tools/serve.py:135-157` takes the lock, reads the cached
-answer, **releases the lock**, and only then calls `sources.upstream_signature`
-— one HEAD and two GETs, each with a 120-second timeout. The lock is taken again
-at the end, to publish the result.
+**The stampede half shipped on 2026-09-01** and `PROJECT.md §7` has the
+reasoning: `freshness()` no longer blocks or goes upstream, one background check
+runs behind a `running` flag raised under the lock, and the page polls
+`upstream.json` until the answer settles. Measured after: a cold server answers
+the payload in 326 ms with `checking: true` on it, and the page asks exactly
+once. The owner chose serve-then-refresh over the three-line lock, so the page
+learns the answer late rather than the other tabs waiting for it.
 
-So every request that arrives before the first check finishes sees no cached
-answer and starts its own. They all make the same three upstream requests, and
-they all write the same `.cache/*.gz` bodies and `.etag` sidecars underneath a
-build that may be reading them. The hourly throttle (`FRESHNESS_TTL = 3600`)
-works perfectly from the second check onwards and does nothing about the first.
+**What is left is the second bullet of that finding**, which the fix guards
+rather than removes. `sources.upstream_signature` makes one HEAD and two GETs,
+and both GETs go through `fetch`, which writes their bodies to `.cache/*.gz`
+with `.etag` sidecars. So serving a page writes to the cache the build reads
+from — now from one background thread rather than from every request at once,
+which is a much smaller window, but still a window. `serve.py`'s own comment has
+flagged it since 2026-08-26 as the thing nobody notices.
 
-**The blocking is deliberate and the stampede is not.** The comment above the
-function argues the trade honestly — a slow first load beats quietly serving
-data you have no reason to trust — and that argument is about *one* check, not
-about *n* of them. Rule 11 is the sharper objection: asking DE three times
-because three tabs opened at once is precisely the hospitality this project has
-committed to not abusing.
+A read-only path for the check would remove the race instead of narrowing it:
+`fetch` would need a mode that returns the body without writing it or its
+sidecars. Worth knowing before starting — that mode has no other caller, so it
+is new surface on the most load-bearing function in the pipeline, and the whole
+warm/cold `STALE`/`MISSING` policy hangs off `fetch`'s write behaviour.
 
-Worth deciding:
+Size: small in lines, and the care is all in not disturbing that policy.
 
-- **Single-flight, or serve-then-refresh.** Holding the lock across the check
-  is the small fix and makes the other tabs wait. Serving the built data
-  immediately and refreshing the banner behind it is the better answer and is a
-  larger change, because the page then has to learn the answer late.
-- **Whether page serving should write the builder's cache at all.** It does
-  today, and the comment already flags it as the thing nobody notices. A
-  read-only path for the check would remove the race rather than guard it.
-
-**A process lock on refresh is the other half and is a separate question.** It
+**A process lock on refresh is a different question and is not this one.** It
 came from the atomic-writes entry, which otherwise shipped on 2026-09-01 (the
 feed-log write) and was already declined for every other site. A lock is what
-would stop *two local builds* interleaving; single-flight above only stops one
-process racing itself. Neither is the other, and only the first is a security
-finding — the second is a foot-gun for whoever runs two terminals.
+would stop *two local builds* interleaving; single-flight stopped one process
+racing itself. Neither is the other, and only the first was a security finding —
+the second is a foot-gun for whoever runs two terminals.
 
 ### The server caps requests, but not connections
 

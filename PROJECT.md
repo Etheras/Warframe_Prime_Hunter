@@ -1223,11 +1223,18 @@ when they earn their keep.
 
 ### Staleness is checked by the server, not the page
 
-`serve.py` verifies upstream **before handing over the dataset**. The browser asks for
-`data/prime-data.js` as it always does; the server checks whether DE has moved on
-since the build, appends `window.WFPRIME_UPSTREAM = {...}` to the file it returns,
-and the banner reads that. The page never talks to Digital Extremes and does not know
-the check happened.
+`serve.py` checks whether DE has moved on since the build, and appends
+`window.WFPRIME_UPSTREAM = {...}` to `data/prime-data.js` as it serves it. The banner
+reads that. The page never talks to Digital Extremes.
+
+**It serves first and refreshes behind, since 2026-09-01.** It used to check
+*before* handing over the dataset, blocking that request while it ran. The
+argument for blocking was about one check and the code did *n* of them — every
+request arriving before the first finished started its own — so `freshness()`
+never blocks now. It answers with what it knows, starts a single background check
+if none is running, and marks the answer `checking`. The page then polls
+`upstream.json` until it settles and redraws the banner in place. §7 has the
+finding and the reasoning.
 
 It could not be done from the page in any case — measured, not assumed:
 `warframe.com` and `cdn.warframestat.us` send no CORS headers, so a cross-origin fetch
@@ -1235,12 +1242,18 @@ fails outright and a `no-cors` one returns an **opaque** response with unreadabl
 headers. Having every visitor contact the CDN would also undo the point of holding
 artwork locally.
 
-Three HEAD requests, no downloads, nothing rebuilt — **throttled to once an hour**, so
-reloading the page cannot hammer DE. The first request after a restart takes about two
-seconds and later ones are instant; that delay is deliberate, on the grounds that a
-slow first load beats quietly serving data you have no reason to trust. Upstream being
-unreachable is silent rather than alarming, and on `file://` or GitHub Pages no server
-runs, so the flag is simply absent and the build-age banner carries on alone.
+Nothing is rebuilt, and it is **throttled to once an hour**, so reloading cannot
+hammer DE. This paragraph said *"three HEAD requests, no downloads"* until
+2026-08-26 and both halves were wrong: `upstream_signature` makes one HEAD (the
+drop table) and two GETs (the export index at ~500 bytes, and the trader window),
+and both GETs go through `fetch`, which writes their bodies to `.cache/*.gz` with
+`.etag` sidecars. Serving a page therefore writes to the cache the build reads
+from — harmless, since it is the same conditional fetch the build would make, but
+a comment saying "no downloads" is how nobody notices.
+
+No request waits for any of that any more. Upstream being unreachable is silent
+rather than alarming, and on `file://` or GitHub Pages no server runs, so the flag
+is simply absent and the build-age banner carries on alone.
 
 **The hour is a ceiling on asking DE, not on being right.** The cached answer is
 stamped with the write time of `.cache/state.json` — the file it compares against — and
@@ -4691,6 +4704,68 @@ One ceiling is worth watching and says so in its own comment: `de_worldstate`, a
 something other than the size of the game — it carries whatever events are
 running — so a large event is the plausible way this first bites. It goes stale
 rather than wrong, and the log line names the source and the number.
+
+### The server serves first and refreshes behind, so one page load is one check
+
+**Shipped 2026-09-01.** `freshness()` in `serve.py` took the lock, read the cached
+answer, **released the lock**, and only then called `sources.upstream_signature` —
+one HEAD and two GETs, each with a 120-second timeout. The lock was taken again at
+the end, to publish.
+
+So every request that arrived before the first check finished saw no cached answer
+and started its own. Three tabs opened together made three sets of the same three
+upstream requests, and all three wrote the same `.cache/*.gz` bodies and `.etag`
+sidecars underneath a build that might be reading them. `FRESHNESS_TTL` worked
+perfectly from the second check onwards and did nothing whatever about the first.
+
+**The blocking was deliberate; the stampede was not.** The comment above the
+function argued the trade honestly — a slow first load beats quietly serving data
+you have no reason to trust — and that argument is about *one* check, not about
+*n* of them. The sharper objection is the project's own rule: asking Digital
+Extremes three times because three tabs opened at once is precisely the
+hospitality *"ask no more often than the source says to"* exists to protect.
+
+**Two fixes were on the table and the owner took the larger one.** Holding the
+lock across the check is three lines and makes the other tabs wait; serving the
+built data immediately and refreshing behind it is a bigger change, because the
+page then has to learn the answer late. The second was chosen, so:
+
+- `freshness()` **never blocks and never goes upstream.** It answers with what is
+  known, raises a `running` flag under the lock, and starts one background thread.
+  A request arriving a microsecond later finds the flag up and starts nothing —
+  the stampede is gone by construction rather than by a lock held longer.
+- Three answers are now distinguishable, and the page reads all three: a settled
+  body; a settled body with `checking: true`, meaning a previous answer is being
+  refreshed behind this response; and `{"ok": null, "checking": true}`, which is
+  what a cold first load gets.
+- **`upstream.json`** serves the same answer on its own, and `shared.js` polls it
+  only while `checking` is true — twelve tries at 700 ms, then it gives up. A
+  banner is an advisory, and a page that polls a dead server all afternoon to draw
+  one has its priorities wrong.
+- `renderStaleBanner` is idempotent and the bar carries `id="upstreamBar"`, so the
+  late answer replaces the bar rather than stacking a second one under the header.
+
+**What this trades.** The first load is now fast and briefly says nothing about
+upstream, where before it was slow and said something. That is only defensible
+because the banner corrects itself within a second or two — a page that never
+asked again would be strictly worse than the blocking version, which is why the
+page half is not optional.
+
+Verified against the real server rather than reasoned about: a cold `serve.py`
+answered the 1.9 MB payload in 326 ms with `checking: true` planted on it, the
+page requested `upstream.json` exactly once, took the settled answer, and stopped.
+The suite pins both halves — a Python test stalls the check on an event and
+asserts twelve simultaneous requests cause **one** check and that none of them
+waits, and two Playwright tests assert the banner appears without a reload and
+that polling stops once the answer settles.
+
+**What did not change, and is a separate question.** A *process* lock on refresh —
+what would stop two local builds interleaving — is not this. Single-flight only
+stops one process racing itself. Neither is the other, and only the first was a
+security finding; the second is a foot-gun for whoever runs two terminals, and it
+keeps its own note in `TODO.md`. The second half of the finding — whether page
+serving should write the builder's cache at all — also stands, and is now the
+whole of that entry.
 
 ### `data/feed-log.json` is written atomically, and it is the only one
 

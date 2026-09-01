@@ -440,12 +440,34 @@
 
   function staleBanner() { return once("staleBanner", drawStaleBanner); }
 
+  /* How long to keep asking, and how often. Twelve tries at 700ms is about
+     eight seconds — comfortably longer than a check that answers, and short
+     enough that a blackholed network stops mattering. There is no retry after
+     that: the banner is an advisory, and a page that polls a dead server all
+     afternoon to draw an advisory has its priorities wrong. */
+  const UPSTREAM_POLL_MS = 700;
+  const UPSTREAM_POLL_TRIES = 12;
+
   function drawStaleBanner() {
-    /* The server checks upstream before serving the data file and plants the
-       answer on it. Nothing is fetched from here - the page never talks to
-       Digital Extremes, and does not know the check happened. Absent on
-       file:// and on GitHub Pages, where no server ran. */
+    /* The server checks upstream and plants the answer on the data file it
+       serves. Nothing is fetched from here to Digital Extremes - the page never
+       talks to them and does not know the check happened. Absent on file:// and
+       on GitHub Pages, where no server ran.
+
+       Since 2026-09-01 the server does not block the data file while it checks,
+       so on a cold first load the planted answer is `checking: true` and the
+       real one arrives a moment later. That is the only reason this polls. */
     const up = window.WFPRIME_UPSTREAM;
+    renderStaleBanner(up);
+    if (up && up.checking) pollUpstream(UPSTREAM_POLL_TRIES);
+  }
+
+  /* Draws, and redraws. Idempotent on purpose: the late answer calls it a
+     second time, so it has to remove whatever the first call left rather than
+     stack a second bar under the header. */
+  function renderStaleBanner(up) {
+    const old = document.getElementById("upstreamBar");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
 
     /* Two audiences. Whoever runs the server can fix this and is told how, in
        the only terms that matter to them - the file they double-click. Anyone
@@ -471,10 +493,34 @@
     if (!notice) return;
 
     const el = document.createElement("div");
+    el.id = "upstreamBar";
     el.className = "databar " + notice.level;
     el.innerHTML = notice.html;
     const header = document.querySelector("header.topbar");
     if (header && header.parentNode) header.parentNode.insertBefore(el, header.nextSibling);
+  }
+
+  /* Ask again until the server's check settles, then redraw once and stop.
+
+     Same shape as the fissure poll below, and it fails in the same safe
+     direction: file://, a bundled single file, or a server that does not carry
+     the endpoint all mean "keep what the payload shipped with". The worst case
+     is the banner this page would have drawn before the check existed. */
+  function pollUpstream(left) {
+    if (left <= 0 || typeof fetch !== "function") return;
+    setTimeout(() => {
+      fetch("upstream.json", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((up) => {
+          if (!up) return;
+          /* Only once it is settled. Redrawing on every poll would flicker the
+             bar for no gain, since a `checking` answer says nothing new. */
+          if (up.checking) return pollUpstream(left - 1);
+          window.WFPRIME_UPSTREAM = up;
+          renderStaleBanner(up);
+        })
+        .catch(() => {});
+    }, UPSTREAM_POLL_MS);
   }
 
   /* Everything the reader took the trouble to set. A backup that restores your
