@@ -111,7 +111,6 @@ What is left of the entry is two fields and a warning about one of them.
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
-| Two relics that pay the same part are counted as two | session — the owner's, 2026-08-27; reproduced, and it inflates the top of the ranking |
 | Six rounds is not a plan a random squad can run | small — the owner's, 2026-08-27; an availability rule, not a thumb; it moves 45 of 66 endless rows |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
@@ -122,11 +121,16 @@ What is left of the entry is two fields and a warning about one of them.
 fixed cost of a run, which was gated by it. What is left is no longer gated by
 anything.
 
-**The row to take next is *Two relics that pay the same part are counted as two*.**
-It is the only one here that is a live defect rather than an improvement: it is
-reproduced, it inflates the top of the ranking, and it was found by reading the
-app rather than the code. Everything else in this table adds something; that one
-corrects something.
+**The one live defect in this table shipped on 2026-09-01** — *Two relics that pay
+the same part are counted as two*, the double-count that put Apollo (Lua) at the
+top of a farm list where one of its two relics paid nothing the other did not.
+`PROJECT.md §7` has the reasoning, the two claims that entry had wrong, and why
+the union fix it named first would have made the ranking worse rather than
+better. **Everything left in this table adds something rather than correcting
+something**, which is a different kind of choice. That is not the reassuring
+sentence: this file has twice claimed nothing was wrong on screen and been wrong
+both times, and the entry that just shipped was found by the owner reading the
+app rather than by anything written here.
 
 *Seven rotation-bearing mission types* is what remains of the entry that gated the
 unit question — tedious rather than hard, and blocking nothing.
@@ -336,73 +340,6 @@ sit behind it.
 Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still
 worth showing.
-
-### Two relics that pay the same part are counted as two
-
-**Found by the owner 2026-08-27, from the ranking, and reproduced exactly.** Two
-observations that turn out to be one gap:
-
-> *Shouldn't Axi D6, because of 30%, be above Axi A21? And shouldn't Taranis,
-> whose relics need 3 golden parts + Aya, be above Apollo which has only 1.5
-> parts — because the Cedo Prime Barrel is a duplicate from the 2 relics?*
-
-**Reproduced**, by banking every part of Cedo, Dual Zoren, Gyre and Quassus Prime
-except the four still wanted: *Where to go* ranked **Apollo 1.57 at #1** and
-**Taranis 1.23 at #2**, per run, matching the screenshots.
-
-**The cause.** Apollo's two wanted relics are `Axi D6` and `Axi A21`, and both
-carry **Cedo Prime Barrel**:
-
-| Relic | Its wanted contents |
-|---|---|
-| `Axi D6` | Cedo Prime Barrel *(Uncommon)*, Dual Zoren Prime Blade *(Rare)* |
-| `Axi A21` | Cedo Prime Barrel *(Uncommon)* |
-
-So Apollo's two relics cover **two** distinct parts, not three — and `Axi A21`
-adds nothing `Axi D6` does not already cover. Taranis's two relics are `Lith G14`
-(Gyre Prime Neuroptics) and `Lith Q3` (Quassus Prime Blade **×2**): three
-part-instances, no overlap, and Aya besides.
-
-**Where it happens, exactly.** In the node loop in `plan.js`, a node accumulates
-`n.rot[slot] += chance × value` and `n.cnt[slot] += chance` **once per relic
-source**, with nothing asking whether two relics at that node pay the same wanted
-part. `n.perRun` is built from that sum. The crack list is half-immune and that is
-the tell: `clears` counts *distinct* parts **within one relic**, so the dedup
-exists — it simply never runs **across** relics.
-
-**How widespread the condition is.** Measured over the live data: of the **234**
-nodes dropping two or more unvaulted relics, **231 have at least one part carried
-by two of them.** Summing each relic's part list against the distinct union
-overstates by up to **1.46×** (Elite Sanctuary Onslaught, 150 part-slots over 103
-distinct; then Plague Star 1.43×, Terrorem 1.37×). Apollo (Lua) carries 14 live
-relics with 11 shared parts, Cedo Prime Barrel among them. **The condition is
-near-universal; whether it bites depends on which of the shared parts you still
-want**, which is why it shows up plainly on a narrow farm list and hides on a
-wide one.
-
-**What is not wrong, so the fix does not overreach.** The row label says *relics /
-run* and 1.57 wanted relics a run is literally true — a run that hands you both
-D6 and A21 has handed you two relics you wanted. The defect is that the ranking
-uses that figure as a proxy for **progress**, and as progress it double-counts.
-Likewise `Axi D6` really is displayed above `Axi A21`; the surprise is that they
-*tie* on openings-per-part-cleared while one of them is redundant given the other.
-
-**Three ways to fix it, none chosen:**
-
-1. **Deduplicate the wanted parts per node.** Value a node on the union of parts
-   its relics can still clear rather than the sum. Most faithful, and it makes the
-   node figure stop being a relic count — so the label has to change with it, the
-   way *per objective* became *per reward*.
-2. **Discount a relic by what a better relic at the same node already covers.**
-   Keeps the relic count honest and re-ranks the crack list, which is where the
-   A21-versus-D6 surprise actually lives.
-3. **Say it on the row rather than score it.** A node whose relics overlap could
-   carry a note; cheapest, changes no number, and leaves the ranking overstating.
-
-Worth settling first: **whether the fix belongs to the node ranking, the crack
-list, or both** — the two observations come from one cause but surface in two
-lists, and the project's standing rule is that those two lists answer different
-questions and must not be merged into one score.
 
 ### Six rounds is not a plan a random squad can run
 

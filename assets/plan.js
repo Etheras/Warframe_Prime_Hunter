@@ -549,6 +549,12 @@
                    than divided back out of the score, because the score has
                    Forma and Aya folded into it and neither is a relic. */
                 cnt: { A: 0, B: 0, C: 0, none: 0 },
+                /* Every relic source that lands on this node, kept per rotation
+                   letter until the walk is over. `rot` and `cnt` cannot be
+                   accumulated as we go any more: whether one relic adds
+                   anything depends on the others here, which is not known until
+                   the last of them has arrived. See `M.creditRelics`. */
+                rows: { A: [], B: [], C: [], none: [] },
                 relics: new Map() };
           nodes.set(key, n);
         }
@@ -565,8 +571,8 @@
            said traces are tight - see `M.sourceValue`. It is a multiplier on the
            relic's value rather than a term added beside it, which is what keeps
            it from being the zero the two previous attempts produced. */
-        n.rot[slot] += ((s.chance || 0) / 100) * worth.value;
-        n.cnt[slot] += (s.chance || 0) / 100;   // rolls counted, never valued
+        n.rows[slot].push({ name: rname, chance: (s.chance || 0) / 100,
+                            value: worth.value, wants: rp.wants });
         /* How much of what you want here arrives already Radiant. Kept as a
            share rather than a flag so a node that is only partly pre-refined
            earns only part of the bonus - none is today, all eleven are wholly
@@ -578,6 +584,27 @@
           n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
         }
       });
+    });
+
+    /* ── relics that add nothing to the ones beside them ──────────────
+       Done here rather than in the walk above because it is a question about
+       the node as a whole: whether `Axi A21` is worth anything at Apollo
+       depends on `Axi D6` also dropping there, which is not known until every
+       source has been placed. `M.creditRelics` has the rule and the reasoning;
+       `n.overlap` is what the row says about it. */
+    nodes.forEach((n) => {
+      const spent = [];
+      Object.keys(n.rows).forEach((slot) => {
+        const c = M.creditRelics(n.rows[slot]);
+        n.rot[slot] = c.worth;
+        n.cnt[slot] = c.count;      // rolls counted, never valued
+        c.spent.forEach((s) => {
+          /* One line per relic, not per rotation: a relic covered in both B and
+             C is one redundancy the reader has to know about, not two. */
+          if (!spent.some((x) => x.name === s.name)) spent.push(s);
+        });
+      });
+      if (spent.length) n.overlap = spent;
     });
 
     /* ── Aya ──────────────────────────────────────────────────────────
@@ -1029,6 +1056,15 @@
     /* The row shows adjusted figures; this line is the unadjusted fact, so say
        which thumbs are on it rather than leaving the two to disagree silently. */
     if (n.halved) lines.push("Ranked figures halved — see the row.");
+    /* The count above is already discounted, so the tooltip that quotes it has
+       to say so — otherwise the row's own arithmetic looks wrong to anyone who
+       counts the relics in the chip beside it. */
+    if (n.overlap) {
+      lines.push(n.overlap.length === 1
+        ? "1 relic here pays only what another already does — see the row."
+        : n.overlap.length + " relics here pay only what another already does" +
+          " — see the row.");
+    }
     if (n.radiantLift > 1) {
       lines.push("Ranked figures +" + Math.round((n.radiantLift - 1) * 100) +
                  "%: it hands relics over Radiant and traces are tight.");
@@ -1331,6 +1367,16 @@
           " minutes, so a bounty is scored on the letter that is up <b>now</b> " +
           "and the row says how long that has left."
         : "") +
+      /* The marker on the row says a short thing; the rule behind it is read
+         once here, which is the arrangement every other marker follows. */
+      (ranked.some((n) => n.overlap)
+        ? " Two relics at one node can pay only the same parts of your list. " +
+          "The weaker one is then counted at <b>" +
+          Math.round(M.REDUNDANCY_WEIGHT * 100) + "%</b> rather than in full — " +
+          "one draw is one relic, so it is still the copy you get when the better " +
+          "one misses, but it is not more progress. Those rows say <em>overlap</em> " +
+          "and name the relic."
+        : "") +
       (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
@@ -1413,6 +1459,24 @@
             "Scored at half on purpose — nobody runs Railjack for caches.\n" +
             "The relic count is untouched.")
           }">halved</span>` : ""}${
+          /* Amber, like the rest of `.est`: the app scored this node lower than
+             its relic count implies, and a discount the reader cannot see is
+             the shape of defect this project keeps having to fix. Names the
+             relic and what covers it, because "overlaps" on its own is a
+             verdict with no evidence in it. */
+          n.overlap ? ` · <span class="est" data-tip="${esc(
+            n.overlap.map((o) => o.name + " pays nothing " +
+              o.coveredBy.join(" or ") + " does not.").join("\n") + "\n\n" +
+            /* Number-neutral on purpose: the list above it runs from one relic
+               to several, and "both" read as a mistake the moment it was
+               three. */
+            "Counted at " + Math.round(M.REDUNDANCY_WEIGHT * 100) + "% here, " +
+            "not dropped.\n\n" +
+            "One reward draw is one relic, so a covered relic is still\n" +
+            "the copy you get on the draws the better one misses.\n" +
+            "What it is not is more progress — every part it clears\n" +
+            "is already covered by something else here.")
+          }">${n.overlap.length} overlap${n.overlap.length === 1 ? "" : "s"}</span>` : ""}${
           /* Shown despite *Include Railjack* being off, because for this relic
              there is nowhere else. Amber for the same reason `.est` is amber:
              the app made a call the reader did not. */

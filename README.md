@@ -314,13 +314,20 @@ Collecting relics and cracking them are different jobs with different
 bottlenecks, and a single number covering both answered neither:
 
 - **Where to go** ranks on **how many relics you want a run hands over**, per
-  objective. That is the big number on each row.
+  reward. That is the big number on each row.
 - **How to crack them** ranks on **how many openings it takes to finish** a
   relic, per part cleared — so a relic you are blocked on a rare for comes above
   one you are a common away from, which is the right way round when you are
   cracking a stack.
 
 Neither list knows anything about the other's question, which is the point.
+
+Two relics at one place can pay only the same parts of your list, and then the
+weaker one is not really a second chance at anything — it clears a part the
+other one already clears. Those relics are counted at **a quarter**, and the row
+says **overlap** and names which relic and what covers it. Not zero: one reward
+draw is one relic, so it is still the copy you get on the draws the better one
+misses. What it is not is more progress.
 
 Under each node there is also a **percentage**: what one whole run there is worth
 towards your list once the relics are opened. It is one line down rather than

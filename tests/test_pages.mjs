@@ -903,6 +903,82 @@ page_test("the planner ranks somewhere to go for a wanted Prime", async () => {
   assert.deepEqual(errors, []);
 });
 
+page_test("a relic that pays nothing another already does is discounted, and says so", async () => {
+  /* The owner found this from the ranking on 2026-09-01: Apollo (Lua) sat at
+     the top on 1.57 wanted relics a run, and its two relics covered two parts
+     between them rather than three — `Axi A21` paid nothing `Axi D6` did not.
+     The node was credited twice for one part.
+
+     A discount the reader cannot see is the shape of defect this project keeps
+     having to fix, so what is under test here is the *saying*, not the
+     arithmetic — `tests/test_model.mjs` has the rule itself.
+
+     The subject is read off the raw payload and never named: a Prime with two
+     live relics that drop at one node in one rotation, where everything the
+     second pays of this Prime the first pays too. 19 of the 167 qualify today
+     and every one of them marks at least four nodes, but which ones qualify
+     changes each time DE vault something. The whole ranking is expanded first,
+     because a marked node is not always in the top eight. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const live = (n) => D.relics[n] && !D.relics[n].vaulted;
+    for (const it of D.items) {
+      const pays = new Map();          // relic -> the parts of THIS Prime it pays
+      for (const p of it.parts || []) {
+        for (const r of p.relics || []) {
+          if (!live(r.relic)) continue;
+          if (!pays.has(r.relic)) pays.set(r.relic, new Set());
+          pays.get(r.relic).add(p.name);
+        }
+      }
+      const spots = new Map();
+      for (const name of pays.keys()) {
+        spots.set(name, new Set((D.relics[name].sources || [])
+          .filter((s) => s.kind === "mission")
+          .map((s) => `${s.planet}|${s.node}|${s.mode}|${s.rotation || ""}`)));
+      }
+      const names = [...pays.keys()];
+      for (const a of names) {
+        for (const b of names) {
+          if (a === b) continue;
+          if (![...spots.get(b)].some((k) => spots.get(a).has(k))) continue;
+          if (![...pays.get(b)].every((p) => pays.get(a).has(p))) continue;
+          localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+          return { name: it.name, relics: names,
+                   weight: window.WFPrimeModel.REDUNDANCY_WEIGHT };
+        }
+      }
+    }
+    return null;
+  });
+  assert.ok(subject, "no Prime has two live relics covering one another at a shared " +
+                     "node — pick a different property rather than passing vacuously");
+  await page.reload({ waitUntil: "load" });
+
+  const more = page.locator("#moreNodes");
+  if (await more.count()) await more.click();
+
+  const marks = page.locator(".spot-meta .est").filter({ hasText: /overlap/ });
+  const marked = await marks.count();
+  assert.ok(marked > 0,
+            `${subject.name} has a relic covered by another at a shared node, so at ` +
+            "least one ranked row has to admit the discount it is scored under");
+
+  const tip = await marks.first().getAttribute("data-tip");
+  const said = tip.match(/^(.+) pays nothing (.+) does not\.$/m);
+  assert.ok(said, `the marker has to name the relic and what covers it, not just ` +
+                  `assert an overlap — got ${JSON.stringify(tip)}`);
+  for (const name of [said[1], said[2]]) {
+    assert.ok(subject.relics.includes(name),
+              `${name} is not one of ${subject.name}'s live relics, so the row is ` +
+              "naming something it did not weigh");
+  }
+  assert.ok(tip.includes(`Counted at ${Math.round(subject.weight * 100)}%`),
+            "the row states the discount it applied, from the model's own constant");
+  assert.deepEqual(errors, []);
+});
+
 page_test("a part you need two of says so on its chip in the crack list", async () => {
   /* The chip named the part and stopped, so farming for a pair looked exactly
      like farming for one — the only thing that moved was the openings figure

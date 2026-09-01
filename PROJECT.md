@@ -3028,6 +3028,87 @@ so it would have needed its own answer whatever the other five got. And a wave i
 not comparable to a dig, so the cross-mission division would still have been a
 guess, only a more elaborate one that looked more precise.
 
+### A relic that pays nothing the one beside it does is counted at a quarter
+
+**Found by the owner from the ranking on 2026-08-27, settled and shipped
+2026-09-01.** With four Primes on the farm list and every part of them banked but
+one each, *Where to go* put **Apollo (Lua) at 1.57 wanted relics a run** at the
+top, above **Taranis (Void) at 1.23** — and Apollo's two relics cover two parts
+between them rather than three:
+
+| Relic | Chance, rot B / C | Worth | Pays |
+|---|---|---|---|
+| `Axi D6` | 14.29% / 12.42% | 0.300 | Cedo Prime Barrel, Dual Zoren Prime Blade |
+| `Axi A21` | 14.29% / 12.42% | 0.200 | Cedo Prime Barrel |
+
+`Axi A21`'s wanted set is a **strict subset** of `Axi D6`'s at identical odds. The
+node loop accumulated `n.cnt[slot] += chance` once per relic source with nothing
+asking whether two relics there paid the same wanted part, so Apollo was credited
+twice for one part — and `n.perRun`, built from that sum, is what the ranking
+divides by as a stand-in for **progress**.
+
+**What was not wrong, so the fix did not overreach.** The row label says *relics /
+run* and 1.57 wanted relics a run is literally true: a run handing you both `D6`
+and `A21` has handed you two relics you wanted. Per *draw* the figure was already
+right — one reward draw yields one relic, so the two are mutually exclusive within
+a run and their chances genuinely add. The double-count is across a **stack**, and
+only when the quantity is read as progress.
+
+**Three fixes were proposed and the first two were measured.** *Value the node on
+the union of parts its relics can clear* — the most faithful-sounding — **makes it
+worse**: counting distinct parts credits `Axi D6` twice, where the relic count
+credits it once, so Apollo rises to **2.25 and keeps #1**, and 233 of 234 nodes
+move on a full farm list with 49-place swings. It is a different unit rather than
+a correction. *Say it on the row and score nothing* leaves the ranking overstating.
+So the fix is the second: **discount a relic by what a better relic at the same
+node already covers.**
+
+**Discounted, not dropped — the owner's call, 2026-09-01.** `REDUNDANCY_WEIGHT` is
+**0.25**: a wholly covered relic keeps a quarter of its count and a quarter of its
+worth. Zeroing it asserts more than the model knows. `Axi A21` is exactly the copy
+you get on the draws `Axi D6` misses, and it stops being redundant the moment the
+covering part is ticked off. The alternatives were measured — at 0.5 Apollo lands
+at **#2**, which is not the correction that was asked for; at 0 it falls to **#11**,
+which is the claim of worthlessness that was declined; at 0.25 it sits at **#4**
+and Taranis takes the top, which is what the owner reported expecting.
+
+**Wholly covered only, and that is the whole difference between a fix and a
+re-ranking.** A relic that overlaps in part and pays something of its own keeps its
+full count. Measured over the live data: discounting partial overlaps as well moves
+**139 of 234 nodes** on a full farm list and takes 11 in or out of the top 20,
+while this rule changes **nothing whatever** there — no relic on a full list is
+wholly covered — and still moves Apollo off the top of the narrow list it was
+wrong about. The defect is near-universal in its *condition* and rare in its
+*bite*, which is why it showed on a four-part farm list and hid on a complete one.
+
+**Per rotation letter, not per node**, and conservatively so. A run reaching C has
+collected A and B on the way, so a relic in A can in truth cover one in C; letting
+it would discount more on an assumption about how far the reader stays. Same
+letter is true however the run goes.
+
+**The rule lives in `model.js` as `creditRelics`**, not in the node loop, so it can
+be tested without a browser — and it is the third judgement in the model beside
+`CACHE_PENALTY` and `RADIANT_BONUS`, written the same way: one named constant to
+be argued with rather than a derived quantity. The two previous attempts at the
+Radiant bonus both collapsed because they were derived.
+
+**It says so on the row.** `n.overlap` puts an amber `overlap` marker on the meta
+line naming the relic and what covers it, the score tooltip repeats it, and *How
+this works* carries the rule once. A number that quietly drops by three quarters
+with no account of itself is the shape of defect this project keeps having to fix,
+and a discount is worth nothing to a reader who cannot see it.
+
+**Two things the `TODO.md` entry had wrong**, both corrected when it shipped.
+It said `Axi D6` and `Axi A21` **tie** on openings-per-part-cleared: measured, A21
+is **5.0** and D6 is **10.0**, a 2× gap, and that gap is precisely why A21 sorts
+*above* D6 in *How to crack them* — which is the half of the owner's observation
+that entry could not explain. And it framed the choice as *node ranking, crack
+list, or both*: **the redundancy belongs to the node**, not to the relic. `Axi A21`
+drops at 65 nodes and `Axi D6` at 64, and A21 is the **sole route of the two at two
+Isolation Vault bounties**. It is redundant at Apollo and not redundant in general,
+so the node ranking can discount it honestly and the crack list — which is
+node-independent — must not.
+
 `PER_REWARD` is kept as an empty table rather than deleted: it is the seam where a
 genuine exception would go — a mode that pays a reward for something other than
 completing its own objective once — and a test asserts it is empty, so an entry

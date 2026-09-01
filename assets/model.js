@@ -143,6 +143,86 @@
      previous attempts collapse to zero were both *derived* quantities. */
   const RADIANT_BONUS = 0.25;
 
+  /* ── a relic that adds nothing the one beside it does not ────────
+     Two relics at one node can pay the same wanted part, and until now each was
+     counted in full. The owner found it from the ranking: with four Primes
+     banked but a part each, *Where to go* put **Apollo (Lua) at 1.57 a run**
+     above **Taranis (Void) at 1.23**, and Apollo's two relics cover two parts
+     between them rather than three —
+
+       Axi D6   14.29% B / 12.42% C   Cedo Prime Barrel, Dual Zoren Prime Blade
+       Axi A21  14.29% B / 12.42% C   Cedo Prime Barrel
+
+     `Axi A21` pays nothing `Axi D6` does not, at identical odds. The node was
+     credited twice for one part, and the figure the ranking divides by is meant
+     to stand for progress.
+
+     **Discounted, not dropped, at the owner's direction, 2026-09-01.** A wholly
+     covered relic is not worthless: one reward draw yields ONE relic, so the two
+     are mutually exclusive within a run — `Axi A21` is exactly the copy you get
+     on the draws where `Axi D6` does not turn up. It is redundant across a
+     stack, not within a run. It also stops being redundant the moment the
+     covering part is ticked off. Zeroing it would assert more than the model
+     knows; a residual says "this buys you little" without claiming it buys
+     nothing.
+
+     **Wholly covered only.** A relic that overlaps in part and pays something of
+     its own keeps its full count. That is the whole difference between a
+     surgical fix and a re-ranking: measured over the live data, discounting
+     partial overlaps too moves 139 of 234 nodes on a full farm list and takes 11
+     in or out of the top 20, while this rule changes **nothing whatever** there —
+     no node on a full list holds a relic that is wholly covered — and still
+     moves Apollo off the top of the narrow list it was wrong about.
+
+     The third judgement in the model, beside `CACHE_PENALTY` and
+     `RADIANT_BONUS`, and written the same way: one named constant, argued with
+     rather than derived. At 0.25 Apollo falls from #1 to #4 and Taranis takes
+     the top; at 0.5 it lands at #2, which is not the correction the owner
+     asked for; at 0 it falls to #11, which is the claim of worthlessness they
+     declined. */
+  const REDUNDANCY_WEIGHT = 0.25;
+
+  /* One node, one rotation letter, and what its relics are really worth here.
+
+     `rows` is `{ name, chance, value, wants }` per relic source, `chance` a
+     probability rather than a percentage. Better relics are considered first —
+     by value, then by chance, then by name so the answer cannot depend on the
+     order the sources happened to arrive in — and each one covers the wanted
+     parts it pays. A relic reached with every one of its parts already covered
+     is the redundant case and keeps `weight` of its count.
+
+     Per rotation letter rather than per node, deliberately and conservatively.
+     A run that reaches C has collected A and B on the way, so a relic in A can
+     in truth cover one in C; letting it would discount more, on an assumption
+     about how far the reader stays. Same letter is the case that is true
+     however the run goes.
+
+     Returns the credited count and worth, and `spent` — which relics were
+     discounted and what covers them — because the row has to be able to say so.
+     A number that quietly halves is the shape this project keeps having to fix. */
+  function creditRelics(rows, weight) {
+    const w = weight == null ? REDUNDANCY_WEIGHT : weight;
+    const order = (rows || []).slice().sort((a, b) =>
+      (b.value - a.value) || (b.chance - a.chance) ||
+      String(a.name).localeCompare(String(b.name)));
+    const covered = new Map();          // part label -> the relic that covers it
+    const spent = [];
+    let count = 0, worth = 0;
+    order.forEach((r) => {
+      const wants = r.wants || [];
+      const redundant = wants.length > 0 && wants.every((p) => covered.has(p));
+      const k = redundant ? w : 1;
+      count += (r.chance || 0) * k;
+      worth += (r.chance || 0) * (r.value || 0) * k;
+      if (redundant) {
+        spent.push({ name: r.name,
+                     coveredBy: Array.from(new Set(wants.map((p) => covered.get(p)))) });
+      }
+      wants.forEach((p) => { if (!covered.has(p)) covered.set(p, r.name); });
+    });
+    return { count, worth, spent };
+  }
+
   /* What one reward drop at a given source is worth to this plan.
 
      Ordinarily the relic's value at the refinement the plan chose. Where DE
@@ -367,5 +447,6 @@
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
+    REDUNDANCY_WEIGHT, creditRelics,
   };
 })();

@@ -506,3 +506,103 @@ test("the run overhead survives a backup round trip, zero included", () => {
   assert.equal(out.plan.runStart, 0.3333, "20 seconds, kept to the precision given");
   assert.equal(out.plan.runEnd, 0, "and a deliberate zero is not a missing value");
 });
+
+/* ── a relic that adds nothing to the one beside it ────────────────
+   Apollo (Lua) as the owner found it on 2026-09-01: two wanted relics at the
+   same odds, and `Axi A21` pays nothing `Axi D6` does not. Named here because
+   this is the case the rule was written for and the numbers are the measured
+   ones — not because these two relics matter more than any others. */
+const APOLLO = () => [
+  { name: "Axi D6", chance: 0.1429, value: 0.3,
+    wants: ["Cedo Prime Barrel", "Dual Zoren Prime Blade"] },
+  { name: "Axi A21", chance: 0.1429, value: 0.2, wants: ["Cedo Prime Barrel"] },
+];
+
+test("a relic wholly covered by a better one is discounted, not dropped", () => {
+  const M = load();
+  const c = M.creditRelics(APOLLO());
+  assert.equal(c.spent.length, 1, "exactly one of the two adds nothing");
+  assert.equal(c.spent[0].name, "Axi A21", "and it is the weaker of the two");
+  assert.deepEqual(Array.from(c.spent[0].coveredBy), ["Axi D6"],
+                   "the row has to be able to name what covers it");
+  /* Not zero. One reward draw is one relic, so A21 is the copy you get when D6
+     misses — worth little to this plan, worth something. */
+  assert.ok(c.count > 0.1429, "the covering relic alone would be 0.1429");
+  assert.equal(+c.count.toFixed(6), +(0.1429 + 0.1429 * M.REDUNDANCY_WEIGHT).toFixed(6));
+});
+
+test("a relic paying something of its own keeps every bit of its count", () => {
+  /* The whole difference between a fix and a re-ranking. Discounting partial
+     overlaps as well moves 139 of 234 nodes on a full farm list; this rule
+     moves none of them, because no relic there is wholly covered. */
+  const M = load();
+  const rows = APOLLO();
+  rows[1] = { name: "Axi A21", chance: 0.1429, value: 0.2,
+              wants: ["Cedo Prime Barrel", "Gyre Prime Neuroptics"] };
+  const c = M.creditRelics(rows);
+  assert.deepEqual(plain(c.spent), [], "an overlap is not a redundancy");
+  assert.equal(+c.count.toFixed(6), +(0.1429 * 2).toFixed(6),
+               "both relics counted in full");
+});
+
+test("the discount lands on the weaker relic however the sources arrived", () => {
+  /* Sources come off the drop tables in whatever order the build wrote them.
+     A rule that discounted whichever it happened to see second would move the
+     ranking when nothing about the game had changed. */
+  const M = load();
+  const forward = M.creditRelics(APOLLO());
+  const backward = M.creditRelics(APOLLO().reverse());
+  assert.equal(backward.spent[0].name, "Axi A21", "still the weaker one");
+  assert.equal(backward.count, forward.count);
+});
+
+test("two relics alike in every way still resolve the same way twice", () => {
+  /* Equal value and equal chance, so neither is the better relic. The tie has
+     to break on something stable or the ranking flickers between builds. */
+  const M = load();
+  const twins = [
+    { name: "Lith B2", chance: 0.11, value: 0.1, wants: ["Gyre Prime Neuroptics"] },
+    { name: "Lith A1", chance: 0.11, value: 0.1, wants: ["Gyre Prime Neuroptics"] },
+  ];
+  const one = M.creditRelics(twins);
+  const two = M.creditRelics(twins.slice().reverse());
+  assert.equal(one.spent[0].name, two.spent[0].name);
+  assert.equal(one.count, two.count);
+});
+
+test("the worth is discounted with the count, so the row cannot contradict itself", () => {
+  /* `count` becomes the ranked relics-a-run and `worth` becomes the score
+     beside it. Discounting one and not the other would put two numbers on one
+     row that disagree about the same relic. */
+  const M = load();
+  const c = M.creditRelics(APOLLO());
+  const full = 0.1429 * 0.3 + 0.1429 * 0.2;
+  const kept = 0.1429 * 0.3 + 0.1429 * 0.2 * M.REDUNDANCY_WEIGHT;
+  assert.ok(c.worth < full - 1e-9, "the redundant relic's value is discounted too");
+  assert.equal(+c.worth.toFixed(6), +kept.toFixed(6));
+});
+
+test("the weight is the only thing deciding how hard the discount bites", () => {
+  /* A judgement, not a measurement — the third in the model, beside
+     CACHE_PENALTY and RADIANT_BONUS. Weight 1 has to reproduce exactly what
+     shipped before this rule existed, or the discount is not the only change. */
+  const M = load();
+  assert.equal(M.creditRelics(APOLLO(), 1).count, 0.1429 * 2);
+  assert.equal(M.creditRelics(APOLLO(), 0).count, 0.1429);
+  assert.ok(M.REDUNDANCY_WEIGHT > 0 && M.REDUNDANCY_WEIGHT < 1,
+            "a weight of 0 claims worthlessness and 1 is the defect");
+});
+
+test("nothing to compare against is not a redundancy", () => {
+  const M = load();
+  assert.deepEqual(plain(M.creditRelics([])), { count: 0, worth: 0, spent: [] });
+  const lone = M.creditRelics([APOLLO()[0]]);
+  assert.deepEqual(plain(lone.spent), []);
+  assert.equal(lone.count, 0.1429);
+  /* A relic wanted for nothing cannot be covered by anything, and must not
+     silently cover everything else either. */
+  const empty = M.creditRelics([{ name: "Lith Z9", chance: 0.1, value: 0, wants: [] },
+                                ...APOLLO()]);
+  assert.equal(empty.spent.length, 1, "still just A21");
+  assert.equal(empty.spent[0].name, "Axi A21");
+});
