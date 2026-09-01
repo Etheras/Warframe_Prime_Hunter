@@ -49,12 +49,50 @@ OVERWRITERS = re.compile(
     re.I,
 )
 
-# An interpreter given its program on the command line, where the program text
-# is what a shell would have to survive quoting.
-INLINE_PROGRAM = re.compile(r"""(?:^|[;|&\n(])\s*(?:python[0-9.]*|py|node|deno)\s+-\s*[ceEp]*\b""", re.I)
+# An interpreter handed its program as text rather than as a file on disk, in
+# any of the three ways that happens. All three make the program text something
+# a shell has to carry, which is the whole hazard: `\b` arriving as a backspace
+# byte is what rule 1 exists for, and a regex is exactly the payload that
+# suffers it.
+#
+# **The last two were missing until 2026-09-01**, and the gap was one `\b`:
+# `-\s*[ceEp]*\b` needs a word character after the dash to close the boundary,
+# so a BARE `-` — the ordinary way to say "the program is on stdin" — never
+# matched. `python - <<'PY'` sailed through, which is the form anyone reaches
+# for once a script is more than a line long. Three such writes went through the
+# guard the day it was found; one of them mangled `\d` and `\/` in a regex on
+# the way in, and failed loudly on an assertion by luck rather than by design.
+#
+# Over-matching is the real risk here, not under-matching: a guard that prompts
+# on every `python -` gets switched off within the week, and `python -` with no
+# write in it is common. That is why this only says *how the program arrives*
+# and `WRITES` below decides whether it intends to write at all — both have to
+# agree before anything is refused.
+INLINE_PROGRAM = re.compile(
+    r"""(?:^|[;|&\n(])\s*(?:python[0-9.]*|py|node|deno)\b\s*"""
+    r"""(?:-\s*[ceEp]+\b"""        # -c, -e, -E, -p: the program is an argument
+    r"""|-(?=\s|$)"""              # a bare -: the program arrives on stdin
+    r"""|<)""",                    # < file: the same thing, by redirect
+    re.I,
+)
 
 # Words that mean the inline program intends to write, not read.
-WRITES = re.compile(r"""open\s*\([^)]*['"][wax]|write_text|writeFile|WriteAllText|\.write\(|>\s*['"]""", re.I)
+#
+# The `open(...)` half asks for a real MODE argument — a comma, then a quoted
+# token made only of mode letters, one of which opens for writing. It used to be
+# `open\s*\([^)]*['"][wax]`, which needed only a quote followed by w, a or x
+# anywhere inside the call, and that matched **`open('assets/plan.js')`** on the
+# `'a` of `assets`. A pure read, refused.
+#
+# That mattered nowhere until INLINE_PROGRAM learnt about stdin programs on
+# 2026-09-01, because until then almost nothing reached this regex; afterwards it
+# would have prompted on the commonest probe in the project. Widening one half of
+# a two-part test is what exposes a loose pattern in the other.
+WRITES = re.compile(
+    r"""open\s*\([^)]*,\s*['"][rwaxbt+]*[wax][rwaxbt+]*['"]"""
+    r"""|write_text|writeFile|WriteAllText|\.write\(|>\s*['"]""",
+    re.I,
+)
 
 # Anything that looks like a path, so an inline program's targets are visible.
 PATHISH = re.compile(r"""['"]([^'"\n]*[/\\][^'"\n]*)['"]|(\b(?:assets|tools|tests)[/\\][^\s'";|&)]+)""")

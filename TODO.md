@@ -212,7 +212,6 @@ unit question — tedious rather than hard, and blocking nothing.
 |---|---|
 | The planner's search finds Primes, never parts | session — the owner's, 2026-09-01 |
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
-| The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
 | The schedule tests assert equality where they should assert a ceiling | small — the owner's, 2026-09-01; they blocked a temporary cadence change |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
@@ -1245,52 +1244,6 @@ Worth settling before it is built, because none of these is obvious:
 The store side is already there and is the cheap half: `KEY_PARTS` is shared,
 both pages read and write it, and a part ticked on either shows on the other —
 that is tested. This is a search and a result list, not a new piece of state.
-
-### The shell-write guard lets `python - <<'EOF'` straight through
-
-**Found 2026-08-27, by walking through it three times without noticing.**
-`tools/guard_shell_writes.py` is the PreToolUse hook behind hard rule 1 — *never
-write source files through a shell* — and it does not see a program supplied on
-**stdin**. Measured against `blocked()` directly, with `assets/plan.js` as the
-target:
-
-| Form | Result |
-|---|---|
-| `echo x > assets/plan.js` | refused |
-| `sed -i … assets/plan.js` | refused |
-| `cat x \| tee assets/plan.js` | refused |
-| `python -c "open('assets/plan.js','w')…"` | refused |
-| `node -e "…writeFileSync('assets/plan.js'…)"` | refused |
-| `Set-Content assets/plan.js …` | refused |
-| **`python - <<'PY'` … `PY`** | **allowed** |
-| **`python < script.py`** | **allowed** |
-
-**The cause is one regex.** `INLINE_PROGRAM` matches
-`(?:python[0-9.]*|py|node|deno)\s+-\s*[ceEp]*\b` — it needs a flag letter after
-the `-`, so a bare `-` (read the program from stdin) never matches, and neither
-does `<`. Both are ordinary ways to hand an interpreter a program, and the
-heredoc form is the one an assistant reaches for when a script is more than a
-line long.
-
-**It was exercised, not theorised.** Three writes went through it that day —
-`TODO.md` twice and `assets/plan.js` once. Nothing was damaged and the files were
-checked afterwards, but the third attempt is the one that matters: the same form
-aimed at `tests/test_pages.mjs` **did** mangle its input, turning `\d` and `\/`
-into `d` and `/` before Python ever saw them. That failed loudly on an assertion
-rather than silently, by luck rather than by design — a regex is exactly the
-payload rule 1 exists for, and `\b` arriving as a backspace byte is the case the
-rule's own comment cites.
-
-**The fix is small**: let `INLINE_PROGRAM` accept a bare `-` and a `<` redirect
-into an interpreter. Worth doing carefully rather than quickly — the guard's job
-is to refuse, so a pattern that over-matches turns every `python -` invocation
-into a prompt, and `python - ` with no write in it is common enough to be
-annoying. The `WRITES` test already gates that and should carry the weight.
-
-**Worth knowing either way**: the guard covers `assets/*.{js,mjs,css}`,
-`tools/*.{py,ps1}`, everything under `tests/`, and any `.html`. Markdown is
-deliberately outside it, which is why `TODO.md` was never going to be refused —
-that part is correct, not a second gap.
 
 ### One Cambion Drift tier labels a different letter from the rest of its family
 

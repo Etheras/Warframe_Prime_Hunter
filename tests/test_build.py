@@ -2238,6 +2238,16 @@ def test_the_guard_refuses_shell_writes_to_source() -> None:
         "python -c \"open('tests/test_build.py','w').write(1)\"",
         "cat header.txt > index.html",
         "Set-Content -Path assets/model.js -Value $x",
+        # A program on STDIN rather than on the command line. Missed until
+        # 2026-09-01 over a single `\b` in INLINE_PROGRAM, and it is the form an
+        # assistant reaches for the moment a script outruns one line — so it was
+        # both the widest hole and the likeliest one to be used. Three writes
+        # went through it the day it was found; one mangled `\d` and `\/` in a
+        # regex on the way in and failed on an assertion by luck.
+        "python - <<'PY'\nopen('assets/plan.js','w').write('x')\nPY",
+        "python3 - <<'EOF'\nimport io\nio.open('tests/test_pages.mjs','w').write(s)\nEOF",
+        "node - <<'JS'\nwriteFileSync('assets/shared.js', out)\nJS",
+        "python < patch.py   # writes open('tools/serve.py','w')",
     ]
     allow = [
         "python tests/test_build.py",
@@ -2248,6 +2258,18 @@ def test_the_guard_refuses_shell_writes_to_source() -> None:
         "python tools/build_data.py > /tmp/build.log 2>&1",
         "python tools/build_data.py --offline",
         "git commit -m 'message'",
+        # The other half of widening INLINE_PROGRAM, and the half that decides
+        # whether the guard survives contact with daily use. A stdin program
+        # that only READS is the common case by far — every probe in
+        # `CLAUDE.md` is one — and a guard that prompts on those gets switched
+        # off within the week. `WRITES` is what has to carry that weight.
+        "python - <<'PY'\nimport json\nprint(json.load(open('data/prime-data.json'))['meta'])\nPY",
+        "python - <<'PY'\nprint(open('assets/plan.js').read().count('relicTier'))\nPY",
+        "node - <<'JS'\nconsole.log(readFileSync('assets/model.js','utf8').length)\nJS",
+        # Writing, but to somewhere the guard deliberately does not cover:
+        # generated output, and the scratchpad.
+        "python - <<'PY'\nopen('data/feed-log.json','w').write(x)\nPY",
+        "python - <<'PY'\nopen('/tmp/scratchpad/probe.mjs','w').write(src)\nPY",
     ]
     check("guard: refuses every shell write to a source file",
           [c for c in refuse if not guard_shell_writes.blocked(c)], [],

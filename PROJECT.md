@@ -4734,6 +4734,43 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### The guard sees a program on stdin, and stopped guessing at write modes
+
+**Shipped 2026-09-01.** `tools/guard_shell_writes.py` is the PreToolUse hook
+behind hard rule 1, and it could not see a program supplied on **stdin**.
+`echo >`, `sed -i`, `tee`, `python -c`, `node -e` and `Set-Content` were all
+refused; **`python - <<'PY'` was allowed**, and so was `python < script.py`.
+
+The cause was one `\b`. `INLINE_PROGRAM` matched `…\s+-\s*[ceEp]*\b`, which needs
+a word character after the dash to close the boundary — so a *bare* `-`, the
+ordinary way to say "the program arrives on stdin", never matched. That is the
+form anyone reaches for the moment a script outruns one line, which made it both
+the widest hole and the likeliest to be used. Three writes went through it the
+day it was found; one mangled `\d` and `\/` in a regex on the way in and failed
+on an assertion by luck rather than by design.
+
+The pattern now accepts all three ways a program can arrive as text: a flag
+(`-c`, `-e`), a bare `-`, or a `<` redirect.
+
+**Widening it exposed a loose pattern in the half that gates it, which is the
+part worth keeping.** The guard only refuses when `INLINE_PROGRAM` *and* `WRITES`
+both match, and `WRITES` asked for `open\s*\([^)]*['"][wax]` — a quote followed
+by `w`, `a` or `x` anywhere inside the call. That matches
+**`open('assets/plan.js')`**, on the `'a` of `assets`. A pure read, refused.
+
+It had never mattered, because until this change almost nothing reached that
+regex; afterwards it would have prompted on the commonest probe in the project —
+every `node:vm` scratchpad in `CLAUDE.md` is a read-only stdin program. `WRITES`
+now requires a real mode argument: a comma, then a quoted token made only of
+mode letters, one of which opens for writing. **Widening one half of a two-part
+test is what exposes a loose pattern in the other half**, and the test carries
+both directions because a guard that over-blocks is a guard somebody switches
+off.
+
+Verified through the live hook rather than against `blocked()`: the heredoc write
+to `tests/` is denied and leaves no file, and a heredoc that only reads
+`assets/plan.js` still runs.
+
 ### Both planner headings are centred on their row, not on their slack
 
 **The owner's, 2026-09-01.** `text-align:center` on the heading was the obvious
