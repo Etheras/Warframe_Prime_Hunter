@@ -352,6 +352,48 @@ Worth settling when it is built:
   pipeline already has a well-worn answer for one: fall through the chain and
   reuse the cache. It should take that path rather than inventing a new one.
 
+**Measured 2026-09-01, so the numbers can be chosen from evidence.** Every body
+in `.cache/`, stored and expanded, since the expansion is the half that has no
+ceiling at all:
+
+| Source | Stored | Expanded | Ratio |
+|---|---:|---:|---:|
+| `api_items` | 1,039,000 | **10,443,694** | 10.1× |
+| `official_droptables` | 258,560 | 4,419,528 | **17.1×** |
+| `export_ExportManifest` | 473,666 | 3,780,187 | 8.0× |
+| `drops_relics` | 238,679 | 2,385,503 | 10.0× |
+| `export_ExportRecipes_en` | 59,174 | 1,293,754 | **21.9×** |
+| `drops_missionRewards` | 108,152 | 1,084,088 | 10.0× |
+| `export_ExportResources_en` | 110,848 | 1,002,658 | 9.0× |
+| `export_ExportWeapons_en` | 84,609 | 610,189 | 7.2× |
+| `de_worldstate` | 19,545 | 130,253 | 6.7× |
+| `api_syndicatemissions` | 6,618 | 61,126 | 9.2× |
+| `wiki_prime` | 12,754 | 56,157 | 4.4× |
+| `api_fissures` | 1,737 | 11,029 | 6.3× |
+| `api_vaulttrader` | 1,361 | 7,947 | 5.8× |
+| `api_events` | 858 | 2,994 | 3.5× |
+| `export_index` | 526 | **490** | 0.9× |
+| **all 23 sources** | **2,475,762** | **25,598,660** | 10.3× |
+
+Artwork separately: **167 files, 8.75 MB**, largest **121,031**, median 47,638,
+smallest 8,500.
+
+Three things fall out of that and each answers one of the questions above:
+
+- **The spread is 21,000×**, from `export_index` at 490 bytes to `api_items` at
+  10.4 MB. That is the case for a number per source, now with a figure on it.
+- **The worst expansion ratio observed is 21.9×** and the largest expansion is
+  10.4 MB. So a ratio guard alone is useless — a 40× ratio is unremarkable and a
+  bomb is 1000× — and the real guard is an **absolute cap on bytes written out**,
+  with the ratio only as a cheap early signal.
+- **Artwork wants two limits, not one**: per image (largest today is 121 KB) and
+  a total across the 167, because 167 responses of 2 MB each is the failure the
+  per-image cap alone would wave through.
+
+A limit set at roughly 3× today's figure leaves room for DE to grow without
+anyone editing a constant in a hurry, and still stops every case in the entry.
+The numbers are the owner's to set; what was missing was the evidence.
+
 ### Serving a page can start the same upstream check several times over
 
 `freshness()` in `tools/serve.py:135-157` takes the lock, reads the cached
