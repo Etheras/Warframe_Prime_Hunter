@@ -160,7 +160,6 @@ Five things worth carrying forward, because none was in the findings:
 | The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
-| `data/feed-log.json` is tracked on purpose, and only for now | **not a defect** — a temporary testing file; the entry is the cleanup reminder |
 
 ### The worldstate is already cached, and barely read
 
@@ -292,33 +291,6 @@ being found by shape rather than by position (`a67b6d5`, `4947bca`). The
 *shape* of the cadence test is still wrong and keeps its own entry — *The
 schedule tests assert equality where they should assert a ceiling* — but being
 wrong is not the same as being red, and it is no longer red.
-
-### `data/feed-log.json` is tracked on purpose, and only for now
-
-**Not a defect — answered by the owner on 2026-09-01.** It is a **temporary
-testing file**, deliberately committed, and it comes out of the repository once
-that testing finishes. It is recorded here so the next reader does not re-file it
-as the oversight it looks like, and so the cleanup is not forgotten.
-
-It looks like an oversight because `.gitignore` lists the generated payload file
-by file — `data/prime-data.js`, `data/prime-data.json`, `data/fissures.json` —
-and this name is simply not among them. A session found it on 2026-09-01 while
-making that write atomic and wrote it up as accidental; it is not.
-
-**Two things follow from it being tracked, and both are temporary too:**
-
-- Every local build rewrites it, so the working tree is dirty after any build.
-  **That is expected. Do not clean it up** — `PROJECT.md §2` now has the rule
-  that made this worth saying, learnt by destroying four rows of it.
-- `PROJECT.md §7` says the public repository has never carried a generated file.
-  While this is tracked, that is not true, and the note there says so.
-
-**When the testing is done:** add it to `.gitignore`, `git rm --cached` it, and
-check the first build after — a build with no local copy fetches the published
-one from the deployed site (`tools/build_data.py:998`), which is the path a fresh
-CI clone already takes, so nothing should change. The deployed log is the record
-the *"how often do DE answer"* question is measured from and its loss would be
-silent, which is the only reason to look rather than assume.
 
 ### The server caps requests, but not connections
 

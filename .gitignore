@@ -7,6 +7,16 @@ data/prime-data.json
 # the fissure list on its own, so an open page can re-read the one part of the
 # payload that expires without downloading the other 1.9 MB
 data/fissures.json
+# The 24-hour record of which source answered each live feed. Tracked between
+# 2026-08-27 and 2026-09-01 as a deliberate testing file, and untracked because
+# tracking it broke the thing it exists for: `read_feed_log` prefers a local
+# copy, a CI checkout therefore found the committed one and never fetched the
+# published one, and the committed rows were then trimmed as older than a day.
+# Every run started empty and wrote a single row, so the log could not
+# accumulate — the record built to answer "how often do DE answer" held one row
+# while the question was being asked. Untracked, CI takes the path a fresh clone
+# already takes: fetch the deployed copy and continue it.
+data/feed-log.json
 
 # item artwork pulled by --with-images. Same reasoning: it is DE's artwork,
 # served via cdn.warframestat.us, and not ours to redistribute.

@@ -121,10 +121,20 @@ jobs:
 
       # Which sources answer a datacenter IP is not always the same as which
       # answer a home connection, so record it before the build runs.
+      #
+      # The worldstate line was missing until 2026-09-01, which made this probe
+      # silent about the only source that routinely refuses. It is the document
+      # all four live feeds come from, and whether DE answer it is what decides
+      # first-party against the WFCD proxy — so "which sources answer a
+      # datacenter IP" was being recorded for every source except the one the
+      # question is actually about. Measured that day across eighteen builds:
+      # one reached DE, seventeen fell through to the proxy, with no pattern in
+      # the clock. See TODO.md.
       - name: Probe the data sources
         if: env.FULL == 'true'
         run: |
           for url in \
+            "https://api.warframe.com/cdn/worldState.php" \
             "https://wiki.warframe.com/index.php?title=Prime&action=raw" \
             "https://www.warframe.com/droptables" \
             "https://origin.warframe.com/PublicExport/index_en.txt.lzma" \

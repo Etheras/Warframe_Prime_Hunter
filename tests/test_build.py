@@ -2677,6 +2677,44 @@ def test_serving_a_page_starts_one_upstream_check_not_one_each() -> None:
         serve._freshness.update(saved)
 
 
+def test_the_ci_probe_asks_about_the_source_that_refuses() -> None:
+    """
+    *Probe the data sources* exists to record which upstreams answer a datacentre
+    IP, because that is not always the same set that answer a home connection.
+
+    It curled five URLs and **not** DE's worldstate — the document all four live
+    feeds come from, and the one whose answer decides first-party against the
+    WFCD proxy. So the probe was silent about the only source that routinely
+    refuses, which is the source the question is always about. Measured
+    2026-09-01 across eighteen builds: one reached DE, seventeen took the proxy.
+
+    Asserted from `sources.py`'s own constants rather than from a copy of the
+    URLs, so a host that moves cannot leave the probe quietly asking the old one.
+    """
+    workflow = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(workflow):
+        print("  skip probe check (no workflow checked out)")
+        return
+    yml = read_text(workflow)
+    probe = re.search(r"(?s)Probe the data sources.*?\bdone\b", yml)
+    check_true("probe: the step is still findable", bool(probe),
+               "the step was renamed or restructured; this test names it")
+    body = probe.group(0) if probe else ""
+
+    # The two first-party documents a build cannot do without, by constant.
+    check_true("probe: it asks DE's worldstate", sources.WORLDSTATE in body,
+               "the feeds' first-party source, and the one that 403s a runner - "
+               "a probe that skips it records everything except the answer")
+    check_true("probe: it asks the official drop tables",
+               sources.OFFICIAL_DROPTABLES in body)
+
+    # And it must stay a probe: no body is fetched, only a status code.
+    check_true("probe: it reads a status code and no body",
+               "-o /dev/null" in body and "%{http_code}" in body,
+               "downloading six documents to find out whether they answer is a "
+               "different thing from asking whether they answer")
+
+
 def test_serving_a_page_never_writes_the_builders_cache() -> None:
     """
     `sources.upstream_signature` makes one HEAD and two GETs, and both GETs went
@@ -3449,6 +3487,7 @@ def main() -> int:
                          test_serving_a_page_starts_one_upstream_check_not_one_each,
                          test_a_check_that_dies_still_lowers_the_flag,
                          test_serving_a_page_never_writes_the_builders_cache,
+                         test_the_ci_probe_asks_about_the_source_that_refuses,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_wiki_can_still_be_built_from_the_docs,
