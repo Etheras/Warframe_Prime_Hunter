@@ -4378,9 +4378,29 @@ subdirectory of the `cache` repository, so it takes that repository's SHA.
 is what makes an upgrade a diff somebody can reason about. The permissions half
 of this finding was already done and was left alone.
 
-What did **not** ship, and has an entry in `TODO.md`: the repository policy that
-*requires* SHA pins, which is a GitHub setting rather than a file here, and
-splitting the wiki job's `contents: write` down to the step that pushes.
+**The policy and the bot landed the same day**, which is what makes the pins hold
+rather than decay:
+
+- **`sha_pinning_required` is on**, turned on by the owner once the nine lines
+  were pinned and green. Pinning fixes nine lines; the policy is what stops the
+  tenth being added as a tag. Verified through
+  `gh api repos/…/actions/permissions`. Worth recording that the switch exists at
+  **repository** level even here — this is a personal repository rather than an
+  organisation one, and several Actions policies are organisation-only, so the
+  plausible wrong answer is that it is unavailable. Asking the API takes one
+  command and settles it.
+- **`.github/dependabot.yml`, monthly.** A SHA cannot move, so it cannot pick up
+  a security fix either, and nothing here would ever say so — pinning trades a
+  supply-chain hole for silent staleness. Dependabot understands SHA-pinned
+  actions and raises a pull request bumping **both the SHA and the `# v7.0.1`
+  comment**, which is the whole reason that comment exists: a bare SHA is not
+  reviewable. Monthly rather than the usual weekly, at the owner's direction —
+  five actions, none moving fast. npm is deliberately excluded: `package.json`
+  exists only to install Playwright for the page tests, nothing in it is shipped
+  or served, and the site has no runtime dependency and is never getting one.
+
+What did **not** ship, and keeps an entry in `TODO.md`: splitting the wiki job's
+`contents: write` down to the step that pushes.
 
 ### `data/feed-log.json` is written atomically, and it is the only one
 

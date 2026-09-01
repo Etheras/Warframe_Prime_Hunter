@@ -126,7 +126,7 @@ because neither was in the finding:
 
 | Entry | Size |
 |---|---|
-| Nothing stops the next workflow re-introducing a mutable tag | small — but **not doable from here**: a repository setting, so it needs the owner in GitHub |
+| The wiki job holds `contents: write` for its whole run | small — the pattern is already next door in `publish.yml` |
 | Downloads and decompression have no ceiling | session — a limit per source, and streaming rather than `read()` |
 | Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
 | The server caps requests, but not connections | small — a semaphore at accept; the rate limit runs too late to help |
@@ -268,34 +268,26 @@ being found by shape rather than by position (`a67b6d5`, `4947bca`). The
 schedule tests assert equality where they should assert a ceiling* — but being
 wrong is not the same as being red, and it is no longer red.
 
-### Nothing stops the next workflow re-introducing a mutable tag
+### The wiki job holds `contents: write` for its whole run
 
-**What is left of *Every GitHub Action runs from a mutable tag*, which shipped
-2026-09-01.** All nine `uses:` lines across both workflows are pinned to
-40-character commit SHAs with the version beside them; `PROJECT.md §7` has the
-reasoning and the SHAs. Two parts of that entry did not ship and are the whole
-of this one:
+**All that is left of *Every GitHub Action runs from a mutable tag*.** The rest
+of that entry shipped on 2026-09-01 and `PROJECT.md §7` has the reasoning: all
+nine `uses:` lines pinned to 40-character SHAs with the version beside them; the
+repository policy that **requires** SHA pins turned on by the owner the same day
+(`sha_pinning_required: true`, verified through the API, so the tenth line cannot
+be added as a tag); and `.github/dependabot.yml` added, monthly, which is the
+answer to *"who notices a pinned SHA has gone stale"* — it understands
+SHA-pinned actions and bumps the comment along with the SHA.
 
-- **The repository policy that *requires* SHA pins.** Pinning nine lines fixes
-  nine lines; the policy is what stops the tenth being added as a tag. It is a
-  repository setting rather than a file in this tree, so it does not ship with a
-  commit — it is the owner's to turn on.
-  **Measured 2026-09-01**: `gh api repos/Etheras/Warframe_Prime_Hunter/actions/permissions`
-  returns `{"enabled":true,"allowed_actions":"all","sha_pinning_required":false}`.
-  So the switch **does** exist on this repository and is off. Worth writing down
-  because the obvious assumption is the other way: this is a personal repository
-  rather than an organisation one (`isInOrganization: false`), and several
-  Actions policies are organisation-only. This is not one of them — do not
-  conclude it is unavailable without asking the API, which takes one command.
-- **Whether the wiki job wants splitting** into a read-only generate step and a
-  minimal write step. The review suggests it. It is a real change rather than a
-  mechanical one: `wiki.yml` holds `contents: write` for the whole job, and
-  splitting it would confine that to the step that pushes.
+What remains is one thing the review suggested and it is not mechanical:
+`wiki.yml` grants `contents: write` to the whole job, where only the step that
+pushes the generated wiki needs it. Splitting it into a read-only generate step
+and a minimal write step confines the token to the moment it is used.
 
-Also worth knowing, since the pins now have to be maintained: **a pinned SHA
-goes stale silently**, which is the cost of the fix. Dependabot understands
-SHA-pinned actions and will raise the bump with the new comment, and turning it
-on is the answer to "who notices" — also a repository setting.
+Worth knowing before starting: the equivalent split is **already done on
+`publish.yml`**, where the build job is `contents: read` and Pages/OIDC are
+granted only to the deploy job. So this is applying a pattern that exists in the
+repository rather than inventing one, and the shape to copy is next door.
 
 ### `data/feed-log.json` is tracked on purpose, and only for now
 

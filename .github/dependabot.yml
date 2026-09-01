@@ -1,0 +1,43 @@
+# Who notices that a pinned action has gone stale.
+#
+# The nine `uses:` lines in publish.yml and wiki.yml are pinned to 40-character
+# commit SHAs (PROJECT.md 7). That closed the hole a moving tag opens — a tag is
+# a pointer its owner can move, and moved to hostile code it would run inside a
+# job holding pages: write, id-token: write or contents: write — but it also took
+# away the free upgrades the tag was quietly providing. A SHA cannot move, so it
+# cannot pick up a security fix either, and nothing here would ever say so.
+#
+# Dependabot is the replacement for that. It understands SHA-pinned actions and
+# raises a pull request that bumps **both the SHA and the `# v7.0.1` comment
+# beside it**, which is the whole reason that comment is there: a bare SHA is not
+# reviewable, and the version next to it turns an upgrade into a diff somebody
+# can reason about.
+#
+# Monthly, at the owner's direction, 2026-09-01. Weekly is the common default and
+# is more than this project earns: five distinct actions, none of them moving
+# fast, against a repository whose whole premise is that it has no runtime
+# dependencies at all.
+#
+# **npm is deliberately absent.** package.json and package-lock.json are tracked,
+# but they exist only to install Playwright for the page tests — nothing in them
+# is shipped, served, or opened by a reader, and the site itself has no runtime
+# package and is never getting one. Watching them would file pull requests about
+# a test runner. If Playwright ever needs upgrading, that is a decision somebody
+# makes on purpose rather than a notification.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    # The workflows live at .github/workflows, but this ecosystem is rooted at
+    # the repository, not at that folder. "/" is correct and "/.github/workflows"
+    # silently matches nothing.
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      # The repository writes messages that say why rather than what; this at
+      # least keeps the subject line in the same shape as everything around it.
+      prefix: "Bump"
+    # No `labels:` key on purpose. Dependabot applies `dependencies` by default
+    # and creates it if it is missing; this repository has only the nine GitHub
+    # starter labels and not that one. Naming it here would add nothing and could
+    # not be tested from a workstation.
