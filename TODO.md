@@ -939,6 +939,44 @@ thumbs are on them, while the fact underneath is not.
 
 ### Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale
 
+**Measured 2026-09-01, at the owner's question — "has DE succeeded at some point
+today, and should the refresh run at a specific time?"** Eighteen builds sampled
+from the CI logs, ten pushes and eight of the ten-minute scheduled runs, spread
+across the whole clock. **One reached DE.**
+
+| Time (UTC) | Feeds came from |
+|---|---|
+| 18:49 | **worldstate** — DE, all three feeds |
+| 18:32, 18:03, 17:48, 17:32, 15:26, 15:24, 15:07, 13:53, 13:52 | proxy |
+| 09:58, 09:17, 09:04, 07:38, 05:23, 01:36, 00:18, 20:56 | proxy |
+
+**So the answer to "a specific time" is no, and the data says why.** The single
+success sits *between* two failures seventeen minutes either side, and the
+failures cover every part of the clock from 00:18 to 20:56. There is no window.
+That fits the documented cause exactly — Akamai refuses an address *range*, so
+what decides it is which runner IP the job happens to draw, not when it asks. A
+cron time cannot choose an IP. **And do not reach for retries**: the entry below
+already records that this is a refusal rather than a hiccup.
+
+**Two things this exposed that are worth fixing, and neither is the 403:**
+
+- **The record designed to answer this cannot answer it.** `data/feed-log.json`
+  is meant to accumulate one row per build over 24 hours, and the deployed copy
+  holds **one row**. Because the file is tracked, a CI checkout finds a local
+  copy and never fetches the published one (`read_feed_log` prefers local); the
+  committed copy is three rows from 2026-08-27, which `trim_feed_log` then drops
+  as older than a day. So every run starts empty and writes a single row. The
+  cleanup already noted under *`data/feed-log.json` is tracked on purpose* is
+  what fixes it, and until then this question has to be answered by reading
+  eighteen CI logs by hand, which is how the table above was built.
+- **The probe step does not ask about the endpoint in question.** *Probe the data
+  sources* curls five URLs — the wiki, the drop tables, `origin.warframe.com`'s
+  export index, and two WFCD hosts — and **not**
+  `api.warframe.com/cdn/worldState.php`, which is the one that decides whether
+  the live feeds come from DE or the proxy. The probe exists to record which
+  sources answer a datacentre IP, and it is silent about the only source that
+  routinely does not. One line to add.
+
 **Found 2026-08-27, from the banner on the deployed site**, which the owner asked
 about:
 
