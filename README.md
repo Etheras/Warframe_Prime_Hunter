@@ -1,5 +1,7 @@
 # Warframe Prime Hunter
-https://etheras.github.io/Warframe_Prime_Hunter/
+
+**[Open the live site →](https://etheras.github.io/Warframe_Prime_Hunter/)**
+· [Source](https://github.com/Etheras/Warframe_Prime_Hunter)
 
 Two local tools over one dataset:
 
@@ -11,6 +13,8 @@ They share your progress, so ticking off a part in one updates the other.
 Everything runs on your own machine. Your collection never leaves it, and there's
 no account.
 
+> ### Your collection stays on your machine
+>
 > **One thing can reach the internet: the item artwork.** Whether it does depends
 > on how you built the data, and the setup step below gets this right on its own —
 > `refresh-data.cmd` / `.sh` pass `--with-images`, which pulls the pictures down
@@ -757,6 +761,8 @@ item and worldstate data from WFCD under MIT) are listed in
 [NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
 fresh on every build, so nothing is redistributed from here.
 
+> ### Not affiliated with Digital Extremes
+>
 > Warframe Prime Hunter is an unofficial fan project. It is not affiliated with, endorsed,
 > sponsored, or approved by Digital Extremes Ltd.
 

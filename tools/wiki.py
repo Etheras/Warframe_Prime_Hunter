@@ -233,29 +233,41 @@ def home(stats: dict) -> str:
     """
     readme = read("README.md")
     head = readme.split("\n## ")[0]                # above the first section
-    quotes = quote_blocks(head)
-    if not quotes:
-        raise SystemExit("wiki: README's opening notice is gone - Home.md is "
-                         "built from it, so check tools/wiki.py")
 
-    # The privacy notice stays at the top, because it is about using the thing
-    # and a reader needs it before they run anything.
-    privacy = quotes[0]
+    # A standing notice is a blockquote that carries its own `###` heading.
+    #
+    # Found by shape, never by wording. This briefly matched the literal string
+    # "### Written by a generative AI" on 2026-09-01, which is a promise that the
+    # sentence will never be reworded - and the owner was right to reject it: a
+    # build must not break because somebody improved a paragraph.
+    #
+    # The distinction the heading draws is real. README carries ten blockquotes
+    # and most are asides - how to repoint an old clone, why the dataset is not
+    # committed, that `file://` may not persist storage. Those are tips beside
+    # the step they belong to. A notice is different in kind: it is about the
+    # project rather than about the task in hand, it stands on its own, and it is
+    # the sort of thing a reader is entitled to find without hunting. Giving one
+    # a heading is how the document says which it is.
+    #
+    # Only these fail the build. An aside going missing is an edit; a disclaimer,
+    # a privacy notice or a legal notice going missing is a promise withdrawn,
+    # and Home.md is where the public reads them.
+    notices = [q for q in quote_blocks(readme)
+               if any(l.startswith("### ") for l in q.split("\n"))]
+    if not notices:
+        raise SystemExit(
+            "wiki: README carries no standing notice - Home.md is built from "
+            "them. A notice is a blockquote with its own `### ` heading; give "
+            "the disclaimer, privacy and legal blocks one and they are found "
+            "again, wherever in the document they sit.")
+    # (title, body) each, the heading lifted out so this page can promote it to
+    # a section of its own.
+    def split_notice(q):
+        head = next(l for l in q.split("\n") if l.startswith("### "))
+        body = "\n".join(l for l in q.split("\n") if not l.startswith("### "))
+        return head[4:].strip(), body.strip()
 
-    # The AI notice is found by what it says, not by where it sits. It opened the
-    # README until 2026-09-01 and now sits with the other disclaimers, below what
-    # the project is and what you need - the owner's ordering, and a better one:
-    # a notice that overshadows the description answers a question nobody has
-    # asked yet. Position was never what made it a notice; being a blockquote
-    # under that heading is, so that is what this looks for.
-    AI_HEADING = "### Written by a generative AI"
-    notice = next((q for q in quote_blocks(readme) if AI_HEADING in q), None)
-    if notice is None:
-        raise SystemExit(f"wiki: README no longer carries a blockquote headed "
-                         f"'{AI_HEADING}' - Home.md is built from it, so either "
-                         f"restore it or teach tools/wiki.py the new wording")
-    # minus its heading: this page gives it one of its own
-    notice = "\n".join(l for l in notice.split("\n") if not l.startswith("### "))
+    notices = [split_notice(q) for q in notices]
 
     # what is left between the two notices, which is the description itself
     pitch = "\n".join(l for l in head.split("\n")[1:]
@@ -269,10 +281,14 @@ def home(stats: dict) -> str:
             f"**[Open the live site]({SITE})** · "
             f"**[Browse the code](https://github.com/{REPO})**\n\n"
             f"---\n\n## Where to go\n\n{nav}\n\n"
-            f"---\n\n## Written by a generative AI\n\n{absolutise(notice.strip())}\n\n"
-            f"---\n\n## Your collection stays on your machine\n\n"
-            f"{absolutise(privacy)}\n\n"
-            f"---\n\n{stats_block(stats)}")
+            # Each notice under its own heading, taken from the README. The
+            # titles were written out here until 2026-09-01, which is the same
+            # hard-coding one level up: this page would have gone on announcing
+            # "Written by a generative AI" over whatever the block had become.
+            # The document owns the wording; this owns the layout.
+            + "".join(f"---\n\n## {title}\n\n{absolutise(body)}\n\n"
+                      for title, body in notices)
+            + f"---\n\n{stats_block(stats)}")
 
 
 def stats_block(stats: dict) -> str:
