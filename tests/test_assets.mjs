@@ -363,23 +363,44 @@ const BOUNTY_DATA = {
 
 // ── the ordinary round cycle ───────────────────────────────────────────────
 
-test("how far to run a node is decided by the node, not by a setting", () => {
+test("how far to run a node is decided by the node, and by who you run it with", () => {
   /* There used to be a *How far you run* control and one answer for the whole
      list. It is worked out per node now: every way of playing it is scored and
      the best rate wins, where the rate is value over rounds-plus-overhead.
 
      Restarting is what the overhead prices. Without it, leaving after two
      rounds and starting again looked free, so `reset` won everywhere by never
-     being charged for the thing it does most. */
-  const ROT = loadRotation();
-  const run = (rot) => ROT.runValue(rot, "Defense", false, null);
+     being charged for the thing it does most.
 
-  // Rotation A is all you want: four A rewards over six rounds beats two over
-  // two once the trip in and out is charged for.
-  const onlyA = run({ A: 1, B: 0, C: 0, none: 0 });
+     **This said "not by a setting" until 2026-09-01 and that is no longer true**
+     — the 4-man squad box now decides whether the six-round run is on offer at
+     all. It is worth being exact about why that is not the old control coming
+     back: *How far you run* was a preference applied to every node, and this is
+     an availability rule applied to one option. A public squad extracts; you
+     cannot hold three strangers for a cycle and a half, so six rounds is not a
+     worse plan for randoms, it is not a plan. */
+  const ROT = loadRotation();
+  const run = (rot, squad = false) => ROT.runValue(rot, "Defense", squad, null);
+
+  // Rotation A is all you want, and you have a team: four A rewards over six
+  // rounds beats two over two once the trip in and out is charged for.
+  const onlyA = run({ A: 1, B: 0, C: 0, none: 0 }, true);
   assert.equal(onlyA.mode, "aabcaa");
   assert.equal(onlyA.rounds, 6);
   assert.deepEqual(plain(onlyA.counts), { A: 4, B: 1, C: 1 });
+
+  // The same node with randoms. `aabcaa` is never scored, so the answer is the
+  // best of what is left: `reset`, which stops at the last round that pays.
+  const onlyARandoms = run({ A: 1, B: 0, C: 0, none: 0 });
+  assert.equal(onlyARandoms.mode, "reset");
+  assert.equal(onlyARandoms.rounds, 2, "the last round paying rotation A");
+
+  /* And the gate needs BOTH halves. A team that wants something deeper in the
+     cycle still gets the ordinary answer — the squad box must not become a
+     blanket "run longer" switch, which is the thumb this deliberately is not. */
+  const teamWantsC = run({ A: 1, B: 0, C: 1, none: 0 }, true);
+  assert.equal(teamWantsC.mode, "reset",
+               "wanting C too means staying past the cycle buys nothing extra");
 
   // What you want is deeper in the cycle, so staying past it buys rotations
   // you want nothing from.
@@ -403,8 +424,11 @@ test("the overhead is what makes staying worth it, and it is only two rounds", (
   const ROT = loadRotation();
   assert.equal(ROT.RUN_OVERHEAD, 2);
 
+  /* Squad on, because this test is about the CONSTANT rather than about who can
+     run six rounds: the comparison it prices only exists when `aabcaa` is on
+     offer, and since 2026-09-01 that means a 4-man premade. */
   const rot = { A: 0.3, B: 0, C: 0, none: 0 };
-  const chosen = ROT.runValue(rot, "Defense", false, null);
+  const chosen = ROT.runValue(rot, "Defense", true, null);
   assert.equal(chosen.mode, "aabcaa");
 
   // the two it was choosing between, priced by hand from the same constant
@@ -489,7 +513,9 @@ test("counting is skipped entirely when nothing asks for it", () => {
 test("a chance over 100% across one table is held at certainty", () => {
   const ROT = loadRotation();
   // several wanted relics in one table can sum past 1; one roll cannot pay twice
-  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "Defense", false, null,
+  // squad on so the four-A run is the one being counted; see the run-length
+  // test above for why that is now a premade's answer rather than everyone's
+  const r = ROT.runValue({ A: 1, B: 0, C: 0, none: 0 }, "Defense", true, null,
                          { A: 1.4, B: 0, C: 0, none: 0 });
   // rotation A is all this node pays, so the run stays for four of them
   assert.equal(r.count, 4, "four rolls at certainty, never 5.6");
@@ -611,7 +637,11 @@ test("every endless mission is costed at its reward count, Onslaught included", 
   const ROT = loadRotation();
   const rot = { A: 1, B: 0, C: 0, none: 0 };
 
-  const eso = ROT.runValue(rot, "Sanctuary Onslaught", false, null);
+  /* Squad on throughout: this is about two mission types costing a reward the
+     same, so both sides need the same run on offer, and the six-round one is a
+     premade's since 2026-09-01. Comparing ESO-with-randoms against
+     Defense-with-a-team would be measuring the squad box, not the cost. */
+  const eso = ROT.runValue(rot, "Sanctuary Onslaught", true, null);
   assert.equal(eso.rounds, 6, "six rewards, the same AABC run any endless node gets");
   assert.deepEqual(plain(ROT.objectivesOf({ ...eso, mode: "Sanctuary Onslaught" })),
                    { count: 6, unit: "round" },
@@ -619,7 +649,7 @@ test("every endless mission is costed at its reward count, Onslaught included", 
 
   /* The control: a mission that was never in the exception table. Same rot map,
      same reward count, same answer — which is the whole point of the decision. */
-  const def = ROT.runValue(rot, "Defense", false, null);
+  const def = ROT.runValue(rot, "Defense", true, null);
   assert.equal(def.rounds, 6);
   assert.deepEqual(plain(ROT.objectivesOf({ ...def, mode: "Defense" })),
                    { count: 6, unit: "round" },
@@ -1284,12 +1314,17 @@ test("both pages name a run's cost with the same words", () => {
   };
   assert.equal(cost("Spy", { A: 0.2, B: 0.2, C: 0.2 }), "3 vaults");
   assert.equal(cost("Caches", { A: 0.3, B: 0.19 }), "2 caches");
-  assert.equal(cost("Defense", { A: 0.2, B: 0.2, C: 0.2 }), "6 rounds");
+  /* "6 rounds" until 2026-09-01. These want all three rotations, so the
+     six-round run is not on offer to anyone now — it is offered only to a 4-man
+     premade wanting nothing but rotation A — and `reset` runs to C at four.
+     The number is incidental here; what this test pins is that both pages say
+     it in the same words. */
+  assert.equal(cost("Defense", { A: 0.2, B: 0.2, C: 0.2 }), "4 rounds");
   /* "12 zones" until 2026-08-27, when the cadence exception was retired and an
      objective became one reward draw on every row. Onslaught reads like every
      other endless mission now; the wiki's two-zones-per-reward is still true and
      is no longer something the ranking charges for. */
-  assert.equal(cost("Sanctuary Onslaught", { A: 0.2, B: 0.2, C: 0.2 }), "6 rounds");
+  assert.equal(cost("Sanctuary Onslaught", { A: 0.2, B: 0.2, C: 0.2 }), "4 rounds");
 
   /* A single whole mission reads as words, not as "1 run" -- that is the case
      that diverged, and Faceoff is the live instance of it. */

@@ -4734,6 +4734,62 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### Six rounds is a premade's option, and it is availability rather than worth
+
+**Shipped 2026-09-01**, asked for by the owner on 2026-08-27. `runValue` offered
+every non-fissure endless node two lengths — `reset`, run to the last round that
+pays, and `aabcaa`, six rounds, a cycle and a half whose extra two rounds are
+both rotation **A**. `scorePlan` picked between them on rate, and six won
+whenever two more A rotations beat the cost of restarting.
+
+**The framing was the decision, not the number.** This was first written down as
+a preference — the model says six, the owner would rather stay four — and that
+was wrong. The owner's correction: *"with randoms nobody goes up to 6 rounds.
+It's not a matter of being optimal, it's not a valid choice for non-4man."* A
+public squad extracts; you cannot hold three strangers for a cycle and a half by
+preferring to. So a six-round plan is not a *worse* plan for a random squad, it
+is **not a plan** — the same category as a Railjack node without a ship, and not
+the same category as the Railjack cache halving, which really is a judgement
+about worth.
+
+That decides where the code goes. A thumb is applied to the score and announced
+on the row (`PROJECT.md` requires it, and the project has exactly one). An
+unavailable option is **filtered out of the choice before anything is scored**,
+which is what `plansFor` already does for `squadOnly` rotation patterns. So
+`aabcaa` is dropped from the mode list unless `squad` **and** rotation A is the
+only thing wanted at that node — strict, zero value in B and C, with no
+share-of-total threshold because that is a second constant nobody has justified.
+
+`opts.squad` already meant "you have an organised team", but this is the first
+time it decides a run *length* rather than a rotation pattern. That coupling is
+named in the code rather than folded into `squadOnly`, which is a property of a
+pattern.
+
+**The entry predicted the wrong outcome, and measuring it is what caught that.**
+It expected a large swing on one checkbox, because 45 of 66 endless rows ran to
+six before the change. Driven through the real page with every farmable Prime
+wished for, 116 places ranked:
+
+| rounds | 2 | 3 | 4 | **6** |
+|---|---:|---:|---:|---:|
+| randoms | 1 | 21 | 44 | **0** |
+| 4-man premade | – | 15 | 50 | **1** |
+
+So six-round plans did not move from everyone to premades. They very nearly
+**stopped existing**: exactly one row of 66 qualifies even with a team, because
+"wants nothing but rotation A" is rare once a real farm list is loaded. Twelve
+rows change cost, thirty-nine change rank, and the top five are identical either
+way — the swing is legible, which is what the entry asked to be checked.
+
+**One test was quietly relying on the old behaviour in a way worth recording.**
+The fissure run-length page test toggled `#p-squad` once as a cheap way to force
+a re-render, and toggled it back at the end. That was harmless while the box only
+changed Disruption's rotation pattern, and stopped being harmless the moment it
+also decided length — a single click would have re-rendered *and* changed the
+number under test. It clicks twice now, so it re-renders and leaves the box where
+it found it. A control that gains a second effect breaks the tests that were
+using it as a lever for its first one.
+
 ### The guard sees a program on stdin, and stopped guessing at write modes
 
 **Shipped 2026-09-01.** `tools/guard_shell_writes.py` is the PreToolUse hook

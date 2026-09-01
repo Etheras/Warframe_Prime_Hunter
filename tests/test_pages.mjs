@@ -2419,11 +2419,26 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
      Ani, already carried a fissure, and reported the five rounds this asserts
      are six. The selection was already careful; the lookup was not, and a
      fuzzy lookup makes a careful selection worth nothing. */
+  /* The baseline is read rather than asserted. It was pinned at `6 rounds`
+     until 2026-09-01, when six rounds became a 4-man premade's option only —
+     and this test is not about how long a non-fissure run is. It is about the
+     fissure overriding whatever that length was, so the length is captured and
+     the override is what gets asserted. */
   const endless = rowFor(page, key);
-  assert.match(await endless.locator(".rounds").innerText(), /6 rounds/,
-               "with no fissure this should be staying for rotation A");
+  const before = await endless.locator(".rounds").innerText();
+  assert.ok(!/5 rounds/.test(before),
+            `the baseline must differ from the fissure answer, got ${before}`);
 
-  const rerender = () => page.evaluate(() => document.querySelector("#p-squad").click());
+  /* Two clicks, not one. This used to toggle `#p-squad` once to force a
+     re-render and toggle it back at the end — which was harmless while that box
+     only changed Disruption's rotation pattern, and stopped being harmless the
+     moment it also decided run LENGTH. A single click would have re-rendered and
+     changed the very number under test. Clicking twice re-renders twice and
+     leaves the box exactly where it was found. */
+  const rerender = () => page.evaluate(() => {
+    const box = document.querySelector("#p-squad");
+    box.click(); box.click();
+  });
   await page.evaluate((n) => {
     window.WFPRIME_DATA.fissures.splice(0, window.WFPRIME_DATA.fissures.length, {
       node: n, tier: "Neo", mode: "Survival",
@@ -2443,7 +2458,7 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
   const notes = await row.locator(".est").allInnerTexts();
   assert.ok(notes.some((t) => /free relic/.test(t)),
             `the row has to say what the fifth rotation bought, got ${JSON.stringify(notes)}`);
-  await rerender();          // put the squad box back where it was
+  /* No "put the box back" step any more — `rerender` never moved it. */
 
   assert.deepEqual(errors, []);
 });

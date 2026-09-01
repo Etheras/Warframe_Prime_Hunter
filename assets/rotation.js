@@ -413,7 +413,39 @@
          relic attached. The free relic is for staying in an endless fissure and
          a Spy mission has nothing to stay in. */
       const fixed = FIXED_LENGTH[mission] || null;
-      const modes = fixed ? ["fixed"] : (isFissure ? ["bonus"] : ["reset", "aabcaa"]);
+      /* Six rounds is not a plan a random squad can run, and that is a question
+         of what is AVAILABLE rather than of what is optimal. The owner's
+         correction, 2026-08-27: *"with randoms nobody goes up to 6 rounds. It's
+         not a matter of being optimal, it's not a valid choice for non-4man."*
+         A public squad extracts; you cannot hold three strangers for a cycle and
+         a half by preferring to.
+
+         So `aabcaa` is dropped from the CHOICE before anything is scored — the
+         same treatment `plansFor` already gives Disruption's under-defend
+         pattern through `squadOnly`, and deliberately NOT the treatment the
+         Railjack cache halving gets. That one is a thumb: it changes a number
+         and says so on the row. This changes what is on offer, and a plan that
+         cannot be executed should never have been on offer.
+
+         Two conditions, both required. `squad` already means "you have an
+         organised team" and this is the first time it decides a run *length*
+         rather than a rotation pattern, which is a new coupling and is why it
+         is spelled out here rather than folded into `squadOnly` — that flag is
+         a property of a pattern, and a length is not a pattern.
+
+         `onlyA` is strict: zero wanted value in B and C. A share-of-total
+         threshold was considered and not built, because it is a second constant
+         nobody has justified and strict is the case the rule was written about.
+
+         Worth knowing what this does NOT touch. A fissure still runs to
+         `BONUS_ROTATIONS` = 5 whatever the squad, because the free relic for
+         reaching five rotations is value the rate cannot see and that half was
+         always right. And `RUN_OVERHEAD` still earns its keep on the shorter
+         answers — `reset` on a node that pays out in fewer than four rounds —
+         even though it now decides this comparison far less often. */
+      const onlyA = (rot.A || 0) > 0 && !(rot.B || 0) && !(rot.C || 0);
+      const lengths = squad && onlyA ? ["reset", "aabcaa"] : ["reset"];
+      const modes = fixed ? ["fixed"] : (isFissure ? ["bonus"] : lengths);
       const runs = [];
       (forced ? [forced] : avail).forEach((p) => {
         modes.forEach((mode) => {
