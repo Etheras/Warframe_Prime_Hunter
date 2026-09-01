@@ -4396,6 +4396,34 @@ preference:
   filters. Those answer "what am I collecting"; this answers "what am I doing
   this evening".
 
+**The counts were wrong on the day it shipped, and the owner caught it.** They
+were computed once over the whole list and never moved, so unticking `Trade 717`
+left the tabs claiming 195 Lith relics above a list holding ten. The reasoning
+behind that was half right and is worth keeping in its corrected form:
+
+> **A facet's count ignores its own control and obeys every other one.**
+
+A tab reading `Lith 10` must not mean "ten survive the tab already pressed" —
+that half was right, and is why the tier counts exclude `relicTier`. But Varzia
+and Trade are a *different* dimension, and a count that disagrees with the rows
+beside it is worse than no count at all. So the errand counts obey the tier and
+ignore themselves, `All` always equals the rows on screen, and pressing Lith now
+moves `Trade 717` to `Trade 185`.
+
+Two consequences, both deliberate:
+
+- **What a control counts and whether it exists are separate questions.** The
+  tab set and the presence of each checkbox come from the unfiltered list, so an
+  errand click never makes a control appear or disappear under the reader's
+  cursor — a tier emptied by a checkbox reads `0` and greys out instead.
+- **The pressed tab is never disabled**, however empty it becomes. Disabling it
+  would leave the reader looking at an empty list with the one control that
+  explains it greyed out.
+
+A page test asserts the counts by arithmetic against the DOM — each tab claims
+exactly what pressing it shows — rather than against expected numbers, which
+would need rewriting every time DE vault something.
+
 **Baro Ki'Teer is deliberately absent from a strip he obviously belongs in.**
 There is no such thing as a Baro relic in the payload: `flags.baro` sits on nine
 *items* and means "he sometimes sells this Prime". A box built on that, next to

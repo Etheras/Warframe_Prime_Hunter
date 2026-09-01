@@ -981,6 +981,75 @@ page_test("pressing a tier tab does not throw away the reader's focus", async ()
   assert.deepEqual(errors, []);
 });
 
+page_test("every count in the strip agrees with the list under it", async () => {
+  /* **Found by the owner on 2026-09-01, on the day the strip shipped.** The
+     tier counts were computed once over the whole list and never moved, so
+     unticking `Trade 717` left the tabs still claiming 195 Lith relics above a
+     list holding ten. A count that disagrees with the rows beside it is worse
+     than no count.
+
+     The rule that fixes it, and what this asserts: **a facet's count ignores
+     its own control and obeys every other one.** So `All` always equals the
+     rows on screen when no tier is selected, and each tier tab equals the rows
+     that tier would show.
+
+     Asserted by arithmetic against the DOM rather than against expected
+     numbers: which relics exist changes every time DE vault something, and a
+     test carrying 195 in it would be rewriting itself every quarter. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    localStorage.setItem("wfprimes.wishlist.v1",
+      JSON.stringify(window.WFPRIME_DATA.items.map((i) => i.id)));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const read = () => page.evaluate(() => {
+    const num = (el) => Number(el.querySelector(".n").textContent.trim());
+    const tabs = {};
+    document.querySelectorAll("#relicFilters .tier-tab").forEach((b) => {
+      tabs[b.dataset.tier || "All"] = num(b);
+    });
+    const boxes = {};
+    document.querySelectorAll("#relicFilters .mini-check").forEach((l) => {
+      boxes[l.querySelector("input").id] = num(l.querySelector(".lbl"));
+    });
+    return { tabs, boxes,
+      rows: document.querySelectorAll("#planRelics .relic-row").length };
+  });
+
+  const before = await read();
+  assert.equal(before.tabs.All, before.rows,
+               "with nothing narrowed, All must be the number of rows");
+  assert.ok(before.boxes["p-trade"] > 0, "this farm list should hold trade-only relics");
+
+  /* The reported bug, exactly: untick an errand and the tier counts must move
+     with it. */
+  await page.click("#relicFilters .mini-check:has(#p-trade)");
+  const after = await read();
+  assert.equal(after.tabs.All, after.rows, "All must still equal the rows on screen");
+  assert.ok(after.tabs.All < before.tabs.All,
+            "hiding an errand has to lower the totals above the list");
+  for (const tier of Object.keys(after.tabs)) {
+    if (tier === "All") continue;
+    assert.ok(after.tabs[tier] <= before.tabs[tier],
+              `${tier} cannot gain relics when an errand is hidden`);
+  }
+  /* And its own count does not move, because a control does not report on
+     itself — that is the half of the original reasoning that was right. */
+  assert.equal(after.boxes["p-trade"], before.boxes["p-trade"],
+               "the Trade count ignores the Trade checkbox");
+
+  /* Each tier tab claims exactly what pressing it shows. */
+  for (const tier of Object.keys(after.tabs)) {
+    if (tier === "All" || !after.tabs[tier]) continue;
+    await page.click(`#relicFilters .tier-tab[data-tier="${tier}"]`);
+    const now = await read();
+    assert.equal(now.rows, after.tabs[tier],
+                 `${tier} said ${after.tabs[tier]} and shows ${now.rows}`);
+  }
+  assert.deepEqual(errors, []);
+});
+
 page_test("a tier with nothing in it gets no tab", async () => {
   /* `STYLE.md §6` — only offer a control for something in front of you, the
      same rule that keeps the effort panel to the mission types actually ranked.

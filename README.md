@@ -326,9 +326,11 @@ Neither list knows anything about the other's question, which is the point.
 Neo · Axi`, each with its count — and a checkbox for each kind of errand on the
 list: **Varzia**, for the relics she sells for Aya, and **Trade**, for relics
 belonging to Primes with no way in at all. A tier with nothing in it gets no tab,
-and an errand you do not have gets no box. They only narrow what is on screen —
-the surviving rows keep the order and the figures they already had — and nothing
-is remembered between visits, because this is a question about the evening rather
+and an errand you do not have gets no box. Every count answers to the other
+controls, so unticking **Trade** lowers the tier counts too and each tab always
+claims exactly what pressing it shows. They only narrow what is on screen — the
+surviving rows keep the order and the figures they already had — and nothing is
+remembered between visits, because this is a question about the evening rather
 than about what you collect. With every Prime on the farm list that is 757 rows;
 unticking **Trade** leaves 40, and a tier tab leaves about ten.
 

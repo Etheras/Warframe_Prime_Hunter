@@ -968,6 +968,13 @@ select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,
 .tier-tab[aria-pressed="true"]{
   background:var(--gold);border-color:var(--gold);color:#1a1408;font-weight:600;
 }
+/* A tier the errand boxes have emptied. It keeps its place and its count — `0`
+   is the informative part — but stops inviting a press it cannot answer. Dimmed
+   rather than hidden: it comes back the moment the box beside it is re-ticked,
+   and a control that vanishes and returns is harder to trust than one that
+   greys. */
+.tier-tab:disabled{opacity:.4;cursor:default}
+.tier-tab:disabled:hover{border-color:var(--line)}
 /* The count is the thing that makes a tab worth reading — `Lith 4` beats
    `Lith`. Dimmed so it reads as an annotation on the name rather than a second
    word competing with it. */

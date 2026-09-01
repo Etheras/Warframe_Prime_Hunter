@@ -328,10 +328,24 @@ errands into the tab strip would have read as five tiers, one of which is a
 person.
 
 Both obey *only offer a control for something in front of you*: a tier with no
-relics gets no tab, and an errand nobody's list has gets no box. The counts are
-what make them worth reading — `Lith 10`, `Trade 717` — and they count the whole
-list rather than what the current selection leaves, or a tab would report on
-itself.
+relics gets no tab, and an errand nobody's list has gets no box.
+
+**The counts are what make them worth reading — `Lith 10`, `Trade 717` — and the
+rule for them took two goes.** A facet's count **ignores its own control and
+obeys every other one**. Counting the whole list regardless is the obvious first
+answer and it is wrong: unticking `Trade 717` left the tier tabs claiming 195
+Lith relics over a list holding ten. Counting only what is currently shown is the
+obvious second answer and it is also wrong: a tab would report on itself, so
+`Lith` would read the same number whatever else you pressed.
+
+Two corollaries, and they are what keep the strip still under the reader's hand:
+
+- **What a control counts and whether it exists are separate questions.** The set
+  of controls comes from the unfiltered list, so pressing one never makes another
+  appear or vanish. A tier emptied by a checkbox reads `0` and greys out.
+- **Never disable the control that is currently chosen**, however empty it has
+  become — that is the reader's way back, and greying it out strands them in
+  front of an empty list with no explanation they can act on.
 
 **A control on a heading's line must let that line wrap.** The strip is about
 500px; in the planner's own column, a `.plan-head` that could not wrap squeezed

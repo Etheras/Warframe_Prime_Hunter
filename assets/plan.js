@@ -1324,6 +1324,80 @@
     return !!rec.vaulted && !rec.resurgence;
   };
 
+  /* What each control should say, with one rule: **a facet's count ignores its
+     own control and obeys every other one.**
+
+     The first version counted everything over the whole list and never moved,
+     on the reasoning that a tab reading `Lith 4` must mean four Lith relics
+     exist rather than four surviving the tab already pressed. That half is
+     right and is why `relicTier` is excluded from the tier counts. The other
+     half was wrong, and the owner caught it: Varzia and Trade are a *different*
+     dimension, so unticking `Trade 717` really does leave fewer Lith relics,
+     and a tab still claiming 195 of them is telling the reader something the
+     list beside it plainly contradicts.
+
+     `dataTier` is separate and does not move: it decides which tabs **exist**,
+     which is a fact about the farm list rather than about the checkboxes. So an
+     errand click changes the numbers on the tabs and never the tabs themselves
+     — nothing appears or disappears under the reader's cursor, and a tier
+     emptied by a checkbox reads `0` rather than vanishing. */
+  function relicCounts() {
+    const dataTier = {}, tierCount = {};
+    let varziaCount = 0, tradeCount = 0, allCount = 0;
+    let dataVarzia = 0, dataTrade = 0;
+    relicRows.forEach(([rname]) => {
+      const t = tierOf(rname);
+      dataTier[t] = (dataTier[t] || 0) + 1;
+      if (isVarzia(rname)) dataVarzia += 1;
+      if (isTrade(rname)) dataTrade += 1;
+      const errandOk = (showVarzia || !isVarzia(rname)) &&
+                       (showTrade || !isTrade(rname));
+      const tierOk = !relicTier || t === relicTier;
+      if (errandOk) { tierCount[t] = (tierCount[t] || 0) + 1; allCount += 1; }
+      /* Varzia and Trade are mutually exclusive categories, so neither box
+         moves the other's count — but each still has to obey the tier. */
+      if (tierOk && isVarzia(rname)) varziaCount += 1;
+      if (tierOk && isTrade(rname)) tradeCount += 1;
+    });
+    /* `data*` decides what **exists**, the rest decide what the numbers say.
+       Keeping them apart is what stops a control disappearing because of
+       another control: selecting a tier with none of Varzia's relics in it
+       shows `Varzia 0`, it does not take her box away. */
+    return { dataTier, dataVarzia, dataTrade,
+             tierCount, varziaCount, tradeCount, allCount };
+  }
+
+  /* The numbers only, moved in place. Called when a control is pressed, where
+     rebuilding the strip would destroy the control being pressed and drop the
+     focus to `<body>` — `STYLE.md §6` again, and the same reason the strip and
+     the list are painted separately. */
+  function refreshRelicCounts() {
+    const { tierCount, varziaCount, tradeCount, allCount } = relicCounts();
+    $$("#relicFilters .tier-tab").forEach((b) => {
+      const t = b.dataset.tier;
+      const n = t ? (tierCount[t] || 0) : allCount;
+      const slot = b.querySelector(".n");
+      if (slot) slot.textContent = String(n);
+      /* A tier the checkboxes have emptied cannot be usefully pressed. Disabled
+         rather than removed: it is a transient consequence of another control,
+         not a fact about the data, and a tab that vanished mid-click would move
+         the ones beside it.
+
+         **Never the tab that is currently pressed**, however empty it has
+         become — disabling that one would leave the reader looking at an empty
+         list with the only control that explains it greyed out, and no way back
+         except a tab they have to work out is the way back. */
+      b.disabled = !!t && n === 0 && relicTier !== t;
+    });
+    const set = (id, n) => {
+      const slot = $("#relicFilters #" + id);
+      const lbl = slot && slot.closest(".mini-check").querySelector(".lbl .n");
+      if (lbl) lbl.textContent = String(n);
+    };
+    set("p-varzia", varziaCount);
+    set("p-trade", tradeCount);
+  }
+
   /* The strip of controls on the heading's line. Rebuilt only when the plan
      itself changes, never when a tab is pressed: `innerHTML` here would destroy
      the button that was just clicked and drop the focus to `<body>`, which is
@@ -1331,21 +1405,17 @@
   function paintRelicFilters() {
     const bar = $("#relicFilters");
     if (!bar) return;
-    /* Counts over the whole list, never over what is currently shown: a tab
-       reading `Lith 4` has to mean four Lith relics exist, not four that
-       survive the tab already pressed. */
-    const tierCount = {};
-    let varziaCount = 0, tradeCount = 0;
-    relicRows.forEach(([rname]) => {
-      tierCount[tierOf(rname)] = (tierCount[tierOf(rname)] || 0) + 1;
-      if (isVarzia(rname)) varziaCount += 1;
-      if (isTrade(rname)) tradeCount += 1;
-    });
+    const counts = relicCounts();
+    const { dataTier } = counts;
     /* A tier that was selected and then emptied — the last Lith Prime came off
        the farm list — would leave an empty panel and no way to read why. The
        selection falls back to every tier rather than leaving the reader to
-       discover that the tab they pressed is now a dead end. */
-    if (relicTier && !tierCount[relicTier]) relicTier = null;
+       discover that the tab they pressed is now a dead end.
+
+       Against `dataTier`, not the filtered count: a tier emptied by the Trade
+       checkbox has not gone anywhere, and silently un-selecting it would undo a
+       choice the reader made with a different control. */
+    if (relicTier && !dataTier[relicTier]) relicTier = null;
 
     /* **Only tiers with something in them get a tab**, per `STYLE.md §6` —
        "only offer a control for something in front of you", the same rule that
@@ -1355,10 +1425,10 @@
 
        One tier means no tabs at all: `All` and `Lith` side by side, both
        selecting the same rows, is a control with nothing to control. */
-    const tabs = TIERS.filter((t) => tierCount[t]).map((t) =>
+    const tabs = TIERS.filter((t) => dataTier[t]).map((t) =>
       `<button type="button" class="tier-tab" data-tier="${t}"` +
       ` aria-pressed="${relicTier === t ? "true" : "false"}">${t}` +
-      `<span class="n">${tierCount[t]}</span></button>`);
+      `<span class="n">${counts.tierCount[t] || 0}</span></button>`);
 
     /* Varzia is a checkbox where the tiers are tabs, and that is deliberate:
        `STYLE.md §6` gives a checkbox to *include this* and another shape to
@@ -1379,16 +1449,16 @@
     bar.innerHTML = (tabs.length > 1
       ? `<button type="button" class="tier-tab" data-tier=""` +
         ` aria-pressed="${relicTier ? "false" : "true"}">All` +
-        `<span class="n">${relicRows.length}</span></button>` + tabs.join("")
+        `<span class="n">${counts.allCount}</span></button>` + tabs.join("")
       : "") +
-      (varziaCount
+      (counts.dataVarzia
         ? `<label class="mini-check" data-tip="${esc(
             "Varzia sells these for Aya at Maroo's Bazaar — they do not drop, so\n" +
             "they have nowhere to send you under Where to go.\n\n" +
             "Untick to see only what you can farm this evening.")}">` +
           `<input type="checkbox" id="p-varzia"${showVarzia ? ' checked="checked"' : ""} />` +
           `<span class="box"></span><span class="lbl">Varzia` +
-          `<span class="n">${varziaCount}</span></span></label>`
+          `<span class="n">${counts.varziaCount}</span></span></label>`
         : "") +
       /* The one that actually shortens the list, which was not obvious until it
          was measured: with every Prime on the farm list the crack list holds
@@ -1396,7 +1466,7 @@
          there on purpose — a Prime with no way in still has a real answer — but
          they are an answer to a different question from "what do I crack
          tonight", and burying the 34 under 717 of them serves neither. */
-      (tradeCount
+      (counts.dataTrade
         ? `<label class="mini-check" data-tip="${esc(
             "Relics for Primes with no way in at all — vaulted, not on Varzia's\n" +
             "shelf, no Baro or quest route. Another player has to trade you one,\n" +
@@ -1404,7 +1474,7 @@
             "Untick to leave only what you can go and get.")}">` +
           `<input type="checkbox" id="p-trade"${showTrade ? ' checked="checked"' : ""} />` +
           `<span class="box"></span><span class="lbl">Trade` +
-          `<span class="n">${tradeCount}</span></span></label>`
+          `<span class="n">${counts.tradeCount}</span></span></label>`
         : "");
   }
 
@@ -2077,12 +2147,18 @@
           b.setAttribute("aria-pressed",
             (b.dataset.tier || null) === relicTier ? "true" : "false");
         });
+        /* The errand counts obey the tier, so pressing a tab moves them too. */
+        refreshRelicCounts();
         paintRelicList();
       });
       bar.addEventListener("change", (e) => {
         if (e.target.id === "p-varzia") showVarzia = e.target.checked;
         else if (e.target.id === "p-trade") showTrade = e.target.checked;
         else return;
+        /* The owner found this missing on 2026-09-01: the tier tabs went on
+           claiming 195 Lith relics while the list beside them held ten. A count
+           that does not obey the control next to it is worse than no count. */
+        refreshRelicCounts();
         paintRelicList();
       });
     }
