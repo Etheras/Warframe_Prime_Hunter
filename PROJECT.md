@@ -941,6 +941,12 @@ header that it is read-only against the repository. Splitting them keeps that tr
 of the workflow that builds and deploys the site. The default `GITHUB_TOKEN` is
 enough for a wiki in the same repository, so this still needs no secret.
 
+**Inside `wiki.yml` the same split runs again**, since 2026-09-01: a `generate`
+job at the read-only floor does the fetching and the building, and a `publish`
+job that raises `contents: write` takes the pages from an artifact and pushes
+them. So the write token exists for one job, and that job runs no build — see
+*The wiki's write token exists for one job, and that job runs no build* in §7.
+
 It runs on documentation pushes, daily an hour after the full build so the
 figures on the landing page are that build's, and by hand — **never** on the
 ten-minute schedule. Nothing on these pages moves that fast, and a wiki with 144
@@ -4307,9 +4313,12 @@ What survives, with the corrections the re-check forced:
   request path, not the file that gets opened, so the same desync above can attach
   the relaxed policy to a different file. That half is part of the `TODO.md` entry.
   `temp_mockup.html` is absent from this disk, so the carve-out is currently inert.
-- **`wiki.py` carries no upstream string into the wiki today**, which is worth
-  knowing because that job holds `contents: write` — but not for the reason first
-  recorded. It assembles from `README.md`, `PROJECT.md` and **`TODO.md`** (not
+- **`wiki.py` carries no upstream string into the wiki today.** This said it was
+  worth knowing "because that job holds `contents: write`", and **since
+  2026-09-01 it does not** — `wiki.py` runs in the read-only `generate` job now
+  and the token lives one job further on. The reason to care is unchanged and was
+  always the better one: whatever `wiki.py` emits gets pushed to a public page,
+  token or no token. It assembles from `README.md`, `PROJECT.md` and **`TODO.md`** (not
   `NOTICE.md`, which is only a link-rewrite target), and two of the six figures in
   its stats table — `meta.itemCount` and `meta.dropSource` (`wiki.py:273, :277`) —
   are raw dict reads interpolated into an f-string with no coercion and no escaping.
@@ -4549,8 +4558,63 @@ rather than decay:
   exists only to install Playwright for the page tests, nothing in it is shipped
   or served, and the site has no runtime dependency and is never getting one.
 
-What did **not** ship, and keeps an entry in `TODO.md`: splitting the wiki job's
-`contents: write` down to the step that pushes.
+The other half of that finding — splitting the wiki job's `contents: write` down
+to the moment it is used — shipped later the same day and has its own entry
+below.
+
+### The wiki's write token exists for one job, and that job runs no build
+
+**Shipped 2026-09-01**, the last open recommendation of the security re-review of
+2026-08-28 and the other half of *Nine actions pinned to commit SHAs*.
+
+`contents: write` is what GitHub requires to push to the `.wiki.git` repository
+behind the wiki tab. It cannot be scoped narrower than that — there is no
+wiki-only scope — so the only two things left to control are **how long it
+exists** and **what runs while it does**. Declared at workflow level, as it was,
+the answers were "the whole run" and "everything".
+
+That mattered because of what the run contains. `wiki.yml` fetches from half a
+dozen third-party endpoints and builds a dataset out of what they return, purely
+so the landing page can state real figures rather than saying it had no data.
+For every second of that, the job held a token that could write this repository —
+and it never used it. The push clones the wiki with its own credential in the
+URL, which is why `persist-credentials: false` was already on the checkout. The
+grant bought nothing at all and was carried straight through the one step where
+somebody else's bytes are parsed.
+
+**The fix is a job boundary, because that is the only boundary `permissions`
+has.** GitHub scopes tokens per job and per workflow, never per step, so
+"confine it to the step that pushes" — which is how both the review and
+`TODO.md` phrased it — is not literally available. Two jobs are:
+
+- **`generate`** holds nothing above the read-only floor. It checks the
+  repository out, restores the cache, runs `build_data.py` and `wiki.py`, and
+  hands `dist/wiki` on as an artifact.
+- **`publish`** raises `contents: write` and does one thing with it. It never
+  checks this repository out, never installs Python, and never speaks to an
+  upstream — it takes the artifact and pushes it.
+
+**The pattern was already next door**, which is the main reason this was cheap:
+`publish.yml` has run a `contents: read` build job with `pages: write` and
+`id-token: write` granted only to the deploy job since 2026-08-26, for the same
+reason and in the same words. This applies it rather than inventing it.
+
+Two things worth keeping:
+
+- **`if-no-files-found: error` on the upload is doing real work.** The push
+  replaces the wiki wholesale — `rm -f wiki-repo/*.md` then copy — so a `wiki.py`
+  that produced nothing would previously have arrived as an empty directory and
+  deleted every page. Across a job boundary that failure mode gets a second
+  chance to be silent, so it is closed where the handover happens.
+- **The test asserts the property, not the wording.** `test_the_wiki_token_is_
+  confined_to_the_job_that_pushes` reads the floor, counts the jobs that raise
+  it, and checks the raising job runs no build. It caught its own false positive
+  while being written: the commit message the push writes names `tools/wiki.py`,
+  and matching on the string rather than on the invocation read that as "this job
+  runs the build". It matches `python tools/…` now.
+
+The cost is one artifact round trip per run, on a workflow that runs daily and on
+documentation pushes — not the ten-minute one.
 
 ### `data/feed-log.json` is written atomically, and it is the only one
 

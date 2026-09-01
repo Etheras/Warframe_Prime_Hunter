@@ -109,12 +109,13 @@ without knowing they had been declined. **A tenth entry was here that neither
 review filed**, found while checking one of those two against the code, which is
 the same way four of the first review's twelve outcomes arrived.
 
-**Five shipped on 2026-09-01** and their entries are gone, with the reasoning in
+**Six shipped on 2026-09-01** and their entries are gone, with the reasoning in
 `PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
 privacy footer naming a host the site never contacts, the unvalidated `filters`
-section of a backup, and **LAN mode, which was removed rather than documented**
-— the review offered "say so" or "add HTTPS" and the owner took neither, so
-`serve.py` is loopback-only and refuses to bind anything else. Three things worth
+section of a backup, **the wiki job's repo-writing token, now held by a job that
+runs no build**, and **LAN mode, which was removed rather than documented** —
+the review offered "say so" or "add HTTPS" and the owner took neither, so
+`serve.py` is loopback-only and refuses to bind anything else. Four things worth
 carrying forward, because none was in the findings:
 
 - **The footer could not have been fixed by correcting the footer.** The payload
@@ -130,10 +131,15 @@ carrying forward, because none was in the findings:
   It was neither: the mode bought a convenience and cost a paragraph the reader
   had to weigh correctly at the wrong moment, so it went. Worth remembering the
   next time a finding arrives with two options in it.
+- **The wiki fix was not the fix that was asked for.** Both the review and this
+  file said "confine `contents: write` to the step that pushes", and GitHub has
+  no per-step permissions — the scope is per job and per workflow, nothing
+  finer. The available fix was a second job, which is a bigger edit than the
+  wording implied and buys the same thing. A finding phrased as a small change
+  is not evidence that a small change exists.
 
 | Entry | Size |
 |---|---|
-| The wiki job holds `contents: write` for its whole run | small — the pattern is already next door in `publish.yml` |
 | Downloads and decompression have no ceiling | session — a limit per source, and streaming rather than `read()` |
 | Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
 | The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
@@ -272,27 +278,6 @@ being found by shape rather than by position (`a67b6d5`, `4947bca`). The
 *shape* of the cadence test is still wrong and keeps its own entry — *The
 schedule tests assert equality where they should assert a ceiling* — but being
 wrong is not the same as being red, and it is no longer red.
-
-### The wiki job holds `contents: write` for its whole run
-
-**All that is left of *Every GitHub Action runs from a mutable tag*.** The rest
-of that entry shipped on 2026-09-01 and `PROJECT.md §7` has the reasoning: all
-nine `uses:` lines pinned to 40-character SHAs with the version beside them; the
-repository policy that **requires** SHA pins turned on by the owner the same day
-(`sha_pinning_required: true`, verified through the API, so the tenth line cannot
-be added as a tag); and `.github/dependabot.yml` added, monthly, which is the
-answer to *"who notices a pinned SHA has gone stale"* — it understands
-SHA-pinned actions and bumps the comment along with the SHA.
-
-What remains is one thing the review suggested and it is not mechanical:
-`wiki.yml` grants `contents: write` to the whole job, where only the step that
-pushes the generated wiki needs it. Splitting it into a read-only generate step
-and a minimal write step confines the token to the moment it is used.
-
-Worth knowing before starting: the equivalent split is **already done on
-`publish.yml`**, where the build job is `contents: read` and Pages/OIDC are
-granted only to the deploy job. So this is applying a pattern that exists in the
-repository rather than inventing one, and the shape to copy is next door.
 
 ### `data/feed-log.json` is tracked on purpose, and only for now
 

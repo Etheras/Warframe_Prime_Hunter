@@ -2468,6 +2468,104 @@ def test_the_wiki_can_still_be_built_from_the_docs() -> None:
     check("wiki: no link points at a path only the repository has", relative, [])
 
 
+def test_the_wiki_token_is_confined_to_the_job_that_pushes() -> None:
+    """
+    `contents: write` is what GitHub requires to push to the .wiki.git
+    repository behind the wiki tab, and it cannot be scoped any narrower than
+    that. So the only two things left to control are how long it exists and
+    what runs while it does.
+
+    Until 2026-09-01 it was declared at workflow level, which is the floor for
+    every job: the job that fetches from half a dozen third-party endpoints and
+    builds a dataset out of what they return held a token that could write this
+    repository for its whole run. It never used that token - the push clones
+    the wiki with its own credential in the URL - so the grant bought nothing
+    and was carried through the one step where somebody else's bytes are
+    parsed.
+
+    Asserted here by property rather than by wording, because the wording is
+    what drifts: the floor is read-only, exactly one job raises it, and that
+    job neither checks this repository out nor runs anything that reaches an
+    upstream. The same split is already on publish.yml and is checked too, so
+    the two cannot come apart without this saying so.
+    """
+    path = os.path.join(ROOT, ".github", "workflows", "wiki.yml")
+    if not os.path.exists(path):
+        print("  skip wiki permissions (no workflow checked out)")
+        return
+    yml = read_text(path)
+
+    floor = re.search(r"(?m)^permissions:\n((?:^[ \t]+\S.*\n)+)", yml)
+    check_true("wiki job: the workflow declares a permissions floor", bool(floor),
+               "with none declared GitHub picks one, and the default is generous")
+    check("wiki job: and the floor is read-only",
+          floor.group(1).strip() if floor else "", "contents: read",
+          "a floor of `write` hands it to every job, which is the arrangement "
+          "this test exists to stop coming back")
+
+    # Split the jobs apart on their own indentation. A job name is the only
+    # thing in this file at exactly two spaces followed by nothing.
+    body = yml.split("\njobs:\n", 1)[1] if "\njobs:\n" in yml else ""
+    jobs: dict = {}
+    current = None
+    for line in body.splitlines():
+        named = re.match(r"^  ([A-Za-z][\w-]*):\s*$", line)
+        if named:
+            current = named.group(1)
+            jobs[current] = []
+        elif current is not None:
+            jobs[current].append(line)
+    jobs = {name: "\n".join(lines) for name, lines in jobs.items()}
+    check("wiki job: the work is split in two", len(jobs), 2,
+          f"jobs found: {sorted(jobs) or 'none - the parse above has drifted'}")
+
+    writers = sorted(k for k, v in jobs.items()
+                     if re.search(r"(?m)^\s+contents:\s*write\b", v))
+    check("wiki job: exactly one job raises the floor", len(writers), 1,
+          f"raised in {writers or 'no job'} - one is the whole point")
+    pusher = jobs[writers[0]] if writers else ""
+    builder = "\n".join(v for k, v in jobs.items() if k not in writers)
+
+    check_true("wiki job: the writing job does not check this repository out",
+               "actions/checkout@" not in pusher,
+               "it wants the generated pages, not the source they came from")
+    # On what it runs, not on what it mentions: the commit message this job
+    # writes names tools/wiki.py, and reading that as "it runs the build" is a
+    # false positive this test has already produced once.
+    invokes = re.findall(r"(?m)^\s*(?:run:\s*)?(python\d?\s+tools/\S+)", pusher)
+    check("wiki job: the writing job runs no build", invokes, [],
+          "parsing an upstream's bytes while holding a repo-writing token is "
+          "exactly the arrangement the split removed")
+    check_true("wiki job: the writing job installs no toolchain",
+               "setup-python@" not in pusher,
+               "nothing it does needs one, and each install is another supply chain")
+
+    check_true("wiki job: the job that builds declares no permissions of its own",
+               not re.search(r"(?m)^\s+permissions:", builder),
+               "it should inherit the read-only floor rather than restate it, so "
+               "that raising the floor cannot silently raise this too")
+    check_true("wiki job: the pages reach the pusher as an artifact",
+               "upload-artifact@" in builder and "download-artifact@" in pusher,
+               "with no handover between them the split cannot work at all")
+    check_true("wiki job: an empty page set fails rather than emptying the wiki",
+               "if-no-files-found: error" in builder,
+               "the push replaces the wiki wholesale, so uploading nothing would "
+               "delete every page instead of failing")
+
+    # The repository policy requires SHA pins, so a tag here cannot be pushed
+    # at all - but it can be written, and the error it earns is worth naming.
+    unpinned = [u for u in re.findall(r"(?m)^\s+uses:\s*(\S+)", yml)
+                if not re.search(r"@[0-9a-f]{40}$", u)]
+    check("wiki job: every action is pinned to a SHA", unpinned, [],
+          "a tag is mutable, and this repository refuses one")
+
+    site = read_text(os.path.join(ROOT, ".github", "workflows", "publish.yml"))
+    check_true("site job: the pattern this copies is still on publish.yml",
+               bool(re.search(r"(?m)^permissions:\n\s+contents: read", site)),
+               "wiki.yml copies a shape that lives next door; if it moves, "
+               "the reason given in wiki.yml's own comments stops being true")
+
+
 def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     """
     Two schedulers, one job. They are separate files because Windows has Task
@@ -2946,6 +3044,7 @@ def main() -> int:
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_wiki_can_still_be_built_from_the_docs,
+                         test_the_wiki_token_is_confined_to_the_job_that_pushes,
                          test_bundle_is_self_contained]),
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
