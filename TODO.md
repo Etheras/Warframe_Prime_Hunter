@@ -278,8 +278,15 @@ of this one:
 
 - **The repository policy that *requires* SHA pins.** Pinning nine lines fixes
   nine lines; the policy is what stops the tenth being added as a tag. It is a
-  repository setting rather than a file in this tree, so it cannot be done from
-  here — it needs the owner in GitHub's settings, under Actions.
+  repository setting rather than a file in this tree, so it does not ship with a
+  commit — it is the owner's to turn on.
+  **Measured 2026-09-01**: `gh api repos/Etheras/Warframe_Prime_Hunter/actions/permissions`
+  returns `{"enabled":true,"allowed_actions":"all","sha_pinning_required":false}`.
+  So the switch **does** exist on this repository and is off. Worth writing down
+  because the obvious assumption is the other way: this is a personal repository
+  rather than an organisation one (`isInOrganization: false`), and several
+  Actions policies are organisation-only. This is not one of them — do not
+  conclude it is unavailable without asking the API, which takes one command.
 - **Whether the wiki job wants splitting** into a read-only generate step and a
   minimal write step. The review suggests it. It is a real change rather than a
   mechanical one: `wiki.yml` holds `contents: write` for the whole job, and
