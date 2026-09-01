@@ -174,7 +174,9 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| Seven rotation-bearing mission types are still unverified | **five now**, and only their cadence — checked against DE's tables 2026-09-02, which contradict none of them |
+| Seven rotation-bearing mission types are still unverified | **five now** — `Legacyte Harvest` verified AABC, `Skirmish` undocumented, `The Circuit` disputed; checked 2026-09-02 |
+| `Rush` is one reward, and is charged four rounds for it | small — the `Spy`/`Caches` shape a third time; wiki and DE's tables agree |
+| `The Circuit` may be two different modes wearing one name | **the owner's, to settle in game** — the wiki and DE's tables describe different things |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
@@ -768,9 +770,72 @@ never noticed while calling Skirmish an AABC assumption. Those take `runValue`'s
 flat path — one reward, no cycle — and are already correct. Only the 16
 rotation-bearing ones are assuming anything.
 
-**No code change came out of this**, which is the honest result rather than a
-disappointing one: the assumption is unverified in its cadence and wrong nowhere
-that DE's tables can show.
+**Then the wiki was read for the cadence the tables cannot state**, 2026-09-02,
+which is the half of the question drop tables are structurally unable to answer.
+Five types, five different outcomes:
+
+| Type | What the wiki says | Standing |
+|---|---|---|
+| `Legacyte Harvest` | *"The order of the rotations is AABC"*, rewards offered every capture, endless | **verified** — no longer an assumption |
+| `Rush` | a single-completion race paying **one** reward: 1/2/3 transports destroyed gives rotation A/B/C | **defect, see below** |
+| `Skirmish` | the Railjack page documents no reward rotations at all | still unverified, and not for want of looking |
+| `The Circuit` | tier-based with weekly caps and no rotation cycle — while DE's table publishes A/B/C for the same node | **the two sources disagree**; see the note below |
+| `The Perita Rebellion` | not endless, a 12-minute timer; rotation A every 3 Orders, B every Order, C on completion | structure differs from AABC, effect unmeasured |
+
+**So one is verified, one is a defect, one is undocumented, and two have sources
+that disagree.** Worth knowing before the next pass: reading five wiki pages
+produced one confirmation and one bug, which is a better yield than this entry
+had assumed when it called the work "tedious rather than hard".
+
+### `Rush` is one reward, and is charged four rounds for it
+
+**Found 2026-09-02 from the wiki, with DE's tables agreeing.** Rush is an
+Archwing race, not an endless mission: *"Players will get 1 Rotation reward
+corresponding with the number of destroyed Transports"* — one transport pays
+rotation A, two pays B, three pays C. One run, one draw, and which rotation it
+comes from is the player's own performance rather than a cycle position.
+
+DE's tables put **relics only in rotation C** — rotation A and B carry none — so
+a relic run means destroying all three transports for a single rotation C draw.
+
+The model treats it as endless AABC. Measured: `reset` runs to **4 rounds**
+(`{A:2, B:1, C:1}`) to reach that one C, so a single draw is charged four times
+what it costs. Two nodes and 37 relic sources are affected — `Phobos/Kepler` and
+`Event: Phobos/Opik`.
+
+**The fix is the shape `Spy` and `Caches` already have** (`d8b4484`): a
+`FIXED_LENGTH` entry, `{count: 1, unit: "run", pays: ["C"]}`. One run, one draw,
+from the rotation the relics are actually in. Not a new pattern — the third
+application of an existing one, and the same evidence standard: the wiki states
+the structure and DE's own tables agree with it.
+
+### `The Circuit` may be two different modes wearing one name
+
+**The owner's, 2026-09-02, to be settled in game.** The wiki calls The Circuit
+tier-based with weekly-capped rewards and no rotation cycle; DE's `Missions:`
+table publishes a `Duviri/The Circuit (The Circuit)` node with explicit
+rotations A, B and C, where A pays credits and endo and B and C each hold the
+same seven Lith relics.
+
+Both descriptions are sourced and they do not fit together. **The owner's
+reading is that these are two different game modes sharing a name** — which
+would explain it completely, and is the kind of thing only a player can confirm.
+Until then nothing here should be changed on the strength of either source.
+
+Worth recording so the next reader does not repeat it: a session read the wiki
+first, concluded The Circuit "never pays rotation A", and filed a defect. It
+does pay rotation A — credits and endo, no relics — and a round paying something
+unwanted is ordinary rather than broken. **The drop tables are what the build
+parses, so the drop tables are what govern**; the wiki describes the game, and
+for this node the two are describing different things.
+
+There is also a third table, `Duviri Circuit`, under **Dynamic Location
+Rewards** rather than Missions — Yao Shrub, Dracroot, Kovnik and other Duviri
+resources, and no relics whatever. It is not what the build reads and should not
+be mistaken for it.
+
+**No code change came out of the table sweep**, which was the honest result
+there. The wiki sweep found one, and it is `Rush` above.
 
 ### `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones
 
