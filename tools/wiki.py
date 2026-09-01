@@ -231,15 +231,31 @@ def home(stats: dict) -> str:
     else. All of it is lifted from README rather than rewritten, so there is
     still exactly one copy of every sentence.
     """
-    head = read("README.md").split("\n## ")[0]     # above the first section
+    readme = read("README.md")
+    head = readme.split("\n## ")[0]                # above the first section
     quotes = quote_blocks(head)
-    if len(quotes) < 2:
-        raise SystemExit("wiki: README no longer opens with its two notices - "
-                         "Home.md is built from them, so check tools/wiki.py")
+    if not quotes:
+        raise SystemExit("wiki: README's opening notice is gone - Home.md is "
+                         "built from it, so check tools/wiki.py")
 
-    # the AI notice, minus its heading: this page gives it one of its own
-    notice = "\n".join(l for l in quotes[0].split("\n") if not l.startswith("### "))
-    privacy = quotes[1]
+    # The privacy notice stays at the top, because it is about using the thing
+    # and a reader needs it before they run anything.
+    privacy = quotes[0]
+
+    # The AI notice is found by what it says, not by where it sits. It opened the
+    # README until 2026-09-01 and now sits with the other disclaimers, below what
+    # the project is and what you need - the owner's ordering, and a better one:
+    # a notice that overshadows the description answers a question nobody has
+    # asked yet. Position was never what made it a notice; being a blockquote
+    # under that heading is, so that is what this looks for.
+    AI_HEADING = "### Written by a generative AI"
+    notice = next((q for q in quote_blocks(readme) if AI_HEADING in q), None)
+    if notice is None:
+        raise SystemExit(f"wiki: README no longer carries a blockquote headed "
+                         f"'{AI_HEADING}' - Home.md is built from it, so either "
+                         f"restore it or teach tools/wiki.py the new wording")
+    # minus its heading: this page gives it one of its own
+    notice = "\n".join(l for l in notice.split("\n") if not l.startswith("### "))
 
     # what is left between the two notices, which is the description itself
     pitch = "\n".join(l for l in head.split("\n")[1:]
