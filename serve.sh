@@ -11,7 +11,10 @@
 #   ./serve.sh              this machine only
 #   ./serve.sh --no-browser don't open a browser window
 #
-# For a phone or tablet on the same network, use ./serve-lan.sh instead.
+# This machine only, and the server refuses to bind anything else. Serving to a
+# phone on the same Wi-Fi was removed on 2026-09-01: no encryption, no login,
+# and Backup/Import on the page. To host it somewhere properly, see "Hosting it
+# somewhere else" in README.md.
 
 set -u
 cd "$(dirname "$0")"

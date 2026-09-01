@@ -2,19 +2,33 @@
 """
 Serve Warframe Prime Hunter and open it in the default browser.
 
-    python tools/serve.py                    # this machine only
-    python tools/serve.py --host 0.0.0.0     # anyone on your network
+    python tools/serve.py                    # this machine
     python tools/serve.py --port 8777        # pin the port
 
 Picks a port that actually works. Windows reserves port ranges dynamically
 (Hyper-V/WSL), so a hardcoded port can start failing between one day and the
 next with nothing but a traceback to explain it.
 
-Binding to 0.0.0.0 puts the site on your local network, which is genuinely
-useful for ticking parts off on a phone while you play — but there is no login
-and no encryption, and Backup/Import is right there in the page, so anyone who
-can reach the port can read *and* overwrite your collection. Use it on a network
-you trust. The banner says as much when it starts.
+**Loopback only, and it refuses to be anything else.** The owner's decision,
+2026-09-01. This used to take `--host 0.0.0.0` and there were two launchers for
+it, so the site could be opened on a phone on the same Wi-Fi — genuinely useful
+while playing, and the thing that made it defensible was a paragraph nobody
+reads at the moment they need it.
+
+What that mode actually offered: no encryption, so anyone on the network could
+rewrite the page and the data in flight, CSP included, after which the
+collection in `localStorage` is same-origin and readable. No login, and
+Backup/Import sits on the page, so anyone who could reach the port could read
+and overwrite the collection. And the whole folder was readable, `.cache` and
+all. The blast radius was one browser's tracker rather than an identity, which
+is why it was Medium rather than High — but "Medium, on a network you trust" is
+a judgement the reader had to make correctly every time, and the value on the
+other side of it was a convenience.
+
+So the mode is gone rather than documented better. `README.md` has a short
+notice for anyone who wants to host this somewhere: it is a folder of static
+files, so a real web server can serve it, and that is a different job from this
+script with different answers about TLS and access.
 """
 
 from __future__ import annotations
@@ -67,16 +81,6 @@ def pick_port(host: str) -> int:
             return p
     raise SystemExit(f"No free port between {BASE_PORT} and "
                      f"{BASE_PORT + PORT_TRIES - 1}. Close something and retry.")
-
-
-def lan_address() -> str | None:
-    """Best guess at the address a phone on the same Wi-Fi would use."""
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("10.255.255.255", 1))       # no packet is actually sent
-            return s.getsockname()[0]
-    except OSError:
-        return None
 
 
 # Upstream freshness, checked by the server before it hands over stale data.
@@ -252,10 +256,16 @@ CSP_LOCAL_ONLY = build_local_csp()
 # Served to this machine and to nothing else, whatever the server is bound to.
 #
 # temp_mockup.html is a scratchpad for showing a proposed change against real
-# data before building it (PROJECT.md §2). It is unreviewed, it is not part of
-# the site, and serve-lan binds 0.0.0.0 - so "it is gitignored" is not enough on
-# its own. Being local-only is enforced here, by the peer address, rather than
-# left to whoever remembers not to run the LAN launcher.
+# data before building it (PROJECT.md §2). It is unreviewed and it is not part
+# of the site, so "it is gitignored" was never enough on its own.
+#
+# **Kept as defence in depth after the LAN mode went**, 2026-09-01. The server
+# now refuses to bind anything but loopback, so in practice every peer is this
+# machine and this check can no longer fire. It stays because it costs one
+# comparison and because it is the check that is true of the *request* rather
+# than of the socket: it survives a reverse proxy, a port forward, and whatever
+# the next person does with `--host`. The tests exercise it with fabricated peer
+# addresses for the same reason.
 LOCAL_ONLY_FILES = frozenset({"temp_mockup.html"})
 LOOPBACK = ("127.", "::1", "localhost", "::ffff:127.")
 
@@ -368,8 +378,11 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
               _relative()  -> "index.html"        -> allowed
               stdlib       -> <ROOT>\\.git\\config -> served
 
-        which is the exposure the allowlist exists to remove, handed out to any
-        peer on the network in LAN mode.
+        which is the exposure the allowlist exists to remove. The server binds
+        loopback only now, so the reader is the person at the keyboard — but a
+        path traversal is not made safe by the audience, and this is one of the
+        properties that has to survive somebody putting the folder behind a real
+        web server.
 
         There is no careful fix for two parsers that have to agree; there is one
         parser. `allowed()` and `open()` are given the same string, so a URL that
@@ -498,8 +511,8 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
 def main() -> int:
     ap = argparse.ArgumentParser(description="Serve Warframe Prime Hunter locally.")
     ap.add_argument("--host", default="127.0.0.1",
-                    help="interface to bind (default 127.0.0.1; use 0.0.0.0 for "
-                         "the whole local network)")
+                    help="interface to bind — loopback only (127.0.0.1, ::1 or "
+                         "localhost). Anything else is refused; see README.")
     ap.add_argument("--port", type=int, default=None,
                     help="port to use (default: the first one that works)")
     ap.add_argument("--no-browser", action="store_true",
@@ -511,18 +524,25 @@ def main() -> int:
         return 1
 
     host = args.host
-    lan = host not in ("127.0.0.1", "localhost")
+    # Loopback or nothing. Enforced here rather than left to which launcher
+    # somebody double-clicked, because the launchers are the part that is easy
+    # to copy from an old checkout - and a refusal that explains itself is worth
+    # more than a flag that silently no longer exists.
+    if not is_loopback(host):
+        print(f"Refusing to bind {host}: this server is loopback-only.")
+        print()
+        print("  It has no encryption and no login, and the page's own")
+        print("  Backup/Import would let anyone who can reach the port read and")
+        print("  overwrite the collection. Serving it to a network was removed")
+        print("  on purpose rather than documented better.")
+        print()
+        print("  To host this somewhere, see 'Hosting it somewhere else' in")
+        print("  README.md - it is a folder of static files and a real web")
+        print("  server can serve it, with TLS and access control that this")
+        print("  script does not pretend to offer.")
+        return 1
     if args.port:
         port = args.port                      # asked for explicitly: honour it
-    elif lan:
-        # Fixed, so a bookmark on a phone survives a restart. If it is taken we
-        # say so rather than silently moving and breaking that bookmark.
-        port = BASE_PORT
-        if not usable(port, host):
-            print(f"Port {port} is in use, and a network server keeps a fixed port "
-                  f"so saved links stay valid.")
-            print("Close whatever is using it, or pass --port to choose another.")
-            return 1
     else:
         port = pick_port(host)
     url = f"http://localhost:{port}"
@@ -551,18 +571,8 @@ def main() -> int:
 
     # flush explicitly: stdout is block-buffered when the console window is not
     # a terminal, which would leave the launcher window blank until it closed
-    lines = ["", f"  Warframe Prime Hunter is running at  {url}"]
-    if lan:
-        addr = lan_address()
-        if addr:
-            lines.append(f"  On this network:        http://{addr}:{port}")
-        lines += [
-            "",
-            "  Anyone on this network can open it. They get their own tracker -",
-            "  ticks live in each browser, so yours is neither visible nor",
-            "  changeable by them. This folder is readable though, .cache and",
-            "  all, so keep private files out of it.",
-        ]
+    lines = ["", f"  Warframe Prime Hunter is running at  {url}",
+             "", "  This machine only - nothing else on the network can reach it."]
     lines += ["", "  Keep this window open while you use the site.",
               "  Close it (or press Ctrl+C) to stop.", ""]
     print("\n".join(lines), flush=True)

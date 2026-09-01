@@ -1413,10 +1413,15 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
 
 page_test("the server decides who is told how to fix stale data", async () => {
   /* The exact bug: these tests run on 127.0.0.1, so the old hostname guess
-     called every reader the owner. Browse your own server by its LAN address and
-     it made the opposite mistake - warned you about something you could fix and
-     did not say how. Only the server can see the peer, so only the server can
-     answer, and it stamps the answer on the payload it already attaches.
+     called every reader the owner. Reach the same server by any other address
+     and it made the opposite mistake - warned you about something you could fix
+     and did not say how. Only the server can see the peer, so only the server
+     can answer, and it stamps the answer on the payload it already attaches.
+
+     The server binds loopback only since 2026-09-01, so the second half of that
+     is no longer reachable from here. The distinction is kept because it is
+     about the request rather than the socket, and it is what still holds behind
+     a proxy or a port forward.
 
      Injected before the page scripts run, which is where serve.py puts it. */
   const banner = async (upstream) => {

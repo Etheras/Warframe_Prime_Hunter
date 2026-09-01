@@ -2152,8 +2152,14 @@ def test_server_serves_only_the_site() -> None:
 
     # temp_mockup.html is a local scratchpad for showing a proposed change
     # against real data (PROJECT.md §2). It is unreviewed and is not part of the
-    # site, and serve-lan binds 0.0.0.0 - so it is local-only by peer address
-    # rather than by anyone remembering which launcher they used.
+    # site, so it is local-only by peer address rather than by anyone
+    # remembering which launcher they used.
+    #
+    # The server refuses to bind anything but loopback since 2026-09-01, so a
+    # non-loopback peer can no longer arrive - and these keep asserting the rule
+    # anyway, with fabricated addresses. The check is about the request rather
+    # than the socket, so it is the one that still holds if these files are ever
+    # put behind something that does listen more widely.
     check("mockup: served to this machine",
           [p for p in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
            if not serve.allowed("temp_mockup.html", p)], [])
@@ -2173,9 +2179,20 @@ def test_server_serves_only_the_site() -> None:
            if serve.is_loopback(p)], [],
           "a guest told to double-click a file they do not have is noise")
 
-    check("mockup: a real page is still served over the LAN",
+    check("mockup: a real page is not caught by the local-only rule",
           serve.allowed("index.html", "192.168.1.169"), True,
           "the local-only rule must not have narrowed the site itself")
+
+    # Loopback or nothing, the owner's decision of 2026-09-01. The LAN mode and
+    # its two launchers are gone; this is what stops them coming back by way of
+    # a flag somebody copies out of an old checkout, and it is checked on the
+    # parser rather than by binding a socket, which a test should not do.
+    check("serve: loopback is accepted, however it is spelled",
+          [h for h in ("127.0.0.1", "localhost", "::1") if not serve.is_loopback(h)], [])
+    check("serve: every other interface is refused",
+          [h for h in ("0.0.0.0", "192.168.1.50", "::", "10.0.0.4")
+           if serve.is_loopback(h)], [],
+          "binding these is what the LAN mode was, and it was removed on purpose")
 
     # A stalled connection is released by the HANDLER's timeout, because that is
     # the one StreamRequestHandler.setup puts on the accepted socket. The same

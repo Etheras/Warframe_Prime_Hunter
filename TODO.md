@@ -109,11 +109,13 @@ without knowing they had been declined. **A tenth entry was here that neither
 review filed**, found while checking one of those two against the code, which is
 the same way four of the first review's twelve outcomes arrived.
 
-**Four shipped on 2026-09-01** and their entries are gone, with the reasoning in
+**Five shipped on 2026-09-01** and their entries are gone, with the reasoning in
 `PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
-privacy footer naming a host the site never contacts, and the unvalidated
-`filters` section of a backup. Two things worth carrying forward from doing them,
-because neither was in the finding:
+privacy footer naming a host the site never contacts, the unvalidated `filters`
+section of a backup, and **LAN mode, which was removed rather than documented**
+— the review offered "say so" or "add HTTPS" and the owner took neither, so
+`serve.py` is loopback-only and refuses to bind anything else. Three things worth
+carrying forward, because none was in the findings:
 
 - **The footer could not have been fixed by correcting the footer.** The payload
   field it read was a single string chosen by whether artwork is local, and a
@@ -123,14 +125,18 @@ because neither was in the finding:
   shipped is consistency inside `parseBackup` and defence in depth, not a hole
   being closed — see the note in `PROJECT.md §7`, which says so rather than
   claiming the larger win.
+- **Removing a feature was on the table and nobody had offered it.** Both
+  reviews and this file framed LAN mode as a documentation-or-encryption choice.
+  It was neither: the mode bought a convenience and cost a paragraph the reader
+  had to weigh correctly at the wrong moment, so it went. Worth remembering the
+  next time a finding arrives with two options in it.
 
 | Entry | Size |
 |---|---|
 | The wiki job holds `contents: write` for its whole run | small — the pattern is already next door in `publish.yml` |
 | Downloads and decompression have no ceiling | session — a limit per source, and streaming rather than `read()` |
 | Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
-| The server caps requests, but not connections | small — a semaphore at accept; the rate limit runs too late to help |
-| LAN mode is plain HTTP, and says nothing about what that costs | small as documentation, large as HTTPS — decide which is being asked for |
+| The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
 | `data/feed-log.json` is tracked on purpose, and only for now | **not a defect** — a temporary testing file; the entry is the cleanup reminder |
@@ -443,41 +449,21 @@ act too late to help:
 
 The review opened 80 partial requests at once; all 80 were accepted, and a
 normal request still returned 200 — so this is a resource question rather than a
-denial of service that has been demonstrated. It only matters in LAN mode;
-localhost is the default and is the safe one.
+denial of service that has been demonstrated.
+
+**Mostly answered by removing LAN mode on 2026-09-01**, and the entry is kept
+rather than deleted because the answer is "the reachable attacker is gone", not
+"the code is fixed". The server binds loopback only now, so the only thing that
+can open 80 stalled connections is a process already running on this machine —
+which has easier things to do. What is left is the shape of the code rather than
+an exposure, and it matters again the moment anyone puts these files behind
+something that does listen more widely, which the README now tells them how to
+do.
 
 A semaphore taken at accept, with a short queue and a 503-and-close when full,
 is the shape the review asks for. **Keep both existing protections** — they
 solve different parts of it, and the comments in that file record what each one
 was measured to do.
-
-### LAN mode is plain HTTP, and says nothing about what that costs
-
-`serve-lan.cmd` and `serve-lan.sh` bind every interface and print an `http://`
-URL. Against an active attacker on the same network that means the scripts and
-data can be rewritten in flight, and the CSP arrives rewritten too — after which
-the collection in `localStorage` is same-origin and readable.
-
-There are no accounts and no credentials here, so the blast radius is one
-browser's tracker state rather than an identity. That is why it is Medium and
-not High.
-
-**The honest question is which of two things is being asked for**, and they are
-very different sizes:
-
-- **Say so.** One paragraph in the README and the LAN launcher output stating
-  that HTTP protects neither integrity nor confidentiality against someone on
-  the same network, and that LAN mode is for a trusted home network. This is
-  small, and it is what the existing Windows Firewall guidance is already half
-  of.
-- **Fix it.** HTTPS via a local reverse proxy plus some access control. That is
-  a new moving part in a project whose whole premise is that it survives being
-  copied to a USB stick, and it should not be taken on unless LAN use has
-  actually grown past one household.
-
-The review recommends the first and offers the second conditionally. Nothing in
-either case makes `http.server` fit to face the internet, and it should never
-be pointed at one.
 
 ### The published site can be framed, and only the host can stop it
 

@@ -4452,6 +4452,55 @@ reason. Both are recorded because the pattern is the point: *the app is the only
 authority on what the app shows*, and anything that restates one of its filters
 will eventually restate it differently.
 
+### The server is loopback only, and LAN mode is gone
+
+**The owner's decision, 2026-09-01.** `serve.py` refuses to bind anything that is
+not loopback, and `serve-lan.cmd` / `serve-lan.sh` are deleted.
+
+**Neither option the review offered.** The security re-review of 2026-08-28 filed
+this as *LAN mode is plain HTTP, and says nothing about what that costs*, and
+framed it as a choice between saying so in the README and adding HTTPS via a
+reverse proxy. The answer was to remove the mode. What it bought was a
+convenience — ticking parts off on a phone while playing. What it cost was a
+judgement the reader had to make correctly at the moment they least wanted to:
+no encryption, so anyone on the path could rewrite the page, the data and the
+CSP in flight, after which the collection in `localStorage` is same-origin and
+readable; no login, with Backup/Import sitting on the page, so anyone who could
+reach the port could read and overwrite the collection; and the whole folder
+readable, `.cache` and all.
+
+The blast radius really was one browser's tracker rather than an identity, which
+is why it was Medium and not High. That is an argument for it being survivable,
+not for keeping it.
+
+**Enforced in the server rather than by deleting the launchers**, and that
+distinction is the point. Deleting two files stops the documented route; a
+`--host` that still bound `0.0.0.0` would leave the capability one copied
+command line away, and old checkouts and shell history are full of those. The
+refusal prints why and points at the README rather than failing on an
+unrecognised flag.
+
+**`is_loopback` stays and is now belt-and-braces.** Every peer is this machine,
+so the `LOCAL_ONLY_FILES` rule that keeps `temp_mockup.html` off the network can
+no longer fire — it is kept because it is a check on the *request* rather than
+on the socket, so it is the one that still holds behind a reverse proxy or a
+port forward, which is exactly what somebody hosting this will put in front of
+it. Its tests fabricate peer addresses and keep passing.
+
+**The README gained a short *Hosting it somewhere else*** instead of a warning
+attached to a feature. It says `serve.py` will not do it, and that the site
+itself hosts anywhere because it is static files with no server side: use HTTPS —
+for integrity rather than secrecy, since a rewritten page can read the
+`localStorage` the collection lives in — put access control in front of anything
+internet-facing, prefer `dist/warframe-prime-hunter.html` since serving the
+repository folder exposes `.cache` and `data/`, and send the security headers
+yourself because they do not come with the files.
+
+Five checks went with the two launchers — the CRLF and encoding checks are a
+glob over `*.cmd` and `*.sh`, so they are per file. Two replaced them, asserting
+the parser accepts loopback in each spelling and refuses everything else, which
+is checked without binding a socket.
+
 ### Nine actions pinned to commit SHAs
 
 **Shipped 2026-09-01**, the first recommendation of the security re-review of

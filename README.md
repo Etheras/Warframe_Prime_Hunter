@@ -56,7 +56,6 @@ underneath is identical on all three; only the launchers and the scheduler diffe
 |---|---|---|
 | Get or update the data | `refresh-data.cmd` | `./refresh-data.sh` |
 | Open the site | `serve.cmd` | `./serve.sh` |
-| Open it to your network | `serve-lan.cmd` | `./serve-lan.sh` |
 | Keep it updated automatically | `tools\schedule.ps1` | `./tools/schedule.sh` |
 
 Check Python is available:
@@ -161,23 +160,40 @@ On Windows, double-click `serve.cmd`. On macOS or Linux:
 Your browser opens at `http://localhost:8777`. Leave the terminal window open while
 you use the site — closing it shuts the server down.
 
-**To open it on your phone**, use `serve-lan.cmd` on Windows or `./serve-lan.sh` on
-macOS and Linux. It prints the address to type in.
-
-Your collection is safe from anyone else who opens it: **ticks live in each browser**,
-not on the server, so a visitor gets their own empty tracker and cannot see or change
-yours. Nothing about your progress is ever sent to the server, and the server accepts
-no writes at all — it answers `GET` and nothing else.
-
-What sharing the address *does* expose is read access to the Warframe Prime Hunter folder, `.cache`
-included, and directory listings of it. That is all public game data, so the practical
-advice is simply: keep private files out of the folder. The local-only server
-walks up from port 8777 to find a free one; the network one keeps 8777 fixed, so a
-bookmark on your phone survives a restart.
+The server is **loopback only** and refuses to bind anything else, so nothing on
+your network can reach it. It walks up from port 8777 to find a free one.
 
 > You *can* open `index.html` directly instead. It is quicker, but some browsers
 > refuse to persist storage for pages opened over `file://`, so your ticks may not
 > survive a restart. Serving the folder always saves properly.
+
+### Hosting it somewhere else
+
+**`serve.py` will not do this, on purpose.** It has no TLS, no login, and the
+page's own Backup/Import is right there — so anyone who could reach the port
+could read and overwrite the collection, and without encryption anyone on the
+path could rewrite the page and its CSP in flight. A "serve it to your Wi-Fi"
+mode existed until 2026-09-01 and was removed rather than documented better.
+
+The site itself hosts fine anywhere, because it is a folder of static files with
+no server side at all. If you want it on a phone, a NAS, or the internet, put it
+behind a real web server and know what you are taking on:
+
+- **Use HTTPS.** Not for secrecy — there is nothing secret in the data — but for
+  integrity. Over plain HTTP anyone on the path can alter the page, and a
+  rewritten page can read the `localStorage` your collection lives in.
+- **Put access control in front of it if it faces the internet.** There is no
+  login here to switch on, and Backup/Import will restore whatever it is handed.
+- **Serve the built file, or serve the folder deliberately.**
+  `dist/warframe-prime-hunter.html` is the whole app in one file and exposes
+  nothing else. Serving the repository folder exposes it — `.cache`, `data/`, and
+  directory listings. That is all public game data, but decide it rather than
+  discover it.
+- **Send the security headers yourself.** `serve.py`'s CSP, `X-Frame-Options` and
+  the rest do not come with the files.
+- **Your collection does not travel.** Ticks live in each browser, so anyone who
+  opens your copy gets their own empty tracker and never sees yours; the server
+  is never told what you own.
 
 ---
 
@@ -851,9 +867,10 @@ your real data — it loads the same dataset and stylesheet the app does. Open i
 at `/temp_mockup.html` while `serve.cmd` is running.
 
 It is **gitignored and served only to this machine**: `serve.py` refuses it to
-any other address, so sharing the LAN server never shares a half-finished idea.
-It is never tracked and has never been pushed, so there is no empty copy of it on
-GitHub to keep in step.
+any address that is not loopback. That check is now belt-and-braces, since the
+server will not bind anything else either — but it is the one that holds if the
+files are ever put behind something that does. It is never tracked and has never
+been pushed, so there is no empty copy of it on GitHub to keep in step.
 
 That one file is also the **only** thing served a relaxed policy: a mockup is one
 file with an inline `<style>` and an inline `<script>`, which the app's own strict
