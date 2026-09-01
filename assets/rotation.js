@@ -543,6 +543,22 @@
        so they never reach the `fixed` branch and the unit here reads correctly
        for them anyway.
 
+     * **Rush** — an Archwing race, not an endless mission. The wiki: *"Players
+       will get 1 Rotation reward corresponding with the number of destroyed
+       Transports"* — one transport pays rotation A, two pays B, three pays C.
+       So the rotation is the player's own performance rather than a position in
+       a cycle, and a run pays exactly once.
+
+       `pays: ["C"]` rather than all three, and that is a claim worth being
+       explicit about: DE's tables put **relics only in rotation C** — A and B
+       carry none — so anyone reaching this code at all is farming relics and
+       destroys all three transports. Modelling A or B would price a run that
+       nobody doing this is making.
+
+       Added 2026-09-02. Before it, `reset` ran the AABC cycle out to **four
+       rounds** to reach that single C, charging one draw four times what it
+       costs, across `Phobos/Kepler` and `Event: Phobos/Opik`.
+
      `pays` is a list rather than a set on purpose: it is the multiset of reward
      draws, so a mission paying the same rotation twice would say so. `count` is
      what the PLAYER does — vaults, caches, one match — which is not always the
@@ -551,6 +567,7 @@
     Spy:     { count: 3, unit: "vault", pays: ["A", "B", "C"] },
     Caches:  { count: 2, unit: "cache", pays: ["A", "B"] },
     Special: { count: 1, unit: "run",   pays: ["A", "B"] },
+    Rush:    { count: 1, unit: "run",   pays: ["C"] },
   };
 
   /* ── how many player objectives buy one reward: nothing, now ──────

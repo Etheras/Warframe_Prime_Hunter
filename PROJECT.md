@@ -4733,6 +4733,39 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### `Rush` pays once, and is no longer charged four rounds to reach it
+
+**Shipped 2026-09-02**, the third application of the `FIXED_LENGTH` shape `Spy`
+and `Caches` got in `d8b4484`, and the first defect the mission-type sweep
+actually found.
+
+Rush is an Archwing race, not an endless mission. The wiki: *"Players will get 1
+Rotation reward corresponding with the number of destroyed Transports"* — one
+transport pays rotation A, two pays B, three pays C. **The rotation is the
+player's own performance rather than a position in a cycle**, and a run pays
+exactly once.
+
+DE's tables agree and add the part that decides the entry: **relics live only in
+rotation C**. A and B carry none. So a relic run means destroying all three
+transports for a single rotation C draw.
+
+The model had it as endless AABC, so `reset` ran the cycle out to **four rounds**
+to reach that one C — one draw charged four times what it costs, across
+`Phobos/Kepler` and `Event: Phobos/Opik`, 37 relic sources between them. Now
+`{count: 1, unit: "run", pays: ["C"]}`, measured back at 1 round and one `C`.
+
+**`pays: ["C"]` is a claim and is worth defending rather than assuming.** The
+alternative is listing all three rotations, which would be describing runs
+nobody making this decision is doing: a rotation A or B result has no relic in it
+to want, so nothing reaches this code path wanting one.
+
+**What made this one safe to act on was two sources agreeing.** The same sweep
+produced a wrong finding hours earlier — The Circuit reported as never paying
+rotation A, on the wiki's word, when DE's table shows rotation A paying credits
+and endo. The rule that came out of it: *the drop tables are what the build
+parses, so the drop tables govern*, and the wiki is for the cadence the tables
+structurally cannot state. Rush is the case where both said the same thing.
+
 ### The Void Trace cap holds at Mastery Rank 30, and says whose guess that is
 
 **The owner's decision, 2026-09-01.** The wiki gives the cap as

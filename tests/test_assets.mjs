@@ -601,8 +601,25 @@ test("a fixed-length mission is costed at its real length, not a chosen one", ()
   assert.deepEqual(faceoff.counts, { A: 1, B: 1 },
                    "a match pays both letters, so it is two rewards in one run");
 
+  /* Rush: an Archwing race paying ONE reward, where the rotation is the
+     player's performance rather than a cycle position — one, two or three
+     transports destroyed gives A, B or C. DE's tables carry relics only in C,
+     so a relic run is all three transports for a single C draw.
+
+     Asserted with only C wanted, because that is the only case that reaches
+     here: a rotation A or B run has no relic in it to want. Before 2026-09-02
+     the AABC optimiser ran this out to four rounds to reach that one C, so the
+     round count is the whole point of the assertion. */
+  const rush = cost("Rush", { A: 0, B: 0, C: 0.2 });
+  assert.deepEqual({ count: rush.count, unit: rush.unit }, { count: 1, unit: "run" });
+  assert.deepEqual(rush.counts, { C: 1 },
+                   "one run, one draw, and it comes from rotation C");
+  assert.equal(ROT.runValue({ C: 0.2 }, "Rush", false, null, { C: 0.2 }, false).rounds, 1,
+               "a single reward must not be charged the four rounds an AABC "
+               + "cycle would take to reach rotation C");
+
   // and none of them may be talked into the endless optimiser's lengths
-  for (const m of ["Spy", "Caches", "Special"]) {
+  for (const m of ["Spy", "Caches", "Special", "Rush"]) {
     const r = ROT.runValue({ A: 0.3, B: 0.3, C: 0.3 }, m, false, null,
                            { A: 0.3, B: 0.3, C: 0.3 }, false);
     assert.equal(r.mode, "fixed", `${m} was offered a run length it cannot have`);

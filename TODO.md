@@ -175,7 +175,6 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | Size |
 |---|---|
 | Seven rotation-bearing mission types are still unverified | **five now** — `Legacyte Harvest` verified AABC, `Skirmish` undocumented, `The Circuit` disputed; checked 2026-09-02 |
-| `Rush` is one reward, and is charged four rounds for it | small — the `Spy`/`Caches` shape a third time; wiki and DE's tables agree |
 | `The Circuit` may be two different modes wearing one name | **the owner's, to settle in game** — the wiki and DE's tables describe different things |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
@@ -786,28 +785,6 @@ Five types, five different outcomes:
 that disagree.** Worth knowing before the next pass: reading five wiki pages
 produced one confirmation and one bug, which is a better yield than this entry
 had assumed when it called the work "tedious rather than hard".
-
-### `Rush` is one reward, and is charged four rounds for it
-
-**Found 2026-09-02 from the wiki, with DE's tables agreeing.** Rush is an
-Archwing race, not an endless mission: *"Players will get 1 Rotation reward
-corresponding with the number of destroyed Transports"* — one transport pays
-rotation A, two pays B, three pays C. One run, one draw, and which rotation it
-comes from is the player's own performance rather than a cycle position.
-
-DE's tables put **relics only in rotation C** — rotation A and B carry none — so
-a relic run means destroying all three transports for a single rotation C draw.
-
-The model treats it as endless AABC. Measured: `reset` runs to **4 rounds**
-(`{A:2, B:1, C:1}`) to reach that one C, so a single draw is charged four times
-what it costs. Two nodes and 37 relic sources are affected — `Phobos/Kepler` and
-`Event: Phobos/Opik`.
-
-**The fix is the shape `Spy` and `Caches` already have** (`d8b4484`): a
-`FIXED_LENGTH` entry, `{count: 1, unit: "run", pays: ["C"]}`. One run, one draw,
-from the rotation the relics are actually in. Not a new pattern — the third
-application of an existing one, and the same evidence standard: the wiki states
-the structure and DE's own tables agree with it.
 
 ### `The Circuit` may be two different modes wearing one name
 
