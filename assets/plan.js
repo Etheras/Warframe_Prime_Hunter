@@ -1616,17 +1616,20 @@
     $("#planWrap").hidden = !hasWork;
     if (!hasWork) return;
 
-    /* A list that ranks on something says so in its heading (`STYLE.md §5`),
-       which means the heading is not static: it follows the sort toggle, and it
-       follows the switch from objectives to minutes that giving effort weights
-       makes. It said "per objective" through both until 2026-08-24. */
-    const rankedOn = $("#planRankedOn");
-    if (rankedOn) rankedOn.textContent = "— " + sortBy().heading(perMinute);
+    /* `STYLE.md §5` asks that a list which ranks on something says so in its
+       heading, and *Where to go* did — a `#planRankedOn` span that followed the
+       sort toggle and the switch to minutes that effort weights make.
 
-    /* The options say it too, because the control sits on the heading now and
-       has no label of its own beside it: "per objective" has to become "per
-       minute" the moment effort weights turn it into one. Rewritten rather than
-       rebuilt, so the open state of a dropdown someone is using is not lost. */
+       **Removed 2026-09-01 at the owner's request, and only because the control
+       beside it already says the same words.** The `<select>` sits on that
+       heading line with no label of its own, and its options are rewritten
+       below to read "per reward", "per minute" or "per run" — so the quantity is
+       still named, by the thing that sets it. The rule is satisfied by the
+       control rather than by a second copy of it. *How to crack them* keeps its
+       sub-heading, shortened, because it has no such control.
+
+       Rewritten rather than rebuilt, so the open state of a dropdown someone is
+       using is not lost. */
     const sel = $("#p-sort");
     if (sel) {
       Object.keys(SORTS).forEach((k) => {

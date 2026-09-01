@@ -4734,6 +4734,36 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### Both planner headings are centred on their row, not on their slack
+
+**The owner's, 2026-09-01.** `text-align:center` on the heading was the obvious
+change and it was not enough: it centres the text inside whatever space the
+controls leave, which put *Where to go* **54px left** of the row's centre and
+*How to crack them* **103px right** of it. The side elements are different
+widths — a select on one row, a tab strip and two checkboxes on the other — so
+centring in the leftovers is centring on an asymmetric gap.
+
+Both sides share the slack equally (`flex:1 1 0`) and the heading takes only
+what it needs. Each side then holds its contents against its own edge with
+`justify-content`, which is what keeps the tabs hard left and the checkboxes hard
+right while the heading sits in the middle. `.plan-head-top` carries an **empty
+`.plan-side`** for the same reason: it has no left-hand control to balance the
+select against, and a spacer is the honest way to say so. Measured at 1440px:
+row centre 858, *Where to go* 858, *How to crack them* 857.
+
+**The *Where to go* sub-heading went with it.** `STYLE.md §5` asks that a list
+which ranks on something says so in its heading, and `#planRankedOn` did —
+following both the sort toggle and the switch to minutes that effort weights
+make. It was removed because **the control beside it already says the same
+words**: the `<select>` sits on that heading line with no label of its own, and
+its options are rewritten to read *per reward*, *per minute* or *per run*. The
+rule is satisfied by the control rather than by a second copy of it, and the
+page test that asserted the heading now reads the selected option instead.
+
+*How to crack them* keeps its sub-heading, shortened to *— openings per part*,
+precisely because it has no such control: remove it there and nothing on screen
+names the quantity its rows are ordered by.
+
 ### The crack-list controls are saved, and the tabs moved left
 
 **Both the owner's, 2026-09-01, and the first reverses a decision taken four

@@ -2334,7 +2334,13 @@ page_test("the ranked number, the order and the heading all say the same thing",
   await page.reload({ waitUntil: "load" });
 
   const read = () => page.evaluate(() => ({
-    heading: document.querySelector("#planRankedOn").textContent.trim(),
+    /* The sort control's own selected option, not a sub-heading. *Where to go*
+       carried a `#planRankedOn` span naming the quantity until 2026-09-01; it
+       was removed because the select beside it says the same words and is the
+       thing that sets them. `STYLE.md §5` still holds — the list names what it
+       ranks on — the name just lives on the control now, so that is where this
+       reads it. */
+    heading: document.querySelector("#p-sort").selectedOptions[0].textContent.trim(),
     // the label sits between the <b> and the .spot-alt as a bare text node
     unit: [...document.querySelector("#planNodes .spot-score").childNodes]
       .filter((n) => n.nodeType === 3).map((n) => n.textContent.trim())

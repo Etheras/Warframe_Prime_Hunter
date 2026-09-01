@@ -908,7 +908,24 @@ abbr.rot:hover{color:var(--teal);text-decoration-color:var(--teal)}
   display:flex;align-items:baseline;justify-content:space-between;gap:14px;
   flex-wrap:wrap;
 }
-.plan-head .plan-h{flex:1 1 auto;min-width:0}
+/* Centred at the owner's request, 2026-09-01 — and centred on the ROW, which
+   `text-align:center` alone does not give you. The first attempt centred the
+   text inside whatever space the controls left over, which put *Where to go*
+   54px left of centre and *How to crack them* 103px right of it, because the
+   side elements are different widths: a select on one, a tab strip and two
+   checkboxes on the other.
+
+   So the two sides share the slack equally (`flex:1 1 0`) and the heading takes
+   only what it needs. Each side then keeps its contents against its own edge
+   with `justify-content`, which is why the tabs still sit hard left and the
+   checkboxes hard right while the heading sits dead centre. `.plan-head-top`
+   carries an empty `.plan-side` for the same reason — it has no left-hand
+   control to balance the select against. */
+.plan-head > .plan-side,
+.plan-head > .tier-tabs{flex:1 1 0;min-width:0}
+.plan-side{display:flex;align-items:center;gap:6px}
+.plan-side-end{justify-content:flex-end}
+.plan-head .plan-h{flex:0 1 auto;min-width:0;text-align:center}
 /* `select.` rather than `.`: `[data-tip]{cursor:help}` is declared later in this
    file, so at equal specificity it wins on order and would turn this control's
    pointer into a question mark. One tag name outranks it without moving the rule
@@ -958,8 +975,7 @@ select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,
    with one either side of the heading, two greedy strips and a greedy `.plan-h`
    share it three ways and nothing sits against its own edge. Only the heading
    grows now, which is what pushes the errands right and leaves the tabs left. */
-#relicTiers{flex:0 0 auto;justify-content:flex-start}
-#relicErrands{flex:0 0 auto}
+#relicTiers{justify-content:flex-start}
 .tier-tab{
   padding:4px 9px;
   background:var(--panel-2);
