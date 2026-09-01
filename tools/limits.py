@@ -73,19 +73,29 @@ MAX_EXPANDED = {
     "export_ExportResources_en.json":  2_000 * KB,   #  1,002,658
     "export_ExportWeapons_en.json":    1_250 * KB,   #    610,189
     "export_ExportWarframes_en.json":    500 * KB,   #    232,131
-    # The one to watch. 130,253 today, but the worldstate carries whatever
-    # events are running, so it is the only source here whose size moves with
-    # something other than the size of the game. If a large event ever pushes it
-    # past this, the build goes stale rather than wrong - and the log line says
-    # which source and by how much, which is the signal to raise this number.
-    "de_worldstate":                     280 * KB,   #    130,253
-    "api_syndicatemissions":             128 * KB,   #     61,126
+    # ── the live feeds, which are measured differently and were got wrong ──
+    #
+    # These carry whatever is running in the game right now, so their size moves
+    # with game state rather than with the size of the catalogue. **One sample
+    # of one of these is not a measurement of it.** Set at twice a single local
+    # sample on 2026-09-01, `api_syndicatemissions` reached 87% of its ceiling on
+    # the very next CI run - 114,415 against the 61,126 measured here, 1.9x
+    # between two samples taken hours apart, because a different set of bounties
+    # was live.
+    #
+    # So these are twice the LARGEST figure seen, not twice the local one, and
+    # they keep extra room besides. `api_events` gets the most of all in
+    # proportion: it was sampled with no limited-time event running at all, which
+    # is the smallest it is ever going to be.
+    "de_worldstate":                     384 * KB,   # 130,253 local; carries events
+    "api_syndicatemissions":             256 * KB,   #  61,126 local, 114,415 on CI
+    "api_fissures":                       48 * KB,   #  11,029 with 17 fissures live
+    "api_vaulttrader":                    32 * KB,   #   7,947
+    "api_events":                         32 * KB,   #   2,994 with NO event running
+    # ── and the rest, whose size tracks the catalogue ──
     "wiki_prime":                        128 * KB,   #     56,157
     "export_ExportRegions_en.json":      100 * KB,   #     49,501
     "export_ExportSentinels_en.json":     32 * KB,   #     11,675
-    "api_fissures":                       24 * KB,   #     11,029
-    "api_vaulttrader":                    16 * KB,   #      7,947
-    "api_events":                          8 * KB,   #      2,994
     "head_droptables":                     4 * KB,   #        959
     "export_index":                        4 * KB,   #        490
 }
@@ -99,7 +109,7 @@ MAX_EXPANDED = {
 MAX_EXPANDED_FAMILY = (
     ("export_", 2_000 * KB),
     ("drops_",  4_800 * KB),
-    ("api_",      128 * KB),
+    ("api_",      256 * KB),          # a live feed; see the note above
     ("wiki_",      16 * KB),
     ("head_",       4 * KB),
 )

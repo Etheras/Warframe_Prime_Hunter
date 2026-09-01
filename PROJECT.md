@@ -4715,11 +4715,24 @@ including the 4.4 MB drop table: every cached source sits between 12% and 49% of
 its own ceiling. A test asserts that nothing is above 75%, which is what tells
 somebody a source has grown *before* builds start going stale over it.
 
-One ceiling is worth watching and says so in its own comment: `de_worldstate`, at
-280 KB against 130 KB measured. It is the only source here whose size moves with
-something other than the size of the game — it carries whatever events are
-running — so a large event is the plausible way this first bites. It goes stale
-rather than wrong, and the log line names the source and the number.
+**And then the canary fired on the next CI run, which is the part worth keeping.**
+`api_syndicatemissions` came back at 114,415 on a clean runner against the 61,126
+measured here — 87% of its ceiling, from two samples taken hours apart, because a
+different set of bounties was live.
+
+The entry above named `de_worldstate` as the one to watch and had the reasoning
+right for the wrong row: **a live feed's size moves with game state, so one sample
+of one is not a measurement of it.** That is a different kind of number from the
+catalogue sources, where 10.4 MB of items is 10.4 MB until DE ship something. The
+five live feeds are now set at twice the *largest* figure seen rather than twice
+the local one, with extra room besides — most of all `api_events`, which was
+sampled with no limited-time event running at all and so was measured at its
+floor.
+
+Two things this cost nothing to learn, because the failure was a red test on a
+runner rather than a stale build in production: the ceiling policy needs to know
+which sources vary, and the 75% canary is the assertion that made the difference
+between finding out now and finding out from a build that had quietly gone stale.
 
 ### The server serves first and refreshes behind, so one page load is one check
 
