@@ -4733,6 +4733,87 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### The cadence test asserts a ceiling on response time, not four equal numbers
+
+**Shipped 2026-09-01, at the owner's request, after the test got in the way of a
+change they had every right to make.** Four numbers describe the refresh cadence
+and the suite required all four to be the **same integer**: the CI cron, the
+Windows task, the cron script, and the page's own fissure poll. The owner set the
+CI cron to 15 minutes for a few days — to measure how often DE answer without
+leaning on WFCD — and the suite went red. Nothing was wrong. The numbers had
+stopped matching.
+
+**Equality is right for exactly one of those pairs**, and the rewrite is mostly
+about telling them apart. `schedule.ps1` and `schedule.sh` are **one job written
+twice**, because Windows has Task Scheduler and everything else has cron; a
+number changed on the platform in front of you and left alone on the other is
+invisible, and there is no reason they should ever differ. That stays an
+equality. The CI cron, the local job and the page poll are **three independent
+schedulers with different constraints** — a best-effort cron with a five-minute
+floor and a deployment budget, a task on a machine that may be asleep, and a poll
+that costs one request to our own origin. Requiring those to agree to the minute
+guarded nothing and cost a measurement.
+
+**What is worth guarding is response time**: how long a change at the source
+takes to reach a reader's screen. That is a sum — `build interval + page poll` —
+and the rule is a ceiling on it, asserted twice because there are two audiences,
+the deployed site and somebody running this locally.
+
+**The ceiling comes from evidence, or it is no better than the equality it
+replaced.** A fissure's shortest observed life is 60 minutes (measured
+2026-08-27, median 88), and a fissure nobody can see is the failure this cadence
+exists to prevent — so the ceiling is half of it, 30 minutes. Driven over
+candidate cadences rather than reasoned about: today's 10 + 10 passes at 20, the
+owner's 15 + 10 passes at 25, 25 + 10 fails, and an hourly rebuild fails hard.
+Confirmed against the real file by setting the cron to `*/25` and watching it go
+red.
+
+The page poll keeps its own looser rule, because it is the one scheduler here
+that costs nobody anything: it reads four kilobytes from our own origin, and a
+page polling faster than the site rebuilds is redundant rather than wrong. What
+is asserted is only that it cannot be the reason a reader waits.
+
+### The deployed site can be framed, and that is accepted rather than unnoticed
+
+**Decided 2026-09-01 by the owner.** `serve.py` sends `frame-ancestors 'none'`
+and `X-Frame-Options: DENY`. GitHub Pages sends neither — during the security
+review it returned no CSP, no `X-Frame-Options`, no `X-Content-Type-Options` and
+no `Referrer-Policy` at all. So the published site can be embedded in a frame by
+anyone, and nothing in this repository can stop it.
+
+**The obvious fix is specified not to work, and it is worth knowing why before
+someone tries it.** Putting the policy in a `<meta http-equiv>` tag does not
+help: the CSP specification requires browsers to **ignore `frame-ancestors` in a
+meta policy**, alongside `report-uri` and `sandbox`. That is mandated rather
+than a quirk, and every engine complies.
+
+The reason is structural, and it generalises. `frame-ancestors` has to be
+enforced by the *embedder*, before it renders the document — but a `<meta>` tag
+is only discoverable after fetching and parsing that document. By the time a
+browser could read the instruction, the framing has already happened. The check
+has to arrive as a response header, and on Pages we do not control response
+headers. `default-src 'none'` is not a substitute: it governs what the page
+loads, not who may embed it.
+
+**Accepted, and here is the argument rather than the assertion.** Clickjacking
+works by tricking somebody into performing a privileged action they did not
+intend. This site has no accounts, no sessions, no server-side state and no
+state-changing controls: the worst a framed click achieves is ticking a checkbox
+in the visitor's own browser, in their own `localStorage`, which they can untick.
+There is no session to ride and no action worth stealing.
+
+The alternatives were weighed and declined: fronting Pages with a service that
+can add headers, or moving the deployment somewhere that supports them. Both buy
+a header this threat model does not need, and both add an operator and a
+dependency to a project whose whole shape is *"static files that survive being
+copied to a USB stick"*.
+
+**Recorded because the finding's own words are right** — this is a defensible
+answer and *"only a bad one if nobody has said it out loud"*. It is said out
+loud here. Anyone hosting these files behind something that does set headers
+should set `frame-ancestors 'none'`; `README.md`'s *Hosting it somewhere else*
+is where they will be looking.
+
 ### Connections are counted at accept, where the other two protections cannot
 
 **Shipped 2026-09-01**, the last security finding with a fix in this repository.

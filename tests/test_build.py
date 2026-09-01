@@ -3080,16 +3080,40 @@ def test_the_wiki_token_is_confined_to_the_job_that_pushes() -> None:
 
 def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     """
-    Two schedulers, one job. They are separate files because Windows has Task
-    Scheduler and everything else has cron, and nothing but a check like this
-    stops one of them drifting - a default changed on the platform in front of
-    you and left alone on the other is not a visible mistake.
+    Four numbers describe the refresh cadence, and this asked all four to be the
+    **same integer** until 2026-09-01. That made it an obstacle rather than a
+    guard: the owner set the CI cron to 15 minutes for a few days, to measure how
+    often DE answer without leaning on WFCD, and the suite went red. Nothing was
+    wrong. The numbers had simply stopped matching.
 
-    The interval is not free-floating either. The refresh exists to keep the
-    "this data is old" banner from ever firing, so it has to run several times
-    over inside that window; the owner's rule is that at least two runs may fail
-    before anyone is told anything is wrong.
+    **Equality is the right shape for exactly one of the four pairs**, and the
+    rewrite is mostly about telling them apart:
+
+    * `schedule.ps1` and `schedule.sh` are **one job written twice**, because
+      Windows has Task Scheduler and everything else has cron. A number changed
+      on the platform in front of you and left alone on the other is invisible,
+      and there is no reason they should ever differ. That one stays an equality.
+    * The CI cron, the local job and the page's poll are **three independent
+      schedulers with different constraints** — GitHub's cron is best-effort with
+      a five-minute floor and a deployment budget, a Windows task runs on a
+      machine that may be asleep, the page poll costs one request to our own
+      origin. Requiring them to agree to the minute guards nothing.
+
+    **What is worth guarding is response time, not agreement**: how long a change
+    at the source takes to reach a reader's screen. That is a sum —
+    `build interval + page poll` — and the rule is a ceiling on it.
+
+    The ceiling has to come from evidence or it is no better than the equality it
+    replaces. A fissure's shortest observed life is **60 minutes** (measured
+    2026-08-27, median 88), and a fissure nobody can see is the failure this
+    cadence exists to prevent, so the ceiling is **half of that**. Today's 10 + 10
+    sits at 20 with room to spare, and the owner's 15 + 10 would have passed
+    without a word.
     """
+    # Half the shortest fissure life measured on 2026-08-27. See the docstring:
+    # this is the one number here that is a judgement, so it is named once.
+    DISCOVERY_CEILING_MIN = 30
+
     ps = read_text(os.path.join(ROOT, "tools", "schedule.ps1"))
     sh = read_text(os.path.join(ROOT, "tools", "schedule.sh"))
     shared = read_text(os.path.join(ROOT, "assets", "shared.js"))
@@ -3117,11 +3141,17 @@ def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     # are mostly absent. Read from the page, which is what actually re-reads it.
     poll = re.search(r"FISSURE_REFRESH_MS\s*=\s*(\d+)\s*\*\s*60\s*\*\s*1000", shared)
     check_true("schedule: the page's own fissure poll is findable", bool(poll))
-    check("schedule: the page re-reads on the same clock the job writes on",
-          int(poll.group(1)) if poll else -1, mins,
-          "a page polling faster than the job writes just re-reads its own answer")
-    check_true("schedule: the cadence is well inside a fissure's life",
-               0 < mins <= 20,
+    polled = int(poll.group(1)) if poll else -1
+    # Its own rule, and a looser one, because it is the only scheduler here that
+    # costs nobody anything: it reads four kilobytes from our own origin. A page
+    # polling faster than the site rebuilds is redundant rather than wrong, so
+    # what is asserted is that it cannot be the reason a reader waits.
+    check_true("schedule: the page poll cannot be what makes a reader wait",
+               0 < polled <= DISCOVERY_CEILING_MIN,
+               f"polling every {polled} min against a {DISCOVERY_CEILING_MIN} min "
+               f"ceiling means the page is the slow part")
+    check_true("schedule: the local job is well inside a fissure's life",
+               0 < mins <= DISCOVERY_CEILING_MIN,
                "a fissure runs an hour or two; refreshing slower than that shows none")
 
     # The third scheduler, and the one that reaches anybody who is not running
@@ -3132,9 +3162,20 @@ def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
     step = re.search(r"(?m)^\s*- cron: \"\*/(\d+) \* \* \* \*\"", flow)
     check_true("schedule: the published site has a short-interval refresh too",
                bool(step), f"crons found: {crons}")
-    check("schedule: and it runs on the same clock as the local job",
-          int(step.group(1)) if step else -1, mins,
-          "a site refreshed slower than the page polls polls for nothing")
+    ci = int(step.group(1)) if step else -1
+
+    # The sum, which is the thing a reader actually experiences. Two of them,
+    # because there are two audiences: the deployed site and somebody running
+    # this locally, and each has its own build interval feeding the same poll.
+    check_true("schedule: a change upstream reaches a deployed reader in time",
+               0 < ci + polled <= DISCOVERY_CEILING_MIN,
+               f"CI every {ci} min plus a {polled} min page poll is "
+               f"{ci + polled} min worst case, against a ceiling of "
+               f"{DISCOVERY_CEILING_MIN} — half the shortest fissure life")
+    check_true("schedule: and reaches a local reader in time too",
+               0 < mins + polled <= DISCOVERY_CEILING_MIN,
+               f"local job every {mins} min plus a {polled} min poll is "
+               f"{mins + polled} min worst case")
     check_true("schedule: the daily full build is still there",
                any(not c.startswith("*/") for c in crons),
                "the ten-minute run takes its heavy sources from the cache, so "
