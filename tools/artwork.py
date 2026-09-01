@@ -25,6 +25,8 @@ import urllib.request
 
 from sources import DE_TEXTURES, IMG_CDN, ROOT, UA, log
 
+import limits  # sibling module; sources put tools/ on the path above
+
 IMG_DIR = os.path.join(ROOT, "assets", "img")
 
 # `imageName` is third-party text - it comes from the items API - and it ends up
@@ -128,7 +130,15 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
         return 0
 
     os.makedirs(IMG_DIR, exist_ok=True)
-    fetched = replaced = failed = skipped = 0
+    fetched = replaced = failed = skipped = oversize = 0
+
+    # Two ceilings rather than one, because 167 responses of 2 MB each is the
+    # failure a per-image cap alone waves through. `budget` is what this run may
+    # still download in total; images already on disk are skipped before they
+    # reach it, so a routine build spends almost none of it and only a full
+    # cold fetch approaches the limit. tools/limits.py has both numbers and what
+    # they were measured against.
+    budget = limits.MAX_IMAGE_TOTAL
 
     real_dir = os.path.realpath(IMG_DIR)
     for url, fname in sorted(urls.items()):
@@ -160,18 +170,34 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
             skipped += 1
             continue
 
+        if budget <= 0:
+            oversize += 1
+            continue
+
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=60) as r:
-                blob = r.read()
+                # Whichever bites first: this image's own ceiling, or what is
+                # left of the run's. Nothing is written until the whole body has
+                # been read inside the limit, so an oversized response costs
+                # bandwidth and never disk.
+                blob = limits.read_capped(
+                    r, min(limits.MAX_IMAGE_BYTES, budget), fname)
             if not blob:
                 raise ValueError("empty response")
             with open(dest, "wb") as fh:
                 fh.write(blob)
+            budget -= len(blob)
             if on_disk:
                 replaced += 1
             else:
                 fetched += 1
+        except limits.TooLarge as e:
+            # A partial run is already the designed behaviour here - the
+            # rewiring pass below only repoints what actually landed, so the
+            # site keeps the remote URL for this one rather than a broken image.
+            oversize += 1
+            log(f"  image refused: {fname} ({e})")
         except Exception as e:                            # noqa: BLE001
             failed += 1
             log(f"  image failed: {fname} ({e})")
@@ -210,6 +236,8 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
         bits.append(f"{pruned} pruned ({pruned_bytes / 1024 / 1024:.1f} MB)")
     if failed:
         bits.append(f"{failed} failed")
+    if oversize:
+        bits.append(f"{oversize} over the size ceiling")
     if skipped:
         bits.append(f"{skipped} missing, offline")
     log("images: " + ", ".join(bits))

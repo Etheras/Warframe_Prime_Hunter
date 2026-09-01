@@ -46,6 +46,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import build_data  # noqa: E402
 import catalogue  # noqa: E402
 import guard_shell_writes  # noqa: E402
+import limits  # noqa: E402
 import official  # noqa: E402
 import relics  # noqa: E402
 import sources  # noqa: E402
@@ -961,6 +962,164 @@ def test_a_blocked_host_is_routed_around() -> None:
         sources.CACHE_DIR = real_cache
         sources.STALE[:], sources.MISSING[:] = stale, missing
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_source_cannot_send_more_than_its_ceiling() -> None:
+    """
+    Every remote read used to take whatever the other end sent. The realistic
+    case is not a hostile CDN but a broken one - a truncated gateway, an error
+    page with the wrong type, a decompression bomb from a host that has itself
+    been compromised - landing on an unattended scheduled build.
+
+    Three properties, and the middle one is the whole point: refusing has to be
+    an ordinary *failed fetch*, because that is the path this pipeline already
+    handles well. A ceiling set too tightly should then cost a stale build and a
+    loud line, never a broken one.
+
+      1. the decompressors stop mid-stream rather than after expanding it all
+      2. an oversized response falls through to the cached copy and says STALE
+      3. every source in `.cache` is inside its own ceiling, comfortably
+
+    The bomb is built here rather than committed: a file that expands to 64 MB
+    is not something to keep in a repository, and `gzip.compress` makes one in
+    a fraction of a second.
+    """
+    import gzip as gziplib
+    import lzma as lzmalib
+
+    # ---- 1. the primitives -------------------------------------------------
+    plain = b"\0" * (64 * 1024 * 1024)
+    bomb = gziplib.compress(plain, 9)
+    check_true("ceiling: the test's own bomb is a bomb",
+               len(plain) // max(len(bomb), 1) > 100,
+               f"{len(bomb):,} -> {len(plain):,} is not much of a bomb")
+
+    started = time.time()
+    try:
+        limits.gunzip_capped(bomb, 1 * limits.MB, "bomb")
+        check_true("ceiling: a gzip bomb is refused", False,
+                   "it expanded 64 MB into memory instead")
+    except limits.TooLarge:
+        check_true("ceiling: a gzip bomb is refused", True)
+    # It must stop *early*. Expanding it all and then measuring would pass the
+    # assertion above while doing the exact thing the ceiling exists to prevent,
+    # and wall clock is the only thing that tells the two apart from here.
+    check_true("ceiling: and it stops early rather than expanding it first",
+               time.time() - started < 5.0,
+               f"took {time.time() - started:.1f}s, so it expanded the lot")
+
+    body = b'{"real":"document"}' * 4000
+    check("ceiling: a legitimate body round-trips byte for byte",
+          limits.gunzip_capped(gziplib.compress(body), 1 * limits.MB, "ok"), body)
+    check("ceiling: a body exactly at the ceiling is allowed",
+          limits.gunzip_capped(gziplib.compress(b"x" * 1000), 1000, "exact"),
+          b"x" * 1000)
+    try:
+        limits.gunzip_capped(gziplib.compress(b"x" * 1001), 1000, "over")
+        check_true("ceiling: one byte over is refused", False)
+    except limits.TooLarge:
+        check_true("ceiling: one byte over is refused", True)
+
+    # The export index is LZMA, and decode_index blanks the one header field
+    # that would otherwise bound the output - so this decompressor needs the
+    # ceiling more than the gzip one does, not less.
+    lz = lzmalib.compress(b"\0" * (32 * 1024 * 1024), format=lzmalib.FORMAT_ALONE)
+    started = time.time()
+    try:
+        limits.unlzma_capped(lz, 4 * limits.KB, "export_index")
+        check_true("ceiling: an LZMA bomb is refused", False)
+    except limits.TooLarge:
+        check_true("ceiling: an LZMA bomb is refused", True)
+    check_true("ceiling: and that one stops early too",
+               time.time() - started < 5.0,
+               f"took {time.time() - started:.1f}s")
+
+    index = b"ExportWarframes_en.json!abc123\n" * 8
+    check("ceiling: a real export index still decodes",
+          limits.unlzma_capped(lzmalib.compress(index, format=lzmalib.FORMAT_ALONE),
+                               4 * limits.KB, "export_index"), index)
+
+    # ---- 2. end to end: oversize is a failed fetch --------------------------
+    #
+    # file:// throughout, like the blocked-host test above: the question is what
+    # `fetch` does with a body it will not accept, and that needs nobody's
+    # server to answer. It also has no Cache-Control, so no `.maxage` sidecar is
+    # written and every call here really re-requests.
+    tmp = tempfile.mkdtemp(prefix="primehunter-ceiling-")
+    url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
+    doc = os.path.join(tmp, "feed.json")
+    real_cache = sources.CACHE_DIR
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        # `api_events` has the smallest ceiling of any live feed, 8 KB.
+        cap = limits.cap_for("api_events")
+        with open(doc, "wb") as fh:
+            fh.write(b"a small honest answer")
+        check("ceiling: a body inside the ceiling is fetched normally",
+              sources.fetch(url(doc), "api_events"), b"a small honest answer")
+        check("ceiling: and nothing about it is stale",
+              (list(sources.STALE), list(sources.MISSING)), ([], []))
+
+        # the same source, now answering with far more than it is allowed
+        with open(doc, "wb") as fh:
+            fh.write(b"z" * (cap * 4))
+        # Truncated for the *message*, not for the assertion: the cached body is
+        # 21 bytes, so [:64] of a correct answer is the whole of it and any
+        # wrong answer still differs. Without this a regression prints 32 KB of
+        # 'z' into the run, which is how a failure stops being readable.
+        got = sources.fetch(url(doc), "api_events")
+        check("ceiling: an oversized answer falls back to the cached copy",
+              got[:64] if got else got, b"a small honest answer",
+              "it must not return the oversized body, and must not be fatal")
+        check("ceiling: and the build is told the data is stale",
+              sources.STALE, ["api_events"],
+              "silently reusing yesterday's copy is how this stays invisible")
+
+        cached = os.path.join(sources.CACHE_DIR, "api_events.gz")
+        with gziplib.open(cached, "rb") as fh:
+            check("ceiling: the oversized body never reached the cache",
+                  fh.read()[:64], b"a small honest answer",
+                  "the cache is what the next offline build reads")
+
+        # cold - nothing to fall back on - is fatal, exactly like any other
+        # source that cannot be fetched. Oversize invents no new outcome.
+        sources.STALE[:], sources.MISSING[:] = [], []
+        try:
+            sources.fetch(url(doc), "api_fissures", critical=True)
+            check_true("ceiling: oversized and uncached is fatal, as any cold "
+                       "failure is", False)
+        except SystemExit:
+            check_true("ceiling: oversized and uncached is fatal, as any cold "
+                       "failure is", True)
+    finally:
+        sources.CACHE_DIR = real_cache
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # ---- 3. the ceilings still fit the real data ---------------------------
+    #
+    # The canary. These are roughly twice what each source measured on
+    # 2026-09-01, which is deliberately little headroom, so this is what tells
+    # somebody a source has grown *before* a build starts going stale over it.
+    cache = os.path.join(ROOT, ".cache")
+    if not os.path.isdir(cache):
+        print("  skip ceiling headroom (no cache yet)")
+        return
+    tight = []
+    for name in sorted(os.listdir(cache)):
+        if not name.endswith(".gz"):
+            continue
+        key = name[:-len(".gz")]
+        with gziplib.open(os.path.join(cache, name), "rb") as fh:
+            size = len(fh.read())
+        room = size / limits.cap_for(key)
+        if room > 0.75:
+            tight.append(f"{key} at {room:.0%} of its ceiling ({size:,})")
+    check("ceiling: every cached source still fits well inside its own", tight, [],
+          "raise the number in tools/limits.py, and move its measured comment "
+          "with it - a source at 100% goes stale rather than wrong, but it "
+          "goes stale every single build")
 
 
 def test_what_the_build_writes_is_what_the_site_ships() -> None:
@@ -3018,6 +3177,7 @@ def main() -> int:
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
+                         test_a_source_cannot_send_more_than_its_ceiling,
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,

@@ -49,8 +49,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 #   catalogue  the wiki Prime page - the only editorial source
 #   relics     joining drop tables into relic contents and relic sources
 #   artwork    optional local copies of item images (--with-images)
+#   limits     what a remote source is allowed to cost, and the caps enforcing it
 import artwork                                            # noqa: E402
 import catalogue                                          # noqa: E402
+import limits                                             # noqa: E402
 import official                                           # noqa: E402
 import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
@@ -1028,7 +1030,8 @@ def read_feed_log(published_url: str | None) -> list:
     try:
         req = urllib.request.Request(published_url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=20) as resp:
-            rows = json.loads(resp.read().decode("utf-8"))
+            raw = limits.read_capped(resp, limits.MAX_FEED_LOG, "feed log")
+        rows = json.loads(raw.decode("utf-8"))
         return rows if isinstance(rows, list) else []
     except Exception as exc:                    # noqa: BLE001 - never fatal
         log(f"  feed log: no previous copy ({exc})")

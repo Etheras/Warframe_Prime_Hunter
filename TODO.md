@@ -109,14 +109,15 @@ without knowing they had been declined. **A tenth entry was here that neither
 review filed**, found while checking one of those two against the code, which is
 the same way four of the first review's twelve outcomes arrived.
 
-**Six shipped on 2026-09-01** and their entries are gone, with the reasoning in
-`PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
+**Seven shipped on 2026-09-01** and their entries are gone, with the reasoning
+in `PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
 privacy footer naming a host the site never contacts, the unvalidated `filters`
 section of a backup, **the wiki job's repo-writing token, now held by a job that
-runs no build**, and **LAN mode, which was removed rather than documented** —
-the review offered "say so" or "add HTTPS" and the owner took neither, so
-`serve.py` is loopback-only and refuses to bind anything else. Four things worth
-carrying forward, because none was in the findings:
+runs no build**, **the unbounded downloads and decompression, now a ceiling per
+source at twice what it measures**, and **LAN mode, which was removed rather
+than documented** — the review offered "say so" or "add HTTPS" and the owner
+took neither, so `serve.py` is loopback-only and refuses to bind anything else.
+Five things worth carrying forward, because none was in the findings:
 
 - **The footer could not have been fixed by correcting the footer.** The payload
   field it read was a single string chosen by whether artwork is local, and a
@@ -137,10 +138,17 @@ carrying forward, because none was in the findings:
   finer. The available fix was a second job, which is a bigger edit than the
   wording implied and buys the same thing. A finding phrased as a small change
   is not evidence that a small change exists.
+- **The ceilings are tight because refusing is cheap, not because the numbers
+  are confident.** The owner chose twice each measured figure where this file
+  had proposed three times. That is only safe because an oversized response
+  takes the path a failed fetch already takes — next host, then the cached copy,
+  then `meta.stale` — so a ceiling set too low costs a stale build and a named
+  log line rather than a broken one. **Read a "source over its ceiling" line as
+  "raise the number", not as an attack.** `de_worldstate` is the one most likely
+  to say it, because it carries whatever events are running.
 
 | Entry | Size |
 |---|---|
-| Downloads and decompression have no ceiling | session — a limit per source, and streaming rather than `read()` |
 | Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
 | The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
@@ -305,83 +313,6 @@ one from the deployed site (`tools/build_data.py:998`), which is the path a fres
 CI clone already takes, so nothing should change. The deployed log is the record
 the *"how often do DE answer"* question is measured from and its loss would be
 silent, which is the only reason to look rather than assume.
-
-### Downloads and decompression have no ceiling
-
-Every remote read in the pipeline takes whatever the other end sends. There is
-no `Content-Length` check, no cap while streaming, and no bound on what a
-compressed body expands to:
-
-| Where | What is unbounded |
-|---|---|
-| `tools/sources.py:331-338` | `resp.read()` with no maximum, then `gzip.decompress(raw)` on the whole thing, then the whole thing written to `.cache/*.gz` |
-| `tools/official.py:365-368` | `lzma.LZMADecompressor().decompress(blob)` on DE's export index, twice — no output cap on either call |
-| `tools/artwork.py:165-170` | each image `r.read()` into memory, then straight to disk; no per-image limit, no total, no media-type check |
-| `tools/build_data.py:1000-1002` | the feed log is fetched from the deployed site and `json.loads`-ed entire |
-
-The realistic case is not a hostile CDN, it is a broken one — a truncated
-gateway response, an error page served with the wrong type, a decompression
-bomb from a host that has itself been compromised. The cost lands on an
-unattended scheduled build: memory, disk, or a run that never finishes.
-
-HTTPS and a fixed host list make this unlikely rather than impossible. **They do
-not make the bytes trustworthy**, and this project already parses those bytes
-into a payload the browser then renders.
-
-Worth settling when it is built:
-
-- **A number per source, not one global number.** The export index is ~500
-  bytes; the drop tables are megabytes; artwork is 167 files. One limit that
-  fits all of them fits none of them.
-- **Incremental decompression.** `gzip.decompress` and `LZMADecompressor.
-  decompress` on a whole blob cannot stop early by construction — this wants the
-  streaming form, reading in chunks and abandoning the moment the expanded total
-  crosses its limit.
-- **What to do on refusal.** An oversized response is a failed fetch, and this
-  pipeline already has a well-worn answer for one: fall through the chain and
-  reuse the cache. It should take that path rather than inventing a new one.
-
-**Measured 2026-09-01, so the numbers can be chosen from evidence.** Every body
-in `.cache/`, stored and expanded, since the expansion is the half that has no
-ceiling at all:
-
-| Source | Stored | Expanded | Ratio |
-|---|---:|---:|---:|
-| `api_items` | 1,039,000 | **10,443,694** | 10.1× |
-| `official_droptables` | 258,560 | 4,419,528 | **17.1×** |
-| `export_ExportManifest` | 473,666 | 3,780,187 | 8.0× |
-| `drops_relics` | 238,679 | 2,385,503 | 10.0× |
-| `export_ExportRecipes_en` | 59,174 | 1,293,754 | **21.9×** |
-| `drops_missionRewards` | 108,152 | 1,084,088 | 10.0× |
-| `export_ExportResources_en` | 110,848 | 1,002,658 | 9.0× |
-| `export_ExportWeapons_en` | 84,609 | 610,189 | 7.2× |
-| `de_worldstate` | 19,545 | 130,253 | 6.7× |
-| `api_syndicatemissions` | 6,618 | 61,126 | 9.2× |
-| `wiki_prime` | 12,754 | 56,157 | 4.4× |
-| `api_fissures` | 1,737 | 11,029 | 6.3× |
-| `api_vaulttrader` | 1,361 | 7,947 | 5.8× |
-| `api_events` | 858 | 2,994 | 3.5× |
-| `export_index` | 526 | **490** | 0.9× |
-| **all 23 sources** | **2,475,762** | **25,598,660** | 10.3× |
-
-Artwork separately: **167 files, 8.75 MB**, largest **121,031**, median 47,638,
-smallest 8,500.
-
-Three things fall out of that and each answers one of the questions above:
-
-- **The spread is 21,000×**, from `export_index` at 490 bytes to `api_items` at
-  10.4 MB. That is the case for a number per source, now with a figure on it.
-- **The worst expansion ratio observed is 21.9×** and the largest expansion is
-  10.4 MB. So a ratio guard alone is useless — a 40× ratio is unremarkable and a
-  bomb is 1000× — and the real guard is an **absolute cap on bytes written out**,
-  with the ratio only as a cheap early signal.
-- **Artwork wants two limits, not one**: per image (largest today is 121 KB) and
-  a total across the 167, because 167 responses of 2 MB each is the failure the
-  per-image cap alone would wave through.
-
-A limit set at roughly 3× today's figure leaves room for DE to grow without
-anyone editing a constant in a hurry, and still stops every case in the entry.
-The numbers are the owner's to set; what was missing was the evidence.
 
 ### Serving a page can start the same upstream check several times over
 

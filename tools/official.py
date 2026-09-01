@@ -22,9 +22,14 @@ from __future__ import annotations
 
 import html as _html
 import lzma
+import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import limits  # noqa: E402  (local module, sits beside this file)
 
 # ── drop table ────────────────────────────────────────────────────────────
 
@@ -360,12 +365,18 @@ def decode_index(blob: bytes) -> dict[str, str]:
 
     DE writes LZMA-alone streams whose declared size trips Python's strict
     decoder, so the size field is blanked and the end marker is trusted.
+
+    Blanking that size field is exactly what removes the decoder's own idea of
+    how large the output should be, which is why the ceiling below is not
+    optional: this is a ~500-byte input, decoded twice, with the one field that
+    would otherwise bound it deliberately overwritten with 0xff.
     """
+    ceiling = limits.cap_for("export_index")
     try:
-        raw = lzma.LZMADecompressor(format=lzma.FORMAT_ALONE).decompress(blob)
+        raw = limits.unlzma_capped(blob, ceiling, "export_index")
     except lzma.LZMAError:
         patched = blob[:5] + b"\xff" * 8 + blob[13:]
-        raw = lzma.LZMADecompressor(format=lzma.FORMAT_ALONE).decompress(patched)
+        raw = limits.unlzma_capped(patched, ceiling, "export_index")
 
     out = {}
     for line in raw.decode("utf-8", "replace").splitlines():

@@ -1034,6 +1034,7 @@ Warframe Prime Hunter/
 ├── tools/
 │   ├── build_data.py       ← orchestration, the item join, and emit
 │   ├── sources.py          ← network, HTTP cache, warm/cold STALE/MISSING policy
+│   ├── limits.py           ← what a source may cost, and the caps enforcing it
 │   ├── catalogue.py        ← the wiki Prime page, and the shared vocabulary
 │   ├── relics.py           ← drop tables -> relic contents and relic sources
 │   ├── artwork.py          ← optional local image copies (--with-images)
@@ -4615,6 +4616,81 @@ Two things worth keeping:
 
 The cost is one artifact round trip per run, on a workflow that runs daily and on
 documentation pushes — not the ten-minute one.
+
+### Every source has a ceiling, and going over it is an ordinary failed fetch
+
+**Shipped 2026-09-01.** Every remote read in the pipeline took whatever the other
+end sent: `resp.read()` with no maximum, `gzip.decompress` over the whole body,
+and the result written straight into `.cache/`. Four sites, and the export index
+was decompressed twice.
+
+The realistic case was never a hostile CDN. It is a **broken** one — a truncated
+gateway, an error page served with the wrong type, a decompression bomb from a
+host that has itself been compromised — landing on an unattended scheduled build,
+where the cost is memory, disk, or a run that never finishes. HTTPS and a fixed
+host list make that unlikely rather than impossible, and they do not make the
+bytes trustworthy; this project parses them into a payload a browser then
+renders.
+
+`tools/limits.py` owns the ceilings and the three primitives that enforce them.
+Four decisions are worth keeping.
+
+**A number per source, at twice what it measures.** The spread across the 23
+sources is 21,000× — a 490-byte export index against a 10.4 MB item list — so one
+limit that fits all of them fits none. Each ceiling carries the figure it was
+derived from as a comment beside it, so the drift between the two is reviewable
+without re-measuring. `TODO.md` proposed three times; the owner chose **two**,
+which is less headroom on purpose and is paid for by the failure mode below.
+
+**An absolute cap, never a ratio.** The worst expansion ratio measured here is
+21.9× and the largest expansion is 10.4 MB. A ratio guard alone is therefore
+useless: 40× is unremarkable in this data and a real bomb is 1000×. Only the
+absolute number stops the case in the finding; the ratio is a cheap early signal
+and nothing more.
+
+**Refusing is a failed fetch, and that is what makes the tightness safe.**
+`sources.fetch` already had a well-worn answer for one — try the next host, fall
+back to the cached copy, record it in `meta.stale`. Oversize takes that path
+rather than inventing a new one, so a ceiling set too tightly costs a stale build
+and a loud log line instead of a broken one. A host that has already sent too
+much is not asked again on later attempts: it will send the same body, and
+re-requesting it three times over is exactly what *"ask no more often than the
+source says to"* exists to prevent.
+
+**Stopping early is the property, not stopping eventually.** `gzip.decompress`
+and `LZMADecompressor.decompress` over a whole blob cannot stop early by
+construction — the bomb has landed by the time there is a length to measure. Both
+are replaced by their incremental forms with a per-call output bound
+(`zlib.decompressobj`, and `LZMADecompressor` with `max_length`), checked every
+64 KB. Measured: a 200 MB gzip bomb at 1029× is refused in under 0.01s. The test
+asserts the wall clock for this reason — expanding it all and *then* measuring
+would satisfy "is refused" while doing the exact thing the ceiling exists to
+prevent.
+
+Two details specific to where they sit:
+
+- **Artwork takes two ceilings**, per image and per run, because 167 responses of
+  2 MB each is the failure a per-image cap alone waves through. Images already on
+  disk never reach the run budget, so a routine build spends almost none of it.
+  A refusal there is already handled: the rewiring pass only repoints what
+  actually landed, so the site keeps the remote URL rather than a broken image.
+- **`decode_index` needed it most and looked like it needed it least.** It is a
+  ~500-byte input, and the reason it is decoded twice is that DE's declared size
+  field trips Python's strict decoder — so the code **blanks that field with
+  `0xff` and trusts the end marker**. Overwriting the one header that would
+  otherwise bound the output is what makes the ceiling load-bearing on the
+  smallest source in the project.
+
+**Measured after the change**, on a live build that refetched eight sources
+including the 4.4 MB drop table: every cached source sits between 12% and 49% of
+its own ceiling. A test asserts that nothing is above 75%, which is what tells
+somebody a source has grown *before* builds start going stale over it.
+
+One ceiling is worth watching and says so in its own comment: `de_worldstate`, at
+280 KB against 130 KB measured. It is the only source here whose size moves with
+something other than the size of the game — it carries whatever events are
+running — so a large event is the plausible way this first bites. It goes stale
+rather than wrong, and the log line names the source and the number.
 
 ### `data/feed-log.json` is written atomically, and it is the only one
 

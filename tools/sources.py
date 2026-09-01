@@ -28,6 +28,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import limits    # noqa: E402  (local module, sits beside this file)
 import official  # noqa: E402  (local module, sits beside this file)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -315,8 +316,17 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     urls = [url] if isinstance(url, str) else list(url)
     last_err = None
     prior = read_etag(path)
+    ceiling = limits.cap_for(key)
+    # A host that answered with more than this key is allowed does not get
+    # asked again: it will send the same oversized body, and requesting it
+    # three times over is exactly what "ask no more often than the source says
+    # to" exists to prevent. Other hosts publishing the same document are still
+    # tried, which is the case this loop was built for.
+    refused = set()
     for attempt in range(3):
         for one in urls:
+            if one in refused:
+                continue
             try:
                 headers = {"User-Agent": UA, "Accept-Encoding": "gzip"}
                 # Ask only for what we do not already hold. The fissure list is
@@ -328,9 +338,14 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     headers["If-None-Match"] = prior
                 req = urllib.request.Request(one, headers=headers)
                 with urllib.request.urlopen(req, timeout=120) as resp:
-                    raw = resp.read()
+                    # Both bounded by what this key is allowed to be. The read
+                    # stops mid-transfer and the gunzip stops mid-stream, so
+                    # neither an enormous body nor a small one that expands to
+                    # an enormous one is ever held whole. tools/limits.py has
+                    # the ceilings and what they were measured against.
+                    raw = limits.read_capped(resp, ceiling, key)
                     if resp.headers.get("Content-Encoding") == "gzip":
-                        raw = gzip.decompress(raw)
+                        raw = limits.gunzip_capped(raw, ceiling, key)
                     tag = resp.headers.get("ETag")
                     freshness = resp.headers.get("Cache-Control")
                 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -339,6 +354,13 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 write_etag(path, tag)
                 write_maxage(path, freshness)
                 return raw
+            except limits.TooLarge as exc:
+                # Not an error to retry: the same host will send the same body.
+                # It is a failed fetch, which this function already knows how to
+                # answer - next host, then the cached copy, then STALE.
+                log(f"! {exc} - refused, falling through")
+                refused.add(one)
+                last_err = exc
             except urllib.error.HTTPError as exc:
                 # 304 is a success: the server has confirmed what we hold is
                 # current. Only reachable when a body was cached, since the
@@ -352,6 +374,8 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 last_err = exc
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 last_err = exc
+        if len(refused) == len(urls):
+            break                 # every host has already sent too much
         if attempt < 2:
             time.sleep(1.5 * (attempt + 1))
 
