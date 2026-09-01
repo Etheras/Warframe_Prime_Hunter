@@ -157,7 +157,6 @@ Five things worth carrying forward, because none was in the findings:
 
 | Entry | Size |
 |---|---|
-| Serving a page still writes the builder's cache | small — a read-only mode on `fetch`; the stampede half of this shipped |
 | The server caps requests, but not connections | small — **largely moot** since the server went loopback-only; kept for whoever hosts it elsewhere |
 | The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
@@ -320,39 +319,6 @@ one from the deployed site (`tools/build_data.py:998`), which is the path a fres
 CI clone already takes, so nothing should change. The deployed log is the record
 the *"how often do DE answer"* question is measured from and its loss would be
 silent, which is the only reason to look rather than assume.
-
-### Serving a page still writes the builder's cache
-
-**The stampede half shipped on 2026-09-01** and `PROJECT.md §7` has the
-reasoning: `freshness()` no longer blocks or goes upstream, one background check
-runs behind a `running` flag raised under the lock, and the page polls
-`upstream.json` until the answer settles. Measured after: a cold server answers
-the payload in 326 ms with `checking: true` on it, and the page asks exactly
-once. The owner chose serve-then-refresh over the three-line lock, so the page
-learns the answer late rather than the other tabs waiting for it.
-
-**What is left is the second bullet of that finding**, which the fix guards
-rather than removes. `sources.upstream_signature` makes one HEAD and two GETs,
-and both GETs go through `fetch`, which writes their bodies to `.cache/*.gz`
-with `.etag` sidecars. So serving a page writes to the cache the build reads
-from — now from one background thread rather than from every request at once,
-which is a much smaller window, but still a window. `serve.py`'s own comment has
-flagged it since 2026-08-26 as the thing nobody notices.
-
-A read-only path for the check would remove the race instead of narrowing it:
-`fetch` would need a mode that returns the body without writing it or its
-sidecars. Worth knowing before starting — that mode has no other caller, so it
-is new surface on the most load-bearing function in the pipeline, and the whole
-warm/cold `STALE`/`MISSING` policy hangs off `fetch`'s write behaviour.
-
-Size: small in lines, and the care is all in not disturbing that policy.
-
-**A process lock on refresh is a different question and is not this one.** It
-came from the atomic-writes entry, which otherwise shipped on 2026-09-01 (the
-feed-log write) and was already declined for every other site. A lock is what
-would stop *two local builds* interleaving; single-flight stopped one process
-racing itself. Neither is the other, and only the first was a security finding —
-the second is a foot-gun for whoever runs two terminals.
 
 ### The server caps requests, but not connections
 

@@ -272,9 +272,24 @@ def stale_if_older(key: str, path: str, max_age: float | None) -> None:
 
 
 def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
-          optional: bool = False, max_age: float | None = None):
+          optional: bool = False, max_age: float | None = None,
+          readonly: bool = False):
     """
     GET with a small on-disk cache so reruns and --offline are cheap.
+
+    `readonly` reads the cache but never writes it — no body, no `.etag`, no
+    `.maxage`, and no entry in `STALE` or `MISSING`. It exists for one caller:
+    `tools/serve.py`, which checks upstream freshness while serving a page and
+    was writing into the cache **the build reads from**, underneath a build that
+    might have been reading it. Narrowing that to one background thread fixed
+    the stampede; this removes the write altogether, which is what the finding
+    actually asked for.
+
+    Everything a read-only caller *should* still do, it still does: it honours
+    the freshness window the source declared, and it sends the `If-None-Match`
+    it already holds, so the polite conditional request is unchanged. It simply
+    does not keep what comes back. The builder owns the cache; a prober does not
+    get to warm it, and does not get to age it either.
 
     On failure: reuse the cached copy if there is one (recorded as STALE),
     otherwise record MISSING and either abort (critical) or return None.
@@ -348,6 +363,8 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                         raw = limits.gunzip_capped(raw, ceiling, key)
                     tag = resp.headers.get("ETag")
                     freshness = resp.headers.get("Cache-Control")
+                if readonly:
+                    return raw            # answered, and deliberately not kept
                 os.makedirs(CACHE_DIR, exist_ok=True)
                 with gzip.open(path, "wb") as fh:
                     fh.write(raw)
@@ -367,8 +384,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 # header is only sent then.
                 if exc.code == 304:
                     # Confirmed current by the server — unless the document is
-                    # one that cannot be this old and still be current.
-                    stale_if_older(key, path, max_age)
+                    # one that cannot be this old and still be current. Skipped
+                    # for a prober, which must not write `STALE` either: this is
+                    # the last of the three places `fetch` records something
+                    # about the build.
+                    if not readonly:
+                        stale_if_older(key, path, max_age)
                     with gzip.open(path, "rb") as fh:
                         return fh.read()
                 last_err = exc
@@ -381,6 +402,13 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
     # warm: a previous copy exists, so this is only an alert
     if os.path.exists(path):
+        if readonly:
+            # A prober's failed refresh is not the build's staleness. Recording
+            # it here would put a source in `meta.stale` because a page was
+            # being served, which is a claim about the payload that the payload
+            # has no part in.
+            with gzip.open(path, "rb") as fh:
+                return fh.read()
         age = time.time() - os.path.getmtime(path)
         log(f"~ {key}: refresh failed ({last_err}) - reusing the cached copy"
             f" ({int(age // 60)} min old)")
@@ -394,6 +422,13 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
             return fh.read()
 
     # cold: nothing to fall back on
+    if readonly:
+        # And never fatal. A prober that cannot reach a source has learnt
+        # something about the source, not about this build — the caller reads
+        # `None` as "no fingerprint" and says nothing to the page. This also
+        # takes `SystemExit` off the path serve.py runs on, which is the
+        # exception that froze its single-flight flag once already.
+        return None
     if optional:
         log(f"~ {key}: unreachable and not cached - continuing without it")
         return None
@@ -408,8 +443,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
 
 def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
-               optional: bool = False, max_age: float | None = None):
-    raw = fetch(url, key, offline, critical, optional, max_age)
+               optional: bool = False, max_age: float | None = None,
+               readonly: bool = False):
+    raw = fetch(url, key, offline, critical, optional, max_age, readonly)
     if raw is None:
         return None
     try:
@@ -425,7 +461,7 @@ def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
         return None
 
 
-def head_cached(url: str, key: str) -> dict:
+def head_cached(url: str, key: str, readonly: bool = False) -> dict:
     """`head`, but not more often than the source says to.
 
     The drop table is the case this exists for. It declares `max-age=86400` —
@@ -445,7 +481,7 @@ def head_cached(url: str, key: str) -> dict:
         except (OSError, ValueError):
             pass                                  # unreadable: just ask again
     headers = head(url)
-    if headers:
+    if headers and not readonly:      # `readonly`: see fetch's docstring
         try:
             os.makedirs(CACHE_DIR, exist_ok=True)
             with gzip.open(path, "wb") as fh:
@@ -480,20 +516,26 @@ def save_state(state: dict) -> None:
         json.dump(state, fh, indent=1)
 
 
-def upstream_signature(offline: bool = False) -> dict:
+def upstream_signature(offline: bool = False, readonly: bool = False) -> dict:
     """
     A small fingerprint of every upstream that matters, cheap enough to poll
     on a schedule: the export index is ~500 bytes, the drop table is a HEAD,
     and the trader window is a short JSON document.
+
+    `readonly` is for `tools/serve.py`, the one caller that is not a build. It
+    asks the same three questions in the same polite way and keeps none of the
+    answers — see `fetch`. The two build callers leave it off, because filling
+    the cache is the whole point when it is a build asking.
     """
     sig: dict = {}
     try:
         sig["exportIndex"] = hashlib.sha256(
-            fetch(EXPORT_INDEX_HOSTS, "export_index", offline)).hexdigest()[:16]
+            fetch(EXPORT_INDEX_HOSTS, "export_index", offline,
+                  readonly=readonly)).hexdigest()[:16]
     except Exception:
         pass
 
-    h = head_cached(OFFICIAL_DROPTABLES, "head_droptables")
+    h = head_cached(OFFICIAL_DROPTABLES, "head_droptables", readonly=readonly)
     sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
 
     # First party, and the same document the build itself reads. This asked the
@@ -503,7 +545,7 @@ def upstream_signature(offline: bool = False) -> dict:
     # was meant to avoid.
     try:
         doc = fetch_json(WORLDSTATE, "de_worldstate", offline,
-                         critical=False, optional=True)
+                         critical=False, optional=True, readonly=readonly)
         trader = ((doc or {}).get("PrimeVaultTraders") or [{}])[0]
         expiry = ((trader.get("Expiry") or {}).get("$date") or {}).get("$numberLong")
         sig["resurgence"] = str(expiry or "?")

@@ -4734,6 +4734,73 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### Serving a page reads upstream and keeps nothing
+
+**Shipped 2026-09-01**, and it closes the half of the freshness finding that
+serve-then-refresh only narrowed. `upstream_signature` makes one HEAD and two
+GETs, and both GETs went through `fetch`, which writes the body to `.cache/*.gz`
+with `.etag` and `.maxage` sidecars. So **serving a page wrote to the cache the
+build reads from** — underneath a build that might have been reading it.
+`serve.py`'s own comment had said so since 2026-08-26, filed under the things
+nobody notices.
+
+`fetch(..., readonly=True)` reads the cache and writes nothing: no body, no
+sidecars, and no entry in `STALE` or `MISSING`. There are three places `fetch`
+records something, and all three are now behind that flag — the success write,
+the warm-fallback `STALE.append`, and `stale_if_older` on a 304.
+
+What a read-only caller still does is the part worth stating: it **honours the
+freshness window the source declared** and **sends the `If-None-Match` it already
+holds**, so the polite conditional request is completely unchanged. It simply
+does not keep the answer. The builder owns the cache; a prober does not get to
+warm it, and does not get to age it either.
+
+**Two things fell out of it.**
+
+`readonly` is never fatal, whatever `critical` says. A prober that cannot reach a
+source has learnt something about the source, not about this build. That also
+takes `SystemExit` off the path `serve.py` runs on — which matters, because that
+exception had already frozen the single-flight flag once (see below).
+
+And the mode has exactly one caller, which is a thing a test has to hold: a
+`readonly` that nobody passes is a `readonly` that silently stops applying. The
+suite asserts `serve.py` asks for it by name.
+
+Verified against the real server rather than the function: 47 files in `.cache/`
+snapshotted, a page served, the check confirmed to have run (`ok: true`, a fresh
+`checkedAt`), and **not one file changed**. Before this the same check rewrote
+three bodies and their sidecars.
+
+### A background check must publish an answer, whatever kills it
+
+**Found and fixed 2026-09-01, hours after the code that caused it.** The
+serve-then-refresh worker lowered its `running` flag in a plain block at the end
+of the function, while its own docstring said `finally` lowered it "whatever
+happens". There was no `finally`.
+
+The flag is what stops the stampede, so a flag left raised stops everything:
+`freshness()` starts a check only when nothing is running, the banner freezes for
+the life of the process, and the page polls twelve times into a state that cannot
+change.
+
+**`SystemExit` is what got there, and it was reachable.** `sources.fetch` raises
+it on a cold miss with nothing cached — a fresh clone with no `.cache`, served
+while offline. `upstream_signature` catches `except Exception`, which does not
+catch a `BaseException`, and neither did the worker.
+
+Both halves were needed. `finally` guarantees the flag comes down; catching
+`BaseException` guarantees an *answer* is published rather than the thread dying
+quietly. `body` is bound before the `try` so the `finally` can never reach for a
+name that was never assigned. The `readonly` work above then removed the
+`SystemExit` path itself, so this is now defence rather than the only defence.
+
+**Worth carrying forward: the docstring was written from the intention.** It
+described `finally` because `finally` was what the author meant to write, and it
+read as evidence to everyone afterwards — including the author, hours later. It
+is the same shape as `bundle.py`'s docstring being wrong by ten about shared
+element ids. A confident sentence in the file that does the thing is not evidence
+about the thing.
+
 ### Six rounds is a premade's option, and it is availability rather than worth
 
 **Shipped 2026-09-01**, asked for by the owner on 2026-08-27. `runValue` offered

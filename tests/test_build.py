@@ -2617,7 +2617,11 @@ def test_serving_a_page_starts_one_upstream_check_not_one_each() -> None:
     entered = threading.Event()
     release = threading.Event()
 
-    def stalled_signature(offline=False):
+    # `readonly` because serve.py asks for the read-only signature; a stub that
+    # does not accept it raises TypeError, which the worker catches and turns
+    # into an error body — so the test would see zero checks and blame the
+    # single-flight flag.
+    def stalled_signature(offline=False, readonly=False):
         calls.append(offline)
         entered.set()
         release.wait(20)
@@ -2669,6 +2673,122 @@ def test_serving_a_page_starts_one_upstream_check_not_one_each() -> None:
               "the TTL is what makes a reload free")
     finally:
         release.set()
+        sources.upstream_signature = real_signature
+        serve._freshness.update(saved)
+
+
+def test_serving_a_page_never_writes_the_builders_cache() -> None:
+    """
+    `sources.upstream_signature` makes one HEAD and two GETs, and both GETs went
+    through `fetch`, which writes the body to `.cache/*.gz` with `.etag` and
+    `.maxage` sidecars. So **serving a page wrote to the cache the build reads
+    from**, underneath a build that might have been reading it. Serve-then-refresh
+    narrowed that from every request at once to one background thread; it did not
+    remove it, and `serve.py`'s own comment had flagged it since 2026-08-26 as
+    the thing nobody notices.
+
+    `readonly` removes it. The properties are: the bytes still come back, and
+    nothing on disk moves — not the body, not either sidecar, and not the
+    module-level `STALE`/`MISSING` lists, which are the build's bookkeeping and
+    have no business being touched because somebody loaded a page.
+
+    file:// throughout, like the two `fetch` tests above: what is being asked is
+    what the function writes, and that needs nobody's server.
+    """
+    tmp = tempfile.mkdtemp(prefix="primehunter-readonly-")
+    url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
+    doc = os.path.join(tmp, "doc.json")
+    real_cache = sources.CACHE_DIR
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        with open(doc, "wb") as fh:
+            fh.write(b'{"live":true}')
+
+        # cold and read-only: the answer arrives, and nothing is kept
+        got = sources.fetch(url(doc), "api_events", readonly=True)
+        check("readonly: the body still comes back", got, b'{"live":true}')
+        left = sorted(os.listdir(sources.CACHE_DIR)) \
+            if os.path.isdir(sources.CACHE_DIR) else []
+        check("readonly: and nothing at all is written", left, [],
+              "a prober that warms the cache is still writing to it")
+        check("readonly: the build's bookkeeping is untouched",
+              (list(sources.STALE), list(sources.MISSING)), ([], []),
+              "a page being served must not put a source in meta.stale")
+
+        # unreachable and read-only is not fatal, however critical the caller
+        # says it is. This is the SystemExit that froze serve.py's flag.
+        gone = sources.fetch(url(os.path.join(tmp, "nope.json")), "api_fissures",
+                             critical=True, readonly=True)
+        check("readonly: an unreachable source is not fatal", gone, None,
+              "a prober must not be able to stop anything")
+
+        # the ordinary path still writes, or the cache would never fill at all
+        sources.fetch(url(doc), "api_events")
+        wrote = sorted(f for f in os.listdir(sources.CACHE_DIR))
+        check_true("readonly: a normal fetch still writes the cache",
+                   "api_events.gz" in wrote, f"found {wrote}")
+    finally:
+        sources.CACHE_DIR = real_cache
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # and the server is the caller that asks for it
+    src = read_text(os.path.join(ROOT, "tools", "serve.py"))
+    check_true("readonly: serve.py asks for the read-only signature",
+               re.search(r"upstream_signature\([^)]*readonly=True", src) is not None,
+               "the mode exists for exactly one caller; if it stops asking, it "
+               "is writing the builder's cache again")
+
+
+def test_a_check_that_dies_still_lowers_the_flag() -> None:
+    """
+    The single-flight flag is what stops a stampede, and a flag left raised is
+    what stops everything else: `freshness()` starts a check only when nothing
+    is running, so a worker that exits without lowering it freezes the banner
+    for the life of the process. The page then polls twelve times into a state
+    that cannot change.
+
+    **`SystemExit` is the one that gets there**, and it is not hypothetical.
+    `sources.fetch` raises it on a cold miss with nothing cached — a fresh clone
+    with no `.cache`, served while offline — and `upstream_signature` catches
+    `except Exception`, which does not catch a `BaseException`. The worker's own
+    handler did not either, for a few hours on 2026-09-01, while its docstring
+    said `finally` lowered the flag "whatever happens". It had no `finally`.
+
+    So both are asserted: the flag comes down, and the page is told something
+    rather than being left on a `checking` answer forever.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import serve
+
+    real_signature = sources.upstream_signature
+    saved = dict(serve._freshness)
+    try:
+        for label, boom in (("SystemExit", SystemExit("cold build, nothing cached")),
+                            ("KeyboardInterrupt", KeyboardInterrupt()),
+                            ("ValueError", ValueError("ordinary failure"))):
+            def explode(offline=False, readonly=False, _b=boom):
+                raise _b
+            sources.upstream_signature = explode
+            serve._freshness.update(checked=0.0, stamp=0.0, body=None, running=False)
+
+            serve._check_upstream(1234.0)
+            check(f"freshness: a check that dies on {label} lowers the flag",
+                  serve._freshness["running"], False,
+                  "a raised flag means no check ever starts again")
+            check_true(f"freshness: and {label} leaves an answer behind",
+                       (serve._freshness["body"] or {}).get("ok") is False,
+                       "a page left on `checking` forever polls and gives up")
+
+        # and the flag being down is what lets the next check actually run
+        calls = []
+        sources.upstream_signature = \
+            lambda offline=False, readonly=False: (calls.append(1), {"x": "1"})[1]
+        serve._freshness.update(checked=0.0, stamp=0.0, body=None, running=False)
+        serve._check_upstream(1234.0)
+        check("freshness: a later check still runs after a dead one", len(calls), 1)
+    finally:
         sources.upstream_signature = real_signature
         serve._freshness.update(saved)
 
@@ -2966,7 +3086,8 @@ def test_a_refresh_clears_the_stale_banner() -> None:
     signature = {"drops": "a"}
     stored = {"signature": {"drops": "b"}}          # behind: the banner is up
     try:
-        sources.upstream_signature = lambda offline=False: (calls.append(1), signature)[1]
+        sources.upstream_signature = \
+            lambda offline=False, readonly=False: (calls.append(1), signature)[1]
         sources.load_state = lambda: stored
         serve.state_stamp = lambda: stamps[0]
         serve._freshness.update({"checked": 0.0, "stamp": 0.0, "body": None,
@@ -3326,6 +3447,8 @@ def main() -> int:
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_serving_a_page_starts_one_upstream_check_not_one_each,
+                         test_a_check_that_dies_still_lowers_the_flag,
+                         test_serving_a_page_never_writes_the_builders_cache,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_wiki_can_still_be_built_from_the_docs,

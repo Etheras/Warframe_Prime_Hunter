@@ -170,26 +170,50 @@ def _check_upstream(stamp: float) -> None:
     The check itself, on a background thread and never on a request's.
 
     Exactly one of these runs at a time; `freshness()` guarantees it by raising
-    `running` under the lock before starting the thread. `finally` lowers it
-    whatever happens, because a flag left raised by an exception would mean the
-    banner never updates again for the life of the process.
+    `running` under the lock before starting the thread.
+
+    **`finally` is what lowers it, and it has to be `finally`.** This said so in
+    prose and did not do it, for the few hours between the serve-then-refresh
+    change and this note. A flag left raised means `freshness()` never starts
+    another check, so the banner is frozen for the life of the process and the
+    page polls twelve times into a state that cannot change.
+
+    The path is real rather than theoretical. `sources.fetch` raises
+    **`SystemExit`** on a cold miss with nothing cached, `upstream_signature`
+    catches `except Exception` — which does not catch `SystemExit`, a
+    `BaseException` — and neither did the handler below. A fresh clone with no
+    `.cache`, served while offline, reached it on the first page load.
+
+    So the catch is `BaseException`: this is a background thread whose only job
+    is to publish an answer, and there is no exception it may exit without
+    publishing one.
     """
+    # Bound before the try, so the `finally` below cannot reach for a name that
+    # was never assigned. It is the answer a check that dies without saying
+    # anything should leave behind.
+    body = {"ok": False, "stale": False, "error": "the check did not finish"}
     try:
         import sources
-        sig = sources.upstream_signature(False)
+        # Read-only: this asks the same three questions and keeps none of the
+        # answers. Serving a page wrote to `.cache/` — the builder's cache —
+        # until 2026-09-01, underneath a build that might have been reading it.
+        sig = sources.upstream_signature(False, readonly=True)
         prev = (sources.load_state() or {}).get("signature") or {}
         moved = sorted(k for k in set(sig) | set(prev) if sig.get(k) != prev.get(k))
         body = {"ok": True, "stale": bool(moved), "moved": moved,
                 "checkedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-    except Exception as exc:                              # noqa: BLE001
+    except BaseException as exc:                          # noqa: BLE001
         # upstream unreachable is not the page's problem - say nothing rather
-        # than cry stale, which would be wrong and unactionable
+        # than cry stale, which would be wrong and unactionable. SystemExit is
+        # in here on purpose: a cold `fetch` raises it, and a server thread must
+        # not take the answer down with it.
         body = {"ok": False, "stale": False, "error": str(exc)[:120]}
-    with _freshness_lock:
-        _freshness["checked"] = time.time()
-        _freshness["stamp"] = stamp
-        _freshness["body"] = body
-        _freshness["running"] = False
+    finally:
+        with _freshness_lock:
+            _freshness["checked"] = time.time()
+            _freshness["stamp"] = stamp
+            _freshness["body"] = body
+            _freshness["running"] = False
 
 
 def freshness() -> dict:
