@@ -174,7 +174,7 @@ What is left of the entry is two fields and a warning about one of them.
 
 | Entry | Size |
 |---|---|
-| Seven rotation-bearing mission types are still unverified | small each, tedious — the unit question that gated this was settled 2026-08-27 |
+| Seven rotation-bearing mission types are still unverified | **five now**, and only their cadence — checked against DE's tables 2026-09-02, which contradict none of them |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
@@ -729,12 +729,48 @@ Elite Sanctuary Onslaught moved #38 → #14. The unit is called *per reward* on
 screen now. `PROJECT.md §7` has the reasoning, the rejected reading and why
 Survival's five minutes made it unworkable.
 
-**So this entry is down to its original question and nothing else: seven mission
-types carry no rotation confirmation at all.** `Key`, `Legacyte Harvest`, `Rush`,
-`Skirmish`, `Special`, `The Circuit` and `The Perita Rebellion` are assumed AABC
-without a wiki reading. `Spy` and `Caches` left that list when they were answered
-and fixed in `d8b4484`; `Bounty` left it as a wall clock. Tedious rather than
-hard, and no longer gating anything.
+**Checked against Digital Extremes' own drop tables on 2026-09-02, and the list
+is now five rather than seven.** Read from `.cache/official_droptables.gz` — the
+document the build actually parses — rather than from the wiki.
+
+**Use the drop tables for this question, not the wiki.** The owner's correction,
+and it cost a wrong finding to learn: the wiki describes The Circuit as
+tier-based with no rotation cycle, while DE's own table publishes explicit
+A/B/C rotations for that node. Both are true of different things — the in-game
+progression really is tier-based, and DE structure the reward *tables* by
+rotation anyway. The tables are what we parse, so the tables are what govern.
+
+| Type | In DE's `Missions:` section | What that settles |
+|---|---|---|
+| `Key` | **0 nodes** | not a mission type — comes from `keyRewards.json` |
+| `Special` | **0 nodes** | not a mission type — comes from `transientRewards.json` |
+| `Skirmish` | 40 nodes: **24 with no rotation**, 16 with A,B,C | most of it is flat, and flat is already handled |
+| `Legacyte Harvest` | 1 node, A,B,C — relics in all three | AABC not contradicted |
+| `Rush` | 2 nodes, A,B,C — relics **only in C** | AABC not contradicted |
+| `The Circuit` | 1 node, A,B,C — A pays credits and endo, B and C hold the relics | AABC not contradicted |
+| `The Perita Rebellion` | 4 nodes, A,B,C — relics **only in A** | AABC not contradicted |
+
+**Two of the seven were never mission types**, which is the finding worth
+keeping: `Key` and `Special` have no nodes in the Missions section at all,
+because they are read from different files entirely. Asking what rotation cycle
+they follow is a category error, and it belongs to *Our four invented "mission
+types" leak into the ranking* rather than here.
+
+**Of the five that remain, DE's tables contradict none.** Every rotation-bearing
+one publishes A, B and C, so the negative check passes everywhere. **What the
+tables cannot settle is the cadence** — how many rounds until B — because they
+list what each rotation contains and never how often it comes round. That is
+the whole of what is still assumed, and it is structural rather than a gap
+somebody forgot to close.
+
+**And 24 of 40 `Skirmish` nodes publish no rotation at all**, which this entry
+never noticed while calling Skirmish an AABC assumption. Those take `runValue`'s
+flat path — one reward, no cycle — and are already correct. Only the 16
+rotation-bearing ones are assuming anything.
+
+**No code change came out of this**, which is the honest result rather than a
+disappointing one: the assumption is unverified in its cadence and wrong nowhere
+that DE's tables can show.
 
 ### `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones
 
@@ -759,6 +795,16 @@ paying one reward per four objectives would be charged an eight-objective restar
 `Bounty`, `Key`, `Special` and `Enemy` are ours, not DE's — one bucket per
 droptable section (`official.py`). DE's own mission type is the parenthesised
 word in `Planet/Node (Type)`, and the wiki lists 35 of them; ours match 24.
+
+**Confirmed from the drop tables on 2026-09-02, rather than inferred.** Parsing
+DE's `Missions:` section gives 384 nodes, and **`Key` and `Special` have zero
+nodes among them** — they are read from `keyRewards.json` and
+`transientRewards.json`, which are separate files with no `(Type)` in them at
+all. So these are not mission types DE publish under a different name; there is
+no DE row behind them to disagree with. That is the strongest form this entry's
+claim can take, and it also removed two names from *Seven rotation-bearing
+mission types are still unverified*, where asking their rotation cycle turned
+out to be a category error.
 
 That matters because the planner presents all of them as places to go:
 
