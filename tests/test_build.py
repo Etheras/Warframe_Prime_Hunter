@@ -963,6 +963,39 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_what_the_build_writes_is_what_the_site_ships() -> None:
+    """
+    Every file the build puts in `data/` and the browser reads has to be copied
+    into `_site` by the workflow, or it is built and then thrown away.
+
+    Not hypothetical. `data/feed-log.json` shipped on 2026-08-27 and was left out
+    of the *Assemble the site* step, so the published copy 404ed for four days.
+    That is worse than a missing file: the log continues from the deployed one,
+    so every CI run read a 404, started a new log, and wrote a single entry —
+    the history never accumulated at all, and the failure looked exactly like
+    "the feature works, DE just always refuse".
+
+    `prime-data.json` is deliberately not required: it is the same payload as the
+    `.js` in a form nothing on the site loads.
+    """
+    workflow = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(workflow):
+        print("  skip site assembly (no workflow checked out)")
+        return
+    yml = read_text(workflow)
+    src = read_text(os.path.join(ROOT, "tools", "build_data.py"))
+
+    written = set(re.findall(r'DATA_DIR,\s*"([^"]+\.json|[^"]+\.js)"', src))
+    check_true("site: the build writes the files this test knows about",
+               {"fissures.json", "feed-log.json", "prime-data.js"} <= written,
+               f"found {sorted(written)} — the pattern that finds them has drifted")
+
+    missing = [name for name in sorted(written - {"prime-data.json"})
+               if f"data/{name}" not in yml]
+    check("site: every file the build writes is copied into _site", missing, [],
+          "built and then thrown away — the browser fetches these by name")
+
+
 def test_the_feed_log_keeps_a_day_and_survives_a_runner() -> None:
     """
     `meta.feeds` says what happened on **this** build and is overwritten by the
@@ -2873,6 +2906,7 @@ def main() -> int:
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
+                         test_what_the_build_writes_is_what_the_site_ships,
                          test_the_feed_log_keeps_a_day_and_survives_a_runner,
                          test_the_worldstate_is_judged_on_its_own_timestamp,
                          test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
