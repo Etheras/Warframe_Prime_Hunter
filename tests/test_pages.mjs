@@ -942,12 +942,12 @@ page_test("the crack list narrows by tier without re-ranking itself", async () =
   /* The subject is whichever tier the page is offering, not a named one: which
      tiers exist is payload, and a tier with nothing in it gets no tab at all. */
   const tier = await page.evaluate(() => {
-    const t = document.querySelector("#relicFilters .tier-tab[data-tier]:not([data-tier=''])");
+    const t = document.querySelector("#relicTiers .tier-tab[data-tier]:not([data-tier=''])");
     return t ? t.dataset.tier : null;
   });
   assert.ok(tier, "a list this long must offer at least one tier tab");
 
-  await page.click(`#relicFilters .tier-tab[data-tier="${tier}"]`);
+  await page.click(`#relicTiers .tier-tab[data-tier="${tier}"]`);
   const shown = await names();
   assert.ok(shown.length, `${tier} was offered as a tab, so it must have rows`);
   assert.ok(shown.length < all.length, "a filter that hides nothing is not a filter");
@@ -974,11 +974,11 @@ page_test("pressing a tier tab does not throw away the reader's focus", async ()
   await page.reload({ waitUntil: "load" });
 
   const tier = await page.evaluate(() => {
-    const t = document.querySelector("#relicFilters .tier-tab[data-tier]:not([data-tier=''])");
+    const t = document.querySelector("#relicTiers .tier-tab[data-tier]:not([data-tier=''])");
     return t ? t.dataset.tier : null;
   });
   assert.ok(tier, "no tier tab to press");
-  const sel = `#relicFilters .tier-tab[data-tier="${tier}"]`;
+  const sel = `#relicTiers .tier-tab[data-tier="${tier}"]`;
 
   const held = await page.evaluate((s) => {
     const el = document.querySelector(s);
@@ -1020,11 +1020,11 @@ page_test("every count in the strip agrees with the list under it", async () => 
   const read = () => page.evaluate(() => {
     const num = (el) => Number(el.querySelector(".n").textContent.trim());
     const tabs = {};
-    document.querySelectorAll("#relicFilters .tier-tab").forEach((b) => {
+    document.querySelectorAll("#relicTiers .tier-tab").forEach((b) => {
       tabs[b.dataset.tier || "All"] = num(b);
     });
     const boxes = {};
-    document.querySelectorAll("#relicFilters .mini-check").forEach((l) => {
+    document.querySelectorAll("#relicErrands .mini-check").forEach((l) => {
       boxes[l.querySelector("input").id] = num(l.querySelector(".lbl"));
     });
     return { tabs, boxes,
@@ -1038,7 +1038,7 @@ page_test("every count in the strip agrees with the list under it", async () => 
 
   /* The reported bug, exactly: untick an errand and the tier counts must move
      with it. */
-  await page.click("#relicFilters .mini-check:has(#p-trade)");
+  await page.click("#relicErrands .mini-check:has(#p-trade)");
   const after = await read();
   assert.equal(after.tabs.All, after.rows, "All must still equal the rows on screen");
   assert.ok(after.tabs.All < before.tabs.All,
@@ -1056,7 +1056,7 @@ page_test("every count in the strip agrees with the list under it", async () => 
   /* Each tier tab claims exactly what pressing it shows. */
   for (const tier of Object.keys(after.tabs)) {
     if (tier === "All" || !after.tabs[tier]) continue;
-    await page.click(`#relicFilters .tier-tab[data-tier="${tier}"]`);
+    await page.click(`#relicTiers .tier-tab[data-tier="${tier}"]`);
     const now = await read();
     assert.equal(now.rows, after.tabs[tier],
                  `${tier} said ${after.tabs[tier]} and shows ${now.rows}`);
@@ -1107,7 +1107,7 @@ page_test("a tier with nothing in it gets no tab", async () => {
   await page.reload({ waitUntil: "load" });
 
   const offered = await page.evaluate(() =>
-    [...document.querySelectorAll("#relicFilters .tier-tab")]
+    [...document.querySelectorAll("#relicTiers .tier-tab")]
       .map((b) => b.dataset.tier).filter(Boolean));
   assert.deepEqual(offered, subject.tiers,
     `${subject.name} has relics in ${subject.tiers.join(", ")} only, so those are ` +
@@ -1127,7 +1127,7 @@ page_test("the errand boxes appear only when there is that errand to hide", asyn
      dropping has no trade-only relics in it, and that absence is the assertion. */
   const { page, errors } = await open("/plan.html");
   const boxes = () => page.evaluate(() =>
-    [...document.querySelectorAll("#relicFilters .mini-check input")].map((i) => i.id));
+    [...document.querySelectorAll("#relicErrands .mini-check input")].map((i) => i.id));
 
   await wishFarmable(page, 3);
   assert.deepEqual(await boxes(), [],
@@ -1154,11 +1154,78 @@ page_test("the errand boxes appear only when there is that errand to hide", asyn
 
   /* And unticking it says why the list is empty, rather than blaming the vault
      for a decision the reader just made. */
-  await page.click("#relicFilters .mini-check:has(#p-trade)");
+  await page.click("#relicErrands .mini-check:has(#p-trade)");
   assert.equal(await page.locator("#planRelics .relic-row").count(), 0);
   const hint = await page.locator("#planRelics .hint").innerText();
   assert.match(hint, /hidden by the controls/,
                "an empty list caused by a filter must not read as an empty vault");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the crack-list controls survive a reload", async () => {
+  /* Reported by the owner on 2026-09-01: Varzia's box came back ticked on every
+     refresh. It was deliberate and documented — the tier and both errand boxes
+     were held in plain variables on the argument that they are view state — and
+     the owner reversed that decision, because a control you have to set on every
+     visit is one the app is making you repeat.
+
+     All three, not just the box that was reported: two adjacent checkboxes of
+     identical shape behaving differently is worse than either behaviour.
+
+     Asserted through an actual reload rather than by reading localStorage. What
+     matters is what the reader sees on the next visit, and a value saved under a
+     key nothing reads back would pass the storage check and fail the reader. */
+  const { page, errors } = await open("/plan.html");
+  /* Farmable Primes for the tier tabs, plus one with no way in at all for the
+     Trade box — a farm list of farmable Primes has neither errand and so draws
+     neither box, which the test above asserts outright. Appended to the
+     wishlist rather than replacing it, so both halves are on screen at once. */
+  await wishFarmable(page, 3);
+  const stranded = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const found = D.items.find((it) => {
+      const f = it.flags || {};
+      if (f.baro || f.special || f.founder || f.permanent) return false;
+      const rs = (it.parts || []).flatMap((p) => (p.relics || []).map((r) => r.relic));
+      return rs.length && rs.every((n) =>
+        D.relics[n] && D.relics[n].vaulted && !D.relics[n].resurgence);
+    });
+    if (!found) return null;
+    const key = "wfprimes.wishlist.v1";
+    const have = JSON.parse(localStorage.getItem(key) || "[]");
+    localStorage.setItem(key, JSON.stringify(have.concat([found.id])));
+    return found.name;
+  });
+  assert.ok(stranded, "no Prime in the payload is fully stranded — pick another property");
+  await page.reload({ waitUntil: "load" });
+
+  const tier = await page.evaluate(() => {
+    const t = document.querySelector("#relicTiers .tier-tab[data-tier]:not([data-tier=''])");
+    return t ? t.dataset.tier : null;
+  });
+  assert.ok(tier, "no tier tab to press — the crack list has fewer than two tiers");
+
+  await page.click(`#relicTiers .tier-tab[data-tier="${tier}"]`);
+
+  /* Whichever boxes this wishlist actually earned. Neither is always drawn —
+     each appears only when there is that errand to hide — so untick what is
+     there rather than assuming both, which is what `.mini-check:has(#p-trade)`
+     hanging for thirty seconds was telling me. */
+  const boxes = await page.evaluate(() =>
+    [...document.querySelectorAll("#relicErrands .mini-check input")].map((i) => i.id));
+  assert.ok(boxes.length, "no errand box on screen — nothing to assert persistence of");
+  for (const id of boxes) await page.click(`#relicErrands .mini-check:has(#${id})`);
+
+  await page.reload({ waitUntil: "load" });
+
+  assert.equal(
+    await page.locator(`#relicTiers .tier-tab[data-tier="${tier}"]`)
+      .getAttribute("aria-pressed"), "true",
+    "the tier came back unselected");
+  for (const id of boxes) {
+    assert.equal(await page.locator(`#relicErrands #${id}`).isChecked(), false,
+                 `${id} came back ticked — the reported bug`);
+  }
   assert.deepEqual(errors, []);
 });
 

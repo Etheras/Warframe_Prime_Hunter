@@ -324,9 +324,15 @@
      different waits and a player timing themselves can measure them separately.
      As expensive to lose as the twenty numbers already here, so a backup carries
      them. */
+  /* `sort`, and since 2026-09-01 the three *How to crack them* controls, are
+     view state rather than assumptions about the player — they change what is
+     on screen, not what the model concludes. They are saved and backed up all
+     the same, because a control the reader sets every single visit is one the
+     app is making them repeat. */
   const PLAN_OPTIONS = ["squad", "event", "railjack", "aya", "traces",
                         "minutes", "runStart", "runEnd",
-                        "sort", "formaHave", "formaNeed"];
+                        "sort", "formaHave", "formaNeed",
+                        "tier", "varzia", "trade"];
 
   /* What a saved filter set is allowed to be, key by key. Mirrors
      `saveFilters()` on the collection page — that is the only thing that writes

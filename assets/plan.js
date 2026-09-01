@@ -40,6 +40,12 @@
   const KEY_PLAN = S.KEYS.plan;
   const KEY_MATERIALS = S.KEYS.materials;
 
+  /* Up here rather than beside the crack list it belongs to, because the saved
+     tier is normalised against it while `opts` is being read — which happens
+     long before that section of the file. A `const` used above its declaration
+     is a ReferenceError, not a hoisted `undefined`. */
+  const TIERS = ["Lith", "Meso", "Neo", "Axi"];
+
   /* What a relic opening is worth, and how to read a backup - shared with the
      collection view, and testable without a browser. See assets/model.js. */
   const M = window.WFPrimeModel;
@@ -120,7 +126,7 @@
        this project has had to fix before. Anyone without a ship unticks it once
        and the choice is saved. */
     { squad: false, event: false, railjack: true, aya: true, traces: true,
-      minutes: {}, sort: "rate" },
+      minutes: {}, sort: "rate", tier: null, varzia: true, trade: true },
     load(KEY_PLAN, {}));
 
   /* Whether the ranked list is showing all of itself or just the top eight.
@@ -132,19 +138,32 @@
   let expandNodes = false;
 
   /* Which relic tier *How to crack them* is showing, and whether Varzia's shelf
-     is among it. `null` means every tier, which is the default and the honest
-     answer — the control only narrows what is on screen and never re-ranks, so
-     the best answer is still the one you get without touching it.
+     and the trade-only relics are among it. `null` means every tier, which is
+     the default and the honest answer — the control only narrows what is on
+     screen and never re-ranks, so the best answer is still the one you get
+     without touching it.
 
-     Not saved, for the same reason `expandNodes` is not: `opts` holds
-     assumptions about the player and every one of them changes what the model
-     concludes, while these two change only how much of the conclusion is
-     visible. A tier silently still selected from last week would make the list
-     look short for a reason nobody could see. The availability filters on the
-     collection page are remembered because they answer "what am I collecting";
-     this answers "what am I doing this evening". */
-  let relicTier = null;
-  let showVarzia = true;
+     **Saved since 2026-09-01, at the owner's direction, reversing the decision
+     below.** These were deliberately not saved, on the argument that `opts`
+     holds assumptions about the player while these change only how much of the
+     conclusion is visible — and that a tier still selected from last week would
+     make the list look short for a reason nobody could see.
+
+     What that argument missed is the cost on the other side: a reader who wants
+     Varzia's relics off has to say so on every single visit, and an app that
+     makes you repeat a choice is not protecting you from it. `sort` was already
+     view state living in `opts` and already saved, so the line the old reasoning
+     drew was not where it claimed to be either. The "looks short for no visible
+     reason" risk is real and is answered by the strip itself: the tab is drawn
+     pressed and every count beside it is live, so the reason is on screen.
+
+     `expandNodes` above stays unsaved, and that is not an inconsistency — it has
+     no control showing its state once the page is drawn.
+
+     Read back defensively: `tier` comes from a store a backup can write, so it
+     is normalised against the real tier list rather than trusted. */
+  let relicTier = TIERS.indexOf(opts.tier) >= 0 ? opts.tier : null;
+  let showVarzia = opts.varzia !== false;
   /* Trade-only relics default **on**, which is the existing behaviour rather
      than a new opinion. They are on the list deliberately — a Prime with no way
      in at all still has a real answer to "which relics do I trade for, and at
@@ -152,7 +171,7 @@
      Hiding them by default would quietly undo that decision; offering the
      control lets a reader deciding what to crack tonight put them away without
      anyone deciding on their behalf. */
-  let showTrade = true;
+  let showTrade = opts.trade !== false;
 
   /* Which number puts the rows in order. Both count the same thing - wanted
      relics - and differ only in what they divide it by, which is the question
@@ -1314,7 +1333,6 @@
      Held here so the list can be repainted without rebuilding the strip the
      reader is standing in — see `paintRelicList`. */
   let relicRows = [];
-  const TIERS = ["Lith", "Meso", "Neo", "Axi"];
   const tierOf = (rname) => String(rname).split(" ")[0];
   const isVarzia = (rname) => !!(RELICS[rname] || {}).resurgence;
   /* Vaulted, not on Varzia's shelf, and here only because the Prime has no
@@ -1373,7 +1391,7 @@
      the list are painted separately. */
   function refreshRelicCounts() {
     const { tierCount, varziaCount, tradeCount, allCount } = relicCounts();
-    $$("#relicFilters .tier-tab").forEach((b) => {
+    $$("#relicTiers .tier-tab").forEach((b) => {
       const t = b.dataset.tier;
       const n = t ? (tierCount[t] || 0) : allCount;
       const slot = b.querySelector(".n");
@@ -1390,7 +1408,7 @@
       b.disabled = !!t && n === 0 && relicTier !== t;
     });
     const set = (id, n) => {
-      const slot = $("#relicFilters #" + id);
+      const slot = $("#relicErrands #" + id);
       const lbl = slot && slot.closest(".mini-check").querySelector(".lbl .n");
       if (lbl) lbl.textContent = String(n);
     };
@@ -1403,8 +1421,14 @@
      the button that was just clicked and drop the focus to `<body>`, which is
      `STYLE.md §6`'s "a control must not rebuild the container it lives in". */
   function paintRelicFilters() {
-    const bar = $("#relicFilters");
-    if (!bar) return;
+    /* Two containers since 2026-09-01, at the owner's direction: the tier tabs
+       sit to the LEFT of the heading and the errand checkboxes stay at the far
+       right, so the heading reads between them. One element could not do that —
+       CSS can order flex children but cannot split one container's contents
+       across a sibling. */
+    const tierBar = $("#relicTiers");
+    const errandBar = $("#relicErrands");
+    if (!tierBar || !errandBar) return;
     const counts = relicCounts();
     const { dataTier } = counts;
     /* A tier that was selected and then emptied — the last Lith Prime came off
@@ -1446,11 +1470,13 @@
        different question in the same shape — the near-miss this project keeps
        having to undo. His shelf has to be read while he is on a relay; see
        `TODO.md`. When it can be, it is one more entry in this strip. */
-    bar.innerHTML = (tabs.length > 1
+    tierBar.innerHTML = (tabs.length > 1
       ? `<button type="button" class="tier-tab" data-tier=""` +
         ` aria-pressed="${relicTier ? "false" : "true"}">All` +
         `<span class="n">${counts.allCount}</span></button>` + tabs.join("")
-      : "") +
+      : "");
+
+    errandBar.innerHTML =
       (counts.dataVarzia
         ? `<label class="mini-check" data-tip="${esc(
             "Varzia sells these for Aya at Maroo's Bazaar — they do not drop, so\n" +
@@ -2129,7 +2155,8 @@
      Same arrangement as the expander above and for the same reason.
 
      **`paintRelicList()` rather than `render()`**, and that is the whole of what
-     makes this safe: these controls live in `#relicFilters`, and a full render
+     makes this safe: these controls live in `#relicTiers` and `#relicErrands`,
+     and a full render
      rewrites that element — destroying the button that was just pressed, which
      sends the focus to `<body>` and returns a keyboard reader to the top of the
      page (`STYLE.md §6`). Narrowing the list changes only the list, so only the
@@ -2137,13 +2164,16 @@
 
      The pressed state is moved in place afterwards for the same reason. */
   {
-    const bar = $("#relicFilters");
-    if (bar) {
-      bar.addEventListener("click", (e) => {
+    const tierBar = $("#relicTiers");
+    const errandBar = $("#relicErrands");
+    if (tierBar) {
+      tierBar.addEventListener("click", (e) => {
         const tab = e.target.closest(".tier-tab");
         if (!tab) return;
         relicTier = tab.dataset.tier || null;
-        $$("#relicFilters .tier-tab").forEach((b) => {
+        opts.tier = relicTier;
+        save(KEY_PLAN, opts);
+        $$("#relicTiers .tier-tab").forEach((b) => {
           b.setAttribute("aria-pressed",
             (b.dataset.tier || null) === relicTier ? "true" : "false");
         });
@@ -2151,10 +2181,13 @@
         refreshRelicCounts();
         paintRelicList();
       });
-      bar.addEventListener("change", (e) => {
-        if (e.target.id === "p-varzia") showVarzia = e.target.checked;
-        else if (e.target.id === "p-trade") showTrade = e.target.checked;
+    }
+    if (errandBar) {
+      errandBar.addEventListener("change", (e) => {
+        if (e.target.id === "p-varzia") opts.varzia = showVarzia = e.target.checked;
+        else if (e.target.id === "p-trade") opts.trade = showTrade = e.target.checked;
         else return;
+        save(KEY_PLAN, opts);
         /* The owner found this missing on 2026-09-01: the tier tabs went on
            claiming 195 Lith relics while the list beside them held ten. A count
            that does not obey the control next to it is worse than no count. */

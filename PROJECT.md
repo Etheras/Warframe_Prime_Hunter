@@ -4734,6 +4734,50 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### The crack-list controls are saved, and the tabs moved left
+
+**Both the owner's, 2026-09-01, and the first reverses a decision taken four
+commits earlier.**
+
+`relicTier`, `showVarzia` and `showTrade` were deliberately *not* saved. The
+argument was that `opts` holds assumptions about the player — each of which
+changes what the model concludes — while these change only how much of the
+conclusion is visible, and that a tier still selected from last week would make
+the list look short for a reason nobody could see.
+
+The owner reported the symptom as a bug: Varzia's box came back ticked on every
+refresh. What the original argument missed is the cost on the other side. **A
+control the reader sets on every single visit is one the app is making them
+repeat**, and the protection it bought was against a confusion the strip itself
+already prevents — the tab is drawn pressed and every count beside it is live,
+so the reason the list is short is on screen. The line the old reasoning drew
+was not where it claimed to be either: `sort` was already view state living in
+`opts` and already saved.
+
+All three, not only the box that was reported. Two adjacent checkboxes of
+identical shape behaving differently is worse than either behaviour on its own.
+`expandNodes` stays unsaved and that is not an inconsistency — it is the one
+with no control showing its state once the page is drawn.
+
+Two things that fell out of doing it:
+
+- **`tier` is normalised against `TIERS` when it is read back**, because
+  `PLAN_OPTIONS` is a name list rather than a shape check and a backup can write
+  that key. `TIERS` moved to the top of `plan.js` for it: a `const` used above
+  its declaration is a ReferenceError, not a hoisted `undefined`.
+- **The three keys were added to `PLAN_OPTIONS`**, or a backup would silently
+  drop them — that list is the allowlist `parseBackup` filters against.
+
+**The tabs moved left in the same pass.** The heading line now reads
+`[All Lith Meso Neo Axi]` · *How to crack them* · `[Varzia | Trade]`, which needs
+two containers: CSS can order flex children but cannot split one container's
+contents across a sibling. Both strips had to stop growing for it to hold —
+`.tier-tabs` was `flex:1 1 auto` because it was the only one on its line, and
+with one either side of a greedy heading the slack got shared three ways and
+nothing sat against its own edge. Measured at 1440px: tabs `312→598`, heading
+`612→1310`, errands `1324→1403`. Below about 1100px the strip wraps above the
+heading, which is the ordinary flex-wrap behaviour and is fine.
+
 ### The server serves first and refreshes behind, so one page load is one check
 
 **Shipped 2026-09-01.** `freshness()` in `serve.py` took the lock, read the cached

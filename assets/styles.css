@@ -948,6 +948,18 @@ select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,
   flex:1 1 auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;
   justify-content:flex-end;
 }
+/* *How to crack them* puts THREE things on its heading line, not two: the tier
+   tabs to the left of the heading, the errand checkboxes to its right, and the
+   heading reading between them. The owner asked for that arrangement on
+   2026-09-01.
+
+   Both strips have to stop growing for it to hold. `.tier-tabs` above is
+   `flex:1 1 auto` because it was the only one on its line and wanted the slack;
+   with one either side of the heading, two greedy strips and a greedy `.plan-h`
+   share it three ways and nothing sits against its own edge. Only the heading
+   grows now, which is what pushes the errands right and leaves the tabs left. */
+#relicTiers{flex:0 0 auto;justify-content:flex-start}
+#relicErrands{flex:0 0 auto}
 .tier-tab{
   padding:4px 9px;
   background:var(--panel-2);

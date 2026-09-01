@@ -210,6 +210,7 @@ unit question — tedious rather than hard, and blocking nothing.
 
 | Entry | Size |
 |---|---|
+| The planner's search finds Primes, never parts | session — the owner's, 2026-09-01 |
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | The shell-write guard lets `python - <<'EOF'` straight through | small — a one-line regex, on a hook rule 1 depends on |
 | One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
@@ -1209,6 +1210,41 @@ not visible before, and they are why this entry stays open.
 **Do not add retries**, whatever else is decided. A 403 from an edge appliance is
 a refusal rather than a hiccup, and `PROJECT.md §2` is explicit that every request
 is somebody else's bandwidth. Retrying an address-range block just spends it.
+
+### The planner's search finds Primes, never parts
+
+**The owner's, 2026-09-01.** The planner's *Add a Prime to your list* box matches
+whole Primes. They want it to offer **parts** as well, and selecting a part to
+**mark that part collected** — the same tick the collection page's drawer gives
+you, reachable from the planner without changing page.
+
+Why it is worth doing: the planner is where you are standing when a part
+actually drops. You have just run Hepit, you have the Neuroptics, and the tool
+that told you to go there cannot record it — you switch to the collection page,
+find the Prime, open the drawer, and tick. The two pages are meant to be equal
+tools over one dataset, and this is the one errand that forces a page change.
+
+Worth settling before it is built, because none of these is obvious:
+
+- **One box or two.** The box currently answers "what do I want to farm"; this
+  makes it answer two questions with one control, and the result list would mix
+  a Prime you are about to *wish for* with a part you are about to *own*. Two
+  kinds of result in one list needs a visible difference, not just an icon.
+- **What selecting a part does when you do not have the Prime on your list.**
+  Ticking a part of a Prime you are not tracking is legitimate — you got a drop
+  you were not chasing — so it should not silently add the Prime to the farm
+  list, and it should not silently do nothing either.
+- **Parts outnumber Primes about four to one.** 167 items against roughly 640
+  parts, so a naive merge buries the Prime results. Ranking, or a section per
+  kind, has to be decided rather than fallen into.
+- **`itemCount` means a part can be wanted more than once** — 53 of them need
+  two or more. A single tick cannot express "I have one of the two Systems", so
+  either the search offers a count or it only handles the common single case and
+  says so.
+
+The store side is already there and is the cheap half: `KEY_PARTS` is shared,
+both pages read and write it, and a part ticked on either shows on the other —
+that is tested. This is a search and a result list, not a new piece of state.
 
 ### The shell-write guard lets `python - <<'EOF'` straight through
 
