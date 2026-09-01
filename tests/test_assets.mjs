@@ -87,6 +87,68 @@ const loadShared = (opts) => {
   return { S: ctx.window.WFPrimeShared, ctx };
 };
 
+/* `siteFooter` writes into every `#siteFoot` it can find, so the only way to
+   read what it produced is to give it one. The stub is deliberately the whole
+   of the DOM it touches — one element with a settable `innerHTML` — because
+   anything richer would be a DOM implementation, which is the dependency this
+   file exists without. */
+function footerHtml(data) {
+  const ctx = sandbox({ data });
+  const foot = { innerHTML: "" };
+  ctx.document.querySelectorAll = (sel) => (sel === "#siteFoot" ? [foot] : []);
+  vm.runInContext(source("shared.js"), ctx);
+  ctx.window.WFPrimeShared.siteFooter();
+  return foot.innerHTML;
+}
+
+test("the privacy footer names the artwork hosts this build actually uses", () => {
+  /* It named `cdn.warframestat.us` for every build that was not local, while
+     `image_for` chooses per item — so the deployed site loaded all 167 images
+     from `content.warframe.com` and the footer named a host it never contacts.
+     The field it read could not express a build that uses both, which is why
+     the build now records the hosts themselves. */
+  const html = footerHtml({ meta: { sources: { imageHosts: ["https://content.warframe.com"] } } });
+  assert.match(html, /artwork loads from/);
+  assert.match(html, /content\.warframe\.com/);
+  assert.ok(!/warframestat/.test(html),
+            "a host this build never contacts must not be named");
+});
+
+test("a build using both artwork hosts says both", () => {
+  /* The case the single string could not express, and the reason this is a
+     list. DE's manifest covers all 167 today; a build where it answered for
+     only some of them is exactly the failure WFCD is kept as fallback for. */
+  const html = footerHtml({ meta: { sources: {
+    imageHosts: ["https://cdn.warframestat.us", "https://content.warframe.com"] } } });
+  assert.match(html, /content\.warframe\.com/);
+  assert.match(html, /cdn\.warframestat\.us/);
+  assert.match(html, /which therefore see your address/,
+               "two hosts see, one host sees — the sentence has to agree with itself");
+  assert.match(html, /raw\.githubusercontent\.com/,
+               "the WFCD CDN answers 301 to GitHub, which sees the request too");
+});
+
+test("local artwork claims no third party, and nothing else does", () => {
+  const local = footerHtml({ meta: { sources: { imageHosts: ["assets/img"] } } });
+  assert.match(local, /no third party sees your visit/);
+  const remote = footerHtml({ meta: { sources: { imageHosts: ["https://content.warframe.com"] } } });
+  assert.ok(!/no third party sees your visit/.test(remote),
+            "the claim this whole field exists to stop being false");
+});
+
+test("a payload built before the hosts were recorded still gets a footer", () => {
+  /* `imageHosts` landed 2026-09-01. An older `data/prime-data.js` has only the
+     string, and a footer that goes blank on one is worse than a coarse one —
+     it carries the licence and the Content Policy attribution. */
+  const old = footerHtml({ meta: { sources: { images: "https://cdn.warframestat.us/img" } } });
+  assert.match(old, /cdn\.warframestat\.us/);
+  const oldLocal = footerHtml({ meta: { sources: {
+    images: "assets/img (local copies; nothing fetched at runtime)" } } });
+  assert.match(oldLocal, /no third party sees your visit/);
+  const none = footerHtml({});
+  assert.match(none, /Content Policy/, "no meta at all still gets the licence");
+});
+
 test("a count that is not a count is refused, whichever end it came from", () => {
   const { S } = loadShared();
 

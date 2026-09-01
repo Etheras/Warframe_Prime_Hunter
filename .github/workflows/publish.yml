@@ -69,7 +69,7 @@ jobs:
     # Nothing beyond the workflow floor: this job reads the repo, fetches from
     # upstream and writes an artifact. It does not deploy.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The build makes no git operation, so it has no use for a credential
           # in .git/config for the length of the job.
@@ -78,7 +78,7 @@ jobs:
       # 3.14 matches what the project is developed against. The floor is 3.8
       # (stdlib only, no walrus, no match, no 3.9+ stdlib) but there is no
       # reason for CI to run anything but current.
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
 
@@ -96,7 +96,7 @@ jobs:
       # aged out.
       - name: Restore source cache
         if: env.FULL == 'true'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache
           key: prime-sources-${{ github.run_id }}
@@ -111,7 +111,7 @@ jobs:
       # keeps. Restore-only is the whole difference.
       - name: Restore source cache (read-only)
         if: env.FULL != 'true'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache
           key: prime-sources-
@@ -214,7 +214,7 @@ jobs:
           cp dist/warframe-prime-hunter.html _site/warframe-prime-hunter-standalone.html
           echo "Published $(date -u +%Y-%m-%dT%H:%MZ)" > _site/BUILD.txt
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
 
@@ -236,4 +236,4 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

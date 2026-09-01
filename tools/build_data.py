@@ -263,6 +263,35 @@ def write_changelog(items: list, relics_out: dict,
     return lines_out
 
 
+def write_atomic(path: str, text: str) -> None:
+    """
+    Write `text` to `path` so a reader never sees half of it.
+
+    Onto a temporary sibling first, then `os.replace`, which is atomic on both
+    platforms this runs on when source and destination share a directory - hence
+    the sibling rather than a temp dir.
+
+    **Added for one file, deliberately.** Non-atomic writes were examined across
+    the pipeline on 2026-08-26 and declined as a backlog entry (`PROJECT.md 7`):
+    every other torn write here **fails loudly**, and a build that stops is a
+    build somebody fixes. `data/feed-log.json` is the exception and postdates
+    that decision - it is read back inside a bare `except (OSError, ValueError):
+    pass`, so a torn one is silently treated as absent and the build starts a
+    fresh 24-hour log, discarding the record of which source answered. Quiet
+    wrong data, not a stopped build, which is the failure mode worth spending a
+    helper on.
+
+    The rest stay opportunistic: use this when touching one of them anyway,
+    rather than sweeping them.
+    """
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
 def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
@@ -1796,6 +1825,18 @@ def main() -> int:
     local_images = (cache_images(out_items, off, verify=args.refresh_images)
                     if want_images else 0)
 
+    # Every distinct place the artwork on THIS payload is actually loaded from,
+    # read off the items after `cache_images` has repointed whatever it took
+    # local. `image_for` chooses per item - DE's content.warframe.com wherever
+    # their texture manifest answered, WFCD's CDN where it did not - so a build
+    # can genuinely use both, and the privacy sentence on the page is only
+    # honest if it is derived from this rather than from which host was
+    # preferred. Origin only: a path would name every file the reader loaded.
+    image_hosts = sorted({
+        "/".join(url.split("/")[:3]) if url.startswith("http") else "assets/img"
+        for url in (str(it.get("image") or "") for it in out_items) if url
+    })
+
     payload = {
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -1851,8 +1892,16 @@ def main() -> int:
                 "bounties": "https://api.warframestat.us/pc/syndicateMissions + /pc/events"
                             " (live worldstate)",
                 "fissures": "https://api.warframestat.us/pc/fissures (live worldstate)",
-                "images": ("assets/img (local copies; nothing fetched at runtime)"
-                           if local_images else "https://cdn.warframestat.us/img"),
+                # What the artwork URLs on this payload ACTUALLY point at,
+                # derived from the items after `cache_images` has had its say
+                # rather than from which host was preferred. The old field was a
+                # single string chosen by whether artwork is local, so it said
+                # `cdn.warframestat.us` for every remote build - including the
+                # normal one where DE answered for all 167 - and the site's own
+                # privacy sentence named a host it never contacts. A build can
+                # use both, and this is the field that can say so.
+                "images": (", ".join(image_hosts) if image_hosts else "none"),
+                "imageHosts": image_hosts,
             },
         },
         "categories": categories,
@@ -1899,8 +1948,11 @@ def main() -> int:
     # rather than a field on the payload: 144 builds a day is a few kilobytes,
     # and the next build has to read it back — cheaply, without pulling 2MB to
     # find out what happened yesterday.
-    with open(os.path.join(DATA_DIR, "feed-log.json"), "w", encoding="utf-8") as fh:
-        json.dump(feed_log, fh, ensure_ascii=False, separators=(",", ":"))
+    # Atomically, because this is the one write here whose torn form is silent:
+    # `read_feed_log` swallows OSError and ValueError, so half a file reads as
+    # no file and the 24-hour record starts over. See `write_atomic`.
+    write_atomic(os.path.join(DATA_DIR, "feed-log.json"),
+                 json.dumps(feed_log, ensure_ascii=False, separators=(",", ":")))
 
     # remember what upstream looked like, so --if-changed can skip next time
     new_state = {

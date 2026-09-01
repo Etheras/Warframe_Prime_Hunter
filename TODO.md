@@ -25,6 +25,10 @@ worth more in the document people read to understand the code.
 the code before being written down — they have their own section below, kept
 together because the corrections only make sense beside the claims they correct.
 
+**Added 2026-09-01.** Nine entries from the independent security re-review dated
+2026-08-28, each re-checked against the working tree before being written down —
+they have their own section, and it sits first because security does.
+
 **Swept the same day.** Seven entries shipped and were deleted: the four akimbo
 Primes whose second sub-weapon could not be recorded, the availability filter that
 hid items with a second source, the drawer that threw away the focus, the
@@ -91,6 +95,45 @@ the first Spy nodes either page has ever shown.
 
 **Both lists can now be seen whole** — the drawer got the same treatment the same
 day, so Spy nodes and the pre-refined eleven are reachable on either page.
+
+### Security
+
+Nine findings from the re-review of 2026-08-28. **No Critical and no High** —
+both Highs from the previous review were re-tested and are fixed. These come
+first in this file because they are security work, not because any of them is on
+fire.
+
+**Two of the nine were already asked and answered**, by the owner on 2026-08-26,
+and are marked below rather than re-opened — the second review re-filed them
+without knowing they had been declined. **A tenth entry was here that neither
+review filed**, found while checking one of those two against the code, which is
+the same way four of the first review's twelve outcomes arrived.
+
+**Four shipped on 2026-09-01** and their entries are gone, with the reasoning in
+`PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
+privacy footer naming a host the site never contacts, and the unvalidated
+`filters` section of a backup. Two things worth carrying forward from doing them,
+because neither was in the finding:
+
+- **The footer could not have been fixed by correcting the footer.** The payload
+  field it read was a single string chosen by whether artwork is local, and a
+  build can use both hosts. The field had to be able to say so first.
+- **The `filters` gap was narrower than filed.** The collection page already
+  validated every one of those keys where it read them, `sort` included. What
+  shipped is consistency inside `parseBackup` and defence in depth, not a hole
+  being closed — see the note in `PROJECT.md §7`, which says so rather than
+  claiming the larger win.
+
+| Entry | Size |
+|---|---|
+| Nothing stops the next workflow re-introducing a mutable tag | small — but **not doable from here**: a repository setting, so it needs the owner in GitHub |
+| Downloads and decompression have no ceiling | session — a limit per source, and streaming rather than `read()` |
+| Serving a page can start the same upstream check several times over | small — one lock held across the check, or serve first and refresh behind |
+| The server caps requests, but not connections | small — a semaphore at accept; the rate limit runs too late to help |
+| LAN mode is plain HTTP, and says nothing about what that costs | small as documentation, large as HTTPS — decide which is being asked for |
+| The published site can be framed, and only the host can stop it | **blocked on GitHub Pages** — a meta CSP cannot carry `frame-ancestors` |
+| A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
+| `data/feed-log.json` is tracked on purpose, and only for now | **not a defect** — a temporary testing file; the entry is the cleanup reminder |
 
 ### The worldstate is already cached, and barely read
 
@@ -185,6 +228,266 @@ its open half closed on 2026-08-24, and what remains of it is a note explaining 
 Railjack levels are absent on purpose. Four wiki edits sit under **Should be fixed
 on the wiki, not here** — those are edits to `wiki.warframe.com`, not to this
 repository.
+
+---
+
+## Security — the re-review of 2026-08-28
+
+**The second independent security review of this project**, against commit
+`16ee027` and compared against the commit the first one read. It found **no
+Critical and no High**. Both Highs from the first review were re-tested and are
+fixed: the remote artwork filename that could escape `assets/img`, and the
+stored DOM XSS through numeric fields with no CSP behind it. What is left is
+five Medium and four Low, and not one of them is an observed compromise — they
+are the software supply chain, resource limits, LAN mode, and two sentences that
+describe the app inaccurately.
+
+**All nine were re-checked against the working tree on 2026-09-01**, after the
+four commits that have landed since the reviewed one, and all nine are still
+true as descriptions of the code. The line numbers below are this tree's;
+several had drifted from the review's by the time they were checked, which is
+the usual reason to re-derive them rather than copy them.
+
+**Still true is not the same as still open.** Two of the nine — the unbounded
+backup import, and non-atomic writes — are things the owner examined and
+**declined** on 2026-08-26, after the first review filed them. The second review
+had no way to know that and filed them again. They are marked below rather than
+re-opened, with the answer left where it lives in `PROJECT.md §7`; the
+atomic-writes one is narrowed to the single write site that genuinely postdates
+the decline. **A tenth entry follows them that neither review filed**, found
+while checking those two against the code.
+
+**The review's assurance gap is already closed and has no entry here.** It
+reported the release gate red — one cadence assertion and four wiki-generation
+assertions — and it no longer is: `python tests/test_build.py` was run on
+2026-09-01 and passed, with `clone-and-build` skipped for want of `--online`.
+The cadence assertion went green when the light refresh went back to ten minutes
+(`070f527`), and the four wiki assertions when the standing notices started
+being found by shape rather than by position (`a67b6d5`, `4947bca`). The
+*shape* of the cadence test is still wrong and keeps its own entry — *The
+schedule tests assert equality where they should assert a ceiling* — but being
+wrong is not the same as being red, and it is no longer red.
+
+### Nothing stops the next workflow re-introducing a mutable tag
+
+**What is left of *Every GitHub Action runs from a mutable tag*, which shipped
+2026-09-01.** All nine `uses:` lines across both workflows are pinned to
+40-character commit SHAs with the version beside them; `PROJECT.md §7` has the
+reasoning and the SHAs. Two parts of that entry did not ship and are the whole
+of this one:
+
+- **The repository policy that *requires* SHA pins.** Pinning nine lines fixes
+  nine lines; the policy is what stops the tenth being added as a tag. It is a
+  repository setting rather than a file in this tree, so it cannot be done from
+  here — it needs the owner in GitHub's settings, under Actions.
+- **Whether the wiki job wants splitting** into a read-only generate step and a
+  minimal write step. The review suggests it. It is a real change rather than a
+  mechanical one: `wiki.yml` holds `contents: write` for the whole job, and
+  splitting it would confine that to the step that pushes.
+
+Also worth knowing, since the pins now have to be maintained: **a pinned SHA
+goes stale silently**, which is the cost of the fix. Dependabot understands
+SHA-pinned actions and will raise the bump with the new comment, and turning it
+on is the answer to "who notices" — also a repository setting.
+
+### `data/feed-log.json` is tracked on purpose, and only for now
+
+**Not a defect — answered by the owner on 2026-09-01.** It is a **temporary
+testing file**, deliberately committed, and it comes out of the repository once
+that testing finishes. It is recorded here so the next reader does not re-file it
+as the oversight it looks like, and so the cleanup is not forgotten.
+
+It looks like an oversight because `.gitignore` lists the generated payload file
+by file — `data/prime-data.js`, `data/prime-data.json`, `data/fissures.json` —
+and this name is simply not among them. A session found it on 2026-09-01 while
+making that write atomic and wrote it up as accidental; it is not.
+
+**Two things follow from it being tracked, and both are temporary too:**
+
+- Every local build rewrites it, so the working tree is dirty after any build.
+  **That is expected. Do not clean it up** — `PROJECT.md §2` now has the rule
+  that made this worth saying, learnt by destroying four rows of it.
+- `PROJECT.md §7` says the public repository has never carried a generated file.
+  While this is tracked, that is not true, and the note there says so.
+
+**When the testing is done:** add it to `.gitignore`, `git rm --cached` it, and
+check the first build after — a build with no local copy fetches the published
+one from the deployed site (`tools/build_data.py:998`), which is the path a fresh
+CI clone already takes, so nothing should change. The deployed log is the record
+the *"how often do DE answer"* question is measured from and its loss would be
+silent, which is the only reason to look rather than assume.
+
+### Downloads and decompression have no ceiling
+
+Every remote read in the pipeline takes whatever the other end sends. There is
+no `Content-Length` check, no cap while streaming, and no bound on what a
+compressed body expands to:
+
+| Where | What is unbounded |
+|---|---|
+| `tools/sources.py:331-338` | `resp.read()` with no maximum, then `gzip.decompress(raw)` on the whole thing, then the whole thing written to `.cache/*.gz` |
+| `tools/official.py:365-368` | `lzma.LZMADecompressor().decompress(blob)` on DE's export index, twice — no output cap on either call |
+| `tools/artwork.py:165-170` | each image `r.read()` into memory, then straight to disk; no per-image limit, no total, no media-type check |
+| `tools/build_data.py:1000-1002` | the feed log is fetched from the deployed site and `json.loads`-ed entire |
+
+The realistic case is not a hostile CDN, it is a broken one — a truncated
+gateway response, an error page served with the wrong type, a decompression
+bomb from a host that has itself been compromised. The cost lands on an
+unattended scheduled build: memory, disk, or a run that never finishes.
+
+HTTPS and a fixed host list make this unlikely rather than impossible. **They do
+not make the bytes trustworthy**, and this project already parses those bytes
+into a payload the browser then renders.
+
+Worth settling when it is built:
+
+- **A number per source, not one global number.** The export index is ~500
+  bytes; the drop tables are megabytes; artwork is 167 files. One limit that
+  fits all of them fits none of them.
+- **Incremental decompression.** `gzip.decompress` and `LZMADecompressor.
+  decompress` on a whole blob cannot stop early by construction — this wants the
+  streaming form, reading in chunks and abandoning the moment the expanded total
+  crosses its limit.
+- **What to do on refusal.** An oversized response is a failed fetch, and this
+  pipeline already has a well-worn answer for one: fall through the chain and
+  reuse the cache. It should take that path rather than inventing a new one.
+
+### Serving a page can start the same upstream check several times over
+
+`freshness()` in `tools/serve.py:135-157` takes the lock, reads the cached
+answer, **releases the lock**, and only then calls `sources.upstream_signature`
+— one HEAD and two GETs, each with a 120-second timeout. The lock is taken again
+at the end, to publish the result.
+
+So every request that arrives before the first check finishes sees no cached
+answer and starts its own. They all make the same three upstream requests, and
+they all write the same `.cache/*.gz` bodies and `.etag` sidecars underneath a
+build that may be reading them. The hourly throttle (`FRESHNESS_TTL = 3600`)
+works perfectly from the second check onwards and does nothing about the first.
+
+**The blocking is deliberate and the stampede is not.** The comment above the
+function argues the trade honestly — a slow first load beats quietly serving
+data you have no reason to trust — and that argument is about *one* check, not
+about *n* of them. Rule 11 is the sharper objection: asking DE three times
+because three tabs opened at once is precisely the hospitality this project has
+committed to not abusing.
+
+Worth deciding:
+
+- **Single-flight, or serve-then-refresh.** Holding the lock across the check
+  is the small fix and makes the other tabs wait. Serving the built data
+  immediately and refreshing the banner behind it is the better answer and is a
+  larger change, because the page then has to learn the answer late.
+- **Whether page serving should write the builder's cache at all.** It does
+  today, and the comment already flags it as the thing nobody notices. A
+  read-only path for the check would remove the race rather than guard it.
+
+**A process lock on refresh is the other half and is a separate question.** It
+came from the atomic-writes entry, which otherwise shipped on 2026-09-01 (the
+feed-log write) and was already declined for every other site. A lock is what
+would stop *two local builds* interleaving; single-flight above only stops one
+process racing itself. Neither is the other, and only the first is a security
+finding — the second is a foot-gun for whoever runs two terminals.
+
+### The server caps requests, but not connections
+
+`tools/serve.py` runs `ThreadingMixIn` with `daemon_threads = True` and no
+ceiling on how many threads it will make. The two protections that exist both
+act too late to help:
+
+- the **token bucket** (`RATE_BURST = 60`, `RATE_PER_SEC = 10.0`, line 296-297)
+  runs inside `do_GET`/`do_HEAD` — after a complete request line and headers
+  have been parsed, so a connection that never sends them is never counted;
+- the **30-second socket timeout** on the handler (line 350) bounds how long
+  each thread lives, not how many there are.
+
+The review opened 80 partial requests at once; all 80 were accepted, and a
+normal request still returned 200 — so this is a resource question rather than a
+denial of service that has been demonstrated. It only matters in LAN mode;
+localhost is the default and is the safe one.
+
+A semaphore taken at accept, with a short queue and a 503-and-close when full,
+is the shape the review asks for. **Keep both existing protections** — they
+solve different parts of it, and the comments in that file record what each one
+was measured to do.
+
+### LAN mode is plain HTTP, and says nothing about what that costs
+
+`serve-lan.cmd` and `serve-lan.sh` bind every interface and print an `http://`
+URL. Against an active attacker on the same network that means the scripts and
+data can be rewritten in flight, and the CSP arrives rewritten too — after which
+the collection in `localStorage` is same-origin and readable.
+
+There are no accounts and no credentials here, so the blast radius is one
+browser's tracker state rather than an identity. That is why it is Medium and
+not High.
+
+**The honest question is which of two things is being asked for**, and they are
+very different sizes:
+
+- **Say so.** One paragraph in the README and the LAN launcher output stating
+  that HTTP protects neither integrity nor confidentiality against someone on
+  the same network, and that LAN mode is for a trusted home network. This is
+  small, and it is what the existing Windows Firewall guidance is already half
+  of.
+- **Fix it.** HTTPS via a local reverse proxy plus some access control. That is
+  a new moving part in a project whose whole premise is that it survives being
+  copied to a USB stick, and it should not be taken on unless LAN use has
+  actually grown past one household.
+
+The review recommends the first and offers the second conditionally. Nothing in
+either case makes `http.server` fit to face the internet, and it should never
+be pointed at one.
+
+### The published site can be framed, and only the host can stop it
+
+`tools/serve.py` sends `frame-ancestors 'none'` and `X-Frame-Options: DENY`.
+GitHub Pages sends neither, and during the review returned no CSP,
+`X-Frame-Options`, `X-Content-Type-Options` or `Referrer-Policy` at all.
+
+**The pages' own meta CSP cannot close this**, and it is worth knowing why
+before anyone tries: the CSP specification requires browsers to *ignore*
+`frame-ancestors` in a `<meta>` policy, and `default-src 'none'` is not a
+substitute for it. This is the one finding on the list that cannot be fixed in
+this repository.
+
+So the options are all about hosting, and each has a real cost:
+
+- put a fronting service in front of Pages that can add response headers;
+- move the deployment somewhere that supports them;
+- accept it, and write down that it was accepted. A static tracker with no
+  accounts and no state-changing controls is a poor clickjacking target — the
+  worst a framed click achieves is ticking a box in the visitor's own browser.
+
+The third is a defensible answer. It is only a bad one if nobody has said it out
+loud.
+
+### A backup import will read a file of any size **[settled — declined 2026-08-26]**
+
+**Not open. Do not re-file it.** This is `L-09` from the first review, filed
+again as `L-03` by the second, and the owner examined and declined it on
+2026-08-26. The reasoning is in `PROJECT.md §7` under *Two security findings
+examined and declined*, and it is worth reading rather than re-deriving: there
+is no adversary in it, both import handlers already wrap `parseBackup` in
+`try`/`catch`, every loop in the parser is linear so a hostile file buys nothing
+a merely large one does not, and **the file picker is not a distinct surface**
+— the same text pastes straight into `#dataArea` with no file at all, so a cap
+on the picker would not remove the behaviour described.
+
+The second review adds nothing the decline did not already answer. It repeats
+the same evidence (`assets/shared.js` around the `FileReader`, `model.js`'s
+parser), reaches the same severity, and suggests the same 5 MiB ceiling.
+
+**It is kept here, rather than deleted, precisely because it has now been filed
+twice.** A third review will file it again. The entry costs a paragraph and
+saves the next reader the work of re-deciding it.
+
+The one thing that came out of looking properly the first time was a *different*
+gap — `filters` and `sort` adopted from a backup without validation. **Half of
+that shipped and half did not**, and the pointer to it has rotted; see the entry
+below.
+
+### A backup's `filters` are adopted whole, and the entry saying so is gone
 
 ---
 

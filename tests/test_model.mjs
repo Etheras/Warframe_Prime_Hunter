@@ -507,6 +507,71 @@ test("the run overhead survives a backup round trip, zero included", () => {
   assert.equal(out.plan.runEnd, 0, "and a deliberate zero is not a missing value");
 });
 
+test("a restored filter set is taken key by key, like the planner's options", () => {
+  /* `filters` was the one section of a backup taken whole on a bare `typeof`
+     while `plan` beside it had a strict allowlist — an inconsistency inside one
+     function. The collection page does validate all of these where it reads
+     them, so this is defence in depth rather than a hole; what it stops is the
+     unrecognised keys being *stored*, and the next section somebody adds
+     copying the loose one instead of the strict one. */
+  const M = load();
+  const out = M.parseBackup({
+    collected: [],
+    filters: {
+      avail: { farmable: true, vaulted: false, "]:hover": true, bad: "yes" },
+      cats: ["Warframes", 7, "Melee"],
+      sort: "release",
+      showCollected: true,
+      hideVaultedRelics: false,
+      andWhateverElse: { deep: [1, 2, 3] },
+    },
+  }, CATALOGUE);
+  assert.deepEqual(Object.keys(plain(out.filters)).sort(),
+                   ["avail", "cats", "hideVaultedRelics", "showCollected", "sort"],
+                   "only the keys saveFilters writes come back");
+  assert.deepEqual(plain(out.filters.avail), { farmable: true, vaulted: false, "]:hover": true },
+                   "a non-boolean bucket is dropped; the page still checks the names");
+  assert.deepEqual(plain(out.filters.cats), ["Warframes", "Melee"], "a non-string category goes");
+});
+
+test("a filter of the wrong type is dropped, never guessed at", () => {
+  /* Coercing would be worse than dropping: a restore that quietly gives
+     somebody a screen they did not save is harder to notice than one that
+     falls back to the default. */
+  const M = load();
+  const out = M.parseBackup({
+    collected: [],
+    filters: { showMissing: "yes", sort: 3, cats: "Warframes", avail: ["farmable"] },
+  }, CATALOGUE);
+  assert.equal(out.filters, null,
+               "nothing recognisable survived, so there is no filter set to save");
+});
+
+test("a filters section that is not an object is refused like any other", () => {
+  const M = load();
+  for (const bad of [null, "filters", 42, [1, 2]]) {
+    const out = M.parseBackup({ collected: [], filters: bad }, CATALOGUE);
+    assert.equal(out.filters, null, `${JSON.stringify(bad)} is not a filter set`);
+  }
+});
+
+test("every key the collection page saves survives a filter round trip", () => {
+  /* The failure this guards is silent and one-directional: a key missing from
+     FILTER_SHAPE is dropped on restore without a word, exactly as an option
+     missing from PLAN_OPTIONS is. Anything saveFilters writes has to be here. */
+  const M = load();
+  const saved = {
+    avail: { farmable: true }, cats: ["Warframes"], sort: "name",
+    showCollected: false, showMissing: true,
+    hideVaultedRelics: true, hideOwnedParts: false,
+  };
+  for (const key of Object.keys(saved)) {
+    assert.ok(key in M.FILTER_SHAPE, `${key} is dropped on restore`);
+  }
+  const out = M.parseBackup({ collected: [], filters: saved }, CATALOGUE);
+  assert.deepEqual(plain(out.filters), saved, "and it comes back exactly as saved");
+});
+
 /* ── a relic that adds nothing to the one beside it ────────────────
    Apollo (Lua) as the owner found it on 2026-09-01: two wanted relics at the
    same odds, and `Axi A21` pays nothing `Axi D6` does not. Named here because

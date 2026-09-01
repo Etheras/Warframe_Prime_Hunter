@@ -98,9 +98,21 @@ texture manifest can be read and from `cdn.warframestat.us` when it cannot.
 
 ## Privacy
 
-No account, no cookies, no analytics, no third-party requests. Your collection lives
-in your browser's `localStorage` and is never transmitted — the server has no idea
-what you own, and could not tell you if asked.
+No account, no cookies, no analytics. Your collection lives in your browser's
+`localStorage` and is never transmitted — the server has no idea what you own, and
+could not tell you if asked.
+
+**"No third-party requests" is true of a build with local artwork, and was stated
+flat here until 2026-09-01.** It is not true of the two artefacts most people
+read: the published site and the standalone download both load 167 images from
+whichever host the build recorded — `content.warframe.com` where DE's texture
+manifest could be read, `cdn.warframestat.us` where it could not, and that one
+redirects on to `raw.githubusercontent.com`. Those hosts therefore see a
+visitor's address and which items they looked at, and nothing else; the
+collection never leaves the browser either way. The site's own footer names the
+hosts the build it came from actually uses, read from `meta.sources.imageHosts`
+rather than asserted, so the page and this file cannot drift apart again. Build
+with `--with-images` and there are genuinely none.
 
 The one piece of personal data touched is the visitor's IP address, which `serve.py`
 uses transiently for rate limiting. It is keyed-hashed with a salt generated at

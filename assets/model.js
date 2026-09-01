@@ -328,6 +328,51 @@
                         "minutes", "runStart", "runEnd",
                         "sort", "formaHave", "formaNeed"];
 
+  /* What a saved filter set is allowed to be, key by key. Mirrors
+     `saveFilters()` on the collection page — that is the only thing that writes
+     this section, and a key here that it does not write is a key nothing will
+     ever read back.
+
+     Typed rather than merely named, unlike `PLAN_OPTIONS`, because these are
+     not all plain settings: `avail` is a map of buckets to booleans and `cats`
+     is a list. `PLAN_OPTIONS` can stay a bare list because a planner option
+     that is the wrong type is a wrong *number*, which the page's own reads
+     clamp; a filter of the wrong type used to reach a CSS selector. */
+  const FILTER_SHAPE = {
+    avail: "boolmap", cats: "strings", sort: "string",
+    showCollected: "boolean", showMissing: "boolean",
+    hideVaultedRelics: "boolean", hideOwnedParts: "boolean",
+  };
+
+  /* A key of the wrong type is dropped rather than coerced. A backup saying
+     `showMissing: "yes"` is a file we do not understand, and guessing what it
+     meant is how a restore quietly gives somebody a screen they did not save. */
+  function takeFilters(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const out = {};
+    Object.keys(FILTER_SHAPE).forEach((k) => {
+      const v = raw[k];
+      if (v === undefined) return;
+      const want = FILTER_SHAPE[k];
+      if (want === "boolean") {
+        if (typeof v === "boolean") out[k] = v;
+      } else if (want === "string") {
+        if (typeof v === "string") out[k] = v;
+      } else if (want === "strings") {
+        if (Array.isArray(v)) out[k] = v.filter((x) => typeof x === "string");
+      } else if (want === "boolmap") {
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          const m = {};
+          Object.keys(v).forEach((b) => { if (typeof v[b] === "boolean") m[b] = v[b]; });
+          out[k] = m;
+        }
+      }
+    });
+    /* An object that carried nothing we recognise is not a filter set. Returning
+       `{}` would have the page save an empty one over what is already there. */
+    return Object.keys(out).length ? out : null;
+  }
+
   function parseBackup(text, items) {
     const raw = typeof text === "string" ? JSON.parse(text) : text;
 
@@ -422,8 +467,27 @@
       });
     }
 
-    const filters = (payload.filters && typeof payload.filters === "object")
-      ? payload.filters : null;
+    /* The same treatment `plan` gets above, and for the same reason.
+       `filters` used to be taken whole on that bare `typeof` — the one field in
+       this function with no shape check while the one beside it had a strict
+       one, which is the kind of inconsistency that gets copied the next time
+       somebody adds a section.
+
+       **What this does not fix, because it was never broken.** The collection
+       page already validates every one of these where it reads them
+       (`app.js`): `avail` is intersected with the buckets that exist and
+       taken as booleans only, `cats` is filtered against `CATEGORIES`, each
+       flag is type-checked, and `sort` is normalised against `SORTS` the
+       moment that object exists. So nothing unrecognised was ever *used* — it
+       was stored, and sat in the reader's own `localStorage` until the next
+       save overwrote it. This is defence in depth and one function reading
+       consistently, not a hole being closed; the note in `PROJECT.md §7` says
+       the same rather than claiming a fix it did not make.
+
+       The shape lives here rather than in `app.js` because `parseBackup` is
+       shared and must not learn which buckets or categories exist — that
+       stays the page's business, and it is still checked there. */
+    const filters = takeFilters(payload.filters);
 
     return { legacy, skipped, unfinished, collected, parts, wishlist, materials, plan, filters };
   }
@@ -448,5 +512,6 @@
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
     REDUNDANCY_WEIGHT, creditRelics,
+    FILTER_SHAPE,
   };
 })();

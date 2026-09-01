@@ -131,6 +131,32 @@ what — the diff already says what. **Always ask before `git push`, every singl
 time.** This is not a permission granted once; a commit is local and reversible,
 a push is outward-facing and is the owner's call.
 
+### Never undo work without asking — no revert, no discard, no reset
+
+Adding to history is ordinary work. **Taking anything out of it, or out of the
+working tree, is the owner's call and needs asking first, every time.** That
+covers `git revert` and `git reset`, rewriting or amending a commit, deleting a
+branch, and — this is the one that actually happened — **`git checkout -- <file>`
+and `git restore`, which silently destroy uncommitted changes with no reflog
+entry and no way back.**
+
+The asymmetry is the whole point. A commit can be undone; an uncommitted change
+that has been checked out over is simply gone. So the more casual the command
+looks, the more it needs asking: `git revert` at least announces itself, while
+`git checkout -- somefile` reads like tidying up.
+
+**Written down on 2026-09-01, from a live instance.** A session ran
+`git checkout -- data/feed-log.json` to keep local build churn out of a commit.
+No commit was reverted and history was untouched — but four rows of a file the
+owner was **using for a test** were destroyed to make a diff look tidier, and
+nobody was asked. Tidiness is never a reason. The right move was to say the file
+was dirty and let the owner decide, or to stage selectively and leave the file
+alone.
+
+If the tree is dirty in a way that complicates a commit: **say so and stop.**
+`git add -p`, committing the file as it stands, or simply leaving it out of the
+commit are all available and none of them destroys anything.
+
 ### No build step, and nothing to install
 
 The site is plain HTML, CSS and JavaScript with the data baked into a `.js` file,
@@ -704,10 +730,24 @@ there together:
 
 Neither baseline is a claim that an audit ran that day. It is a starting line,
 chosen so the two run on one cadence instead of drifting a day apart forever. The
-nearest thing to a real data point sits just behind it — an outside security
-review on 2026-08-26, ten findings, two declined and recorded in §7 and eight in
-`TODO.md` — and feature usability has genuinely never been done, which makes
-2026-09-27 its first.
+nearest things to real data points sit just behind it — **two outside security
+reviews, on 2026-08-26 and 2026-08-28**, the first filing ten findings (two
+declined and recorded in §7, eight in `TODO.md`) and the second nine against
+`16ee027`, all of which are in `TODO.md` under *Security* — and feature
+usability has genuinely never been done, which makes 2026-09-27 its first.
+
+**Neither review moves the date above, and that is deliberate.** They are
+somebody else's pass over this code, not ours; the monthly audit asks its own
+questions, covers the built file and the deployed site, and is the thing this
+table tracks. An outside review arriving a month before one is due is a reason
+to have less to find, not a reason to skip it.
+
+**What the second review is worth knowing for**, beyond its findings: it
+re-filed two items the owner had already examined and declined, because a
+decline recorded in §7 is invisible to someone reading the repository from
+outside. That is the cost of keeping declined findings out of `TODO.md`, and it
+is still the right trade — but it means every review after the first will
+re-file them, and the answer is to point at §7 rather than to re-decide.
 
 ---
 
@@ -4055,7 +4095,40 @@ a legitimate backup. Declined.
 
 The finding did point at the right function, and looking properly turned up a real
 gap that is *not* the one filed: `filters` and `sort` are adopted from a backup
-without validation. That one is in `TODO.md`.
+without validation.
+
+**That pointer rotted, and was repaired on 2026-09-01.** It said "That one is in
+`TODO.md`" while no such entry was in `TODO.md`, and checking the code found the
+gap had been half closed: `sort` lives inside `plan` and is filtered against
+`PLAN_OPTIONS`, while `filters` was still taken whole on a bare `typeof` check.
+Worth noting how it nearly went missing — the half that shipped took the sentence
+with it, and a pointer to a backlog entry is only as good as the next person who
+follows it.
+
+**The other half shipped the same day**, and what it is worth is narrower than
+the entry implied. `parseBackup` now takes `filters` through `FILTER_SHAPE`, a
+typed allowlist beside `PLAN_OPTIONS` — booleans as booleans, `cats` as strings,
+`avail` as a map of booleans, and a section carrying nothing recognisable
+returning `null` rather than an empty object the page would save over what is
+already there. Wrong types are **dropped rather than coerced**: a restore that
+quietly hands somebody a screen they did not save is harder to notice than one
+that falls back to the default.
+
+**What it did not fix, because it was never broken.** The collection page
+already validated every one of these where it read them — `avail` intersected
+with the buckets that exist and taken as booleans only, `cats` filtered against
+`CATEGORIES`, each flag type-checked, and `sort` normalised against `SORTS` at
+`app.js:351`, the first line where that object exists. So no unrecognised value
+was ever *used*; it was stored, and sat in the reader's own `localStorage` until
+the next save. This is defence in depth and one function reading consistently.
+The argument for doing it anyway is the one the backlog entry made second and it
+is the better one: `filters` was the only section of `parseBackup` with no shape
+check while the section beside it had a strict one, and that is the kind of
+inconsistency the next person copies.
+
+The typed form is why `FILTER_SHAPE` is a map where `PLAN_OPTIONS` is a bare
+list. A planner option of the wrong type is a wrong *number*, and the page's own
+reads clamp it; a filter of the wrong type used to reach a CSS selector.
 
 **"Cache poisoning" is the wrong name for a narrow interrupted-write window.** The
 claim was that fetched bytes are written over the gzip cache before parsing
@@ -4268,6 +4341,106 @@ What survives, with the corrections the re-check forced:
   deleted at `ae68819` about two and three-quarter hours later, so that blob is in
   public history permanently. Its content is benign — working rules, no credentials,
   no absolute paths — but "nothing local ever got out" would be false.
+
+  **A second correction, 2026-09-01: it does carry one, deliberately and for
+  now.** `data/feed-log.json` is generated by every build and is tracked. A
+  session found it and wrote it up as an oversight — `.gitignore` lists the
+  payload files under `data/` one by one and that name is not among them — and
+  the owner's answer is that it is a **temporary testing file**, committed on
+  purpose and coming out when the testing finishes. So the claim above holds as a
+  statement about credentials and about the generated payload, and does not hold
+  literally while this file is there. `TODO.md` carries the cleanup.
+
+### Nine actions pinned to commit SHAs
+
+**Shipped 2026-09-01**, the first recommendation of the security re-review of
+2026-08-28 and the cheapest thing on its list. Every `uses:` line in both
+workflows named a moving major-version tag, and a tag is a pointer its owner can
+move. Moved to hostile code, it would run inside a job holding a token —
+`pages: write` and `id-token: write` on the deploy job, `contents: write` on the
+wiki job.
+
+| Action | Pin | Version |
+|---|---|---|
+| `actions/checkout` | `3d3c42e5aac5ba805825da76410c181273ba90b1` | v7.0.1 |
+| `actions/setup-python` | `5fda3b95a4ea91299a34e894583c3862153e4b97` | v7.0.0 |
+| `actions/cache` and `actions/cache/restore` | `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` | v6.1.0 |
+| `actions/upload-pages-artifact` | `fc324d3547104276b827a68afc52ff2a11cc49c9` | v5.0.0 |
+| `actions/deploy-pages` | `cd2ce8fcbc39b97be8ca5fce6e763baed58fa128` | v5.0.0 |
+
+Each moving tag was checked to point at exactly the release named beside it
+rather than the version being read off the tag and trusted — `v6` and `v6.1.0`
+resolve to the same commit, and so on for all five. `cache/restore` is a
+subdirectory of the `cache` repository, so it takes that repository's SHA.
+
+**The comment is load-bearing and is why this is readable at all.** A bare
+40-character SHA goes stale silently and cannot be reviewed; `# v7.0.1` beside it
+is what makes an upgrade a diff somebody can reason about. The permissions half
+of this finding was already done and was left alone.
+
+What did **not** ship, and has an entry in `TODO.md`: the repository policy that
+*requires* SHA pins, which is a GitHub setting rather than a file here, and
+splitting the wiki job's `contents: write` down to the step that pushes.
+
+### `data/feed-log.json` is written atomically, and it is the only one
+
+**Shipped 2026-09-01.** Non-atomic writes across the pipeline were examined and
+**declined** on 2026-08-26 — see *Two security findings examined and declined* —
+and that decline rested on one property: every torn write here **fails loudly**,
+and a build that stops is a build somebody fixes.
+
+The feed log postdates the decline and breaks that property. It is read back
+inside a bare `except (OSError, ValueError): pass`, so a torn one is silently
+treated as **absent** and the build starts a fresh 24-hour log, discarding the
+record of which source answered each live feed. That is the same end state as
+the four days the log spent 404ing because the workflow never copied it, and it
+is quiet wrong data rather than a stopped build — the one failure mode here
+worth spending a helper on.
+
+`write_atomic` in `build_data.py` writes to a temporary sibling, `fsync`s, and
+`os.replace`s. A sibling rather than a temp directory because `os.replace` is
+only atomic within a filesystem. **Deliberately used at one call site**: the rest
+stay opportunistic, to be taken when that code is being touched anyway, which is
+exactly what the 2026-08-26 decline concluded and this does not reopen.
+
+### The privacy footer names the hosts the build actually uses
+
+**Shipped 2026-09-01.** The security re-review found `artworkNote()` naming
+`cdn.warframestat.us` while the deployed site loaded all 167 images from
+`content.warframe.com` — a privacy sentence naming a host it never contacts and
+omitting the one it does.
+
+**The finding could not be fixed where it was found, and that is the part worth
+keeping.** `artworkNote()` read `meta.sources.images`, and that field was a single
+string chosen by whether artwork is local. But `image_for` picks **per item** —
+DE's `content.warframe.com` wherever their texture manifest answered, WFCD's CDN
+where it did not — so a build can genuinely use both, and no correction to the
+sentence could have made it true. The field had to be able to express the answer
+first.
+
+So the build now records **`meta.sources.imageHosts`**, the distinct origins the
+URLs on that very payload carry, computed *after* `cache_images` has repointed
+whatever went local. Origin only, never paths — a path would name every file the
+reader loaded. `meta.sources.images` survives as the same list joined into a
+sentence, and `artworkNote()` falls back to it for a payload built before this,
+because a footer that goes blank on an old dataset loses the licence and the
+Content Policy attribution, which is worse than being coarse.
+
+Measured both ways before and after: a local build reports `["assets/img"]` and
+claims no third party; a build without local artwork reports
+`["https://content.warframe.com"]` and names it. The mixed case has a test rather
+than a measurement, since DE currently answer for all 167.
+
+Two smaller corrections went with it. `NOTICE.md` asserted *"no third-party
+requests"* flat, which is true only of a build with local artwork and false of
+both artefacts most people read — it is now scoped, and says which hosts and what
+they see. And the footer now mentions that `cdn.warframestat.us` answers 301 to
+`raw.githubusercontent.com`, so a reader told "one third party" is not told
+wrong; `serve.py`'s CSP has to allow that hop for the same reason.
+
+**The comment claiming this was derived from the CSP was itself wrong** and is
+corrected: `build_csp` scans the payload *text* for host names and never reads
+this field. Two answers to one question, arrived at independently.
 
 ---
 

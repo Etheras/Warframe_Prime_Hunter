@@ -682,18 +682,54 @@
        claim was false on GitHub Pages and false in the download, 167 times per
        page load, in the one paragraph a reader has no way to check.
 
-       `meta.sources.images` already says which build this is, and serve.py reads
-       the same signal to decide whether its CSP may name the CDN at all — so the
-       sentence is derived from the same fact as the enforcement rather than
-       asserted beside it. */
+       **Then it named the wrong host for two days**, which is the more
+       interesting half. It read `meta.sources.images` and hard-coded
+       `cdn.warframestat.us` for every answer that was not local — but that field
+       was a single string chosen by whether artwork is local, while `image_for`
+       in the build chooses **per item**: DE's `content.warframe.com` wherever
+       their texture manifest answered, WFCD's CDN where it did not. On the
+       normal build DE answer for all 167, so the deployed site loaded every
+       image from a host this sentence never mentioned and mentioned one it never
+       contacted. Correcting the sentence alone could not fix it, because the
+       field could not express a build that uses both — so the build now records
+       `meta.sources.imageHosts`, the hosts the URLs on this very payload
+       actually carry, and this reads that.
+
+       The old string is still consulted as a fallback: a payload built before
+       2026-09-01 has no `imageHosts`, and a footer that goes blank on an old
+       dataset is worse than one that is a little coarse.
+
+       Not derived from the CSP, though the comment used to say so — `build_csp`
+       in serve.py scans the payload text for host names rather than reading this
+       field. Two answers to one question, arrived at independently. */
     function artworkNote() {
-      const src = ((DATA.meta || {}).sources || {}).images || "";
-      return src.indexOf("assets/img") === 0
-        ? "Artwork and data are served from this site, so no third party sees your visit. "
-        : "Data is served from this site, but artwork loads from " +
-          link("https://cdn.warframestat.us", "cdn.warframestat.us") +
-          ", which therefore sees your address and which items you looked at. " +
-          "A copy built with artwork included fetches nothing at all. ";
+      const src = ((DATA.meta || {}).sources || {}) || {};
+      const listed = Array.isArray(src.imageHosts) ? src.imageHosts : null;
+      const hosts = listed || (String(src.images || "").indexOf("assets/img") === 0
+        ? ["assets/img"] : ["https://cdn.warframestat.us"]);
+      const remote = hosts.filter((h) => /^https?:/i.test(h));
+      if (!remote.length) {
+        return "Artwork and data are served from this site, so no third party sees your visit. ";
+      }
+      /* Named individually rather than counted: "two third parties" tells a
+         reader nothing they can act on, and which one it is happens to be the
+         difference between Digital Extremes and a community mirror. */
+      const named = remote.map((h) => link(h, h.replace(/^https?:\/\//i, "")));
+      const joined = named.length === 1 ? named[0]
+        : named.slice(0, -1).join(", ") + " and " + named[named.length - 1];
+      return "Data is served from this site, but artwork loads from " + joined +
+        ", which therefore " + (named.length === 1 ? "sees" : "see") +
+        " your address and which items you looked at. " +
+        /* Only when that host is in play. It answers 301 to GitHub rather than
+           serving the bytes itself, so a reader told "one third party" would be
+           told wrong — see the note in serve.py's `build_csp`, which has to
+           allow the redirect target for the same reason. */
+        (remote.some((h) => /cdn\.warframestat\.us/i.test(h))
+          ? "cdn.warframestat.us redirects to " +
+            link("https://raw.githubusercontent.com", "raw.githubusercontent.com") +
+            ", which sees it too. "
+          : "") +
+        "A copy built with artwork included fetches nothing at all. ";
     }
 
     /* The rate limiter is a property of tools/serve.py, and saying so on a page
