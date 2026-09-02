@@ -2266,6 +2266,95 @@ def test_no_source_file_carries_a_control_byte() -> None:
           "an escape mangled through a shell is invisible in an editor")
 
 
+def test_the_guard_notices_a_source_file_that_changed() -> None:
+    """
+    The other half of the guard, and the half that does not need a list.
+
+    The refusal below is a blacklist of shell syntax, and a sweep on 2026-09-02
+    found ten ways round it in an afternoon. This pass does not read the command
+    at all: it hashes the guarded files in the PreToolUse pass and again in the
+    PostToolUse pass, and reports anything that moved. So it covers mechanisms
+    nobody enumerated - `cp`, `dd`, a compiled binary - because none of them can
+    change a file without changing its hash.
+
+    Driven against a throwaway tree with the same relative shape, via
+    `CLAUDE_PROJECT_DIR`, because the alternative is a test that writes to this
+    repository's own source to prove that writing to it is caught.
+    """
+    hook = os.path.join(ROOT, "tools", "guard_shell_writes.py")
+    tmp = tempfile.mkdtemp(prefix="primehunter-guardpost-")
+    try:
+        seed = {"assets/app.js": "// original\n",
+                "index.html": "<p>original</p>\n",
+                "data/prime-data.js": "generated\n"}
+        for rel, body in seed.items():
+            path = os.path.join(tmp, rel.replace("/", os.sep))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(body)
+
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=tmp)
+
+        def pass_(verify: bool) -> str:
+            args = [sys.executable, hook] + (["--verify"] if verify else [])
+            done = subprocess.run(
+                args, input=json.dumps({"session_id": "suite",
+                                        "tool_input": {"command": "echo hi"}}),
+                capture_output=True, text=True, env=env)
+            return (done.stdout or "").strip()
+
+        def touch(rel: str, body: str) -> None:
+            with open(os.path.join(tmp, rel.replace("/", os.sep)), "w",
+                      encoding="utf-8") as fh:
+                fh.write(body)
+
+        # A guarded file changing between the two passes is the whole point, and
+        # `cp` is the case the blacklist cannot see at all.
+        pass_(False)
+        touch("assets/app.js", "// mangled by something nobody listed\n")
+        said = pass_(True)
+        check_true("guard: a changed source file is reported", bool(said),
+                   "the post pass said nothing about assets/app.js")
+        if said:
+            check_true("guard: and it names the file",
+                       "assets/app.js" in json.loads(said).get("reason", ""))
+
+        # Root-level HTML, which every overwriter in the blacklist misses because
+        # it is named without a directory.
+        pass_(False)
+        touch("index.html", "<p>changed</p>\n")
+        check_true("guard: a changed root page is reported too", bool(pass_(True)))
+
+        # Generated output is not source. A build writing `data/` every ten
+        # minutes must not look like an incident.
+        pass_(False)
+        touch("data/prime-data.js", "rebuilt\n")
+        check_true("guard: rebuilding generated data is not reported",
+                   not pass_(True))
+
+        # Nothing moved at all.
+        pass_(False)
+        check_true("guard: an ordinary command is not reported", not pass_(True))
+
+        # An Edit between two shell commands is in the baseline before the
+        # command runs, so it is never attributed to one.
+        touch("assets/app.js", "// edited with the Edit tool\n")
+        pass_(False)
+        check_true("guard: an edit made between commands is not reported",
+                   not pass_(True))
+
+        # A `command` that is not a string reached the regexes and raised, and a
+        # hook that raises is a hook that fails open.
+        done = subprocess.run(
+            [sys.executable, hook],
+            input=json.dumps({"tool_input": {"command": ["a", "b"]}}),
+            capture_output=True, text=True, env=env)
+        check("guard: a non-string command does not crash the hook",
+              done.returncode, 0, done.stderr.strip()[:120])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_the_guard_refuses_shell_writes_to_source() -> None:
     """
     The test above finds the damage; `tools/guard_shell_writes.py` refuses the
@@ -3720,6 +3809,7 @@ def main() -> int:
                          test_a_pre_refined_relic_reward_keeps_its_refinement,
                          test_no_source_file_carries_a_control_byte,
                          test_the_guard_refuses_shell_writes_to_source,
+                         test_the_guard_notices_a_source_file_that_changed,
                          test_markup_is_xml_well_formed,
                          test_server_serves_only_the_site,
                          test_serving_a_page_starts_one_upstream_check_not_one_each,

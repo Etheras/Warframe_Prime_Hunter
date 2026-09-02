@@ -1000,10 +1000,23 @@ python tests/test_build.py --online
 
 ### Blocking shell writes to source files — optional, and only if you use Claude Code
 
-`tools/guard_shell_writes.py` refuses any shell command that would write
-`assets/*.js`, `assets/*.css`, `tools/*.py`, `tests/*` or an `.html` file — a
-heredoc, a `>` redirect, `sed -i`, `Set-Content`, `python -c`. Reads, greps,
-builds and redirects to `/tmp` are untouched.
+`tools/guard_shell_writes.py` protects `assets/*.js`, `assets/*.css`,
+`tools/*.py`, `tests/*` and `.html` files from being written through a shell. It
+does it in two passes, and the difference between them matters:
+
+- **Before the command it refuses the ones it recognises** — a heredoc, a `>`
+  redirect, `sed -i`, `Set-Content`, `python -c`. Reads, greps, builds and
+  redirects to `/tmp` are untouched.
+- **After the command it hashes those files and reports anything that changed.**
+  This half reads no command at all, so it covers mechanisms the first half has
+  never heard of — `cp`, `dd`, a script, a compiled binary — because none of them
+  can change a file without changing its hash.
+
+**The first pass is a blacklist of shell syntax and is not complete**, which is
+why the second exists: a sweep found ten ways round it in an afternoon. Do not
+read the refusal as a guarantee. The second pass has the opposite trade — it
+cannot prevent, only report, and it reports within a second of the write while
+the command is still on screen.
 
 It exists because a shell mangles escapes on the way in, three times here: `\b`
 became a literal backspace byte and shipped a regex that matched nothing, `\n`
@@ -1030,10 +1043,26 @@ files here. `.claude/` is gitignored, so wire it per machine in
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/tools/guard_shell_writes.py\" --verify",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }
 ```
+
+Both entries, or neither is much use: the `PreToolUse` pass takes the fingerprint
+that the `PostToolUse` pass compares against, so `--verify` on its own has nothing
+to measure and simply stays quiet.
 
 Check it before trusting it — this must print a refusal rather than creating the
 file:
@@ -1041,6 +1070,10 @@ file:
 ```bash
 echo '{"tool_input":{"command":"echo x >> assets/app.js"}}' | python tools/guard_shell_writes.py
 ```
+
+It costs about two milliseconds a command here — 24 files and 1.2 MB to
+SHA-256 — so it hashes everything every time rather than trying to be clever
+about what might have moved.
 
 ---
 

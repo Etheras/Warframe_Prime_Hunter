@@ -448,11 +448,21 @@ Three layers hold the rule, because remembering it demonstrably did not work:
 - **A test that catches the damage.** `test_no_source_file_carries_a_control_byte`
   sweeps every source file for control bytes outside tab, newline and carriage
   return. It runs in the offline suite and in CI.
-- **A hook that refuses the path.** `tools/guard_shell_writes.py` reads a
-  PreToolUse payload and denies any shell command that would write a guarded
-  file, with an explanation of what to do instead. It stays out of the way of
-  reads, greps, builds and redirects to `/tmp` — `test_the_guard_refuses_shell_writes_to_source`
-  asserts both directions, because a guard that over-blocks gets switched off.
+- **A hook that refuses the paths it recognises.** `tools/guard_shell_writes.py`
+  reads a PreToolUse payload and denies the shell commands it can identify as
+  writing a guarded file, with an explanation of what to do instead. It stays out
+  of the way of reads, greps, builds and redirects to `/tmp` —
+  `test_the_guard_refuses_shell_writes_to_source` asserts both directions,
+  because a guard that over-blocks gets switched off.
+  **This said "denies any shell command that would write a guarded file" until
+  2026-09-03, and that was false** — it is a blacklist of shell syntax and ten
+  ways round it were found in an afternoon. The word "any" is what would have
+  stopped somebody checking.
+- **A pass that notices the ones it did not recognise.** The same file, run again
+  as a PostToolUse hook with `--verify`, fingerprints the guarded set before and
+  after every shell command and reports what moved. No enumeration, so no gap —
+  and no prevention either, which is the trade. See *The guard stopped guessing
+  at shell syntax and started checking what changed*.
   The wiring lives in `.claude/settings.local.json`, which is gitignored along
   with the rest of `.claude/`; `README.md` has it for anyone setting up a fresh
   machine.
@@ -5405,6 +5415,60 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 **The comment claiming this was derived from the CSP was itself wrong** and is
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
+
+### The guard stopped guessing at shell syntax and started checking what changed
+
+**Shipped 2026-09-03**, from the owner's question after the sweep: *"shouldn't it
+be a whitelist instead of a blacklist that needs constant updating?"* Yes — and
+the interesting part is that the obvious inversion is the wrong one.
+
+**Why the blacklist could not be finished.** `guard_shell_writes.py` matched
+shell syntax: redirects, `sed -i`, `tee`, `Set-Content`, an interpreter handed a
+program. A sweep on 2026-09-02 found **ten** ways round it in an afternoon —
+`cd assets && sed -i app.js`, `sed -i index.html` (the root pages are always
+named bare), `cp` from the scratchpad, `1>`, `sed --in-place`,
+`dist/../assets/app.js`, `python -u -c`, the full `node.exe` path this project's
+own orientation file recommends, `find -exec`, and `shutil.copy`. There is no
+reason to think that was the last ten: it is static analysis of an arbitrary
+shell language, which does not terminate.
+
+**Why whitelisting commands would not have fixed it.** The guard has two halves —
+*is this a write* and *which paths does it name* — and a verb whitelist only
+replaces the first. `PATHISH` still has to find the paths, and roughly half the
+holes live there: `cd assets && sed -i app.js` names no guarded path at all, so
+no list of allowed verbs would have seen it either.
+
+**The inversion that works is to stop reading the command.** Hash the guarded
+files in the PreToolUse pass, hash them again in the PostToolUse pass, report
+what moved. Nothing is enumerated, so every mechanism is covered — including the
+ones nobody has thought of — because none of them can change a file without
+changing its hash.
+
+**Two limits, stated rather than glossed.** It **detects rather than prevents**:
+the bytes have landed by the time it speaks. That is only acceptable because the
+failure this rule exists for is *silent* — `\b` arriving as a backspace byte,
+surviving every syntax check — and a report one second later, while the command
+is still on screen, defeats a silent failure nearly as well as a refusal does.
+And it sees only what the tool it is wired to can change.
+
+**The false-positive question answered itself.** The snapshot is taken in the
+*Pre* pass, so an Edit or Write between two shell commands is already in the
+baseline and is never attributed to a command. Only a change occurring between
+the two passes of one invocation is reported. Verified in the suite.
+
+**Cheap enough not to be clever.** 24 guarded files, 1.2 MB, 1.6 ms to SHA-256
+the lot — so it hashes everything every time rather than tracking mtimes, which
+is simpler and strictly harder to fool.
+
+**The blacklist stays**, demoted rather than deleted: it still gives an immediate,
+specific refusal for the common cases, which is a better experience than a report
+after the fact. It is just no longer the thing being relied on, and both
+`README.md` and `PROJECT.md` said "any shell command" until this shipped — the
+word that would have stopped anyone checking.
+
+**One older finding closed with it.** The hook crashed, and therefore failed
+*open*, on a payload whose `command` was not a string. It is coerced now, and the
+suite asserts a non-string payload exits cleanly.
 
 ### The ceiling tests measure memory, because the clock could not fail them
 

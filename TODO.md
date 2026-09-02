@@ -159,7 +159,6 @@ Five things worth carrying forward, because none was in the findings:
 |---|---|
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
 | `gunzip_capped` turns a refused download into a short one | small — **the one regression of 2026-09-01**; a truncated body now returns partial bytes where the stdlib raised |
-| The shell-write guard has ten ways round it, and two documents say it has none | session — all pre-existing; **the two false sentences should be corrected whatever is decided about the code** |
 | The wiki-permissions test matches spellings, not the property it names | small — the job split is real and verified; the test is not what holds it |
 | The pin count in `dependabot.yml` was stale the day it was written | small — nine claimed, eleven actual, all correctly pinned |
 
@@ -402,56 +401,6 @@ where it made it quieter instead.
 **Size: small.** `if not dec.eof: raise` after the loop, plus a loop over
 `unused_data` for the multi-member case, and a test for each that feeds a
 deliberately truncated body.
-
-### The shell-write guard has ten ways round it, and two documents say it has none
-
-**Pre-existing, not this session's doing** — the session changed `INLINE_PROGRAM`
-and `WRITES` only, and **both of its changes are correct**: every heredoc form is
-now refused, and the `open('assets/…')` read that the old pattern denied on the
-`'a` of `assets` is allowed again. Everything below lives in `REDIRECT`,
-`OVERWRITERS`, `EXEMPT` and `PATHISH`, which it did not touch.
-
-Confirmed live against the real hook, each rewriting a file in a throwaway tree:
-
-| form | why it slips |
-|---|---|
-| `cd assets && sed -i … app.js` | `PATHISH` needs a slash or an `assets/`-style prefix |
-| `sed -i … index.html` | the two root pages are always named bare, so no overwriter sees them |
-| `cp` / `mv` / `dd` / `Copy-Item` onto a source file | not in `OVERWRITERS` at all — and writing to the scratchpad first is explicitly allowed |
-| `echo x 1> assets/app.js` | the lookbehind that excludes `2>` excludes every numbered fd |
-| `sed --in-place …` | `OVERWRITERS` requires a literal `-i` token |
-| `echo x > dist/../assets/app.js` | `EXEMPT` is a substring test |
-| `python -u -c "…"` | a flag before `-c` breaks the pattern |
-| `"C:\Program Files\nodejs\node.exe" -e …` | `INLINE_PROGRAM` anchors the interpreter at a command boundary — and this is the invocation `CLAUDE.md` itself recommends |
-| `find … -exec sed -i …` | same anchor |
-| `shutil.copy` / `os.replace` / `write_bytes` | `WRITES` only knows `open(…, "w")`-shaped writes |
-
-**The doc claim is the part that will mislead somebody.** `README.md:978` says the
-hook refuses *"any shell command that would write"* a guarded file and
-`PROJECT.md:451` says it *"denies any shell command that would write a guarded
-file"*. Neither is true, and a rule believed to be complete is one nobody
-double-checks.
-
-**Two smaller shapes in the same file.** `WRITES` still denies a pure read whose
-program merely contains `.write(` — `sys.stdout.write` in a probe is refused, over
-a message that says reading is fine, which is the shape that gets a guard turned
-off. And `main()` catches only `JSONDecodeError`/`UnicodeDecodeError`, so a
-payload whose `command` is not a string raises and the hook **fails open**. The
-JSON case failing open is deliberate and documented; this one is not.
-
-**Not urgent, and worth saying why.** This is a machine-local rail against an
-assistant's own mistakes, wired in a gitignored settings file. It is not a
-security boundary and nothing an outsider can reach. It also is not the only
-layer: `test_no_source_file_carries_a_control_byte` catches the original
-backspace-byte class after the fact, however the bytes arrived. What it does not
-catch is `\n` arriving as a real newline, which is the other documented mode.
-
-**Size: session**, and it is a judgement call rather than a patch — the file's own
-comment argues that over-matching is what kills a guard, and `cp` and `mv` appear
-in ordinary work constantly. Destination-aware parsing (last positional for
-`cp`/`mv`, `of=` for `dd`) is the only version that does not deny
-`cp assets/app.js /tmp/app.bak`. **The doc sentences should be corrected whatever
-is decided about the code**, because they are false today.
 
 ### The pin count in `dependabot.yml` was stale the day it was written
 
