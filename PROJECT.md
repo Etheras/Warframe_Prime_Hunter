@@ -4733,6 +4733,53 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+### The planner's search marks parts collected, and adds no Primes at all
+
+**Shipped 2026-09-02**, and the owner's answer was larger than the question
+asked. The entry proposed *adding* parts to a search that already added Primes;
+the ruling was to **remove the Prime search outright** and give the box to parts.
+
+**It is a division of labour, not a loss.** The planner is where you are standing
+when a part actually drops — you have just run Hepit, you have the Neuroptics —
+and until now the only way to record it was to change page, find the Prime and
+open its drawer. Deciding *what to chase* is the collection page's job, and it
+already has the control on every card and in every drawer, so nothing is
+stranded. Checked before building, because a search box that stops adding Primes
+would be a trap if that were the only way to add one.
+
+Four forks, each with a defensible alternative, each now pinned by a test
+because picking the other would look like a bug:
+
+- **Parts only, no Primes among the results.** Mixing them puts a row that
+  *wishes for* something beside a row that *owns* something, and at a glance
+  they are the same row.
+- **Matched on the whole `"Ash Prime Neuroptics"` string.** Part names are
+  generic — measured: `Blueprint` is on 160 Primes, `Systems` on 57 — so a bare
+  part name returns a wall of identical-looking rows. Either half still works.
+- **Newest first, owned last.** A part you are holding is far likelier to be
+  from something recent than from a 2015 release; 166 of 167 items carry a
+  `releaseDate` and the odd one out (Kavasa Prime Collar) falls back to
+  alphabetical. Owned rows also *dim and take a green left edge*, because sort
+  order is invisible once a list is scrolled — the row has to say it itself.
+- **A tick records the part and leaves the farm list alone**, then says so. You
+  can get a drop you were not chasing, and adding the Prime would reorder the
+  whole page off one click; but a tick with no visible effect reads as a tick
+  that failed, so the untracked case says *"— not on your farm list"*.
+
+**One tick is one part**, reusing `cyclePart`: the 53 parts needing two or more
+go `0/2 → 1/2 → have`, which is how a drop actually arrives. That behaviour
+already existed on the *Still needed* rows; the search borrows it rather than
+inventing a second rule.
+
+**Two things the browser caught that no static check could.** The confirmation
+began as its own absolutely-positioned panel at the same offset as the results
+list, so it landed *on top of the first result* — it is the first row inside the
+panel now. And the empty-list hint linked to the collection page's own file,
+which is a dangling reference in the single-file build where both views share
+one document; the bundle check refuses it, **including when the name appears
+only in a comment**, which is why the comment explaining this does not contain
+it.
+
 ### `Rush` pays once, and is no longer charged four rounds to reach it
 
 **Shipped 2026-09-02**, the third application of the `FIXED_LENGTH` shape `Spy`

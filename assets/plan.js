@@ -1153,7 +1153,19 @@
   function renderWishlist() {
     const el = $("#wishlist");
     if (!ST.wishlist.length) {
-      el.innerHTML = `<p class="hint">Empty. Search above to add something.</p>`;
+      /* The search above marks parts collected now, so it can no longer be
+         what this points at. Adding a Prime is the collection page's job — on
+         every card and in every drawer — and saying which page is kinder than
+         saying "add something" and leaving the reader to find out where.
+
+         Named rather than linked, deliberately. An anchor at the collection
+         page's own file is a dangling reference in the single-file build, where
+         both views live in one document and that file does not exist — the
+         bundle check catches it, and catches it in a *comment* too, which is
+         how this sentence came to be phrased without the name in it. The tab
+         marked COLLECTION is two inches above this text on either build. */
+      el.innerHTML = `<p class="hint">Empty. Add Primes from the collection —
+        every card has a farm-list button.</p>`;
       return;
     }
     el.innerHTML = ST.wishlist.map((id) => {
@@ -2083,37 +2095,105 @@
     if (!document.hidden) onReturn.forEach((fn) => fn());
   });
 
-  /* ── add-to-list search ──────────────────────────────────────── */
+  /* ── mark-a-part-collected search ────────────────────────────────
+     **This box used to add a Prime to the farm list, and stopped on
+     2026-09-02 at the owner's direction.** It searches *parts* now, and ticking
+     one records that you have it.
+
+     The swap is a division of labour rather than a loss. The planner is where
+     you are standing when a part actually drops — you have just run Hepit, you
+     have the Neuroptics — and until now the only way to record it was to change
+     page, find the Prime and open its drawer. Adding a Prime to the farm list
+     is the collection page's job and it already does it, on every card and in
+     the drawer, which is where you are when you are deciding what to chase.
+     Nobody is stranded by the box changing hands.
+
+     Parts only, and no Primes among the results: mixing them would put a row
+     that *wishes for* something beside a row that *owns* something, and the two
+     look identical at a glance. */
   const searchBox = $("#addSearch"), results = $("#addResults");
+  /* What the last tick did, held here and rendered as the first row of the
+     results panel. A separate floating panel was tried and landed on top of the
+     first result — both were absolutely positioned at the same offset. */
+  let lastSaid = "";
+
+  /* Flattened once. 586 parts against 167 Primes, and the search runs on every
+     keystroke, so the join is done here rather than three times a word. */
+  const ALL_PARTS = ITEMS.flatMap((it) => (it.parts || []).map((p) => ({
+    it, p,
+    /* Matched on the whole "Ash Prime Neuroptics" string. Part names are
+       generic — `Blueprint` is on 160 Primes, `Systems` on 57 — so matching a
+       bare part name returns a wall of identical-looking rows. Typing either
+       half still works, and typing both narrows properly. */
+    hay: (it.name + " " + p.name).toLowerCase(),
+  })));
+
+  /* Newest first, because a part you are holding is far more likely to be from
+     something recent than from a 2015 release, and alphabetical for the one
+     item DE publish no release date for (Kavasa Prime Collar). */
+  const releasedAt = (it) => it.releaseDate || "";
+
   function runSearch() {
     const q = searchBox.value.trim().toLowerCase();
-    if (!q) { results.hidden = true; return; }
-    const hits = ITEMS.filter((i) =>
-      i.parts.length && !ST.wants(i.id) && i.name.toLowerCase().includes(q)
-    ).slice(0, 8);
-    results.innerHTML = hits.length
-      ? hits.map((i) => `<button class="add-hit" data-add="${esc(i.id)}">
-          <span>${esc(i.name)}</span><span class="add-cat">${esc(i.category)}</span></button>`).join("")
-      : `<div class="add-none">nothing matching, or already on the list</div>`;
+    if (!q) { results.hidden = true; lastSaid = ""; return; }
+    const hits = ALL_PARTS.filter((r) => r.hay.includes(q));
+    hits.sort((a, b) => {
+      /* Owned last. What you are looking for is almost always something you do
+         not have yet, and burying it under things you have already ticked is
+         the one ordering that makes the box useless. */
+      const oa = haveOf(a.it.id, a.p.name) >= needOf(a.p),
+            ob = haveOf(b.it.id, b.p.name) >= needOf(b.p);
+      if (oa !== ob) return oa ? 1 : -1;
+      const da = releasedAt(a.it), db = releasedAt(b.it);
+      if (da && db && da !== db) return db < da ? -1 : 1;   // newest first
+      if (da !== db) return da ? -1 : 1;                    // dated before undated
+      return a.it.name < b.it.name ? -1 : a.it.name > b.it.name ? 1 : 0;
+    });
+    const note = lastSaid
+      ? `<div class="add-said" role="status">${esc(lastSaid)}</div>` : "";
+    results.innerHTML = note + (hits.length
+      ? hits.slice(0, 10).map((r) => {
+          const need = needOf(r.p), have = haveOf(r.it.id, r.p.name);
+          const done = have >= need;
+          return `<button class="add-hit part-hit${done ? " has" : ""}"
+            data-got="${esc(r.it.id)}" data-part="${esc(r.p.name)}">
+            <span>${esc(r.it.name)} <b>${esc(r.p.name)}</b></span>
+            <span class="add-cat">${done ? "have" : (need > 1 ? have + "/" + need : "need")}</span>
+          </button>`;
+        }).join("")
+      : `<div class="add-none">no part matching that</div>`);
     results.hidden = false;
+  }
+
+  /* What the tick did, said where the tick happened. Cleared when the box is
+     emptied, so it never describes an action from a search ago. */
+  function sayGot(it, p) {
+    const need = needOf(p), have = haveOf(it.id, p.name);
+    /* The case the owner asked to be told about: you got a drop you were not
+       chasing. The part is still recorded — owning something is not the same as
+       wanting it, and silently adding the Prime would reorder the whole page
+       off one tick — but a tick with no visible effect reads as a tick that did
+       not work, so it says which happened. */
+    const where = ST.wants(it.id) ? "" : " — not on your farm list";
+    lastSaid = have >= need
+      ? `${it.name} ${p.name}: have it${where}`
+      : `${it.name} ${p.name}: ${have} of ${need}${where}`;
   }
   searchBox.addEventListener("input", runSearch);
   searchBox.addEventListener("focus", runSearch);
 
   document.addEventListener("click", (e) => {
-    const add = e.target.closest("[data-add]");
-    if (add) {
-      ST.addWish(add.dataset.add);
-      searchBox.value = ""; results.hidden = true;
-      render();
-      return;
-    }
+    /* `data-add` is gone with the Prime search that emitted it — adding to the
+       farm list is the collection page's job now. */
     const got = e.target.closest("[data-got]");
     if (got) {
       const id = got.dataset.got, name = got.dataset.part;
       const it = BY_ID.get(id);
       const p = it && it.parts.find((x) => x.name === name);
       if (p) {
+        // Only the search results say what they did; the *Still needed* rows
+        // are already on screen and change under the reader's eye.
+        const fromSearch = !!got.closest("#addResults");
         /* One click, and the same meaning it has on the collection page: up by
            one, round to zero past the last. This used to increment and clamp,
            so a mis-click here could not be taken back — on the one page with no
@@ -2121,6 +2201,7 @@
         ST.cyclePart(it, p);
         ST.syncCollected(it);
         render();
+        if (fromSearch) { sayGot(it, p); runSearch(); }
       }
       return;
     }

@@ -38,7 +38,12 @@
   </div>
 
   <div class="search-wrap">
-    <input id="addSearch" type="search" placeholder="Add a Prime to your list…  (press /)" autocomplete="off" spellcheck="false" />
+    <input id="addSearch" type="search" placeholder="Mark a part collected…  (press /)" autocomplete="off" spellcheck="false" />
+    <!-- What the last tick did is rendered as the first row INSIDE this panel,
+         not as a second floating one. Both were absolutely positioned at the
+         same offset to begin with, so the message landed on top of the first
+         result — one panel is the fix, and it keeps the message beside the list
+         it is describing. -->
     <div id="addResults" class="add-results" hidden="hidden"></div>
   </div>
 

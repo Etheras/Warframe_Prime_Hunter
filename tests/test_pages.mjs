@@ -3115,6 +3115,92 @@ page_test("a Prime with no way in still gets the relics to trade for, and the re
   assert.deepEqual(errors, []);
 });
 
+page_test("the planner's search marks parts collected, and adds no Primes", async () => {
+  /* The box used to add a Prime to the farm list. On 2026-09-02 the owner had
+     it replaced outright: it searches parts now and ticking one records that
+     you have it. Adding a Prime is the collection page's job — every card and
+     every drawer has the control — so nothing is stranded by the swap.
+
+     Four decisions are pinned here, because each was a fork with a defensible
+     alternative and each would look like a bug to someone who picked the other:
+     parts only, newest first, owned last, and a tick that does NOT touch the
+     farm list. */
+  const { page, errors } = await open("/plan.html");
+  const search = async (q) => {
+    await page.fill("#addSearch", q);
+    await page.waitForTimeout(150);
+    return page.evaluate(() =>
+      [...document.querySelectorAll("#addResults .add-hit")].map((b) => ({
+        text: b.innerText.replace(/\s+/g, " ").trim(),
+        part: b.dataset.part || null,
+        has: b.classList.contains("has"),
+      })));
+  };
+
+  const hits = await search("neuroptics");
+  assert.ok(hits.length, "a generic part name must still find something");
+  assert.equal(hits.filter((h) => !h.part).length, 0,
+               "every result is a part — a Prime among them would put 'wish for "
+               + "this' beside 'I own this', and they look identical");
+
+  /* Newest first. Read from the payload rather than hard-coded, so this asserts
+     the ordering rule and not today's release calendar. */
+  const dates = await page.evaluate((names) => {
+    const D = window.WFPRIME_DATA;
+    return names.map((n) => {
+      const it = D.items.find((x) => n.startsWith(x.name));
+      return it ? (it.releaseDate || "") : "";
+    });
+  }, hits.map((h) => h.text));
+  const dated = dates.filter(Boolean);
+  assert.deepEqual(dated, [...dated].sort().reverse(),
+                   `results must run newest first, got ${JSON.stringify(dated)}`);
+
+  /* A tick records the part and leaves the farm list alone — you can get a drop
+     you were not chasing, and adding the Prime would silently reorder the whole
+     page off one click. */
+  const wishBefore = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]").length);
+  await page.click("#addResults .add-hit");
+  await page.waitForTimeout(200);
+  const wishAfter = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]").length);
+  assert.equal(wishAfter, wishBefore, "ticking a part must not add its Prime");
+
+  const note = await page.locator("#addResults .add-said").innerText();
+  assert.match(note, /not on your farm list/i,
+               "a tick with no visible effect reads as a tick that failed, so "
+               + "the untracked case has to say so");
+
+  /* Owned sorts last and says so on the row, because sort order alone is
+     invisible once the list is scrolled. */
+  const ticked = note.split(":")[0].trim();
+  const again = await search(ticked.toLowerCase());
+  assert.ok(again.length, "the part it just ticked must still be findable");
+  assert.ok(again[0].has, `${ticked} is owned now, so its row must be marked`);
+
+  /* 53 parts need more than one, and a tick adds one rather than completing it.
+     The subject is found in the payload on that property, never named. */
+  const multi = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    for (const it of D.items) {
+      for (const p of it.parts || []) {
+        if ((p.itemCount || 1) > 1) return `${it.name} ${p.name}`;
+      }
+    }
+    return null;
+  });
+  assert.ok(multi, "no part needs more than one — pick another property");
+  const before = await search(multi.toLowerCase());
+  assert.match(before[0].text, /0\/2|0\/\d/, `expected a count, got ${before[0].text}`);
+  await page.click("#addResults .add-hit");
+  await page.waitForTimeout(200);
+  const mid = await page.locator("#addResults .add-hit").first().innerText();
+  assert.match(mid.replace(/\s+/g, " "), /1\/\d/,
+               `one tick adds one, it does not complete: got ${mid}`);
+  assert.deepEqual(errors, []);
+});
+
 page_test("the crack list says how many relics the vault is keeping from it", async () => {
   /* A Prime you CAN farm, some of whose relics are vaulted, keeps those relics
      out of the crack list — which is right: there is somewhere to go, and

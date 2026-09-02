@@ -1029,6 +1029,29 @@ select.rank-by:focus{border-color:var(--gold-dim);box-shadow:0 0 0 3px rgba(217,
 .add-cat{font-size:11px;color:var(--txt-faint)}
 .add-none{padding:9px 12px;font-size:12px;color:var(--txt-faint)}
 
+/* Since 2026-09-02 this search marks parts collected rather than adding Primes,
+   so a result has a state worth seeing at a glance: one you still need, or one
+   you already have. Owned rows sort to the bottom AND dim, because sort order
+   alone is invisible once the list is scrolled — the reader has to be able to
+   tell from the row itself, not from where it sits.
+
+   The left edge carries it as well as the colour. A dimmed row and a normal row
+   differ only in weight, which is exactly the distinction that disappears for a
+   reader who cannot see the difference; a border is a second channel. */
+.part-hit{border-left:3px solid var(--gold-dim)}
+.part-hit.has{border-left-color:#2c4a37;opacity:.62}
+.part-hit.has .add-cat{color:#6f9a7d}
+
+/* What the last tick did, as the first row of the results panel rather than a
+   second floating one. It began as its own absolutely-positioned box at the
+   same offset as `.add-results` and landed on top of the first result — which
+   is what two things sharing one anchor does. Inside the panel it is beside the
+   list it describes and cannot collide with it. */
+.add-said{
+  padding:7px 12px;font-size:12px;color:var(--txt-dim);
+  background:var(--panel-2);border-bottom:1px solid var(--line-soft);
+}
+
 /* the list itself */
 .wish{border:1px solid var(--line-soft);border-radius:8px;margin-bottom:7px;overflow:hidden}
 .wish-done{border-color:#2c4a37}
