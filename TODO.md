@@ -244,9 +244,35 @@ of a worklist, not of the click, and worth deciding on its own merits.
 
 | Entry | Waiting on |
 |---|---|
-| Plague Star and Profit-Taker are the same shape, modelled two ways | Plague Star to run |
-| The Ghoul and Plague Star detection has never seen a live event | either event to run — the `tag` half can be done now |
+| Plague Star and Profit-Taker are the same shape, modelled two ways | **Plague Star, and it has a date: 2026-09-09 to 2026-09-23** |
+| The Ghoul and Plague Star detection has never seen a live event | **the same window — 2026-09-09 to 2026-09-23.** The `tag` half can be done before it opens, and should be |
 | Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
+
+**Two of those three now have a date, given by the owner on 2026-09-02 from DE's
+own announcement: Operation Plague Star runs 2026-09-09 to 2026-09-23, all
+platforms.** That is the first time anything in this table has had one.
+
+**What it is worth doing before the 9th, rather than during it.** The window is
+two weeks and the observation itself is a few minutes, but it can only be made
+while the event is live, and the thing being observed is *what the worldstate
+looks like* — which cannot be reconstructed afterwards from a memory of having
+looked. So the preparation is the part with a deadline:
+
+- **Land the `tag` half first.** It needs no event, it is described in its own
+  entry, and matching on `tag` before the keyword scan means the first sighting
+  yields a permanent identifier instead of another guess. Doing it after the event
+  opens wastes the only thing the window supplies.
+- **Capture the whole entry, not the answer.** Save the raw `/pc/events` and
+  `/pc/syndicateMissions` rows for Plague Star verbatim into `PROJECT.md` — `tag`,
+  `node`, `maximumScore`, `interimSteps`, `rewards[]`, `activation`, `expiry`. A
+  future question about the shape is then answerable without waiting for 2027.
+- **Check the detection actually fires**, on the deployed site and locally: does
+  `eventRunning` see it, does the Plague Star bounty leave the *include event
+  nodes* gate, and does the Hemocyte row stop being unreachable.
+
+**And the second date on this page is Baro, 2026-09-04 to 09-06** — his `Manifest`
+is empty between visits, so *Baro's actual stock is published, and never read* has
+a two-day window of its own, five days before Plague Star opens.
 
 *Seven rotation-bearing mission types* used to sit in this table waiting on "wiki
 checking; tedious, not blocked". **The wiki checking was done on 2026-08-26** and
@@ -1214,6 +1240,11 @@ one, and it is now a guarded risk rather than an unguarded one.
 
 ### Plague Star and Profit-Taker are the same shape, modelled two ways
 
+**Unblocked with a date, 2026-09-02.** DE's announcement, brought by the owner:
+Operation Plague Star runs **2026-09-09 to 2026-09-23**, all platforms. This entry
+has been waiting on "Plague Star to run" since 2026-08-14 and now has a fortnight
+to be answered in.
+
 **Raised by the owner 2026-08-14, and they are right that something is off.**
 Both are gated multi-stage activities that end in a boss dropping relics. Four of
 the five differences are real and the models follow them correctly — Profit-Taker
@@ -1686,6 +1717,16 @@ the two fields we read*). A node could say **"asks MR5"** the same way it says
 hand to do it; nothing reads it yet.
 
 ### The Ghoul and Plague Star detection has never seen a live event
+
+**It gets its chance on 2026-09-09.** The owner brought DE's announcement on
+2026-09-02: Operation Plague Star runs **2026-09-09 to 2026-09-23**, all
+platforms. Everything below was written not knowing when, or whether, that would
+happen — read it as a plan with a start date now rather than as a wait.
+
+**Do the `tag` half before the 9th.** It is the one piece that needs no event, and
+landing it first is what turns the sighting into a permanent identifier instead of
+one more keyword guess. Doing it during the window spends the window on work that
+did not need it.
 
 The bounty clock and the event gating both shipped on 2026-08-12
 (`PROJECT.md §7`). One part of it is unverified and cannot be verified on demand:
