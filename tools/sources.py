@@ -371,10 +371,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 write_etag(path, tag)
                 write_maxage(path, freshness)
                 return raw
-            except limits.TooLarge as exc:
-                # Not an error to retry: the same host will send the same body.
-                # It is a failed fetch, which this function already knows how to
-                # answer - next host, then the cached copy, then STALE.
+            except limits.Refused as exc:
+                # Both refusals, and both the same answer. Too large is not an
+                # error to retry - the same host will send the same body - and
+                # a body that did not decode whole is not one to keep. Either
+                # way it is a failed fetch, which this function already knows
+                # how to answer: next host, then the cached copy, then STALE.
                 log(f"! {exc} - refused, falling through")
                 refused.add(one)
                 last_err = exc

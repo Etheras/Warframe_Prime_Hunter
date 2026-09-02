@@ -50,8 +50,29 @@ MB = 1024 * KB
 CHUNK = 64 * KB
 
 
-class TooLarge(Exception):
+class Refused(Exception):
+    """
+    A body this build will not accept, for any reason.
+
+    Callers catch this rather than either subclass: every one of them answers a
+    refused body the same way, by treating it as a failed fetch - next host,
+    then the cached copy, then `STALE`. The split below is for the log line and
+    for saying which happened, not for branching on.
+    """
+
+
+class TooLarge(Refused):
     """A source sent, or expanded to, more than its ceiling allows."""
+
+
+class Malformed(Refused):
+    """
+    A compressed body that does not decode to a whole document.
+
+    Separate from `TooLarge` because it means the opposite thing about the
+    sender: too large is a source that grew, malformed is a transfer that broke.
+    Both are refused, and refusing is the same cheap operation either way.
+    """
 
 
 # What each source may expand to, keyed by its `.cache` name. The comment on
@@ -177,18 +198,53 @@ def gunzip_capped(raw: bytes, limit: int, what: str) -> bytes:
     before returning anything, so the bomb has already landed by the time there
     is a length to measure. `zlib.decompressobj` takes a per-call output bound,
     which is the only shape that can stop early.
+
+    **Two things a raw `decompressobj` does not do that `gzip.decompress` did**,
+    both found on 2026-09-02 by running the two against the same bodies rather
+    than by reading either. They are the cost of dropping to the lower-level API
+    and neither is announced by it.
+
+    A decompressor that runs out of input part-way through a member simply
+    stops. So a **truncated** download returned the bytes it had managed and
+    looked exactly like a complete document - `gzip.decompress` raised
+    `EOFError` on it, this returned 271 bytes of a 514-byte body. `dec.eof` is
+    the fact, and it was never asked for. The ceilings exist to make a bad body
+    safe, and this was the one path where moving to them made a bad body
+    *quieter*.
+
+    And a gzip body may hold **more than one member**: `gzip.decompress`
+    concatenates them all, while one decompressobj finishes at the first and
+    leaves the remainder in `unused_data`. So the loop is per member now.
+    Trailing zero padding ends it, which is what the stdlib tolerates; trailing
+    bytes that are not a member are `Malformed`, which is what the stdlib calls
+    `BadGzipFile`. Both were measured against `gzip.decompress` first, so this
+    matches an observed contract rather than an assumed one.
     """
-    dec = zlib.decompressobj(16 + zlib.MAX_WBITS)   # 16: expect a gzip wrapper
     out = bytearray()
-    pending = raw
-    while pending:
-        out += dec.decompress(pending, CHUNK)
+    data = raw
+    while data:
+        dec = zlib.decompressobj(16 + zlib.MAX_WBITS)  # 16: expect a gzip wrapper
+        pending = data
+        try:
+            while pending:
+                out += dec.decompress(pending, CHUNK)
+                if len(out) > limit:
+                    raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
+                pending = dec.unconsumed_tail
+            out += dec.flush()
+        except zlib.error as exc:
+            # Not a gzip member at all. Reached only for the second member
+            # onwards, since the first would have failed on the header.
+            raise Malformed(f"{what}: not a gzip stream ({exc})") from exc
         if len(out) > limit:
             raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
-        pending = dec.unconsumed_tail
-    out += dec.flush()
-    if len(out) > limit:
-        raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
+        if not dec.eof:
+            raise Malformed(
+                f"{what}: gzip stream ends part-way through a member, so the "
+                f"{len(out):,} bytes decoded are a fragment rather than a document")
+        data = dec.unused_data
+        if data and not data.strip(b"\0"):
+            break                       # trailing padding, as the stdlib allows
     return bytes(out)
 
 

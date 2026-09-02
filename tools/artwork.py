@@ -192,7 +192,7 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
                 replaced += 1
             else:
                 fetched += 1
-        except limits.TooLarge as e:
+        except limits.Refused as e:
             # A partial run is already the designed behaviour here - the
             # rewiring pass below only repoints what actually landed, so the
             # site keeps the remote URL for this one rather than a broken image.
