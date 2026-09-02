@@ -209,7 +209,7 @@ unit question — tedious rather than hard, and blocking nothing.
 |---|---|
 | The planner's search finds Primes, never parts | session — the owner's, 2026-09-01 |
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
-| One Cambion Drift tier labels a different letter from the rest of its family | small to check, unknown to fix — 16 against 1, so margin rather than a wrong answer |
+| One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
@@ -1201,10 +1201,43 @@ agrees on `C`, and the vote abstains on that job entirely rather than dissenting
 — so nothing shipped is wrong today. What it costs is margin: a family decided
 16–1 is one upstream change away from being decided 9–8.
 
-Worth checking against a live window rather than the cached one, since a single
-reading cannot tell a misfiled job from a genuinely different phase on Deimos.
-If Deimos really does run its own rotation phase, the family split is too coarse
-and that is a larger and more interesting problem than a misfiled bounty.
+**Checked against a live window on 2026-09-02, which is what this asked for, and
+the suspicion above is wrong.** Read straight off DE's worldstate:
+
+| Family | Letters published live | Dissenter |
+|---|---|---|
+| standard | A ×17, **B ×1** | `EntratiSyndicate` 30-40, `TierDTableBRewards` |
+| vault | C ×3 | none |
+
+**It is not a misfiled Isolation Vault bounty.** Every vault job carries a
+`VaultBounty` prefix in its reward path — `VaultBountyTierATableCRewards` and
+its two siblings — all three publish `C`, and the join in `build_data.py` already
+keys on that prefix (`key = (sid, tuple(levels), "VaultBounty" in name)`). The
+families are cleanly separated and the level collision at 30-40 is handled.
+
+The dissenter is a **genuine standard Cambion Drift job** publishing `TableB`
+while seventeen standard jobs across Cetus, Fortuna and Deimos publish `TableA`.
+Seen in two windows a day apart, both times at 30-40 on Deimos.
+
+**So the interesting reading is the right one: the letter is per tier, not per
+family.** DE publish a letter for every tier independently, and at least one tier
+disagrees with its family's majority persistently rather than by accident. The
+family split is an approximation, and this is the case that shows it.
+
+**Why it costs nothing today, concretely.** Not merely "16 against 1 is not
+close" — **no Cambion Drift bounty group carries a relic at all**, measured on
+the payload. The mislabelled tier never reaches a ranked number, because this
+app ranks relic sources and that tier has none. If DE ever put a relic in it, the
+letter would be wrong on screen the same day.
+
+**And the fix direction is now known rather than unknown.** The per-group letter
+is already captured — `live_bounty_letters` returns `out[group] = {letter,
+stages, minMR}` — while `rotation.js:211` scores from
+`BOUNTY.families[name]` instead. Preferring the group's own published letter,
+and falling back to the family only where a group has none, would remove the
+approximation without deriving anything new. What needs deciding is what the
+*countdown* means once tiers can disagree, since `walkFrom` advances one letter
+for a whole family.
 
 ### The page tests flake in a full run and pass on their own
 
