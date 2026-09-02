@@ -176,6 +176,7 @@ What is left of the entry is two fields and a warning about one of them.
 |---|---|
 | Seven rotation-bearing mission types are still unverified | **five now** — `Legacyte Harvest` verified AABC, `Skirmish` undocumented, `The Circuit` disputed; checked 2026-09-02 |
 | `The Circuit` may be two different modes wearing one name | **the owner's, to settle in game** — the wiki and DE's tables describe different things |
+| `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | session |
 | Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
@@ -785,6 +786,49 @@ Five types, five different outcomes:
 that disagree.** Worth knowing before the next pass: reading five wiki pages
 produced one confirmation and one bug, which is a better yield than this entry
 had assumed when it called the work "tedious rather than hard".
+
+### `The Perita Rebellion` is a time box, and the model has no clock for it
+
+**Tried, measured and reverted on 2026-09-02.** Written down because the obvious
+fix is wrong in a way that only shows up once it is built, and the next reader
+will otherwise reach for it exactly as this session did.
+
+**What it actually is.** A 12-minute mission, not endless and not fixed-length:
+*"Players are given 12 minutes to complete as many objectives, called Orders, as
+they can before facing down the boss enemy."* Every 3 Orders pays rotation A,
+every Order pays rotation B, finishing pays rotation C — and DE's tables put
+**relics only in rotation A**. So a run yields as many A draws as the player is
+fast enough to earn, and the wiki declines to give a typical or maximum count.
+
+**Why AABC is wrong here.** It does not merely mislabel rounds: it makes rotation
+A *run out*. Rounds 1 and 2 pay A, then the cycle turns to B and C, so `reset`
+stops at two draws believing no more are reachable. In the mission they keep
+coming every three Orders until the clock stops.
+
+**Why the obvious fix is worse.** A one-letter cycle —
+`{ plan: () => "A", cycle: 1 }`, the shape Disruption's *holding rotation B*
+plan already uses — was built and measured:
+
+| | before | with the one-letter cycle |
+|---|---|---|
+| randoms (the default) | 2 rounds, **2** A draws | 1 round, **1** A draw |
+| 4-man premade | 6 rounds, 4 A draws | 6 rounds, 6 A draws |
+
+`reset` means *run to the last round that pays*, and with a cycle of 1 that is
+round 1 — so the default case halves. The premade case improves and the common
+case regresses, which is a bad trade and not a close one.
+
+**What it would actually need.** A count of A draws per run, which is a function
+of player speed inside a fixed clock. `FIXED_LENGTH` wants exactly that number
+and nobody has it: the wiki says there is none, and inventing one is what
+`PROJECT.md §2` calls picking a number the mission cannot have. The honest model
+is closer to *"one run, N draws, where N is effort"* — which is the effort-weight
+machinery rather than the rotation machinery, and no mission currently uses it
+that way.
+
+**So it stays as it is**, mislabelled but not visibly wrong: 4 nodes, 2 rounds,
+2 A draws. The error is in what the rounds are *called*, and the count it lands
+on is plausible. Left alone deliberately, not overlooked.
 
 ### `The Circuit` may be two different modes wearing one name
 
