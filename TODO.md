@@ -539,47 +539,6 @@ advice to disregard a failure.
 - **Two comments in `limits.py` (lines 59, 107) describe rules the table does not
   follow.** **Size: small.**
 
-### A fissure that opens repaints its badge and does not re-rank, and does nothing at all on the collection page
-
-**The owner's observation, 2026-09-02**: *"the page doesn't refresh unless I
-F5"*. It is right, and it is two separate gaps rather than one — both in the
-callback, not in the poller.
-
-**The poller itself is sound and is not the problem.** `startFissurePoll` pulls
-on load, every `FISSURE_REFRESH_MS` (ten minutes), and again on
-`visibilitychange` when the tab comes back. It updates `DATA.fissures` in place
-and calls every registered watcher. *An open page picks up a fissure that opened
-after it loaded* covers exactly this, and passes.
-
-**What it covers is the badge.** The planner registers
-`S.watchFissures(paintFissures)`, and `paintFissures` rewrites `.fissure-slot`
-innerHTML and nothing else. But a fissure is not decoration: `fissureHere` feeds
-`runValue`, so it changes what a run is *worth* and therefore the row's number
-and the list's order. Those are computed in the node walk, during `render()`,
-which the watcher never calls. So a fissure opening on a ranked node makes the
-badge appear beside a rate that still assumes no fissure, and the row does not
-move to where it now belongs — which is the whole point of a ranked list.
-
-**And the collection page registers no callback at all.** `app.js:58` is
-`S.watchFissures()`, with no argument. The list updates underneath it and nothing
-repaints, so that page is exactly as stale as the owner describes until something
-else triggers a render. `shared.js` even explains why the watcher list is an
-array rather than a single callback — *"in the single-file build the first caller
-is app.js, which passes none"* — so the shape was understood and the second half
-was not done.
-
-**Why the test did not catch either.** It asserts a `.tag.fissure` appears on the
-planner. It never reads the rate beside it, never re-reads the order, and never
-opens `/index.html`. A test that pins the badge pins the badge.
-
-**Size: small**, and the fix is probably one line per page — give `app.js` a
-render callback, and give the planner one that re-ranks rather than repaints. The
-judgement is what "re-render" should cost: a full `render()` on the planner
-re-sorts the list under the reader's cursor every ten minutes, which is the
-behaviour *the crack-list controls* were careful to avoid. Repainting in place
-and re-sorting only on the reader's next interaction may be the better answer,
-and that is a decision rather than a patch.
-
 ### The deployed site shows no fissures for hours at a time
 
 **Reported by the owner on 2026-09-02** as a wrong fissure rotation on the

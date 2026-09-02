@@ -304,6 +304,44 @@
   const anyClocked = () =>
     !!(BOUNTY && Object.keys(BOUNTY.groups || {}).length);
 
+  /* **Everything the ranking reads off the clock, as one string.** Same string,
+     nothing that decides a row has moved.
+
+     `stamp` above is the bounty letters and only those, and a tick built on it
+     re-rendered for a rotation changeover while sitting still through four other
+     things that move a row just as much. Found 2026-09-02, from the owner asking
+     what else changes the ranking with nobody clicking anything:
+
+     - **fissures** - `fissureHere` feeds `runValue`, so one opening or closing
+       changes what a run is worth. The signature holds the *live* set, so a
+       fissure closing moves it exactly as one opening does.
+     - **event windows** - `isEventNode` asks `eventRunning`, which reads the
+       clock, and `reachableSource` gates on it. When Plague Star opens, every
+       bounty behind that gate becomes reachable mid-session.
+     - **Prime Resurgence** - the Aya block asks whether the window is still
+       open, and it closes on a date like any other.
+
+     Deliberately not here: anything that only changes what a row *says*.
+     Countdowns are repainted from `data-until` without a re-render, which is the
+     cheap path this exists to stay off. The test is whether it moves a number
+     the list is sorted on.
+
+     Takes the fissure list rather than reading it, because this module never
+     owns it - `fissuresAt` is handed one too, and the page is the only thing
+     that knows which list is current. */
+  const clockStamp = (fissures) => {
+    const at = Date.now();
+    const live = (fissures || [])
+      .filter((f) => Date.parse(f.ends) > at)
+      .map((f) => f.node + "|" + f.tier + (f.hard ? "|h" : "") + (f.storm ? "|s" : ""))
+      .sort().join(",");
+    const events = Object.keys((BOUNTY && BOUNTY.events) || {}).sort()
+      .map((k) => k + (eventRunning(BOUNTY.events[k]) ? "1" : "0")).join(",");
+    const res = ((DATA.meta || {}).resurgence || {}).expiry;
+    const resLive = !res || new Date(res).getTime() > at;
+    return [stamp(), live, events, resLive ? "1" : "0"].join("~");
+  };
+
   /* A bounty is not costed in rounds at all. One run pays the stages of
      whichever letter the clock has up, so what going now is worth is that
      letter and nothing else - the others are a wait, not a longer run.
@@ -995,7 +1033,7 @@
     perReward: PER_REWARD,
     bonusRotations: BONUS_ROTATIONS,
     liveRotation, familyState, whenNext, untilText, awayText, traderWindow,
-    stamp, anyClocked,
+    stamp, anyClocked, clockStamp,
     cycleMinutes: CYCLE_MINUTES, sequence: SEQ,
     signature, pickNode,
     fissuresAt, minutesLeft,

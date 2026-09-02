@@ -5406,6 +5406,66 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
 
+### The tick re-ranks for everything on the clock, not just for bounty letters
+
+**Shipped 2026-09-02**, from the owner asking the right question after the
+fissure work: *what else changes the ranking without a UI element being clicked?*
+
+**There was already a correct pattern, applied to one input.** `plan.js` runs a
+thirty-second tick that compares `ROT.stamp()` — the letters of every clocked
+bounty — and calls a full `render()` when it moves, falling back to repainting
+`[data-until]` countdowns when it has not. That is exactly the right shape: a
+re-rank on real news, a cheap repaint otherwise.
+
+**It was watching one of four things.** The audit found the ranking reads the
+clock in four places and the stamp covered the first:
+
+| input | reaches the ranking through | was it watched |
+|---|---|---|
+| bounty rotation letters | `liveRotation` → `runValue` | **yes** |
+| fissures | `fissureHere` → `runValue` | no — badge repaint only |
+| event windows | `eventRunning` → `isEventNode` → `reachableSource` | no |
+| Prime Resurgence window | the Aya block's `ayaRotationLive` | no |
+
+So a fissure opening repainted a badge beside a rate that still assumed no
+fissure, and the row never moved to where it now belonged — which is the whole
+point of a ranked list. Both of the others are live questions rather than
+hypotheticals: `meta.resurgence.expiry` was **2026-09-03T18:00Z**, the day after
+this shipped, and `meta.bounties.events` already carries Plague Star for
+**2026-09-09**.
+
+**`ROT.clockStamp(fissures)` is the whole question now**, folding all four into
+one string, and the tick compares that instead. It takes the fissure list rather
+than reading it, because the module never owns that list — `fissuresAt` is handed
+one too, and only the page knows which is current.
+
+**What is deliberately *not* in it:** anything that changes only what a row
+*says*. Countdowns keep their cheap repaint path. The test for inclusion is
+whether it moves a number the list is sorted on, and the suite pins both
+directions — a fissure whose only change is time-left must **not** move the
+stamp, or the tick re-renders every thirty seconds and the reader's list re-sorts
+under the cursor for nothing.
+
+**The `anyClocked()` gate is gone**, and that was a real hole rather than
+tidying: it asked whether any *bounty* was clocked, so a payload with no bounty
+groups ran no tick at all — while fissures, events and the Resurgence window are
+on the clock regardless. The gate could only ever answer a quarter of the
+question it was standing in front of.
+
+**The poller now re-ranks as well as repainting**, by registering the tick as a
+second fissure watcher. It goes through the tick rather than straight to
+`render()` so that `seen` is written where it is read; two writers and one reader
+is how a stamp starts lying.
+
+**One thing the audit expected to find and did not.** `app.js` registers no
+fissure callback, which looked like the same defect one page over and is not:
+nothing persistent on the collection page is painted from the list. `bestSpots`
+is reached only through `spotsHTML`, and that only from `openItem` — so the array
+is consulted when a drawer opens and by then holds whatever the last poll left.
+The comment at the call site already said so. **Checked before changing it, and
+left alone** — the entry that had claimed otherwise was wrong and was deleted
+rather than shipped.
+
 ### A Steel Path fissure is not the ordinary node's fissure
 
 **Shipped 2026-09-02**, from the owner's report that the site was naming missions

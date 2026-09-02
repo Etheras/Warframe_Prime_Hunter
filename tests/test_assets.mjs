@@ -1414,6 +1414,48 @@ test("the two opt-ins each gate their own kind of source, and only their own", (
                "the Railjack box must not let an event node through");
 });
 
+test("the clock stamp moves for anything that re-ranks, and not for a countdown", () => {
+  /* The tick re-renders when this string changes and only repaints countdowns
+     when it does not, so what belongs in it is exactly "things that move a
+     number the list is sorted on". It held the bounty letters alone until
+     2026-09-02, which meant a fissure opening repainted a badge beside a rate
+     that still assumed no fissure. */
+  /* The clock is frozen, because `clockStamp` reads `Date.now()` itself rather
+     than taking one - it is answering "what does the board look like right now",
+     and a caller passing its own would be describing a different board. So the
+     test has to agree with the sandbox about when now is. */
+  const now = Date.parse("2026-09-02T12:00:00Z");
+  const ROT = loadRotation({ now });
+  const at = (mins) => new Date(now + mins * 60000).toISOString();
+  const F = (o) => Object.assign(
+    { node: "Hydron (Sedna)", tier: "Lith", hard: false, storm: false }, o);
+
+  const none = ROT.clockStamp([]);
+  const one = ROT.clockStamp([F({ ends: at(60) })]);
+  assert.notEqual(one, none, "a fissure opening has to move the stamp");
+
+  assert.equal(ROT.clockStamp([F({ ends: at(60) })]), one,
+               "the same list twice is the same stamp");
+  assert.equal(ROT.clockStamp([F({ ends: at(30) })]), one,
+               "only the time left changed, which is a repaint and not a re-rank");
+
+  assert.equal(ROT.clockStamp([F({ ends: at(-1) })]), none,
+               "an expired fissure counts as gone, so closing moves it back");
+  assert.notEqual(ROT.clockStamp([F({ ends: at(60), hard: true })]), one,
+                  "Steel Path is a different bet, so it is a different stamp");
+  assert.notEqual(ROT.clockStamp([F({ ends: at(60), node: "Xini (Eris)" })]), one,
+                  "the same fissure somewhere else re-ranks a different row");
+
+  /* Order must not decide it: two reads of one unchanged board have to agree
+     however the list arrived, or the tick re-renders every thirty seconds. */
+  const a = F({ ends: at(60) }), b = F({ ends: at(90), node: "Xini (Eris)" });
+  assert.equal(ROT.clockStamp([a, b]), ROT.clockStamp([b, a]),
+               "the stamp is about the set, not about the order it came in");
+
+  assert.equal(ROT.clockStamp(null), ROT.clockStamp([]),
+               "an old build carries no list, which is not a change");
+});
+
 test("a Steel Path fissure is not the ordinary node's fissure", () => {
   /* The defect this pins, reported by the owner on 2026-09-02: `hard` reached
      the payload and only a tooltip read it, so a Steel Path fissure marked the

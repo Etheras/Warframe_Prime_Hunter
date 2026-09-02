@@ -2526,11 +2526,16 @@
      place, which disturbs nothing; a full re-render is kept for the letter
      actually changing, because it replaces the list under whoever is reading
      it. */
-  if (ROT.anyClocked()) {
-    let seen = ROT.stamp();
+  /* **Not gated on `anyClocked()` any more.** That asked whether any *bounty*
+     was on the clock, which left a payload with no bounty groups running no tick
+     at all - and fissures, event windows and the Resurgence window are on the
+     clock whether or not a bounty is. `clockStamp` is the whole question now, so
+     the gate would only ever have answered a part of it. */
+  {
+    let seen = ROT.clockStamp(FISSURES);
     const tick = () => {
       if (document.hidden) return;
-      const now = ROT.stamp();
+      const now = ROT.clockStamp(FISSURES);
       if (now !== seen) { seen = now; render(); return; }
       $$("[data-until]").forEach((el) => {
         el.textContent = untilText(Number(el.dataset.until)) + " left";
@@ -2538,5 +2543,10 @@
     };
     setInterval(tick, 30000);
     onReturn.push(tick);      // see visibilitychange above
+    /* The poller only calls back when the file actually changed, so this is a
+       re-rank on real news rather than on a timer. It goes through `tick` rather
+       than straight to `render` so that `seen` is updated in the same place it
+       is read - two writers and one reader is how a stamp starts lying. */
+    S.watchFissures(tick);
   }
 })();
