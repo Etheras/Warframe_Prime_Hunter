@@ -2416,10 +2416,18 @@ badge. If a second activity ever locks someone in, the honest move is to promote
 `railjackOnly` to a general `onlyFrom(activity)` rather than add a second special
 case beside it.
 
-### Neither the Steel Path nor Mastery Rank is an option — for different reasons
+### The Steel Path gates a fissure but not a source; Mastery Rank gates nothing
 
-Both gate entering a node. Neither gets a control, and the two reasons are not
-the same, which is worth writing down because the outcome looks uniform.
+**This was titled *"Neither the Steel Path nor Mastery Rank is an option"* until
+2026-09-02**, and the retitling is the finding. Everything below about *sources*
+still holds and was re-checked. What it did not cover — because nothing here had
+ever separated the two — is that a Steel Path **fissure** is not a source at all,
+and that half now has a control. See *A Steel Path fissure is not the ordinary
+node's fissure* further down.
+
+Both gate entering a node. Neither gets a control **for the drop tables**, and the
+two reasons are not the same, which is worth writing down because the outcome
+looks uniform.
 
 **The Steel Path is a second star chart**, unlocked once by clearing the first.
 Until you have, its nodes are not on your chart at all — the same shape as an
@@ -2445,6 +2453,14 @@ written for the day one does.
 **Revisit if that stops being true.** The moment a Steel Path table pays
 something its ordinary twin does not, the badge stops being sufficient and the
 checkbox earns its place.
+
+**That clause was collected on 2026-09-02, by the other half of the question.**
+Not by a drop table changing — the Faceoff twins are still identical — but by a
+*fissure*, which this entry had never considered because a fissure is not in the
+drop tables at all. It comes off the live worldstate as a flag on an ordinary
+node, so it pays something the ordinary node does not, and it does so at nodes
+that have no Steel Path table anywhere. The checkbox earned its place exactly
+where the sentence said it would, in a place the sentence was not looking.
 
 **Mastery Rank gates nothing here either, and would not even if it mattered.**
 The worldstate publishes
@@ -5389,6 +5405,54 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 **The comment claiming this was derived from the CSP was itself wrong** and is
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
+
+### A Steel Path fissure is not the ordinary node's fissure
+
+**Shipped 2026-09-02**, from the owner's report that the site was naming missions
+that were not live, and their own guess at the shape of it, which was right.
+
+`build_fissures` carried `hard` from the worldstate into the payload correctly.
+**Exactly one line read it** — a tooltip. `ROT.fissuresAt` tested node, storm and
+expiry and never tested `hard`, so both pages counted a Steel Path fissure as a
+fissure on the **ordinary** node: it changed the ranking through `fissureHere`,
+and the badge said only `Lith fissure 45m`.
+
+Measured while diagnosing it, 28 fissures live: **10 Steel Path, 6 Void Storm, 12
+ordinary** — and **ten nodes carried a Steel Path fissure with no ordinary one**,
+Hydron, Xini, Pago and Yuvarium among them. Ten rows claiming a fissure at a place
+where, on the chart the reader was looking at, there was none.
+
+**It was wrong for everyone, not only for players without the Steel Path
+unlocked**, and that decided the fix. Steel Path Hydron is a different mission
+instance from Hydron; running the ordinary node cracks nothing whoever you are. So
+it had to gate the row rather than merely label it — a badge alone would have been
+honest and still wrong.
+
+**The shape was already in the same function.** `allowStorm` threads through
+`fissuresAt` from `opts.railjack`, so a Void Storm answers to a switch. Steel Path
+answering to nothing was a one-clause asymmetry, and the fix is the symmetric
+clause plus the option that feeds it: `fissuresAt(list, node, now, allowStorm,
+allowHard)`, `opts.steel`, `#p-steel`, defaulting off exactly as Railjack does.
+
+**Both opt-ins are read as "may this be counted", deliberately.** A caller passing
+neither gets the plain star chart, so a call site anyone forgets hides a real
+fissure rather than inventing one — the safe direction, and the reason the
+parameter is `allowHard` rather than `hideHard`. The collection page passes
+`false` **explicitly** rather than relying on the omitted argument, because a
+default that happens to be falsy is not a decision a later reader can find.
+
+**And the badge names it as well as gating it**, because the tooltip is where a
+reason belongs and not where a fact does: `Meso Steel Path fissure 1h 29m`.
+
+**One test had to change, and it was the right one to have to change.** *A Steel
+Path node is ranked, and says so on the row* asserted `#p-steel` did not exist —
+a proxy for the 2026-08-14 decision that stopped being one the moment a checkbox
+arrived for a different question. It now asserts the box exists and is off by
+default, and keeps the assertions it always owned, which are about **sources**:
+the Faceoff twin is still folded rather than filtered, with the box off. The new
+behaviour is pinned in `test_assets.mjs` instead, against `fissuresAt` itself
+rather than against the checkbox — the filter is what decides and the checkbox is
+one caller. Mutating the clause to `(true || !f.hard)` turns it red, checked.
 
 ### What the verification sweep of 2026-09-02 confirmed
 

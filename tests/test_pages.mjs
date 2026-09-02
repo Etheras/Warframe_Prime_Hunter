@@ -1623,7 +1623,17 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
      would exclude it - but every Steel Path table carrying a relic is a Faceoff
      variant identical to its ordinary twin, so an option would have changed two
      duplicate rows and nothing else. The badge carries the whole message, which
-     is what this pins: the node ranks, and the row says what it needs. */
+     is what this pins: the node ranks, and the row says what it needs.
+
+     **A Steel Path SOURCE and a Steel Path FISSURE are different questions, and
+     `#p-steel` answers only the second.** This assertion used to be "there is no
+     Steel Path checkbox", which was a proxy for the decision above and stopped
+     being one on 2026-09-02, when a checkbox arrived for fissures. A fissure is
+     not a drop-table row: it comes off the live worldstate as a flag on an
+     *ordinary* node, so it is reachable only on a chart the reader may not be
+     standing on, and unlike the Faceoff twins it offers something the ordinary
+     node does not. What this test still owns is the source half - the Faceoff
+     assertions below run with the box off and must not care about it. */
   const { page, errors } = await open("/plan.html");
   /* Pick the subject by node NAME, never by calling isSteelPath. Choosing the
      target with the function under test makes the whole case vacuous: break the
@@ -1646,8 +1656,10 @@ page_test("a Steel Path node is ranked, and says so on the row", async () => {
             "removed them all, delete this test rather than letting it pass empty");
   await page.reload({ waitUntil: "load" });
 
-  assert.equal(await page.locator("#p-steel").count(), 0,
-               "there is no Steel Path checkbox, and adding one back needs a reason");
+  assert.equal(await page.locator("#p-steel").count(), 1,
+               "the Steel Path checkbox gates fissures and should be on the page");
+  assert.equal(await page.locator("#p-steel").isChecked(), false,
+               "Steel Path fissures are excluded by default, like Railjack");
 
   /* A Faceoff table is one reward a run against 22 relics, so it sorts well
      below anything endless and is out of sight of both the eight rows and the

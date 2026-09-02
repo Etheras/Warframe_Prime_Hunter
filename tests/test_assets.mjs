@@ -1413,3 +1413,43 @@ test("the two opt-ins each gate their own kind of source, and only their own", (
   assert.equal(ROT.reachableSource(ev, { railjack: true, event: false }), false,
                "the Railjack box must not let an event node through");
 });
+
+test("a Steel Path fissure is not the ordinary node's fissure", () => {
+  /* The defect this pins, reported by the owner on 2026-09-02: `hard` reached
+     the payload and only a tooltip read it, so a Steel Path fissure marked the
+     ORDINARY node - ten of them one evening, at nodes carrying no ordinary
+     fissure at all. Steel Path Hydron is a different instance of Hydron, so the
+     row was wrong for everyone rather than only for players who had not
+     unlocked it.
+
+     Asserted through `fissuresAt` rather than through the checkbox, because the
+     filter is the thing that decides and the checkbox is one caller of it. */
+  const ROT = loadRotation();
+  const now = Date.parse("2026-09-02T12:00:00Z");
+  const at = (mins) => new Date(now + mins * 60000).toISOString();
+  const HERE = "Hydron (Sedna)";
+
+  const plainF = { node: HERE, tier: "Lith", ends: at(60), hard: false, storm: false };
+  const hard   = { node: HERE, tier: "Meso", ends: at(90), hard: true,  storm: false };
+  const storm  = { node: HERE, tier: "Neo",  ends: at(120), hard: false, storm: true };
+  const list = [plainF, hard, storm];
+  const tiers = (allowStorm, allowHard) =>
+    ROT.fissuresAt(list, HERE, now, allowStorm, allowHard).map((f) => f.tier);
+
+  assert.deepEqual(tiers(false, false), ["Lith"],
+                   "by default the ordinary star chart only");
+  assert.deepEqual(tiers(false, true), ["Meso", "Lith"],
+                   "the Steel Path box admits the hard one, longest remaining first");
+
+  assert.deepEqual(tiers(true, false), ["Neo", "Lith"],
+                   "the Railjack box must not let a Steel Path fissure through");
+  assert.deepEqual(tiers(false, true).includes("Neo"), false,
+                   "the Steel Path box must not let a Void Storm through");
+  assert.deepEqual(tiers(true, true), ["Neo", "Meso", "Lith"],
+                   "both on is both, still ordered by what is left");
+
+  /* The whole point, stated as the reader's question: a node whose ONLY fissure
+     is Steel Path is not a fissure node on the ordinary chart. */
+  assert.deepEqual(ROT.fissuresAt([hard], HERE, now, true, false), [],
+                   "a node carrying only a Steel Path fissure must not be marked");
+});

@@ -701,9 +701,26 @@
 
      Void Storms are Railjack, so they answer to the same switch everything else
      Railjack does rather than appearing on a page that has it turned off. */
-  function fissuresAt(list, node, now, allowStorm) {
+  /* **`allowHard` is the Steel Path, and it defaults to excluded.** Added
+     2026-09-02, after the owner reported the site naming missions that were not
+     live. `hard` reached the payload from the worldstate and exactly one line
+     read it - a tooltip - so a Steel Path fissure was counted as a fissure on
+     the *ordinary* node, and ten nodes one evening carried one with no ordinary
+     fissure at all.
+
+     Steel Path Hydron is a different mission instance from Hydron, so this is
+     wrong for the reader who has unlocked it too: running the ordinary node
+     cracks nothing either way. That is why it gates the row rather than merely
+     labelling it.
+
+     Both opt-ins are read as "may this be counted", so a caller that passes
+     neither gets the plain star chart. That is the safe direction - a missed
+     caller hides a real fissure rather than inventing one - and it is why the
+     parameter is `allowHard` rather than `hideHard`. */
+  function fissuresAt(list, node, now, allowStorm, allowHard) {
     return (list || [])
       .filter((f) => f.node === node && (allowStorm || !f.storm) &&
+                     (allowHard || !f.hard) &&
                      Date.parse(f.ends) > now)
       .sort((a, b) => Date.parse(b.ends) - Date.parse(a.ends));
   }

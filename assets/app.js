@@ -618,10 +618,18 @@
        answer, so neither can cost a run at a length the other disagrees with.
 
        Void Storms are allowed, as everywhere on this page: it never hides
-       Railjack, since some live relics drop nowhere else. */
+       Railjack, since some live relics drop nowhere else.
+
+       **The Steel Path is refused, and the two arguments are not symmetrical.**
+       A storm is a place a relic really drops; a Steel Path fissure is the same
+       relic on a chart the reader may not be standing on, and running the
+       ordinary node cracks nothing. This page has no planner options to read, so
+       it takes the default rather than a preference - passed explicitly, because
+       an omitted argument that happens to be falsy is not a decision anybody can
+       find later. The planner's switch is the only place this is asked. */
     const now = Date.now();
     const isFissureNow = (e) =>
-      ROT.fissuresAt(FISSURES, nodeKey(e), now, true).length > 0;
+      ROT.fissuresAt(FISSURES, nodeKey(e), now, true, false).length > 0;
     map.forEach((e) => {
       const live = e.kind === "bounty" ? liveRotation(e.node) : null;
       const r = runValue(e.rot, e.mode, state.squad, live, null,

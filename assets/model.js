@@ -329,7 +329,7 @@
      on screen, not what the model concludes. They are saved and backed up all
      the same, because a control the reader sets every single visit is one the
      app is making them repeat. */
-  const PLAN_OPTIONS = ["squad", "event", "railjack", "aya", "traces",
+  const PLAN_OPTIONS = ["squad", "event", "railjack", "steel", "aya", "traces",
                         "minutes", "runStart", "runEnd",
                         "sort", "formaHave", "formaNeed",
                         "tier", "varzia", "trade"];

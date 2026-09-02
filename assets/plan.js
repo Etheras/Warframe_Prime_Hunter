@@ -755,7 +755,7 @@
     const bonus = fissureBonus(relicPlan);
     const now = Date.now();
     const fissureHere = (n) =>
-      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack).length > 0;
+      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack, opts.steel).length > 0;
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
       /* Railjack is excluded from the fissure branch for the same reason its
@@ -2048,15 +2048,23 @@
   function paintFissures() {
     const now = Date.now();
     $$(".fissure-slot").forEach((slot) => {
-      const live = ROT.fissuresAt(FISSURES, slot.dataset.node, now, opts.railjack);
+      const live = ROT.fissuresAt(FISSURES, slot.dataset.node, now,
+                                  opts.railjack, opts.steel);
       if (!live.length) { slot.innerHTML = ""; return; }
       const f = live[0];
       const tip = "A " + f.tier + " fissure is running here, closing " +
         new Date(f.ends).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
         ".\nSo this run earns the relic and cracks one." +
-        (f.hard ? "\nSteel Path." : "") + (f.storm ? "\nVoid Storm." : "");
+        (f.hard ? "\nSteel Path — a different instance of this node, not the one "
+                + "on your ordinary chart." : "") +
+        (f.storm ? "\nVoid Storm." : "");
+      /* Named in the badge, not only in the tooltip. A Steel Path fissure is
+         only reachable on a chart the reader may not be standing on, so it has
+         to survive being read at a glance - the tooltip is where the reason
+         lives, not where the fact does. */
       slot.innerHTML = '<span class="tag fissure" data-tip="' + esc(tip) + '">' +
-        esc(f.tier) + " fissure " + esc(leftText(ROT.minutesLeft(f, now))) + "</span>";
+        esc(f.tier) + (f.hard ? " Steel Path" : "") + " fissure " +
+        esc(leftText(ROT.minutesLeft(f, now))) + "</span>";
     });
   }
 
@@ -2285,7 +2293,8 @@
     });
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
-   ["p-railjack", "railjack"], ["p-traces", "traces"]].forEach(([id, key]) => {
+   ["p-railjack", "railjack"], ["p-steel", "steel"],
+   ["p-traces", "traces"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });
