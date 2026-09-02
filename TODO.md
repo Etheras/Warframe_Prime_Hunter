@@ -158,6 +158,11 @@ Five things worth carrying forward, because none was in the findings:
 | Entry | Size |
 |---|---|
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
+| `gunzip_capped` turns a refused download into a short one | small — **the one regression of 2026-09-01**; a truncated body now returns partial bytes where the stdlib raised |
+| The shell-write guard has ten ways round it, and two documents say it has none | session — all pre-existing; **the two false sentences should be corrected whatever is decided about the code** |
+| Two ceiling assertions cannot fail | small — a naive full expansion takes 0.018s against a 5.0s bound, so it passes the check meant to reject it |
+| The wiki-permissions test matches spellings, not the property it names | small — the job split is real and verified; the test is not what holds it |
+| The pin count in `dependabot.yml` was stale the day it was written | small — nine claimed, eleven actual, all correctly pinned |
 
 ### The worldstate is already cached, and barely read
 
@@ -203,6 +208,14 @@ app rather than by anything written here.
 *Seven rotation-bearing mission types* is what remains of the entry that gated the
 unit question — tedious rather than hard, and blocking nothing.
 
+**One measurement in this family stopped reproducing**, found by the sweep of
+2026-09-02 and filed below as *The six-round table's four-round column no longer
+reproduces*. The decision it supports is untouched — 116 places, zero six-round
+rows for randoms and exactly one for a premade all still measure exactly — but
+one four-round row has gone missing since the table was written, so a re-run no
+longer matches the page. **A measurement nobody can re-run is the thing this file
+keeps asking entries to be**, which is why a one-row drift is worth a line.
+
 ### Interface
 
 | Entry | Size |
@@ -214,6 +227,8 @@ unit question — tedious rather than hard, and blocking nothing.
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
+| Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
+| The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
 
 ### One refactor
 
@@ -315,6 +330,211 @@ that shipped and half did not**, and the pointer to it has rotted; see the entry
 below.
 
 ### A backup's `filters` are adopted whole, and the entry saying so is gone
+
+---
+
+## Defects found by the verification sweep of 2026-09-02
+
+**A re-check of the 31 commits of 2026-09-01/02**, asked for by the owner after
+the session that wrote them. The suite was green (`clone-and-build` the only
+skip) and CI green on every commit, so nothing here was failing — which is the
+point of the sweep and the reason it is worth writing down what it *did* find.
+
+**What was confirmed working is longer than what follows and is in
+`PROJECT.md §7`**, because a verification that only records defects reads as if
+the session went badly. It did not: the six-round restriction, the read-only
+cache, the connection cap, the loopback refusal, the vault-hidden count, the
+search's span rule and the mission-type figures all reproduce exactly, several
+to the digit.
+
+**One of these is a regression the session introduced.** The rest are
+pre-existing gaps the session walked past, or sentences it wrote that were
+already false. They are separated below because the distinction decides urgency.
+
+### `gunzip_capped` turns a refused download into a short one
+
+**The one regression, and the only entry here that is new damage.**
+`tools/limits.py:172` replaced `gzip.decompress` with an incremental
+`zlib.decompressobj` so a bomb could be stopped mid-expansion. That part works
+and is measured. What went with it is the *end-of-stream check*.
+
+Measured on 2026-09-02, same input to both:
+
+| input | `gzip.decompress` | `gunzip_capped` |
+|---|---|---|
+| truncated stream | raises `EOFError` | returns **271 of 514 bytes** |
+| two concatenated members | returns both | returns **the first only** |
+
+`dec.eof` is `False` in the truncated case, so the fact is available and simply
+never consulted, and `dec.unused_data` holds the second member. A truncated
+download used to be a loud failure that fell through to the cache; it is now a
+short document that looks complete. Most of our sources are JSON and a truncation
+would fail to parse — which is why this has not shown — but the ceiling work
+exists precisely to make malformed upstream input safe, and this is the one path
+where it made it quieter instead.
+
+**Size: small.** `if not dec.eof: raise` after the loop, plus a loop over
+`unused_data` for the multi-member case, and a test for each that feeds a
+deliberately truncated body.
+
+### Two ceiling assertions cannot fail
+
+`tests/test_build.py:1009` and `:1035` assert that the capped decompressors stop
+*early* rather than expanding first, and both do it with `time.time() - started
+< 5.0`. Measured against the same bombs the tests build:
+
+- naive `gzip.decompress` of the 64 MB bomb: **0.018s** — 278× under the threshold
+- naive `lzma.decompress` of the 32 MB bomb: **0.056s** — 89× under
+
+So the implementation each assertion exists to reject passes it comfortably. The
+comment above the first one states the intent exactly right — *"expanding it all
+and then measuring would pass the assertion above"* — and then picks a bound that
+does not separate the two. Hard rule 6: a test that cannot fail is worse than
+none.
+
+**Size: small.** The capped path is ~13× faster than the naive one on the same
+input (0.0014s against 0.018s), so a ratio against a measured naive baseline
+bites where a wall-clock constant does not; peak allocation would too.
+
+### The shell-write guard has ten ways round it, and two documents say it has none
+
+**Pre-existing, not this session's doing** — the session changed `INLINE_PROGRAM`
+and `WRITES` only, and **both of its changes are correct**: every heredoc form is
+now refused, and the `open('assets/…')` read that the old pattern denied on the
+`'a` of `assets` is allowed again. Everything below lives in `REDIRECT`,
+`OVERWRITERS`, `EXEMPT` and `PATHISH`, which it did not touch.
+
+Confirmed live against the real hook, each rewriting a file in a throwaway tree:
+
+| form | why it slips |
+|---|---|
+| `cd assets && sed -i … app.js` | `PATHISH` needs a slash or an `assets/`-style prefix |
+| `sed -i … index.html` | the two root pages are always named bare, so no overwriter sees them |
+| `cp` / `mv` / `dd` / `Copy-Item` onto a source file | not in `OVERWRITERS` at all — and writing to the scratchpad first is explicitly allowed |
+| `echo x 1> assets/app.js` | the lookbehind that excludes `2>` excludes every numbered fd |
+| `sed --in-place …` | `OVERWRITERS` requires a literal `-i` token |
+| `echo x > dist/../assets/app.js` | `EXEMPT` is a substring test |
+| `python -u -c "…"` | a flag before `-c` breaks the pattern |
+| `"C:\Program Files\nodejs\node.exe" -e …` | `INLINE_PROGRAM` anchors the interpreter at a command boundary — and this is the invocation `CLAUDE.md` itself recommends |
+| `find … -exec sed -i …` | same anchor |
+| `shutil.copy` / `os.replace` / `write_bytes` | `WRITES` only knows `open(…, "w")`-shaped writes |
+
+**The doc claim is the part that will mislead somebody.** `README.md:978` says the
+hook refuses *"any shell command that would write"* a guarded file and
+`PROJECT.md:451` says it *"denies any shell command that would write a guarded
+file"*. Neither is true, and a rule believed to be complete is one nobody
+double-checks.
+
+**Two smaller shapes in the same file.** `WRITES` still denies a pure read whose
+program merely contains `.write(` — `sys.stdout.write` in a probe is refused, over
+a message that says reading is fine, which is the shape that gets a guard turned
+off. And `main()` catches only `JSONDecodeError`/`UnicodeDecodeError`, so a
+payload whose `command` is not a string raises and the hook **fails open**. The
+JSON case failing open is deliberate and documented; this one is not.
+
+**Not urgent, and worth saying why.** This is a machine-local rail against an
+assistant's own mistakes, wired in a gitignored settings file. It is not a
+security boundary and nothing an outsider can reach. It also is not the only
+layer: `test_no_source_file_carries_a_control_byte` catches the original
+backspace-byte class after the fact, however the bytes arrived. What it does not
+catch is `\n` arriving as a real newline, which is the other documented mode.
+
+**Size: session**, and it is a judgement call rather than a patch — the file's own
+comment argues that over-matching is what kills a guard, and `cp` and `mv` appear
+in ordinary work constantly. Destination-aware parsing (last positional for
+`cp`/`mv`, `of=` for `dd`) is the only version that does not deny
+`cp assets/app.js /tmp/app.bak`. **The doc sentences should be corrected whatever
+is decided about the code**, because they are false today.
+
+### The pin count in `dependabot.yml` was stale the day it was written
+
+The comment says *"The nine `uses:` lines in publish.yml and wiki.yml"* and
+*"five distinct actions"*. The same session's job split made it **eleven lines**,
+all SHA-pinned, and seven distinct actions. Measured: `grep -c "uses:"` gives 11,
+and all 11 match `@[0-9a-f]{40}`.
+
+Nothing is broken — the pinning itself is right and the repository-level policy
+is genuinely on — but a number written into a comment in the same commit that
+changed it is the drift shape this project keeps finding.
+
+**Size: small.**
+
+### The wiki-permissions test matches spellings, not the property it names
+
+`tests/test_build.py:3051` asserts that the `contents: write` job runs no build.
+It does that by matching three step spellings, so four mutations that put
+arbitrary code back inside the write-token job all leave it green. The job split
+itself is real and verified — `generate` inherits `contents: read`, `publish`
+holds the write token and runs only checkout, download-artifact and the push —
+but the test is not what is holding it that way.
+
+**Size: small.** Assert on the job's step *list* — that every `run:` in the
+write-token job is one of a named allowlist — rather than on phrases.
+
+### Two figures the workflows reason from are wrong
+
+- **`144 runs a day`** (`publish.yml:110`, `wiki.yml:15`, `PROJECT.md:836/901/904`,
+  `CLAUDE.md:530`) is four to six times what GitHub actually delivers; the
+  deployed feed log holds **23 rows**, not ~144. Scheduled workflows are
+  best-effort and skipped under load. Nothing depends on the number arithmetically
+  — but *"how often do DE answer"* is measured against it.
+- **`publish.yml:53`** says a red mark on a scheduled run *"usually"* means a
+  superseded refresh. Over 200 runs, **5 of the 6 scheduled red marks were real
+  test failures**. The sentence trains the reader to ignore exactly the signal
+  they should read.
+
+**Size: small**, both — but the second is the one worth doing, because it is
+advice to disregard a failure.
+
+### Smaller things, all confirmed
+
+- **Kavasa Prime Collar's search rows stutter its name.** The planner's result
+  label is item + part, and Kavasa is the **only item of 167** whose part names
+  already carry the item name, so it reads *"Kavasa Prime Collar Kavasa Prime
+  Band"*. It is also the one item with no DE recipe, which is why it is odd.
+  `plan.js:2192`. **Size: small** — drop the item prefix when the part name
+  already starts with it.
+- **The server's own 404 page violates the CSP it sends.** `serve.py`'s error
+  response carries an inline `style`, which its own `style-src 'self'` blocks;
+  the browser logs a CSP violation on every 404. Harmless, and mildly funny, but
+  it is the one place the project ships markup that its own policy refuses.
+  **Size: small.**
+- **`api_events` is 32 KB and a test comment says 8.** `tests/test_build.py:1057`
+  still calls it *"the smallest ceiling of any live feed, 8 KB"*; commit
+  `37a4f77` raised it to 32,768 bytes. **Size: small.**
+- **`wiki.yml:138` interpolates `${{ github.repository }}` into a shell command
+  line** — the only expression-into-shell in either workflow. The value is not
+  attacker-controlled on this repository, so it is a shape to fix rather than a
+  hole to close. **Size: small.**
+- **`PROJECT.md:4713`'s *"between 12% and 49%"*** was invalidated by a later
+  commit in the same session that raised a ceiling. Re-measured today the spread
+  is 9.1%–49.0%. **Size: small.**
+- **Two comments in `limits.py` (lines 59, 107) describe rules the table does not
+  follow.** **Size: small.**
+
+### The six-round table's four-round column no longer reproduces
+
+`PROJECT.md:5144` records the measurement that settled *Six rounds is a premade's
+option*:
+
+| rounds | 2 | 3 | 4 | 6 |
+|---|---:|---:|---:|---:|
+| recorded | 1 | 21 | **44** | 0 |
+| 2026-09-02 | 1 | 21 | **43** | 0 |
+
+Driven through the real page the way the entry describes — every farmable Prime
+wished for — **116 places ranked**, matching exactly, and the load-bearing
+figures match exactly too: **zero** six-round rows for randoms and **exactly one**
+for a 4-man premade. Only the four-round cell is one short, in both rows
+(premade reads 49 against a recorded 50), so the recorded totals of 66 are 65
+today. Not fissure-driven — re-measured after the live feed settled, with no row
+showing a fissure.
+
+Something in the daily rebuild moved one endless node between 2026-09-01 21:47
+and now. **Nothing is wrong on screen** and the decision the table supports is
+untouched. What it costs is the property that made the entry good: a measurement
+somebody can re-run. **Size: small** — re-measure, and record the payload's build
+stamp beside the numbers so the next mismatch is legible instead of alarming.
 
 ---
 

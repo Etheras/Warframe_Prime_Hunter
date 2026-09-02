@@ -5390,6 +5390,57 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
 
+### What the verification sweep of 2026-09-02 confirmed
+
+**A re-check of the 31 commits of 2026-09-01/02**, asked for by the owner the
+morning after. The defects it found are in `TODO.md` under *Defects found by the
+verification sweep of 2026-09-02*. This entry is the other half, and it exists
+because **a sweep that records only what it broke misrepresents what it read.**
+Most of what was claimed is true, and several figures reproduce to the digit.
+
+Measured rather than read, in a browser against the served pages and in a shell
+against the real tools:
+
+| claim | how it was checked | result |
+|---|---|---|
+| read-only cache, "47 files, zero changed" | hashed every `.cache` entry, served pages, ran a full upstream check, re-hashed | **47 before, 47 after, 0 changed** |
+| serve-then-refresh does not block | polled `/upstream.json` through a cold start | `{"ok":null,"checking":true}` then `{"ok":true,"stale":false}` — exactly the designed shape |
+| connections capped at accept | opened 72 sockets and said nothing on them | **exactly 8 immediate 503s**, and a real request still served; full recovery after release, no slot leak |
+| loopback only, exits 1 | ran `--host` with a LAN IP, `::`, `0.0.0.0`, `localhost`, `127.0.0.1` | first three refused, **exit code 1**; last two bound |
+| six rounds restricted to premades | every farmable Prime wished, ranked list expanded | **116 places**, **0** six-round rows for randoms, **exactly 1** for a premade |
+| `Skirmish` publishes no rotation for most nodes | parsed DE's own droptables Missions section | **24 of 40**, and `Key`/`Special` **0 each** — every sharp figure exact |
+| the crack list says what the vault hides | computed the union of vaulted relics independently | **19**, and the page says 19 |
+| the search's span rule | drove 19 queries including `.*`, `(((`, unicode and mixed case | refusal is *dynamic* — no word list — and no unescaped `RegExp` is built |
+| the panel collision is fixed | measured geometry at 1280×900 and 375×812 | `.add-said` is `position:static` inside the panel; no overlap, no overflow, no horizontal scroll |
+
+**Three things are worth keeping past the sweep itself.**
+
+**The guard's own two changes are correct, and everything wrong with it is
+older.** Every heredoc form is refused, and the read the old `WRITES` denied on
+the `'a` of `assets` is allowed again. The ten bypasses found sit in `REDIRECT`,
+`OVERWRITERS`, `EXEMPT` and `PATHISH` — none of which that commit touched. It is
+worth separating those, because "the guard leaks" and "the fix did not work" are
+different sentences and only the first is true.
+
+**The regression was in the half that got quieter, not the half that got
+louder.** `limits.py` was written to make oversized input safe and it does —
+a 200 MB bomb is refused in milliseconds, boundaries are exact, every network
+read is capped. What slipped through is a *truncated* body: `gzip.decompress`
+raised, `gunzip_capped` returns the partial bytes. Hardening a path against one
+failure mode is where a second one hides.
+
+**A measured figure stopped reproducing within a day.** The six-round table's
+four-round column reads 43/49 today against a recorded 44/50, while every other
+cell and the 116-place total match exactly. Nothing on screen is wrong and the
+decision stands; one endless node moved in a daily rebuild. **A table of live
+measurements needs the payload's build stamp beside it**, or its next reader
+cannot tell drift from a broken model.
+
+**And the sweep itself is evidence for the browser rule.** The static checks that
+matter here — `node --check`, `ast.parse`, the XML test — pass on all of this and
+say nothing about any of it. The connection cap, the read-only cache and the
+panel geometry each needed the thing actually running.
+
 ---
 
 ## 8. Gotchas discovered while building
