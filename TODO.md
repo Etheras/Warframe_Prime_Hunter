@@ -178,7 +178,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `The Circuit` may be two different modes wearing one name | **the owner's, to settle in game** — the wiki and DE's tables describe different things |
 | `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
-| Our four invented "mission types" leak into the ranking | session |
+| Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
 | Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
@@ -910,6 +910,36 @@ stages each until 2026-08-24, when the heist was given a case of its own
 `Bounty` still carries two units — the effort row takes the unit of whichever node
 has the most objectives so a one-run heist cannot relabel a form that is mostly
 stages. A plaster on exactly the problem this entry describes.
+
+**Checked through on 2026-09-02, and every consequence named above is already
+handled.** The entry is an architecture complaint whose symptoms have each been
+answered separately, which is worth stating plainly because it reads like a list
+of live defects and is not one:
+
+| Claim | Standing |
+|---|---|
+| `Enemy` is not a destination | handled — it carries a badge saying so, keyed on `kind` |
+| `Key` is not a mission type, and nobody runs one for its own sake | handled — **all 240 `Key` sources carry `access: "quest"`**, so `notADestination` excludes them and they never rank |
+| `Special` is a bag of Void Storms, Faceoff and Duviri | handled — Faceoff has a `FIXED_LENGTH` entry, and Void Storms publish no rotation so they never reach it |
+| `Bounty` carries two units | handled by `isHeist`, and **there is no better signal to key on** |
+
+**The `isHeist` regex is not a plaster over a missing field — the field does not
+exist.** DE file the phases as ordinary bounty groups named
+`Level 40 - 60 PROFIT-TAKER - PHASE 1`, checked against their tables. The name is
+the only thing distinguishing a heist from a bounty in the source, so matching on
+it is reading the signal DE provide rather than guessing at one. Anyone planning
+to "do this properly" should know that first.
+
+**What was actually missing was anything holding those four facts in place**, and
+that shipped: `test_our_invented_buckets_each_still_behave_as_one_thing` asserts
+each of them. Every one would otherwise fail *silently in the ranking* — a `Key`
+row without `access` would rank as a destination carrying 22 relics, and a
+renamed heist would go back to four stages a phase.
+
+**So what is left is the architecture and nothing else**: the bucket names are
+ours, `objectivesOf` keys off them, and a future member that behaves differently
+would be mis-costed until somebody noticed. That is a real risk and not an urgent
+one, and it is now a guarded risk rather than an unguarded one.
 
 ### Plague Star and Profit-Taker are the same shape, modelled two ways
 

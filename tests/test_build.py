@@ -2764,6 +2764,74 @@ def test_the_server_caps_connections_not_just_requests() -> None:
         httpd.server_close()
 
 
+def test_our_invented_buckets_each_still_behave_as_one_thing() -> None:
+    """
+    `Bounty`, `Key`, `Special` and `Enemy` are **our** names, one per droptable
+    section, not Digital Extremes' mission types. DE's own type is the
+    parenthesised word in `Planet/Node (Type)`, and these four have no such row
+    behind them — confirmed 2026-09-02 by parsing the `Missions:` section, where
+    `Key` and `Special` have zero nodes.
+
+    A bucket that is not a mission type is only a problem when its members stop
+    behaving alike, because `objectivesOf` keys off the name and hands back one
+    unit for all of them. That has cost something once: the four Profit-Taker
+    phases were charged four bounty stages each until 2026-08-24, because a
+    heist and a bounty share a bucket.
+
+    Every case is handled today. **Nothing was holding them handled**, which is
+    what this is for — each assertion is a fact the model quietly relies on, and
+    each would fail silently in the ranking rather than loudly here.
+    """
+    payload = os.path.join(ROOT, "data", "prime-data.json")
+    if not os.path.exists(payload):
+        print("  skip bucket invariants (no dataset yet)")
+        return
+    with open(payload, encoding="utf-8") as fh:
+        data = json.load(fh)
+
+    srcs = [s for r in data["relics"].values() for s in (r.get("sources") or [])]
+    check_true("buckets: the payload has sources to check", len(srcs) > 100)
+
+    # `Key` — an extra key-gated objective on an existing mission, and nobody
+    # runs one for its own sake. It must never rank as a destination, which the
+    # model decides from `access` rather than from the bucket name.
+    keys = [s for s in srcs if s.get("mode") == "Key"]
+    check_true("buckets: Key sources exist to assert about", bool(keys))
+    stray = sorted({s.get("access") for s in keys} - {"quest"})
+    check("buckets: every Key source is quest-gated, so none is a destination",
+          stray, [],
+          "notADestination reads `access`, so a Key row without it would be "
+          "ranked as somewhere to go - and they carry 22 relics each")
+
+    # `Enemy` — the Hemocyte, which spawns inside a bounty already listed. It is
+    # a second row for a trip you are already making, not a place.
+    enemies = [s for s in srcs if s.get("kind") == "enemy"]
+    if enemies:
+        modes = sorted({s.get("mode") for s in enemies})
+        check("buckets: Enemy is its own kind, not a mission type worn by others",
+              modes, ["Enemy"],
+              "the badge that says an enemy is not a destination keys on kind")
+
+    # `Bounty` carries two units — stages for a bounty, one run for a heist —
+    # and DE give no field to tell them apart: the phases are filed as ordinary
+    # bounty groups named `Level 40 - 60 PROFIT-TAKER - PHASE 1`. The name is
+    # the only signal there is, which is why `isHeist` matches on it. Checked
+    # 2026-09-02 against DE's own tables rather than assumed.
+    bounty_nodes = {s.get("node") or "" for s in srcs if s.get("kind") == "bounty"}
+    heists = {n for n in bounty_nodes if "PROFIT-TAKER" in n.upper()}
+    check_true("buckets: the heist rows are still findable by name",
+               bool(heists),
+               "isHeist matches /PROFIT-TAKER/ on the node; if DE rename these, "
+               "four phases go back to being charged four stages each")
+    # and they are the only bounty rows with no rotation, which is the property
+    # that made them visible in the first place
+    rotted = {n for n in heists
+              if any(s.get("rotation") for s in srcs
+                     if (s.get("node") or "") == n)}
+    check("buckets: and they remain the rotation-less ones", sorted(rotted), [],
+          "a heist gaining a rotation would mean DE have restructured them")
+
+
 def test_the_ci_probe_asks_about_the_source_that_refuses() -> None:
     """
     *Probe the data sources* exists to record which upstreams answer a datacentre
@@ -3616,6 +3684,7 @@ def main() -> int:
                          test_a_check_that_dies_still_lowers_the_flag,
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
+                         test_our_invented_buckets_each_still_behave_as_one_thing,
                          test_the_server_caps_connections_not_just_requests,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
