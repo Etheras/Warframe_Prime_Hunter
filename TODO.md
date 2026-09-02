@@ -212,7 +212,7 @@ unit question — tedious rather than hard, and blocking nothing.
 | One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
 | The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
-| A vaulted relic on a Prime you *can* farm another way is still hidden | small — the narrow half of the owned-relics question, left open on purpose |
+| A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
 
@@ -1350,16 +1350,39 @@ Primes and parts, never relic inventory, and *Relic inventory* is **[settled]**
 below as declined — hand-entering a stack is more work than the answer is worth.
 Nothing here is worth building until that is revisited or sidestepped.
 
-Two shapes, if it is:
+Two shapes were offered, and **the second shipped on 2026-09-02**:
 
 - **A planner switch**, mirroring the collection view's *Hide vaulted*: *"I have
   vaulted relics"*, and the crack list stops filtering on obtainability. No data
   entry. Note this is exactly the switch the fully-vaulted case deliberately did
   **not** need — there the answer follows from the data, here it depends on
   something only the reader knows, which is the honest reason to have one.
-- **Say it rather than show it**: where a wanted Prime has vaulted relics it is
-  not being shown, count them — *"3 more, vaulted"* — so the reader knows the
-  list is filtered rather than complete.
+  **Still open, and still undecided.**
+- ~~**Say it rather than show it**~~ — **shipped.** The crack list now counts the
+  wanted relics the vault filter kept out and says so beneath the rows: *"5 more
+  relics are vaulted and not shown — if you are holding any, they are worth
+  cracking too."*
+
+**Why the smaller shape went first.** It sidesteps the blocker rather than
+pre-empting it: a count needs nothing from the reader, decides nothing about
+relic inventory, and does not foreclose the switch. What it fixes is narrow and
+real — the filter was **silent**, so a filtered list and a complete one looked
+identical, and a reader holding a stack of vaulted relics had no way to know the
+page was declining to answer.
+
+Counted only where genuinely wanted: a relic held by the Forma bonus alone is
+not something the reader is short of, and counting it would overstate what is
+being hidden. Suppressed when the list is empty for the fully-vaulted reason,
+which already says so in its own words — two messages saying the same thing
+differently is worse than one.
+
+Verified against `Caliban Prime`, chosen off the payload for having both kinds:
+12 relics, 7 live and ranked, 5 vaulted and reported. The test derives both
+numbers from the payload rather than naming them.
+
+**What is left is the switch, and the blocker under it is unchanged**: the app
+tracks Primes and parts, never relic inventory, and *Relic inventory* is
+**[settled]** below as declined.
 
 ### The rest of the player facts the header could hold
 

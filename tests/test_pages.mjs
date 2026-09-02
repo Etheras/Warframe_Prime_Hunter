@@ -3115,6 +3115,52 @@ page_test("a Prime with no way in still gets the relics to trade for, and the re
   assert.deepEqual(errors, []);
 });
 
+page_test("the crack list says how many relics the vault is keeping from it", async () => {
+  /* A Prime you CAN farm, some of whose relics are vaulted, keeps those relics
+     out of the crack list — which is right: there is somewhere to go, and
+     burying it under relics you cannot farm is what the filter is for. What was
+     wrong until 2026-09-02 is that it happened in silence, so a filtered list
+     and a complete one looked identical.
+
+     The subject is chosen from the payload on that exact property rather than
+     named, and the expected count is derived from the payload too — so this
+     asserts the page against the data, not against itself. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const it = D.items.find((x) => {
+      if (!(x.farmableRelics || []).length) return false;
+      const all = [...new Set((x.parts || []).flatMap(
+        (p) => (p.relics || []).map((r) => r.relic)))];
+      return all.some((n) => D.relics[n] && D.relics[n].vaulted && !D.relics[n].resurgence)
+        && all.some((n) => D.relics[n] && (!D.relics[n].vaulted || D.relics[n].resurgence));
+    });
+    if (!it) return null;
+    const all = [...new Set((it.parts || []).flatMap(
+      (p) => (p.relics || []).map((r) => r.relic)))];
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    return {
+      name: it.name,
+      vaulted: all.filter((n) => D.relics[n] && D.relics[n].vaulted
+                                 && !D.relics[n].resurgence).length,
+      live: all.filter((n) => D.relics[n] && (!D.relics[n].vaulted
+                                              || D.relics[n].resurgence)).length,
+    };
+  });
+  assert.ok(subject, "no farmable Prime has a mix of live and vaulted relics");
+  await page.reload({ waitUntil: "load" });
+
+  const rows = await page.locator("#planRelics .relic-row").count();
+  assert.equal(rows, subject.live,
+               `${subject.name} has ${subject.live} live relics, so that is what ranks`);
+
+  const hint = await page.locator("#planRelics .hint").innerText();
+  assert.match(hint, new RegExp(`\\b${subject.vaulted}\\b`),
+               `the list must say how many it is not showing, got: ${hint}`);
+  assert.match(hint, /vaulted/i);
+  assert.deepEqual(errors, []);
+});
+
 page_test("the drawer hides vaulted relics by default, and says so rather than showing nothing", async () => {
   /* Changed 2026-08-27: the drawer's question is "where do I farm this part",
      and a vaulted relic cannot be farmed, so listing them first buries the few

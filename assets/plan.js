@@ -503,9 +503,28 @@
        and knows nothing about where the relic came from — so a relic bought
        with farmed Aya belongs in it on exactly the same terms as a dropped one. */
     const relicPlan = new Map();
+    /* Relics this list declines to show, counted rather than merely dropped.
+       A Prime you can get another way, some of whose relics are vaulted, keeps
+       those relics out of the crack list — which is right, since there is
+       somewhere to go and burying it under relics you cannot farm is what the
+       filter is for. What was wrong is that it happened in **silence**: a
+       reader could not tell a complete list from a filtered one.
+
+       Saying it costs nothing and decides nothing. The other shape this could
+       take — a planner switch, *"I have vaulted relics"*, that stops filtering
+       — needs the reader to tell us something only they know, and the relic
+       inventory that would answer it properly is declined in `TODO.md`. A count
+       sidesteps that question rather than pre-empting it. */
+    let vaultedOut = 0;
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
-      if (!rec || (rec.vaulted && !rec.resurgence && !stranded.has(rname))) return;
+      if (!rec || (rec.vaulted && !rec.resurgence && !stranded.has(rname))) {
+        // Only ones genuinely wanted: a relic held by the Forma bonus alone is
+        // not something the reader is short of, and counting it would overstate
+        // what is being hidden from them.
+        if (rec && entries.some((e) => !e.bonus)) vaultedOut += 1;
+        return;
+      }
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value, openings, blocker } = bestRefinement(entries);
@@ -886,7 +905,7 @@
     });
 
     return { relicPlan, ranked: folded, places: ranked.length,
-             needs, formaShort, ayaValue, ayaRelic,
+             needs, formaShort, ayaValue, ayaRelic, vaultedOut,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
              blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
@@ -1333,6 +1352,11 @@
      Held here so the list can be repainted without rebuilding the strip the
      reader is standing in — see `paintRelicList`. */
   let relicRows = [];
+  /* How many wanted relics the vault filter kept out, so the list can say it is
+     filtered rather than look complete. Held beside `relicRows` and set in the
+     same place, for the same reason: `paintRelicList` runs on its own when a
+     control is pressed and must not have to rebuild the plan to find out. */
+  let relicsVaulted = 0;
   const tierOf = (rname) => String(rname).split(" ")[0];
   const isVarzia = (rname) => !!(RELICS[rname] || {}).resurgence;
   /* Vaulted, not on Varzia's shelf, and here only because the Prime has no
@@ -1587,7 +1611,21 @@
       (!relicTier || tierOf(rname) === relicTier) &&
       (showVarzia || !isVarzia(rname)) &&
       (showTrade || !isTrade(rname)));
-    $("#planRelics").innerHTML = rp.length ? rp.map(relicRowHtml).join("")
+    /* Appended to whatever the list says, empty or not, because the fact it
+       reports is true either way: there are relics you need that this list is
+       not showing. Worded as what it is rather than as an apology — the reader
+       is not being told something is broken, they are being told the list is
+       narrower than their collection. */
+    /* Not when `relicRows` is empty: that case already prints "none of the
+       relics you need can be got right now — they are vaulted", and following
+       it with a count of how many are vaulted says the same thing twice in
+       different words. The note is a qualifier on a list, so it needs a list. */
+    const vaultNote = relicsVaulted && relicRows.length
+      ? `<p class="hint">${relicsVaulted} more relic${relicsVaulted === 1 ? "" : "s"}
+         ${relicsVaulted === 1 ? "is" : "are"} vaulted and not shown — if you are
+         holding any, they are worth cracking too.</p>`
+      : "";
+    $("#planRelics").innerHTML = (rp.length ? rp.map(relicRowHtml).join("")
       /* Two different silences, and saying the wrong one is worse than saying
          nothing. "Nothing can be got right now" is a fact about the vault; an
          empty list because the reader unticked Varzia is a fact about the
@@ -1599,12 +1637,13 @@
            relicRows.length === 1 ? "is" : "are"} hidden by the controls
            above.</p>`
         : `<p class="hint">None of the relics you need can be got right now —
-           they are vaulted, and not in this Prime Resurgence rotation either.</p>`;
+           they are vaulted, and not in this Prime Resurgence rotation either.</p>`)
+      + vaultNote;
   }
 
   function render() {
     renderWishlist();
-    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic,
+    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic, vaultedOut,
             ayaRotationLive, ayaMissing, perMinute, blocked, places } = buildPlan();
     renderEffort(ranked);
 
@@ -1905,6 +1944,7 @@
        repainted on its own when a tab is pressed. Rebuilding the strip on a
        press would destroy the button under the reader's finger. */
     relicRows = rpAll;
+    relicsVaulted = vaultedOut;
     paintRelicFilters();
     paintRelicList();
 
