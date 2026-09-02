@@ -966,6 +966,33 @@ def test_a_blocked_host_is_routed_around() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _peak_bytes(fn, expected_exc) -> dict:
+    """Run `fn`, and report its peak Python allocation and whether it raised.
+
+    The two go together because a ceiling test asks one question in two halves —
+    *did it refuse* and *did it refuse before expanding the lot* — and measuring
+    the second separately would mean running the bomb twice.
+
+    `tracemalloc` rather than `time`: what a ceiling protects is memory, and the
+    naive implementation these assertions exist to reject is fast enough to pass
+    any wall clock anybody would be willing to wait for. It sees these buffers
+    because every one of them is a Python `bytes`; a C library holding its own
+    arena would be invisible here, which is worth knowing before reusing this on
+    something that is not zlib or lzma.
+    """
+    import tracemalloc
+    raised = False
+    tracemalloc.start()
+    try:
+        fn()
+    except expected_exc:
+        raised = True
+    finally:
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+    return {"peak": peak, "raised": raised}
+
+
 def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     """
     Every remote read used to take whatever the other end sent. The realistic
@@ -996,19 +1023,29 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
                len(plain) // max(len(bomb), 1) > 100,
                f"{len(bomb):,} -> {len(plain):,} is not much of a bomb")
 
-    started = time.time()
-    try:
-        limits.gunzip_capped(bomb, 1 * limits.MB, "bomb")
-        check_true("ceiling: a gzip bomb is refused", False,
-                   "it expanded 64 MB into memory instead")
-    except limits.TooLarge:
-        check_true("ceiling: a gzip bomb is refused", True)
-    # It must stop *early*. Expanding it all and then measuring would pass the
-    # assertion above while doing the exact thing the ceiling exists to prevent,
-    # and wall clock is the only thing that tells the two apart from here.
+    # It must stop *early*: expanding the whole thing and then measuring would
+    # pass the refusal assertion while doing the exact thing the ceiling exists
+    # to prevent.
+    #
+    # **This was a wall clock until 2026-09-03, and it could not fail.** The
+    # bound was five seconds, and `gzip.decompress` on this same bomb - the
+    # naive implementation the assertion exists to reject - takes **0.018s**.
+    # It passed the check by a factor of 278. Hard rule 6: a test that cannot
+    # fail is worse than no test.
+    #
+    # Peak allocation is the honest axis, because "the bomb has already landed"
+    # is a statement about memory rather than about time. Measured on this
+    # machine: naive 148 MB against capped 1.5 MB, a hundredfold gap, so 16 MB
+    # sits an order of magnitude clear of both. `tracemalloc` sees this because
+    # every buffer involved is a Python `bytes`.
+    peak = _peak_bytes(lambda: limits.gunzip_capped(bomb, 1 * limits.MB, "bomb"),
+                       limits.TooLarge)
+    check_true("ceiling: a gzip bomb is refused", peak["raised"],
+               "it expanded 64 MB into memory instead")
     check_true("ceiling: and it stops early rather than expanding it first",
-               time.time() - started < 5.0,
-               f"took {time.time() - started:.1f}s, so it expanded the lot")
+               peak["peak"] < 16 * limits.MB,
+               f"peak allocation was {peak['peak']:,} bytes against a "
+               f"{limits.MB:,} byte ceiling, so it expanded the lot first")
 
     body = b'{"real":"document"}' * 4000
     check("ceiling: a legitimate body round-trips byte for byte",
@@ -1026,15 +1063,17 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     # that would otherwise bound the output - so this decompressor needs the
     # ceiling more than the gzip one does, not less.
     lz = lzmalib.compress(b"\0" * (32 * 1024 * 1024), format=lzmalib.FORMAT_ALONE)
-    started = time.time()
-    try:
-        limits.unlzma_capped(lz, 4 * limits.KB, "export_index")
-        check_true("ceiling: an LZMA bomb is refused", False)
-    except limits.TooLarge:
-        check_true("ceiling: an LZMA bomb is refused", True)
+    # Same correction as the gzip pair above, and a narrower gap: LZMA keeps a
+    # dictionary buffer that a 4 KB ceiling does not shrink, so the capped run
+    # still peaks around 8.6 MB against the naive 89.5 MB. Tenfold rather than a
+    # hundredfold, which is why the bound is 32 MB - roughly four times the
+    # capped figure and a third of the naive one, clear of both.
+    peak = _peak_bytes(lambda: limits.unlzma_capped(lz, 4 * limits.KB, "export_index"),
+                       limits.TooLarge)
+    check_true("ceiling: an LZMA bomb is refused", peak["raised"])
     check_true("ceiling: and that one stops early too",
-               time.time() - started < 5.0,
-               f"took {time.time() - started:.1f}s")
+               peak["peak"] < 32 * limits.MB,
+               f"peak allocation was {peak['peak']:,} bytes, so it expanded it first")
 
     index = b"ExportWarframes_en.json!abc123\n" * 8
     check("ceiling: a real export index still decodes",
@@ -1054,7 +1093,10 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     stale, missing = list(sources.STALE), list(sources.MISSING)
     try:
         sources.CACHE_DIR = os.path.join(tmp, "cache")
-        # `api_events` has the smallest ceiling of any live feed, 8 KB.
+        # `api_events` has the smallest ceiling of any live feed. The number is
+        # read from `cap_for` rather than written here: this comment said 8 KB
+        # until 2026-09-03, and had said it since `37a4f77` raised the ceiling to
+        # 32 KB in the same session that wrote it.
         cap = limits.cap_for("api_events")
         with open(doc, "wb") as fh:
             fh.write(b"a small honest answer")

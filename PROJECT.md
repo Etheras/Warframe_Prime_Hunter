@@ -5406,6 +5406,49 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
 
+### The ceiling tests measure memory, because the clock could not fail them
+
+**Shipped 2026-09-03.** Two assertions in `test_a_source_cannot_send_more_than_its_ceiling`
+claimed the capped decompressors stop *early* rather than expanding a bomb and
+then measuring it. Both were `time.time() - started < 5.0`.
+
+**Measured against the implementation they exist to reject:** a naive
+`gzip.decompress` of the same 64 MB bomb takes **0.018s**, and `lzma.decompress`
+of the 32 MB one takes **0.056s**. They passed the check by factors of 278 and
+89. The comment above the first one described the defect it was guarding against
+exactly right and then picked a bound that could not detect it — which is the
+more interesting half, because the reasoning was sound and only the threshold was
+unfalsifiable.
+
+**Peak allocation is the honest axis.** "The bomb has already landed" is a claim
+about memory, not about time, and the gap there is not close:
+
+| | naive | capped | bound now |
+|---|---:|---:|---:|
+| gzip, 1 MB ceiling | 148 MB | 1.5 MB | 16 MB |
+| LZMA, 4 KB ceiling | 89.5 MB | 8.6 MB | 32 MB |
+
+LZMA's is the narrower pair because it keeps a dictionary buffer that a 4 KB
+ceiling does not shrink — tenfold rather than a hundredfold, hence the looser
+bound. `tracemalloc` sees all of it because every buffer involved is a Python
+`bytes`; a C library holding its own arena would be invisible, which `_peak_bytes`
+says out loud for whoever reuses it next.
+
+**Proved by mutation, which is the only evidence worth having here.** Changing
+`dec.decompress(pending, CHUNK)` to `dec.decompress(pending)` — dropping the
+output bound, so the member expands in one call and the length check fires
+afterwards — leaves *"a gzip bomb is refused"* green and turns *"stops early"*
+red. That is exactly the discrimination the wall clock could not make: the naive
+version does refuse, it just refuses too late, and only one of the two assertions
+was ever able to notice.
+
+**One stale number went with it.** The end-to-end half of the same test called
+`api_events` *"the smallest ceiling of any live feed, 8 KB"*. It has been 32 KB
+since `37a4f77`, raised in the same session that wrote the comment. The figure is
+read from `cap_for` now and the comment says what it used to claim, because a
+number in prose beside the code that computes it is a number that will be wrong
+again.
+
 ### The refresh can be driven from this machine, because GitHub's schedule is not a schedule
 
 **Shipped 2026-09-03.** The owner asked whether forcing the build from outside

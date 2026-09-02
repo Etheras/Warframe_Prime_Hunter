@@ -160,7 +160,6 @@ Five things worth carrying forward, because none was in the findings:
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
 | `gunzip_capped` turns a refused download into a short one | small — **the one regression of 2026-09-01**; a truncated body now returns partial bytes where the stdlib raised |
 | The shell-write guard has ten ways round it, and two documents say it has none | session — all pre-existing; **the two false sentences should be corrected whatever is decided about the code** |
-| Two ceiling assertions cannot fail | small — a naive full expansion takes 0.018s against a 5.0s bound, so it passes the check meant to reject it |
 | The wiki-permissions test matches spellings, not the property it names | small — the job split is real and verified; the test is not what holds it |
 | The pin count in `dependabot.yml` was stale the day it was written | small — nine claimed, eleven actual, all correctly pinned |
 
@@ -404,25 +403,6 @@ where it made it quieter instead.
 `unused_data` for the multi-member case, and a test for each that feeds a
 deliberately truncated body.
 
-### Two ceiling assertions cannot fail
-
-`tests/test_build.py:1009` and `:1035` assert that the capped decompressors stop
-*early* rather than expanding first, and both do it with `time.time() - started
-< 5.0`. Measured against the same bombs the tests build:
-
-- naive `gzip.decompress` of the 64 MB bomb: **0.018s** — 278× under the threshold
-- naive `lzma.decompress` of the 32 MB bomb: **0.056s** — 89× under
-
-So the implementation each assertion exists to reject passes it comfortably. The
-comment above the first one states the intent exactly right — *"expanding it all
-and then measuring would pass the assertion above"* — and then picks a bound that
-does not separate the two. Hard rule 6: a test that cannot fail is worse than
-none.
-
-**Size: small.** The capped path is ~13× faster than the naive one on the same
-input (0.0014s against 0.018s), so a ratio against a measured naive baseline
-bites where a wall-clock constant does not; peak allocation would too.
-
 ### The shell-write guard has ten ways round it, and two documents say it has none
 
 **Pre-existing, not this session's doing** — the session changed `INLINE_PROGRAM`
@@ -526,9 +506,6 @@ advice to disregard a failure.
   the browser logs a CSP violation on every 404. Harmless, and mildly funny, but
   it is the one place the project ships markup that its own policy refuses.
   **Size: small.**
-- **`api_events` is 32 KB and a test comment says 8.** `tests/test_build.py:1057`
-  still calls it *"the smallest ceiling of any live feed, 8 KB"*; commit
-  `37a4f77` raised it to 32,768 bytes. **Size: small.**
 - **`wiki.yml:138` interpolates `${{ github.repository }}` into a shell command
   line** — the only expression-into-shell in either workflow. The value is not
   attacker-controlled on this repository, so it is a shape to fix rather than a
