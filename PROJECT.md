@@ -4753,9 +4753,25 @@ because picking the other would look like a bug:
 - **Parts only, no Primes among the results.** Mixing them puts a row that
   *wishes for* something beside a row that *owns* something, and at a glance
   they are the same row.
-- **Matched on the whole `"Ash Prime Neuroptics"` string.** Part names are
-  generic — measured: `Blueprint` is on 160 Primes, `Systems` on 57 — so a bare
-  part name returns a wall of identical-looking rows. Either half still works.
+- **Matched word by word on the whole `"Ash Prime Neuroptics"` string**, every
+  word required, so `ash neuro` narrows where `ash` alone does not. Either half
+  still works on its own.
+- **A part name on its own is refused, not ignored.** The owner's follow-up the
+  same day: make the reader be specific. Measured on this payload, `Blueprint`
+  is on 160 Primes, `Systems` 57, `Barrel` 54, `Receiver` 53, `Neuroptics` and
+  `Chassis` 50 each, and `Prime` on all 167 — a bare part name returns fifty
+  near-identical rows differing only in a name the reader has not typed, which
+  is the shape most likely to get the wrong part ticked.
+
+  **The rule is about the query, not a list of banned words**: if it still spans
+  more than the ten rows the list can show, it says so and asks for the Prime's
+  name. A stop-word list would need maintaining against DE inventing part types
+  — `Cerebrum` and `Carapace` are already here, on six Primes each — while this
+  needs nothing. It also **refuses rather than silently ignoring** the word,
+  which is the difference between a reader who knows what to do next and one who
+  thinks the search is broken. Measured after: `prime` and `blueprint` refused
+  at 160, `neuroptics` at 50, `stock` at 29; `link` (10), `carapace` (6),
+  `vasto` (2) and `ash` (1) all still answer.
 - **Newest first, owned last.** A part you are holding is far likelier to be
   from something recent than from a 2015 release; 166 of 167 items carry a
   `releaseDate` and the odd one out (Kavasa Prime Collar) falls back to

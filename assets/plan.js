@@ -2133,10 +2133,20 @@
      item DE publish no release date for (Kavasa Prime Collar). */
   const releasedAt = (it) => it.releaseDate || "";
 
+  /* How many different Primes a query may span before it is not a search.
+     Ten, the same number of rows the list shows: if the answer cannot be put on
+     screen, the reader has not said enough yet to be given one. */
+  const SPAN_LIMIT = 10;
+
   function runSearch() {
     const q = searchBox.value.trim().toLowerCase();
     if (!q) { results.hidden = true; lastSaid = ""; return; }
-    const hits = ALL_PARTS.filter((r) => r.hay.includes(q));
+    /* Every word must match, so "ash neuro" narrows where "ash" alone does not.
+       Fuzzy in the sense that matters here — a substring per word, so "neuro"
+       finds Neuroptics and "ash" finds Ash Prime — and strict about the whole
+       query rather than about any one word. */
+    const words = q.split(/\s+/).filter(Boolean);
+    const hits = ALL_PARTS.filter((r) => words.every((w) => r.hay.includes(w)));
     hits.sort((a, b) => {
       /* Owned last. What you are looking for is almost always something you do
          not have yet, and burying it under things you have already ticked is
@@ -2151,6 +2161,29 @@
     });
     const note = lastSaid
       ? `<div class="add-said" role="status">${esc(lastSaid)}</div>` : "";
+
+    /* **A part name on its own is not a search.** Measured on this payload:
+       `Blueprint` is on 160 Primes, `Systems` 57, `Barrel` 54, `Receiver` 53,
+       `Neuroptics` and `Chassis` 50 each — and `Prime` is on all of them. Typing
+       one returns fifty near-identical rows differing only in a name the reader
+       has not typed, which is a list to scroll rather than an answer, and the
+       one shape most likely to get the wrong part ticked.
+
+       So the rule is about the *query*, not about a list of banned words: if it
+       still spans more than the list can show, say so and ask for the Prime.
+       A stop-word list would have to be maintained against DE inventing part
+       types — `Cerebrum` and `Carapace` are already here, on six Primes each —
+       while this needs nothing and keeps working. It also refuses rather than
+       silently ignoring the word, which is the difference between a reader who
+       knows what to do next and one who thinks the search is broken. */
+    const span = new Set(hits.map((r) => r.it.id)).size;
+    if (span > SPAN_LIMIT) {
+      results.innerHTML = note +
+        `<div class="add-none">That is ${span} different Primes — add the
+         Prime's name, like <b>ash neuro</b>.</div>`;
+      results.hidden = false;
+      return;
+    }
     results.innerHTML = note + (hits.length
       ? hits.slice(0, 10).map((r) => {
           const need = needOf(r.p), have = haveOf(r.it.id, r.p.name);

@@ -3137,22 +3137,59 @@ page_test("the planner's search marks parts collected, and adds no Primes", asyn
       })));
   };
 
-  const hits = await search("neuroptics");
-  assert.ok(hits.length, "a generic part name must still find something");
+  /* A part name on its own is refused, because it is not a search: measured on
+     this payload, `Neuroptics` is on 50 Primes and `Blueprint` on 160, and
+     fifty near-identical rows differing only in a name the reader has not typed
+     is the shape most likely to get the wrong part ticked.
+
+     Asserted through the *rule* rather than a word list — the query must span
+     no more than the list can show — so a part type DE invent later is covered
+     without anyone maintaining anything. */
+  const tooBroad = await search("neuroptics");
+  assert.equal(tooBroad.length, 0, "a bare part name must not return rows");
+  const refusal = await page.locator("#addResults .add-none").innerText();
+  assert.match(refusal, /different Primes/,
+               `it must say why and what to do, got: ${refusal}`);
+  // and still refused when qualified only by another generic word
+  assert.equal((await search("prime neuroptics")).length, 0,
+               "'prime' narrows nothing — it is on every item in the payload");
+
+  const hits = await search("ash neuro");
+  assert.ok(hits.length, "naming the Prime must find its part");
   assert.equal(hits.filter((h) => !h.part).length, 0,
                "every result is a part — a Prime among them would put 'wish for "
                + "this' beside 'I own this', and they look identical");
 
-  /* Newest first. Read from the payload rather than hard-coded, so this asserts
-     the ordering rule and not today's release calendar. */
+  /* Newest first, checked on a query that spans several Primes — a one-Prime
+     query would order one date against itself and assert nothing. The subject
+     is asked of the payload: a part word narrow enough to be allowed through
+     but shared by more than one Prime. */
+  const spread = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const byWord = new Map();
+    for (const it of D.items) {
+      for (const p of it.parts || []) {
+        for (const w of (p.name || "").toLowerCase().split(/\s+/)) {
+          if (!byWord.has(w)) byWord.set(w, new Set());
+          byWord.get(w).add(it.id);
+        }
+      }
+    }
+    for (const [w, ids] of byWord) if (ids.size > 1 && ids.size <= 10) return w;
+    return null;
+  });
+  assert.ok(spread, "no part word spans 2-10 Primes — the ordering is untestable");
+  const many = await search(spread);
+  assert.ok(many.length > 1, `'${spread}' must return several rows to order`);
   const dates = await page.evaluate((names) => {
     const D = window.WFPRIME_DATA;
     return names.map((n) => {
       const it = D.items.find((x) => n.startsWith(x.name));
       return it ? (it.releaseDate || "") : "";
     });
-  }, hits.map((h) => h.text));
+  }, many.map((h) => h.text));
   const dated = dates.filter(Boolean);
+  assert.ok(new Set(dated).size > 1, "all one date — the ordering is untestable");
   assert.deepEqual(dated, [...dated].sort().reverse(),
                    `results must run newest first, got ${JSON.stringify(dated)}`);
 
