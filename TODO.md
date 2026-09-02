@@ -588,12 +588,27 @@ closed.**
   owner's machine is awake, so the hours it is off are still covered by the same
   best-effort cron as before. Whether that is enough is a judgement to make after
   living with it, and there is nothing to build until it is made.
-- **Let the page read a live feed itself.** The only version that actually
-  tracks a one-hour object. It is also the bigger decision: `connect-src 'self'`
-  forbids it today, the privacy footer names the hosts the *build* contacts and
-  would have to name one the *reader* contacts, and rule 11 becomes a question
-  about a browser's request rate rather than a build's. Worth its own entry
-  before any of it is written.
+- **Let the page read a live feed itself. — kept open, and expected to be
+  withdrawn.** The only version that tracks a one-hour object independently of
+  any build. It is also the bigger decision: `connect-src 'self'` forbids it
+  today, the privacy footer names the hosts the *build* contacts and would have
+  to name one the *reader* contacts, and rule 11 becomes a question about a
+  browser's request rate rather than a build's.
+
+  **This is on watch rather than on the list.** The dispatch shipped the same
+  day, and the first measurement after it is not close: at 21:15Z the deployed
+  file was **2.4 minutes old and carried 25 fissures, all 25 of them live** —
+  against 2.1 hours old, 31 published and **none** live the previous afternoon.
+  If that holds, the problem this bullet exists to solve does not, and the
+  honest outcome is to delete it rather than to build it.
+
+  **What would have to be true to withdraw it**, so the judgement is not made on
+  a good afternoon: the deployed file stays inside ten minutes across a normal
+  week, including the hours the owner's machine is asleep, and no reader-facing
+  symptom survives. **What would keep it**: gaps that reopen whenever the machine
+  is off, which is the one hole the dispatch cannot cover by construction.
+  Re-read this entry once there is a week of evidence — not before, because one
+  afternoon is how the ten-minute cron looked too.
 
 **What is actually open is now one thing: the live feed, and only if the opt-in
 above proves not to be enough.** Size: session, and the decision still comes
