@@ -227,7 +227,8 @@ keeps asking entries to be**, which is why a one-row drift is worth a line.
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
-| The deployed site shows no fissures for hours at a time | session — **the live defect the owner reported**; 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
+| A Steel Path fissure is marked on the ordinary node, which nobody can run | small–session — **the defect the owner reported**; `hard` reaches the payload and only a tooltip reads it. 10 of 28 live fissures, at 10 nodes with no ordinary one |
+| The deployed site shows no fissures for hours at a time | session — the second half of the same report; 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
 | Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
 | The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
 
@@ -512,6 +513,78 @@ advice to disregard a failure.
   is 9.1%–49.0%. **Size: small.**
 - **Two comments in `limits.py` (lines 59, 107) describe rules the table does not
   follow.** **Size: small.**
+
+### A Steel Path fissure is marked on the ordinary node, which nobody can run
+
+**The owner's report of 2026-09-02** — *"the site reported missions that weren't
+live at the moment"* — and their own diagnosis, which was right. It is not the
+staleness entry below; this one is wrong even against a feed fetched one second
+ago.
+
+`build_fissures` carries `hard` all the way from the worldstate into the payload.
+**Exactly one line reads it**, `plan.js:2057`, which appends *"Steel Path."* to a
+tooltip. Nothing else does:
+
+- `ROT.fissuresAt` filters on `f.node === node && (allowStorm || !f.storm) &&
+  Date.parse(f.ends) > now`. **`hard` is never tested.**
+- so `plan.js:758` and `app.js:624` count the node as a fissure for **ranking**
+- and the badge reads `Lith fissure 45m`, with no marker in the visible text
+
+Measured live at 15:5xZ on 2026-09-02, 28 fissures running:
+
+| | count |
+|---|---:|
+| Steel Path (`isHard`) | **10** |
+| Void Storm (`isStorm`) | 6 |
+| ordinary star chart | **12** |
+
+and **ten nodes carried a Steel Path fissure with no ordinary one** — Cambria
+(Earth), Hydron (Sedna), Ker (Ceres), Pago and Taveuni (Kuva Fortress), Proteus
+(Neptune), Stephano (Uranus), Valefor (Europa), Xini (Eris), Yuvarium (Lua). Every
+one of those was a row saying *a fissure is running here* about a place where, on
+the chart the reader is looking at, none was.
+
+**It is wrong for everybody, not only for players without the Steel Path
+unlocked.** Steel Path Hydron is a different mission instance from Hydron. Running
+the ordinary node cracks nothing, whoever you are, so the ranking is wrong for the
+reader who *has* unlocked it too — it just fails differently. That is worth being
+precise about, because "add a checkbox for people who have not unlocked it" is the
+obvious fix and it is not sufficient on its own.
+
+**Storms are handled and Steel Path is not, in the same function.** `allowStorm`
+is threaded through `fissuresAt` from `opts.railjack`, so a Void Storm answers to
+a switch. The asymmetry is the bug in one line.
+
+**This does not contradict *Neither the Steel Path nor Mastery Rank is an
+option*** (`PROJECT.md §7`), and it is worth saying why rather than quietly
+reopening it. That entry measured **sources from the drop tables**, where the only
+Steel Path content carrying relics is the Faceoff pair and each variant is
+identical to its ordinary twin — so a control bought two duplicate rows and the
+badge was enough. A fissure is not a source: it arrives from the live worldstate,
+it lands on an ordinary node, and `isSteelPath` cannot see it because that
+predicate reads a node *name*. The entry closes with **"Revisit if that stops
+being true. The moment a Steel Path table pays something its ordinary twin does
+not, the badge stops being sufficient."** Ten nodes tonight paid something their
+ordinary twin did not.
+
+**Four ways, and the owner picks.**
+
+- **Drop `hard` fissures in `fissuresAt`.** One clause, mirrors nothing, and
+  silently loses a real farming route for anyone who runs the Steel Path.
+- **Mark it and keep ranking it** — badge reads `Lith fissure · Steel Path`. Honest
+  on screen, still ranks a node the reader may not want and cannot run as listed.
+- **A switch, exactly as storms have one.** `fissuresAt(list, node, now,
+  allowStorm, allowHard)` fed from a new `opts.steel`, defaulting off. Reinstates
+  the checkbox deleted on 2026-08-14 — but for a different question than the one
+  that was measured then, and `plan.js:2417` currently *deletes* `opts.steelPath`
+  from every saved plan, which would have to stop.
+- **Both of the last two**, which is what storms effectively do: gated by a switch
+  *and* named on the row when shown.
+
+**Recommended: the fourth**, because it is the pattern already in the function and
+the one the reader has already learnt from Railjack. **Size: small** for the filter
+and the badge, **session** once the option, its persistence, `PLAN_OPTIONS`, the
+migration that currently deletes the key, and a test for each half are counted.
 
 ### The deployed site shows no fissures for hours at a time
 
