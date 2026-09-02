@@ -571,19 +571,23 @@ This is the same root as *`144 runs a day` is four to six times the cadence
 GitHub delivers*, and this is what that costs in the product rather than in a
 log.
 
-**Two directions, and they are different projects.**
+**Half of this shipped on 2026-09-03 and the entry is narrowed rather than
+closed.**
 
-- **Build more often — and this one is already spent.** The cron is **already
-  `*/10`**, and `publish.yml:27` already says why that is a target rather than a
-  guarantee: *"GitHub schedules are best effort — five minutes is the documented
-  floor, runs are queued and can be delayed or dropped entirely under load."*
-  Measured against that target: **24 builds in 17.7 hours**, about one every 44
-  minutes, with a 268-minute gap. So the configured cadence is six times the
-  delivered one, the floor belongs to GitHub rather than to this repository, and
-  there is no number to change. Pages' own ~10-deploys-an-hour ceiling closes the
-  door from the other side. **Treat this option as unavailable rather than as
-  unreliable** — that is the correction, made 2026-09-02 after the owner asked
-  why a ten-minute refresh was not producing ten-minute data.
+- **Build more often — ~~spent~~ shipped, as an opt-in.** This entry said the
+  option was unavailable because the cron is already `*/10` and the floor belongs
+  to GitHub. **That was wrong and the owner caught it**: it is GitHub's
+  *scheduler* that is best effort, not its runners, and a `workflow_dispatch` is
+  not in that queue. `tools/schedule.{ps1,sh}` can now fire one on the same
+  ten-minute tick that refreshes the local copy — `-DispatchRemote` /
+  `--dispatch-remote`, off by default. `PROJECT.md §7` has the reasoning,
+  including the trap that made it a workflow change rather than a one-liner: every
+  dispatch used to take the *full* path, so firing one every ten minutes would
+  have re-downloaded the wiki and the drop tables that often.
+  **What is left of this bullet is a limit, not a task**: it only helps while the
+  owner's machine is awake, so the hours it is off are still covered by the same
+  best-effort cron as before. Whether that is enough is a judgement to make after
+  living with it, and there is nothing to build until it is made.
 - **Let the page read a live feed itself.** The only version that actually
   tracks a one-hour object. It is also the bigger decision: `connect-src 'self'`
   forbids it today, the privacy footer names the hosts the *build* contacts and
@@ -591,10 +595,17 @@ log.
   about a browser's request rate rather than a build's. Worth its own entry
   before any of it is written.
 
-**Size: session** for either, and **the decision comes first** — nothing here
-should be built until it is made. A third option worth naming only to reject it:
-publishing an emptier list is not better, because the page already renders the
-empty case correctly and the reader still learns nothing.
+**What is actually open is now one thing: the live feed, and only if the opt-in
+above proves not to be enough.** Size: session, and the decision still comes
+first — it is a CSP change, a privacy-footer change and a rule 11 question about
+a browser's request rate rather than a build's, none of which should be started
+on a hunch. Give the dispatch a few days first; *"at most ten minutes stale while
+the machine is on"* may simply be the answer, in which case this entry closes
+without the second half ever being built.
+
+A third option worth naming only to reject it: publishing an emptier list is not
+better, because the page already renders the empty case correctly and the reader
+still learns nothing.
 
 ### The six-round table's four-round column no longer reproduces
 

@@ -5406,6 +5406,62 @@ wrong; `serve.py`'s CSP has to allow that hop for the same reason.
 corrected: `build_csp` scans the payload *text* for host names and never reads
 this field. Two answers to one question, arrived at independently.
 
+### The refresh can be driven from this machine, because GitHub's schedule is not a schedule
+
+**Shipped 2026-09-03.** The owner asked whether forcing the build from outside
+would work for Pages. It does, and the reason it was worth asking is that the
+alternative had been written off too quickly — this entry corrects that as much
+as it records the change.
+
+**What was wrong with "build more often is spent".** The 2026-09-02 entry said
+that option was unavailable because the cron is already `*/10` and the floor
+belongs to GitHub. The first half is true and the conclusion was not: it is
+GitHub's *scheduler* that is best effort, not GitHub's *runners*. A
+`workflow_dispatch` is not in that queue. Measured against the ten-minute cron:
+about one delivered run every forty-four minutes, worst gap two hundred and
+sixty-eight. A request sent from the owner's machine turns the configured cadence
+into the delivered one, and the remaining ceiling is Pages' own ~10 deployments
+an hour — ten-minute triggers sit at six, inside it.
+
+**The trap, and it is the whole reason this needed a workflow change first.**
+`FULL` was `github.event_name != 'schedule' || ...`, so **every** dispatch took
+the full path: the wiki, the drop tables and DE's export, re-downloaded. Firing
+that every ten minutes would have been a straight breach of hard rule 11, and it
+would have been invisible — the site would have got fresher while the sources got
+hammered. The owner caught the same risk independently and from the other end
+(*"I don't like the idea of a full rebuild every 10 minutes"*), which is worth
+recording: the fix was already in, and two people arriving at the same objection
+from opposite directions is the useful kind of agreement.
+
+So `workflow_dispatch` gained a `full` input, defaulting **true** so the button in
+the Actions tab behaves as it always has. Only a caller passing `full=false` gets
+the light path — restore the cache read-only, then `build_data.py --if-changed`,
+which is the export index, one HEAD to the drop table, the trader window and the
+fissures, every fetch conditional. The heavy sources stay on the daily 18:40
+build and on pushes.
+
+**Where it is wired.** `tools/schedule.ps1 -DispatchRemote` registers a **second
+action on the same task** rather than a second task — Task Scheduler runs actions
+in order, and one task is one thing to remove and one place for the cadence to
+live. `tools/schedule.sh --dispatch-remote` appends to the same cron line, joined
+with `;` rather than `&&` **on purpose**: a local refresh that fails, on a machine
+with no network, must not also cancel the request for the deployed site to
+refresh itself. They answer different questions and neither is a precondition for
+the other.
+
+**Off by default, and that is not timidity.** It spends the owner's Actions
+minutes and Pages deployments, needs the GitHub CLI signed in, and only helps
+while the machine is awake. It is a supplement to the cron, not a replacement —
+the cron still runs, still best effort, and still covers the hours this machine
+is off.
+
+**What it does not fix.** A published file is still only as fresh as its last
+build. This raises the floor from "expired more often than not" to "at most ten
+minutes stale while the machine is on", which is inside a fissure's lifetime and
+therefore enough — but the only version that tracks a one-hour object
+independently of any build is still the page reading a live feed itself, and that
+remains an open decision in `TODO.md`.
+
 ### The tick re-ranks for everything on the clock, not just for bounty letters
 
 **Shipped 2026-09-02**, from the owner asking the right question after the

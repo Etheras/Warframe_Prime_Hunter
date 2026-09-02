@@ -31,11 +31,30 @@ on:
     # an hour; six is comfortably inside that, three-minute polling would not be.
     - cron: "*/10 * * * *"
   workflow_dispatch:        # run it by hand from the Actions tab
+    inputs:
+      full:
+        description: "Rebuild every source from scratch, rather than only what moved"
+        type: boolean
+        default: true
 
-# Which of the two a run is. A push, a manual run and the daily cron all rebuild
-# from scratch; only the ten-minute cron takes the short path.
+# Which of the two a run is. A push and the daily cron rebuild from scratch; the
+# ten-minute cron takes the short path.
+#
+# **A dispatch chooses, and defaults to full.** Added 2026-09-03. The reason is
+# that a dispatch is now two different things: a person clicking *Run workflow*,
+# who means "rebuild everything", and `tools/schedule.{ps1,sh}` firing every ten
+# minutes to force the refresh GitHub's own scheduler keeps dropping. Those want
+# opposite paths, and before this the expression below gave both the full one —
+# so a ten-minute dispatch would have re-downloaded the wiki, the drop tables and
+# DE's export every ten minutes, which is exactly what hard rule 11 forbids and
+# what the short path exists to avoid.
+#
+# The default stays `true` so the button in the Actions tab behaves as it always
+# has; only a caller that passes `full=false` gets the light build.
 env:
-  FULL: ${{ github.event_name != 'schedule' || github.event.schedule == '40 18 * * *' }}
+  FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full
+         || github.event_name == 'schedule' && github.event.schedule == '40 18 * * *'
+         || github.event_name == 'push' }}
 
 # Read-only against the repo. This workflow cannot modify your code.
 #

@@ -59,7 +59,27 @@ param(
     [int]$EveryHours = 0,
     [string]$TaskName = "Warframe Prime Hunter data refresh",
     [switch]$Remove,
-    [switch]$RunNow
+    [switch]$RunNow,
+    # Also force the *deployed* site to rebuild, on the same schedule.
+    #
+    # The local refresh above keeps this machine's `data/` current. It does
+    # nothing for GitHub Pages, which can only ever be as fresh as its last
+    # build - and GitHub's own scheduler is best effort, so the ten-minute cron
+    # in `publish.yml` was measured delivering about one run every forty-four
+    # minutes with a worst gap of two hundred and sixty-eight. Against a fissure
+    # that lives an hour or two, that is a published list which has expired in
+    # full more often than not.
+    #
+    # A dispatch from here is not subject to that queue, so it turns the
+    # configured cadence into the delivered one. It asks for `full=false`, the
+    # light build, because anything else would re-download the wiki and the drop
+    # tables every ten minutes.
+    #
+    # Needs the GitHub CLI, authenticated (`gh auth login`) with permission to
+    # run workflows on this repository. Off by default: it is somebody's build
+    # minutes and somebody's Pages quota, so it is opted into rather than
+    # assumed.
+    [switch]$DispatchRemote
 )
 
 if ($EveryHours -gt 0) { $EveryMinutes = $EveryHours * 60 }
@@ -141,6 +161,24 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
 $action = New-ScheduledTaskAction -Execute $python `
     -Argument "`"$scriptPath`" --if-changed" -WorkingDirectory $root
 
+# One task, two actions, in order. Task Scheduler accepts an array and runs them
+# sequentially, which is what is wanted: refresh this machine, then ask the
+# deployed site to refresh itself. A second task would have been a second thing
+# to remove, and a second place for the two schedules to drift apart.
+$actions = @($action)
+if ($DispatchRemote) {
+    $gh = Get-Command "gh" -ErrorAction SilentlyContinue
+    if ($null -eq $gh) {
+        throw ("-DispatchRemote needs the GitHub CLI on PATH (looked for gh). " +
+               "Install it and run 'gh auth login', or re-run without the switch.")
+    }
+    # `-f full=false` is the whole point of the switch: the light build, the same
+    # path the ten-minute cron takes. Without it a dispatch rebuilds every source
+    # from scratch - see the FULL expression in .github/workflows/publish.yml.
+    $actions += New-ScheduledTaskAction -Execute $gh.Source `
+        -Argument "workflow run publish.yml -f full=false" -WorkingDirectory $root
+}
+
 # -Once with a repetition, rather than N daily triggers: it says "every hour" in
 # one object, instead of registering twenty-four of them.
 #
@@ -180,7 +218,7 @@ $description = "Refreshes Warframe Prime Hunter's Prime data from Digital Extrem
 # old one has a different name, so it would otherwise survive alongside the new.
 if ($TaskName -ne $LegacyTaskName) { Remove-TaskIfPresent -Name $LegacyTaskName | Out-Null }
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+Register-ScheduledTask -TaskName $TaskName -Action $actions -Trigger $trigger `
     -Settings $settings -Description $description -Force | Out-Null
 
 if ($EveryMinutes -lt 60) {
@@ -194,6 +232,10 @@ if ($EveryMinutes -lt 60) {
 }
 Write-Host "Scheduled '$TaskName' every $every, first run $Time."
 Write-Host "  runs: $python `"$scriptPath`" --if-changed"
+if ($DispatchRemote) {
+    Write-Host "  then: gh workflow run publish.yml -f full=false"
+    Write-Host "        (forces the deployed site to rebuild, light path)"
+}
 Write-Host "  from: $root"
 Write-Host ""
 Write-Host "Check it:    Get-ScheduledTask -TaskName '$TaskName'"

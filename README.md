@@ -598,6 +598,31 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryHours 8
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
 ```
 
+**If you publish this to GitHub Pages, and want the published copy as fresh as
+your local one**, add `-DispatchRemote` (or `--dispatch-remote` on the shell
+script). The task then also asks GitHub to rebuild the site on the same
+schedule:
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -DispatchRemote
+```
+
+> **Why this exists.** A published site is only ever as fresh as its last build,
+> and GitHub's own scheduler is best effort — it queues and drops runs under
+> load. Measured on this repository: a workflow asking for a run every ten
+> minutes was delivered about one every forty-four, with a worst gap of over four
+> hours. Void Fissures live an hour or two, so the published list had often
+> expired in full before the next build. A request sent from your machine is not
+> in that queue.
+>
+> It runs the **light** build — the same one the ten-minute schedule uses, which
+> refreshes the worldstate and rebuilds everything else from cache. The wiki and
+> the drop tables are not re-downloaded; those stay on the daily build.
+>
+> It needs the [GitHub CLI](https://cli.github.com/) installed and signed in
+> (`gh auth login`), and it only helps while your machine is awake. It is off by
+> default because it spends your Actions minutes and your Pages deployments.
+
 ### Automatically — macOS and Linux
 
 Same job, installed into `cron`:

@@ -41,6 +41,21 @@ EVERY=0            # hours; 0 means "not given", so the minute cadence stands
 EVERY_MIN=10
 AT="18:30"
 ACTION=install
+# --dispatch-remote: also force the DEPLOYED site to rebuild, on the same
+# schedule. The job above keeps this machine's data/ current and does nothing
+# for GitHub Pages, which is only ever as fresh as its last build -- and
+# GitHub's scheduler is best effort, measured at about one run every 44 minutes
+# against a configured ten, with a worst gap of 268. A dispatch from here is not
+# in that queue, so it turns the configured cadence into the delivered one.
+#
+# It asks for full=false, the light path: restore the cache read-only and run
+# build_data.py --if-changed, which fetches the export index, one HEAD to the
+# drop table, the trader window and the fissures, all conditional. The wiki and
+# the drop tables are NOT re-downloaded -- those stay on the daily 18:40 build.
+#
+# Needs the GitHub CLI, authenticated, with permission to run workflows here.
+# Off by default: it spends build minutes and Pages quota.
+DISPATCH=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,6 +64,7 @@ while [ $# -gt 0 ]; do
     --at)    AT="${2:-}";    shift 2 ;;
     --remove) ACTION=remove; shift ;;
     --show)   ACTION=show;   shift ;;
+    --dispatch-remote) DISPATCH=1; shift ;;
     -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -143,7 +159,21 @@ sq() {
   printf "'%s'" "$_o$_s"
 }
 
-LINE="$MINUTES $HOURS * * * cd $(sq "$ROOT") && $(sq "$PY") tools/build_data.py --if-changed >/dev/null 2>&1 $MARKER"
+# `;` rather than `&&` between the two, deliberately: a local refresh that fails
+# (no network on this machine, say) must not also cancel the request for the
+# deployed site to refresh itself. They answer different questions and neither is
+# a precondition for the other.
+DISPATCH_CMD=""
+if [ "$DISPATCH" = 1 ]; then
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "--dispatch-remote needs the GitHub CLI on PATH (looked for gh)."
+    echo "Install it and run 'gh auth login', or drop the flag."
+    exit 1
+  fi
+  DISPATCH_CMD="; gh workflow run publish.yml -f full=false >/dev/null 2>&1"
+fi
+
+LINE="$MINUTES $HOURS * * * cd $(sq "$ROOT") && $(sq "$PY") tools/build_data.py --if-changed >/dev/null 2>&1$DISPATCH_CMD $MARKER"
 
 if [ "$ACTION" = show ]; then
   printf '%s\n' "$LINE"
