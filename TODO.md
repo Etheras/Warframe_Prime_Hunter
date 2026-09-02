@@ -227,6 +227,7 @@ keeps asking entries to be**, which is why a one-row drift is worth a line.
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
+| The deployed site shows no fissures for hours at a time | session — **the live defect the owner reported**; 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
 | Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
 | The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
 
@@ -511,6 +512,57 @@ advice to disregard a failure.
   is 9.1%–49.0%. **Size: small.**
 - **Two comments in `limits.py` (lines 59, 107) describe rules the table does not
   follow.** **Size: small.**
+
+### The deployed site shows no fissures for hours at a time
+
+**Reported by the owner on 2026-09-02** as a wrong fissure rotation on the
+GitHub Pages site, and measured the same hour. It is not a wrong rotation
+*letter*: it is the whole list, and the site's answer is **none**.
+
+At 15:52Z the deployed `data/fissures.json` held **31 fissures generated at
+13:47Z, every one of which had already ended** — the last at 15:19Z. Live at
+that moment, read straight from the same upstream the build uses: **28**. So the
+site said there was nowhere to crack a relic while twenty-eight places were
+running.
+
+**The page is not at fault and that is worth stating**, because it is the part
+that looks broken. `ROT.fissuresAt` filters on `Date.parse(f.ends) > now` and
+`paintFissures` repaints on a timer, so an expired fissure is dropped rather
+than displayed. That is why the failure shows up as *nothing* instead of as a
+list of places that closed two hours ago — the honest shape, and still a wrong
+answer to the only question the feature exists to answer.
+
+**The cause is cadence, not the 403.** The published file can never be fresher
+than the last build, and `watchFissures` fetches that same static file, so a
+page left open all afternoon re-reads one 13:47 snapshot. Build gaps reach
+**268 minutes** against a fissure life of one to three hours, so the list is
+routinely expired in full before the next run. Digital Extremes did not answer
+the runner once in 17.7 hours — every build used the proxy — but that is the
+known 403 and it is *not* this: the proxy's fissure data was correct when it was
+fetched. It simply aged out.
+
+This is the same root as *`144 runs a day` is four to six times the cadence
+GitHub delivers*, and this is what that costs in the product rather than in a
+log.
+
+**Two directions, and they are different projects.**
+
+- **Build more often.** Cheapest to say, least reliable: scheduled workflows are
+  best-effort and GitHub skips them under load, which is exactly why the
+  measured cadence is already a fraction of the configured one. Pushing the
+  schedule down does not raise the floor, and a fissure can be shorter than any
+  cron this repo would be reasonable in asking for.
+- **Let the page read a live feed itself.** The only version that actually
+  tracks a one-hour object. It is also the bigger decision: `connect-src 'self'`
+  forbids it today, the privacy footer names the hosts the *build* contacts and
+  would have to name one the *reader* contacts, and rule 11 becomes a question
+  about a browser's request rate rather than a build's. Worth its own entry
+  before any of it is written.
+
+**Size: session** for either, and **the decision comes first** — nothing here
+should be built until it is made. A third option worth naming only to reject it:
+publishing an emptier list is not better, because the page already renders the
+empty case correctly and the reader still learns nothing.
 
 ### The six-round table's four-round column no longer reproduces
 
