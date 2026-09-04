@@ -46,6 +46,18 @@ true; the cadence row changed shape and the Mastery Rank row shipped.
 Titles are given verbatim so they can be grepped — each one is a `###` heading
 further down, where the reasoning lives.
 
+**Five rows added 2026-09-04**, under *Findings of 2026-09-04*. Three came from
+the owner watching the thing run for two days, which found what no local suite
+was ever going to:
+
+| Entry | What it is | Size |
+|---|---|---|
+| The freshness fingerprint asks DE directly, and DE mostly refuse CI | **defect** — `upstream_signature` skips the `from_chain` fallback, so ~92% of CI builds fingerprint a reused worldstate and skip a rebuild that was due | session |
+| The scheduled task steals focus every ten minutes | **defect** — no `-Principal` on `Register-ScheduledTask`; the S4U fix may break `gh`'s keyring and that is unmeasured | small, blocked on a decision |
+| An anchor for the ten-minute refresh, from the data rather than a grid | the boundary is published (`18:00 UTC`); the grid ignores it | owner's call |
+| Baro's relic should live only while he is on the relay | **decided**, not built — the app has no Baro errand at all yet | session |
+| Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
+
 **A row was added on 2026-08-26 and deleted on 2026-08-27**, in the same two days
 that produced it: *The standalone runs both pages' wiring twice, and it shows*
 came from the first session that ever drove the built single file in a browser
@@ -577,6 +589,159 @@ somebody can re-run. **Size: small** — re-measure, and record the payload's bu
 stamp beside the numbers so the next mismatch is legible instead of alarming.
 
 ---
+
+## Findings of 2026-09-04
+
+### The freshness fingerprint asks DE directly, and DE mostly refuse CI
+
+**Reported by the owner**: the Prime Resurgence rotation flipped and the relic
+data on the deployed site did not follow for about twenty minutes, across
+refreshes that did happen in between. Measured, and it is a real defect with a
+clean cause.
+
+The boundary is **18:00 UTC exactly**, and it is published in the data rather
+than inferred: `PrimeVaultTraders[0]` in DE's worldstate carries
+`Activation 2026-09-03T18:00:00Z` and `Expiry 2026-10-01T18:00:00Z`. Nothing has
+to guess when a rotation turns over.
+
+**The cause is that `upstream_signature` never got the `from_chain` fix.**
+`tools/sources.py` builds the `--if-changed` fingerprint from three keys, and the
+`resurgence` one is `PrimeVaultTraders[0].Expiry` read by a bare
+`fetch_json(WORLDSTATE, "de_worldstate", ...)` — **no DE → WFCD → cache chain, no
+proxy fallback, and no content-freshness guard.** Everywhere else that trap is
+already understood and documented: `fetch` answers a failed refresh by handing
+back cached bytes, so a 403 yields a *usable* worldstate, and `from_chain` in
+`build_data.py` exists precisely so a reused copy is not mistaken for a
+first-party answer. The live feeds were fixed. The fingerprint that decides
+whether to rebuild them was not.
+
+On CI that matters, because DE 403 the runner's address range. Measured from the
+deployed `data/feed-log.json` on 2026-09-04: of 53 consecutive builds, `de` was
+`stale` 47 times, `offline` twice and **`ok` four times** — DE answered about 8%
+of builds. So ~92% of ten-minute builds computed `sig["resurgence"]` from a
+reused cached worldstate, where the expiry cannot move, concluded nothing had
+changed, and rebuilt the trader data from the same stale cache. The rotation was
+picked up only when a run happened to draw one of the ~8% of fresh answers —
+which is exactly a lag of a couple of cycles.
+
+**Why only the relic data lagged**, and this is the confirming detail: the
+fissure list is fetched live on the light path either way (`publish.yml`, the
+*Refresh the fissure list and rebuild from cache* step), because a cached fissure
+is worthless. Fissures stayed current while Varzia's shelf did not, which is
+precisely what was reported.
+
+**Two fixes, and they are independent.** The first is the defect: route the
+signature's worldstate through `from_chain` like everything else, so the proxy
+answers when DE refuse and a reused copy is never read as fresh. The second is
+the anchor the owner asked for, and the data already provides it — see below.
+Note the daily FULL build is already anchored this way, at `40 18 * * *`, "so
+this picks up a new rotation on the same day it starts". The anchor idea is
+established here; it is the ten-minute path that flies blind.
+
+### An anchor for the ten-minute refresh, from the data rather than a grid
+
+**Asked for by the owner 2026-09-04.** Today the light build runs on `*/10`, a
+blind grid with no relationship to when anything upstream actually changes. Every
+feed we publish carries its own expiry: fissure `ends`, `meta.baro.expiry`,
+`PrimeVaultTraders[0].Expiry`, bounty cycle ends. The earliest of those is the
+only moment the page can go wrong, and it is known in advance.
+
+**Reference, not a dependency** — technique read from `browse.wf`
+(`calamity-inc`, MIT), nothing copied and no data used. It keeps a
+"refresh-at" timestamp set to the earliest expiry across the feeds it shows,
+re-derives it from each fresh response, and lets a cheap timer fire when that
+deadline passes. Two details are worth stealing as ideas: when a refresh comes
+back with an *unchanged* expiry it backs off by a fixed delay rather than
+retrying hard, and countdowns between fetches are recomputed locally from an
+expiry attribute instead of costing a request. Our pages already do the second
+of those for Baro's label and the fissure countdowns.
+
+**What this would change here.** GitHub's cron cannot be steered — five minutes
+is its floor and runs are dropped under load, which is why the dispatch from this
+machine exists at all. But the dispatch *is* steerable: `tools/schedule.ps1`
+could fire on the boundaries the payload already names instead of every ten
+minutes flat, or simply add a run a minute after each known boundary on top of
+the grid. **Not decided** — it trades a simple schedule for one that has to be
+re-derived, and the owner should choose. The 18:00 UTC Resurgence flip is the
+cheapest possible first case: one extra dispatch a day, at a time the data states.
+
+### The scheduled task steals focus every ten minutes
+
+**Reported by the owner 2026-09-04, and called a disaster** — a console window
+appears and takes focus 144 times a day.
+
+`tools/schedule.ps1` calls `Register-ScheduledTask` with **no `-Principal`**
+(line ~221), so the task inherits an interactive logon token and every action
+runs as a visible console process. `New-ScheduledTaskSettingsSet -Hidden` does
+not fix this and is a common false lead: it hides the task in the Task Scheduler
+UI, not the window.
+
+**The obvious fix has a trap.** `-LogonType S4U` runs the task in session 0 with
+no window at all, but S4U grants a token with no credential material, and this
+machine's `gh` keeps its token in the **keyring** (`gh auth status` reports
+`Logged in to github.com account Etheras (keyring)`; there is no plaintext
+`~/.config/gh/hosts.yml`). DPAPI-protected secrets are typically unreadable under
+S4U, so the second action — `gh workflow run publish.yml` — would likely start
+failing silently, taking the refresh with it. **This was not measured**: the
+probe that would settle it registers a scheduled task, which the permission
+layer declined, so it stays a documented risk rather than a finding.
+
+Options, cheapest first, for the owner to pick:
+1. **`-LogonType S4U`** — no window, needs the `gh` question answered first by
+   registering one throwaway task that runs `gh auth status` and writes the
+   result to a file.
+2. **Keep the interactive logon, hide the console** — wrap both actions in
+   `powershell.exe -WindowStyle Hidden`, which suppresses the window but can
+   still flash briefly on some builds.
+3. **Move the token out of the keyring** so option 1 is safe regardless.
+
+### Vendor `ItemType` paths have a general rule, and we found one case of it
+
+**Reference, not a dependency** — read from `warframe-public-export-plus` and
+`browse.wf` (`calamity-inc`, MIT). Neither their code nor their data is used.
+
+The Baro work on 2026-09-04 discovered by hand that his manifest's
+`/Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze`
+corresponds to `/Lotus/Types/Game/Projections/...` in `ExportRelicArcane_en.json`.
+Both projects state that as the general rule: **a vendor can only sell
+StoreItems, and a StoreItem path maps to the real type path by removing the
+`/StoreItems` segment** — with bundles as the documented exception, which
+resolve through a separate bundle export. So the join used for Baro's relic is
+not a coincidence of that one row, and the same rule reads Varzia's manifest.
+
+One thing there is worth treating as a **negative** example. `browse.wf` marks
+everything in Varzia's manifest as Resurgence **without reading the trader's
+activation or expiry at all** — a snapshot treated as permanent state. That is
+the exact wrong-`true` this backlog already refuses for Baro, and it is
+reassuring to see what it looks like when nobody gates it.
+
+Not adopted, and worth recording as considered-and-rejected: their relic naming
+builds a display name from era plus category through a localisation dictionary.
+We do not need it — `ExportRelicArcane_en.json` carries `name` outright.
+
+### Baro's relic should live only while he is on the relay
+
+**Decided by the owner 2026-09-04**, and it settles the question the entry
+*Baro's relics should be crackable, the way Varzia's are* was holding open:
+
+> We keep the relic as long as Baro is here, and then we forget he had it. Just
+> like all the other relic.
+
+So it is a **live feed, not a catalogue fact** — the same shape as a fissure. It
+is present in the payload while `meta.baro` says he is on the relay, and absent
+otherwise; nothing records that he once sold it, and no build that runs during
+the twelve empty days needs to say anything at all. That removes the "what does
+the row say while he is away" problem rather than solving it, because there is no
+row while he is away.
+
+**Still to build, and none of it exists yet** — as of this entry the app has no
+Baro errand whatsoever, which is why *How to crack them* shows only `Varzia` and
+`Trade`. The work: fetch `ExportRelicArcane_en.json` (add it to `EXPORT_WANTED`
+in `tools/sources.py`; it is already named in the export index, `max-age` ~356
+days, so it is nearly free), strip `/StoreItems` from each `Manifest` row's
+`ItemType`, keep the rows that resolve to a relic, mark those relics on the
+payload the way `resurgence` is marked, and add the third errand checkbox beside
+`Varzia` and `Trade` in `assets/plan.js`. Docs and tests in the same commit.
 
 ## Defects found by the documentation sweep of 2026-08-15
 
