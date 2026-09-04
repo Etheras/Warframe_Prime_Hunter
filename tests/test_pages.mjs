@@ -1291,13 +1291,19 @@ page_test("a row names the rotations that pay a relic, and prices the free one a
   // ── the free relic is the fissure's tier, and is marked worth nothing ──
   assert.ok(text.includes(`free ${subject.fissureTier}`),
     `the free relic must name the fissure's tier — got ${JSON.stringify(text)}`);
-  /* Asserted on the class rather than on a word in the row. The row deliberately
-     says only "+free Neo" and lets colour carry whether you want it — owner's
-     call, 2026-09-04 — so the property is which class it wears. */
-  const chip = row.locator(".est-nil", { hasText: `free ${subject.fissureTier}` });
-  assert.equal(await chip.count(), 1,
+  /* Asserted on the value, not on how the row is dressed. The row says only
+     "+free Neo" in one colour — owner's call, 2026-09-04, after a ", unwanted"
+     suffix and then a dim variant were both rejected — so the property that
+     matters is that a tier holding nothing wanted is priced at nothing, which
+     is what makes the node rank where it should. */
+  const tip = await row.locator(".est", { hasText: `free ${subject.fissureTier}` })
+    .getAttribute("data-tip");
+  assert.ok(tip, `the free relic needs a tooltip — got ${JSON.stringify(text)}`);
+  assert.match(tip, new RegExp(`0 are on your list`),
     `${subject.name} wants ${subject.wantTiers.join("/")} and no ${subject.fissureTier}, ` +
-    `so the free one must be dimmed as worth nothing — got ${JSON.stringify(text)}`);
+    `so none of that tier can be on the list — tooltip said ${JSON.stringify(tip)}`);
+  assert.match(tip, /worth 0(\.0)?%/,
+    `a tier with nothing wanted in it must be priced at nothing — ${JSON.stringify(tip)}`);
 
   // ── the rotation letters name rotations that pay a relic ──
   const letters = (text.match(/rot ([A-C+]+)/) || [])[1] || "";

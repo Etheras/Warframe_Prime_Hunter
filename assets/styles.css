@@ -573,12 +573,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* A number you did not supply, standing in for one you have not set yet. Same
    brightness as the line it sits on; only the hue changes — see STYLE.md §1. */
 .est{color:var(--odd);cursor:help}
-/* An estimate worth nothing to this reader: the free relic a fissure pays when
-   its tier holds nothing on your list. Dim rather than amber for the reason
-   STYLE.md gives the Baro badge — colour is for what you can act on, and this
-   is the row telling you not to bother. Still a tooltip, because *why* it is
-   worth nothing is the useful part. */
-.est-nil{color:var(--txt-dim);cursor:help}
 /* A relic handed over already refined, at a refinement this plan actually
    wanted: a straight gain, so it borrows the refinement palette rather than the
    amber that means "read the tooltip, this one is odd". Where the refinement

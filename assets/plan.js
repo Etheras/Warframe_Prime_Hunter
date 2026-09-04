@@ -1971,7 +1971,7 @@
              endless node flat, on the argument that a node-independent constant
              cannot reorder them; now the run itself is chosen for the fissure,
              so the relic is real and belongs to this row alone. */
-          n.bonus ? ` · <span class="${n.bonus.want ? "est" : "est-nil"}" data-tip="${esc(
+          n.bonus ? ` · <span class="est" data-tip="${esc(
             "Staying five rotations in a " + n.bonus.tier + " fissure pays a free "
             + "Exceptional\n" + n.bonus.tier + " relic — worth " + pct(n.bonus.value)
             + " here, averaged over the " + n.bonus.pool + "\nlive " + n.bonus.tier
@@ -1987,12 +1987,12 @@
                  + "is worth\nmore than the sixth round would have been."
                : "\n\nNone of them is, so this one is worth nothing to you — the "
                  + "tier is\nthe fissure's, not yours to choose."))
-          /* Always "+free <tier>", never a word for whether you want it: the
-             colour already carries that (`.est` amber against `.est-nil` dim,
-             the same amber-means-actionable rule as everywhere else) and the
-             tooltip has the reason. Owner's call, 2026-09-04 — an earlier
-             version wrote ", unwanted" into the row and it reads as clutter
-             next to a colour that had already said it. */
+          /* Always "+free <tier>", one colour, no adornment. Owner's call,
+             2026-09-04, after two versions that said too much: ", unwanted" in
+             the row, then a dim variant for the same thing. The tier name and
+             the ranking carry it — a free relic of a tier you want nothing from
+             is worth 0 and the row falls accordingly. The tooltip has the rest
+             for anyone who hovers. */
           }">+free ${esc(n.bonus.tier)}</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant" +

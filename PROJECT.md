@@ -3391,12 +3391,18 @@ don't need Neo relics."*
 `fissureBonus` returns per tier now and the node takes its own. **Measured on the
 reported list: Mithra 0.85 → 0.73 relics a run**, and nodes with no live fissure
 did not move. A tier holding nothing wanted is kept at zero rather than dropped,
-so the row can say `+free Neo` in dim rather than showing nothing.
+so the row can still say `+free Neo` rather than showing nothing.
 
-**And the row says only `+free Neo`.** An earlier version wrote `+free Neo,
-unwanted`; the owner's call is that the colour already says it — `.est` amber for
-something to act on, `.est-nil` dim for something not — and the word is clutter.
-Same rule as the Baro badge earlier the same day, and `STYLE.md` carries it.
+**And the row says only `+free Neo`, in one colour.** Two versions were rejected
+before that: `+free Neo, unwanted`, and then a dimmed variant carrying the same
+meaning in colour instead of a word. The owner's call, and it is the more
+confident design — **the ranking is the answer.** A free relic of a tier holding
+nothing you want is worth 0, the node falls to where that puts it, and the row
+does not need to editorialise about a number it is already showing you. The tier
+name is the only thing the reader could not otherwise work out, so it is the only
+thing added. Worth remembering the next time a row is tempted to explain itself:
+this is not the same case as the Baro badge, where the flag genuinely said
+something the reader could not see.
 
 **Aya is worth less when you are not chasing it.** The owner's rule, given as
 four cases: a relic on your farm list is 100%; Aya while a Prime on that list is
