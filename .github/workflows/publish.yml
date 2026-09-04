@@ -14,9 +14,30 @@ on:
   push:
     branches: [main]
   schedule:
-    # 18:40 UTC daily — the FULL build. Prime Resurgence rotations flip at
-    # 18:00 UTC, so this picks up a new rotation on the same day it starts.
-    - cron: "40 18 * * *"
+    # 18:05 UTC daily — the FULL build, five minutes after the only fixed
+    # boundary in this dataset. Prime Resurgence rotations flip at 18:00 UTC
+    # exactly: `PrimeVaultTraders` carries Activation 2026-09-03T18:00:00Z and
+    # Expiry 2026-10-01T18:00:00Z, so the time is published rather than guessed.
+    #
+    # **Five minutes, not forty** (owner, 2026-09-04). Forty was arbitrary and
+    # left the site a rotation behind for most of an hour. Five is the smallest
+    # offset that is safely *after* the turnover: DE declare `max-age=28` on the
+    # worldstate and WFCD `max-age=120` on their copy, so the new rotation is
+    # visible within ~2.5 minutes even by the fallback route. That is roughly
+    # 2x margin, and GitHub's scheduler only ever runs a cron LATE, never early,
+    # so the offset cannot be eaten from the front.
+    #
+    # **It is deliberately not anchored to DE's patch cadence, which cannot be
+    # anchored to.** Measured 2026-09-04 from Last-Modified on the export
+    # manifests: seven publications, all Tue/Wed/Thu and all inside US Eastern
+    # business hours - and that is 13:13 to 20:59 UTC, an eight-hour window with
+    # no fixed time in it. It does not need one: `--if-changed` fingerprints the
+    # export index and the drop table, so the ten-minute build already catches a
+    # patch within ten minutes of any hour it lands. What this daily run uniquely
+    # covers is the **wiki**, which is not fingerprinted and which editors update
+    # over the hours after a patch - a daily cadence suits that, and the hour
+    # does not change it.
+    - cron: "5 18 * * *"
     # Every ten minutes — the LIGHT build, for the one source with an hour to
     # live. Void Fissures move every hour or two and the pages only ever show
     # ones that have not expired, so a site rebuilt once a day always shows
@@ -51,9 +72,16 @@ on:
 #
 # The default stays `true` so the button in the Actions tab behaves as it always
 # has; only a caller that passes `full=false` gets the light build.
+#
+# **The cron string below is matched literally, so it and the `schedule:` entry
+# have to be changed together.** Moving the daily build from `40 18` to `5 18`
+# on 2026-09-04 would otherwise have left this comparing against a schedule that
+# no longer exists — the daily run would have quietly taken the LIGHT path and
+# nothing would have failed, it would just have stopped refreshing the wiki and
+# stopped filling the cache. There is no way to reference the entry by name.
 env:
   FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full
-         || github.event_name == 'schedule' && github.event.schedule == '40 18 * * *'
+         || github.event_name == 'schedule' && github.event.schedule == '5 18 * * *'
          || github.event_name == 'push' }}
 
 # Read-only against the repo. This workflow cannot modify your code.

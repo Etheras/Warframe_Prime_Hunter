@@ -758,7 +758,7 @@ Pages needs a **public** repo on the free plan.
 
 **6. It keeps itself current**
 
-`.github/workflows/publish.yml` rebuilds the data from DE every day at 18:40 UTC and
+`.github/workflows/publish.yml` rebuilds the data from DE every day at 18:05 UTC and
 republishes the site — so it stays up to date whether or not your PC is switched on,
 and the data still never enters the repository.
 

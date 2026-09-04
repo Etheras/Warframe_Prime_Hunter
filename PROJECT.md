@@ -902,7 +902,7 @@ an empty parse, not to police the catalogue.
 
 | Cron | What runs | Why |
 |---|---|---|
-| `40 18 * * *` | probe, full test suite, full fetch, cache **saved** | Resurgence flips at 18:00 UTC; this is the build that fills the cache |
+| `5 18 * * *` | probe, full test suite, full fetch, cache **saved** | Resurgence flips at 18:00 UTC; this is the build that fills the cache. **The `FULL` expression matches this string literally — change both together** |
 | `*/10 * * * *` | cache **restored read-only**, `--if-changed`, no probe, no tests | the fissure list, and nothing else, at the cadence it deserves |
 
 The short run exists because the published site had the one gap the local task did
@@ -5650,7 +5650,7 @@ So `workflow_dispatch` gained a `full` input, defaulting **true** so the button 
 the Actions tab behaves as it always has. Only a caller passing `full=false` gets
 the light path — restore the cache read-only, then `build_data.py --if-changed`,
 which is the export index, one HEAD to the drop table, the trader window and the
-fissures, every fetch conditional. The heavy sources stay on the daily 18:40
+fissures, every fetch conditional. The heavy sources stay on the daily 18:05
 build and on pushes.
 
 **Where it is wired.** `tools/schedule.ps1 -DispatchRemote` registers a **second

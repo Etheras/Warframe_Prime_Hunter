@@ -3164,6 +3164,59 @@ def test_the_ci_probe_asks_about_the_source_that_refuses() -> None:
                "different thing from asking whether they answer")
 
 
+def test_the_full_build_matches_a_schedule_that_exists() -> None:
+    """
+    `FULL` decides whether a scheduled run rebuilds everything or takes the light
+    path, and it decides it by comparing `github.event.schedule` against a cron
+    string **written out literally**. GitHub offers no way to name a `schedule:`
+    entry, so the same text lives in two places and nothing connects them.
+
+    Found by walking into it on 2026-09-04: moving the daily build from
+    `40 18 * * *` to `5 18 * * *` at the owner's request left the comparison
+    pointing at a schedule that no longer existed. Nothing would have failed —
+    the daily run would simply have taken the LIGHT path from then on, quietly
+    never refreshing the wiki and never filling the cache the ten-minute runs
+    restore from. It would have looked like a slow drift in data quality weeks
+    later, with nothing to connect it to a one-line schedule change.
+
+    So: every cron the `FULL` expression names must be a cron the workflow
+    actually runs.
+    """
+    path = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(path):
+        print("  skip FULL/schedule check (no workflow checked out)")
+        return
+    yml = read_text(path)
+
+    scheduled = set(re.findall(r"^\s*-\s*cron:\s*[\"']([^\"']+)[\"']", yml, re.M))
+    check_true("FULL: the workflow still declares schedules", bool(scheduled),
+               "no cron entries found — this test names the shape")
+
+    full = re.search(r"(?s)FULL:\s*\$\{\{(.*?)\}\}", yml)
+    check_true("FULL: the expression is still findable", bool(full),
+               "it was renamed or restructured; this test reads it by name")
+    expr = full.group(1) if full else ""
+
+    named = set(re.findall(r"event\.schedule\s*==\s*'([^']+)'", expr))
+    check_true("FULL: it decides by naming a cron", bool(named),
+               "if this stops being a literal comparison the trap is gone and so "
+               "is the need for this test — delete it rather than loosening it")
+
+    orphans = sorted(named - scheduled)
+    check("FULL: every cron it names is one the workflow runs", orphans, [],
+          f"named {sorted(named)}, declared {sorted(scheduled)} — a daily build "
+          f"comparing against a schedule that does not exist silently becomes a "
+          f"light build")
+
+    # And the converse is deliberately NOT asserted: the ten-minute cron is a
+    # schedule the expression must *not* name, so "every schedule is named" would
+    # be exactly backwards.
+    check_true("FULL: the light schedule is left unnamed, on purpose",
+               "*/10 * * * *" in scheduled and "*/10 * * * *" not in named,
+               "naming it would give the ten-minute run the full fetch, which is "
+               "what hard rule 11 forbids")
+
+
 def test_serving_a_page_never_writes_the_builders_cache() -> None:
     """
     `sources.upstream_signature` makes one HEAD and two GETs, and both GETs went
@@ -3981,6 +4034,7 @@ def main() -> int:
                          test_a_check_that_dies_still_lowers_the_flag,
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
+                         test_the_full_build_matches_a_schedule_that_exists,
                          test_our_invented_buckets_each_still_behave_as_one_thing,
                          test_the_server_caps_connections_not_just_requests,
                          test_the_schedulers_outpace_the_banner_they_prevent,

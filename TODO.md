@@ -599,8 +599,34 @@ this reporting is fixed, this is the improvement that sat behind it. The
 boundary is **18:00 UTC exactly** and is published rather than inferred:
 `PrimeVaultTraders[0]` carries `Activation 2026-09-03T18:00:00Z` and
 `Expiry 2026-10-01T18:00:00Z`, so nothing has to guess when a rotation turns
-over. The daily FULL build is already anchored to it at `40 18 * * *`; it is the
-ten-minute path that flies blind.
+over. The daily FULL build is anchored to it, and moved from `40 18 * * *` to
+**`5 18 * * *`** on 2026-09-04 at the owner's direction — forty minutes was
+arbitrary and left the site a rotation behind for most of an hour. It is the
+ten-minute path that still flies blind.
+
+**And DE's patch cadence is not a second anchor, because it is not anchorable.**
+Measured 2026-09-04 from `Last-Modified` on the export manifests DE publish —
+seven distinct publications, HEAD only, and only on manifests this project holds
+no freshness window for:
+
+| UTC | Day | US Eastern |
+|---|---|---|
+| 2025-03-27 14:18 | Thu | 10:18 |
+| 2025-06-24 20:59 | Tue | 16:59 |
+| 2026-06-18 20:51 | Thu | 16:51 |
+| 2026-06-23 18:36 | Tue | 14:36 |
+| 2026-06-25 20:33 | Thu | 16:33 |
+| 2026-08-12 13:13 | Wed | 09:13 |
+| 2026-08-19 17:12 | Wed | 13:12 |
+
+**Tue/Wed/Thu only, never Fri to Mon, and always inside US Eastern office hours**
+— which is an eight-hour spread in UTC (13:13 to 20:59) with no fixed time in
+it. So there is nothing to schedule against, and nothing needs to be:
+`--if-changed` fingerprints the export index and the drop table, so the
+ten-minute build already detects a patch within ten minutes of whatever hour it
+lands. The daily build's unique job is the **wiki**, which is not fingerprinted
+and which editors update over the hours *following* a patch — a daily cadence
+suits that and the hour does not change it.
 
 Today the light build runs on `*/10`, a
 blind grid with no relationship to when anything upstream actually changes. Every
