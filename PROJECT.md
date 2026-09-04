@@ -5006,9 +5006,14 @@ Two details specific to where they sit:
   smallest source in the project.
 
 **Measured after the change**, on a live build that refetched eight sources
-including the 4.4 MB drop table: every cached source sits between 12% and 49% of
-its own ceiling. A test asserts that nothing is above 75%, which is what tells
-somebody a source has grown *before* builds start going stale over it.
+including the 4.4 MB drop table: every cached source sat between 12% and 49% of
+its own ceiling. **Re-measured 2026-09-04 across all 24 cached sources: 9.1% to
+49.0%**, still nothing above half. The bottom of the range moved because a later
+commit raised a ceiling and a new feed was added, not because anything shrank —
+`api_events` is the 9.1%, and it is deliberately roomy because it was sampled
+with no limited-time event running. A test asserts that nothing is above 75%,
+which is what tells somebody a source has grown *before* builds start going
+stale over it.
 
 **And then the canary fired on the next CI run, which is the part worth keeping.**
 `api_syndicatemissions` came back at 114,415 on a clean runner against the 61,126

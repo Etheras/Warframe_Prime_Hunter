@@ -582,6 +582,32 @@ class SiteHandler(http.server.SimpleHTTPRequestHandler):
             return os.path.join(ROOT, ".refused")
         return os.path.join(ROOT, rel.replace("/", os.sep))
 
+    # The one page this server produced that its own policy refused.
+    #
+    # `send_error` renders `http.server.DEFAULT_ERROR_MESSAGE`, and since Python
+    # 3.11 that template carries an inline `<style>` block setting
+    # `color-scheme`. `style-src 'self'` has no `'unsafe-inline'`, so every 404
+    # logged a CSP violation in the console - harmless, and the only markup the
+    # project shipped that its own header blocked. Overridden rather than
+    # excepted: widening the policy for an error page would be trading the rule
+    # for the convenience of four lines of CSS nobody sees.
+    #
+    # `%(code)d`/`%(message)s`/`%(explain)s` are the substitutions the base class
+    # fills in, and `message`/`explain` are escaped by it before they land here.
+    error_message_format = (
+        "<!DOCTYPE HTML>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '<meta charset="utf-8" />\n'
+        "<title>%(code)d %(message)s</title>\n"
+        "</head>\n"
+        "<body>\n"
+        "<h1>%(code)d %(message)s</h1>\n"
+        "<p>%(explain)s</p>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
     def end_headers(self):
         """
         Headers a browser will act on, which cost nothing to send.

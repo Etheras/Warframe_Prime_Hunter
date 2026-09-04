@@ -132,10 +132,18 @@ jobs:
         env:
           # Masked by Actions. Kept out of the command line for the same reason.
           GH_TOKEN: ${{ github.token }}
+          # `${{ }}` is substituted into the script *before* a shell sees it, so
+          # an expression written inline is not a variable — it is text pasted
+          # into the command. This one is `github.repository`, which GitHub sets
+          # and nobody can influence, so it was a shape rather than a hole; it
+          # went through `env` on 2026-09-04 anyway, because the shape is the
+          # part that gets copied. The next expression somebody pastes in beside
+          # it may be a branch or an issue title, and those are attacker-supplied.
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           git clone --depth 1 \
-            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.wiki.git" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" \
             wiki-repo
 
           # The wiki is wholly generated, so it is replaced rather than merged:

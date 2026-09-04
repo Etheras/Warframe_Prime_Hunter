@@ -437,17 +437,19 @@ changed it is the drift shape this project keeps finding.
 
 **Size: small.**
 
-### The wiki-permissions test matches spellings, not the property it names
+### The wiki-permissions test matches spellings **[fixed 2026-09-04]**
 
-`tests/test_build.py:3051` asserts that the `contents: write` job runs no build.
-It does that by matching three step spellings, so four mutations that put
-arbitrary code back inside the write-token job all leave it green. The job split
-itself is real and verified — `generate` inherits `contents: read`, `publish`
-holds the write token and runs only checkout, download-artifact and the push —
-but the test is not what is holding it that way.
+Now an allowlist, as this asked: every executable the write-token job invokes
+must be one of `{git, cp, rm, echo}`, every action it uses must be named, and
+every action must be pinned to a 40-character SHA. Verified by planting exactly
+the mutations the old test allowed — `curl … | sh`, `node build.js`, and an
+unpinned `some-org/some-action@v3` — and watching three assertions fire that
+previously would not have.
 
-**Size: small.** Assert on the job's step *list* — that every `run:` in the
-write-token job is one of a named allowlist — rather than on phrases.
+Two details worth keeping. The commit message is stripped before the script is
+read, because it names `tools/wiki.py` and reading that as "it runs the build" is
+a false positive this test had already produced once. And `\` continuations are
+skipped, or the URL on the second line of `git clone \` counts as an executable.
 
 ### Two figures the workflows reason from were wrong **[both fixed 2026-09-04]**
 
@@ -476,20 +478,32 @@ stale thing by the end.
   Band"*. It is also the one item with no DE recipe, which is why it is odd.
   `plan.js:2192`. **Size: small** — drop the item prefix when the part name
   already starts with it.
-- **The server's own 404 page violates the CSP it sends.** `serve.py`'s error
-  response carries an inline `style`, which its own `style-src 'self'` blocks;
-  the browser logs a CSP violation on every 404. Harmless, and mildly funny, but
-  it is the one place the project ships markup that its own policy refuses.
-  **Size: small.**
-- **`wiki.yml:138` interpolates `${{ github.repository }}` into a shell command
-  line** — the only expression-into-shell in either workflow. The value is not
-  attacker-controlled on this repository, so it is a shape to fix rather than a
-  hole to close. **Size: small.**
-- **`PROJECT.md:4713`'s *"between 12% and 49%"*** was invalidated by a later
-  commit in the same session that raised a ceiling. Re-measured today the spread
-  is 9.1%–49.0%. **Size: small.**
-- **Two comments in `limits.py` (lines 59, 107) describe rules the table does not
-  follow.** **Size: small.**
+- ~~**The server's own 404 page violates the CSP it sends.**~~ **Fixed
+  2026-09-04.** One correction to the report: it is an inline `<style>` *element*,
+  not a `style=` attribute — Python added it to `DEFAULT_ERROR_MESSAGE` in 3.11
+  to set `color-scheme`. `SiteHandler` overrides the template rather than
+  widening the policy for an error page. Verified against a real 404 from a
+  running server: no `<style>`, CSP header still sent. The test asserts the
+  override differs from the stdlib default, because the failure mode is the
+  override going away, and then the wrong answer is the *absence* of code.
+- ~~**`wiki.yml` interpolates `${{ github.repository }}` into a shell command
+  line.**~~ **Fixed 2026-09-04**, through `env:`. It was a shape rather than a
+  hole, and the shape is the part that gets copied — the next expression pasted
+  in beside it may be a branch name. A test now asserts **both** workflows have
+  no expression inside any `run:` block.
+- ~~**`PROJECT.md`'s *"between 12% and 49%"*.**~~ **Fixed 2026-09-04.**
+  Re-measured across all 24 cached sources: **9.1% to 49.0%**, nothing above
+  half. `api_events` is the 9.1% and is roomy on purpose — it was sampled with
+  no limited-time event running.
+- **The `limits.py` comments: one was wrong, and not the two claimed.** Both
+  named locations were checked. The `Refused` docstring is accurate — both
+  callers catch the base class and neither branches on a subclass. The live-feed
+  note is accurate too: every row is at least twice its largest sample. What
+  *was* wrong is the **table header**, which said the ceiling is the measurement
+  "doubled and rounded up" while nine catalogue rows sit at 2.0–2.2x and
+  `api_fissures` is 4.5x, `api_vaulttrader` 4.1x, `api_events` 10.9x and
+  `export_index` 8.4x. The header and the note below it contradicted each other.
+  **Fixed 2026-09-04**, with the ratios written down.
 
 ### The deployed site shows no fissures for hours at a time
 

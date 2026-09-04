@@ -2777,6 +2777,25 @@ def test_server_serves_only_the_site() -> None:
     check("serves nothing else", [p for p in forbidden if serve.allowed(p)], [],
           "an allowlist that leaks is worse than none, because it is trusted")
 
+    # The one page this server produced that its own CSP refused. Python's
+    # `DEFAULT_ERROR_MESSAGE` has carried an inline `<style>` block since 3.11
+    # (it sets `color-scheme`), and `style-src 'self'` has no `'unsafe-inline'`,
+    # so every 404 logged a violation. Asserted against the stdlib default too,
+    # because the failure mode is the override quietly going away rather than
+    # the template growing a style: without the override this is inherited and
+    # the wrong answer is the *absence* of code.
+    import http.server as _hs
+    tpl = serve.SiteHandler.error_message_format
+    check_true("404 page: the error template is overridden, not inherited",
+               tpl != _hs.DEFAULT_ERROR_MESSAGE,
+               "inheriting it brings back the inline <style> the CSP blocks")
+    check("404 page: and carries no inline style of its own",
+          [m for m in ("<style", "style=") if m in tpl], [],
+          "this is the only markup the project ships that its own header refuses")
+    # It still has to be a usable error page, not just a compliant one.
+    check("404 page: it still says which error it is",
+          [f for f in ("%(code)d", "%(message)s", "%(explain)s") if f not in tpl], [])
+
     # temp_mockup.html is a local scratchpad for showing a proposed change
     # against real data (PROJECT.md §2). It is unreviewed and is not part of the
     # site, so it is local-only by peer address rather than by anyone
@@ -3364,6 +3383,39 @@ def test_the_full_build_matches_a_schedule_that_exists() -> None:
                "what hard rule 11 forbids")
 
 
+def test_no_workflow_expression_is_pasted_into_a_shell() -> None:
+    """
+    `${{ }}` is substituted into the script **before** a shell sees it, so an
+    expression written inside a `run:` block is not a variable — it is text
+    pasted into the command. When the value is attacker-supplied (a branch name,
+    an issue title, a PR body) that is arbitrary code execution with whatever
+    token the job holds.
+
+    Neither workflow had a dangerous one: the single instance was
+    `github.repository` in the wiki push, which GitHub sets and nobody can
+    influence. It went through `env` on 2026-09-04 anyway, because **the shape is
+    what gets copied** — the next expression pasted in beside it may not be safe,
+    and by then nothing would look unusual.
+
+    So the rule is the shape, asserted on both workflows: expressions belong in
+    `env:`, `with:` and `if:`, never in a shell body.
+    """
+    for name in ("publish.yml", "wiki.yml"):
+        path = os.path.join(ROOT, ".github", "workflows", name)
+        if not os.path.exists(path):
+            print(f"  skip {name} (no workflow checked out)")
+            continue
+        yml = read_text(path)
+        blocks = re.findall(
+            r"(?ms)^\s+run:\s*\|\s*\n(.*?)(?=\n\s{6}-\s|\n\s{4}\w+:|\Z)", yml)
+        blocks += re.findall(r"(?m)^\s+run:[ \t]+(?!\|)(\S.*)$", yml)
+        pasted = [ln.strip() for b in blocks for ln in b.splitlines()
+                  if "${{" in ln and not ln.strip().startswith("#")]
+        check(f"{name}: no expression is pasted into a shell", pasted, [],
+              "put it in env: and read it as a shell variable, so the value is "
+              "data the shell quotes rather than script it parses")
+
+
 def test_serving_a_page_never_writes_the_builders_cache() -> None:
     """
     `sources.upstream_signature` makes one HEAD and two GETs, and both GETs went
@@ -3603,16 +3655,64 @@ def test_the_wiki_token_is_confined_to_the_job_that_pushes() -> None:
     check_true("wiki job: the writing job does not check this repository out",
                "actions/checkout@" not in pusher,
                "it wants the generated pages, not the source they came from")
-    # On what it runs, not on what it mentions: the commit message this job
-    # writes names tools/wiki.py, and reading that as "it runs the build" is a
-    # false positive this test has already produced once.
-    invokes = re.findall(r"(?m)^\s*(?:run:\s*)?(python\d?\s+tools/\S+)", pusher)
-    check("wiki job: the writing job runs no build", invokes, [],
-          "parsing an upstream's bytes while holding a repo-writing token is "
-          "exactly the arrangement the split removed")
     check_true("wiki job: the writing job installs no toolchain",
                "setup-python@" not in pusher,
                "nothing it does needs one, and each install is another supply chain")
+
+    # ── What the token-holding job may run, as an allowlist ──────────────────
+    #
+    # This asked three questions about *spellings* until 2026-09-04 — does it
+    # mention `actions/checkout@`, `setup-python@`, `python tools/...` — and a
+    # sweep pointed out the obvious: `curl … | sh`, `node build.js`, `bash
+    # anything.sh` or an unpinned third-party action all walk straight past it.
+    # A blacklist of three phrases is not what "runs no build" means.
+    #
+    # So the property is inverted. Every executable this job invokes must be one
+    # of a named few, and every action it uses must be named and pinned. Adding
+    # anything new here fails until somebody writes it down, which is the point:
+    # this job holds a token that can write the repository, and the whole reason
+    # the jobs were split is that nothing which parses somebody else's bytes
+    # should run while it does.
+    ALLOWED_RUN = {"git", "cp", "rm", "echo"}
+    ALLOWED_USES = {"actions/download-artifact"}
+
+    blocks = re.findall(r"(?ms)^\s+run:\s*\|\s*\n(.*?)(?=\n\s{6}-\s|\Z)", pusher)
+    blocks += re.findall(r"(?m)^\s+run:[ \t]+(?!\|)(\S.*)$", pusher)
+    check_true("wiki job: its shell is still findable", bool(blocks),
+               "no run: block parsed - the shape this reads has drifted")
+
+    script = "\n".join(blocks)
+    # The commit message is prose in a quoted string, and it names tools/wiki.py.
+    # Reading that as "it runs the build" is a false positive this test has
+    # already produced once, so the message is removed before anything is read.
+    script = re.sub(r'git commit -m ".*?"', "git commit", script, flags=re.S)
+
+    SHELL_KEYWORDS = {"if", "fi", "then", "else", "elif", "set", "exit", "cd",
+                      "do", "done", "while", "for", "case", "esac"}
+    invoked, continued = set(), False
+    for line in script.splitlines():
+        s = line.strip()
+        was_continued, continued = continued, s.endswith("\\")
+        # A `\` continuation carries arguments, not a new command; counting the
+        # URL on the second line of `git clone \` as an executable is noise.
+        if not s or s.startswith("#") or was_continued:
+            continue
+        word = s.split()[0].rstrip("\\")
+        if word and word not in SHELL_KEYWORDS:
+            invoked.add(word)
+
+    check("wiki job: it runs nothing outside its allowlist",
+          sorted(invoked - ALLOWED_RUN), [],
+          f"invoked {sorted(invoked)}; allowed {sorted(ALLOWED_RUN)} — a new "
+          f"command in the job holding the write token has to be argued for")
+
+    uses = re.findall(r"uses:\s*([^@\s]+)@(\S+)", pusher)
+    check("wiki job: it uses no action outside its allowlist",
+          sorted({a for a, _ in uses} - ALLOWED_USES), [],
+          "a third-party action here runs with the write token")
+    check("wiki job: and every action it does use is pinned to a commit",
+          [a for a, ref in uses if not re.fullmatch(r"[0-9a-f]{40}", ref)], [],
+          "a tag can be moved under you; a SHA cannot")
 
     check_true("wiki job: the job that builds declares no permissions of its own",
                not re.search(r"(?m)^\s+permissions:", builder),
@@ -4183,6 +4283,7 @@ def main() -> int:
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
                          test_the_full_build_matches_a_schedule_that_exists,
+                         test_no_workflow_expression_is_pasted_into_a_shell,
                          test_our_invented_buckets_each_still_behave_as_one_thing,
                          test_the_server_caps_connections_not_just_requests,
                          test_the_schedulers_outpace_the_banner_they_prevent,

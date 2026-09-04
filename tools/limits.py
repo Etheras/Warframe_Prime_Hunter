@@ -76,9 +76,18 @@ class Malformed(Refused):
 
 
 # What each source may expand to, keyed by its `.cache` name. The comment on
-# each line is what it actually measured on 2026-09-01; the ceiling is that
-# doubled and rounded up, so the drift between them is reviewable without
-# re-measuring.
+# each line is what it actually measured — 2026-09-01 for most of them, and the
+# date is given on any row added since. The ceiling is **at least** that
+# doubled, so the drift between the two is reviewable without re-measuring.
+#
+# *At least*, not exactly: this said "doubled and rounded up" until 2026-09-04
+# and the table has never followed it. Measured across every row, the nine
+# catalogue sources sit at 2.0x to 2.2x, which is what that sentence described —
+# but `api_fissures` is 4.5x, `api_vaulttrader` 4.1x, `api_events` 10.9x and
+# `export_index` 8.4x. Those are deliberate and the reason is two paragraphs
+# down: a live feed's size moves with game state, so one sample of it is not a
+# measurement. The header and that note disagreed, and the header was the one
+# that was wrong.
 #
 # The transfer is held to the same number. For a gzip response that compares a
 # compressed body against an expanded ceiling, which is loose in our favour and
@@ -114,8 +123,9 @@ MAX_EXPANDED = {
     "api_vaulttrader":                    32 * KB,   #   7,947
     # Baro's manifest, measured 2026-09-04 during an actual visit: 41 rows,
     # 6,219 bytes. It is `[]` twelve days in fourteen, so the measured figure is
-    # the busy case and not the usual one.
-    "api_voidtrader":                     32 * KB,   #   6,219 with 41 rows
+    # the busy case and not the usual one — which is the opposite of `api_events`
+    # below and the reason both get room well past double.
+    "api_voidtrader":                     32 * KB,   #   6,219 with 41 rows (2026-09-04)
     "api_events":                         32 * KB,   #   2,994 with NO event running
     # ── and the rest, whose size tracks the catalogue ──
     "wiki_prime":                        128 * KB,   #     56,157
