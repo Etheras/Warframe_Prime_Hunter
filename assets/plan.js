@@ -172,6 +172,18 @@
      control lets a reader deciding what to crack tonight put them away without
      anyone deciding on their behalf. */
   let showTrade = opts.trade !== false;
+  let showBaro = opts.baro !== false;
+
+  /* Is Baro on a relay *right now*, by this page's clock rather than the
+     build's? Same helper and the same reasoning as the collection view's Baro
+     filter (`app.js`): a build is up to ten minutes old and a tab can be open
+     for hours, so freezing the answer at build time is wrong twice a fortnight.
+
+     This is what makes the owner's decision of 2026-09-04 hold — *we keep the
+     relic while he is here and then forget he had it*. `relics[n].baro` says
+     what his manifest held when the build ran; this says whether that is still
+     true. Both have to agree before a row claims he is selling anything. */
+  const baroIsHere = (now) => ROT.traderWindow((DATA.meta || {}).baro, now).here;
 
   /* Which number puts the rows in order. Both count the same thing - wanted
      relics - and differ only in what they divide it by, which is the question
@@ -339,7 +351,7 @@
       const f = it.flags || {};
       const buyable = mine.some((n) => {
         const rec = RELICS[n];
-        return rec && (!rec.vaulted || rec.resurgence);
+        return rec && (!rec.vaulted || rec.resurgence || isBaro(n));
       });
       if (!buyable && !f.baro && !f.special && !f.founder && !f.permanent) {
         mine.forEach((n) => stranded.add(n));
@@ -518,7 +530,8 @@
     let vaultedOut = 0;
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
-      if (!rec || (rec.vaulted && !rec.resurgence && !stranded.has(rname))) {
+      if (!rec || (rec.vaulted && !rec.resurgence && !isBaro(rname)
+                   && !stranded.has(rname))) {
         // Only ones genuinely wanted: a relic held by the Forma bonus alone is
         // not something the reader is short of, and counting it would overstate
         // what is being hidden from them.
@@ -1371,11 +1384,20 @@
   let relicsVaulted = 0;
   const tierOf = (rname) => String(rname).split(" ")[0];
   const isVarzia = (rname) => !!(RELICS[rname] || {}).resurgence;
-  /* Vaulted, not on Varzia's shelf, and here only because the Prime has no
-     route at all — the `stranded` case. Same test the row badge uses. */
+  /* On Baro's manifest when the build ran, **and** he is still on the relay.
+     Both halves, always: the first alone would keep selling his relic for the
+     twelve days a fortnight he is gone. */
+  const isBaro = (rname) => !!(RELICS[rname] || {}).baro && baroIsHere();
+  /* Vaulted, with no errand of its own — here only because the Prime has no
+     route at all, the `stranded` case. Same test the row badge uses.
+
+     Baro is excluded for the same reason Varzia is: a relic you can go and buy
+     today is not one you have to be traded. The moment he leaves it becomes a
+     trade row again on its own, with no build in between, because `isBaro`
+     goes false on the page's clock. */
   const isTrade = (rname) => {
     const rec = RELICS[rname] || {};
-    return !!rec.vaulted && !rec.resurgence;
+    return !!rec.vaulted && !rec.resurgence && !isBaro(rname);
   };
 
   /* What each control should say, with one rule: **a facet's count ignores its
@@ -1397,28 +1419,31 @@
      emptied by a checkbox reads `0` rather than vanishing. */
   function relicCounts() {
     const dataTier = {}, tierCount = {};
-    let varziaCount = 0, tradeCount = 0, allCount = 0;
-    let dataVarzia = 0, dataTrade = 0;
+    let varziaCount = 0, tradeCount = 0, baroCount = 0, allCount = 0;
+    let dataVarzia = 0, dataTrade = 0, dataBaro = 0;
     relicRows.forEach(([rname]) => {
       const t = tierOf(rname);
       dataTier[t] = (dataTier[t] || 0) + 1;
       if (isVarzia(rname)) dataVarzia += 1;
       if (isTrade(rname)) dataTrade += 1;
+      if (isBaro(rname)) dataBaro += 1;
       const errandOk = (showVarzia || !isVarzia(rname)) &&
-                       (showTrade || !isTrade(rname));
+                       (showTrade || !isTrade(rname)) &&
+                       (showBaro || !isBaro(rname));
       const tierOk = !relicTier || t === relicTier;
       if (errandOk) { tierCount[t] = (tierCount[t] || 0) + 1; allCount += 1; }
-      /* Varzia and Trade are mutually exclusive categories, so neither box
-         moves the other's count — but each still has to obey the tier. */
+      /* Varzia, Baro and Trade are mutually exclusive categories, so no box
+         moves another's count — but each still has to obey the tier. */
       if (tierOk && isVarzia(rname)) varziaCount += 1;
       if (tierOk && isTrade(rname)) tradeCount += 1;
+      if (tierOk && isBaro(rname)) baroCount += 1;
     });
     /* `data*` decides what **exists**, the rest decide what the numbers say.
        Keeping them apart is what stops a control disappearing because of
        another control: selecting a tier with none of Varzia's relics in it
        shows `Varzia 0`, it does not take her box away. */
-    return { dataTier, dataVarzia, dataTrade,
-             tierCount, varziaCount, tradeCount, allCount };
+    return { dataTier, dataVarzia, dataTrade, dataBaro,
+             tierCount, varziaCount, tradeCount, baroCount, allCount };
   }
 
   /* The numbers only, moved in place. Called when a control is pressed, where
@@ -1426,7 +1451,7 @@
      focus to `<body>` — `STYLE.md §6` again, and the same reason the strip and
      the list are painted separately. */
   function refreshRelicCounts() {
-    const { tierCount, varziaCount, tradeCount, allCount } = relicCounts();
+    const { tierCount, varziaCount, tradeCount, baroCount, allCount } = relicCounts();
     $$("#relicTiers .tier-tab").forEach((b) => {
       const t = b.dataset.tier;
       const n = t ? (tierCount[t] || 0) : allCount;
@@ -1450,6 +1475,7 @@
     };
     set("p-varzia", varziaCount);
     set("p-trade", tradeCount);
+    set("p-baro", baroCount);
   }
 
   /* The strip of controls on the heading's line. Rebuilt only when the plan
@@ -1499,13 +1525,20 @@
        Shown only when she has something here — six relics at most, and none at
        all whenever the farm list wants nothing from her rotation.
 
-       **Baro Ki'Teer belongs beside her and is deliberately absent.** There is
-       no such thing as a Baro relic in this payload: `flags.baro` sits on nine
-       *items* and means "he sometimes sells this Prime". A control filtering on
-       that, next to one filtering Varzia's actual shelf, would answer a visibly
-       different question in the same shape — the near-miss this project keeps
-       having to undo. His shelf has to be read while he is on a relay; see
-       `TODO.md`. When it can be, it is one more entry in this strip. */
+       **Baro Ki'Teer is the third one, since 2026-09-04.** He was deliberately
+       absent until then, and the reason is worth keeping: `flags.baro` sits on
+       nine *items* and means "he sometimes sells this Prime", so a control
+       built on it would have answered a visibly different question from
+       Varzia's in the same shape. What changed is that his actual shelf can now
+       be read — `VoidTraders[0].Manifest` names it outright while he is on a
+       relay — so `relics[n].baro` is his real stock and not a guess.
+
+       His box differs from hers in one way, and it is the whole of the owner's
+       decision: it appears only while he is here. Not disabled, not showing
+       zero — absent, exactly as it was before he arrived. `dataBaro` is `0`
+       twelve days in fourteen because `isBaro` consults the page's clock, so
+       the strip goes back to two controls on its own with no build in
+       between. */
     tierBar.innerHTML = (tabs.length > 1
       ? `<button type="button" class="tier-tab" data-tier=""` +
         ` aria-pressed="${relicTier ? "false" : "true"}">All` +
@@ -1521,6 +1554,19 @@
           `<input type="checkbox" id="p-varzia"${showVarzia ? ' checked="checked"' : ""} />` +
           `<span class="box"></span><span class="lbl">Varzia` +
           `<span class="n">${counts.varziaCount}</span></span></label>`
+        : "") +
+      /* Baro sits between Varzia and Trade because that is the order of how
+         hard the errand is: her shelf is up for a month, his for two days, and
+         a trade needs another player. */
+      (counts.dataBaro
+        ? `<label class="mini-check" data-tip="${esc(
+            "Baro Ki'Teer is on a relay now and sells these for Ducats and\n" +
+            "credits. They do not drop, so they have nowhere to send you\n" +
+            "under Where to go.\n\n" +
+            "He leaves in two days and this control goes with him.")}">` +
+          `<input type="checkbox" id="p-baro"${showBaro ? ' checked="checked"' : ""} />` +
+          `<span class="box"></span><span class="lbl">Baro` +
+          `<span class="n">${counts.baroCount}</span></span></label>`
         : "") +
       /* The one that actually shortens the list, which was not obvious until it
          was measured: with every Prime on the farm list the crack list holds
@@ -1581,6 +1627,18 @@
           "That is why nowhere is listed under Where to go.\n\n" +
           "This is the rotation she is selling now, so the list changes when " +
           "the rotation does.")}">from Varzia</span>`
+      : isBaro(rname)
+        /* Deliberately checked before `vaulted`, because his relic is vaulted
+           and would otherwise read "trade for it" while he is standing on a
+           relay selling it. The moment he leaves, `isBaro` goes false and this
+           row becomes a trade row again with no rebuild in between — which is
+           the owner's decision of 2026-09-04 expressed in one branch. */
+        ? `<span class="from-baro" data-tip="${esc(
+            "Baro Ki'Teer is on a relay now and sells this relic for Ducats " +
+            "and credits, both farmed.\nThat is why nowhere is listed under " +
+            "Where to go.\n\n" +
+            "He leaves after two days and takes it with him — this badge and " +
+            "the Baro control both go when he does.")}">from Baro</span>`
       : rec.vaulted
         /* Only ever reached for a Prime with no way in at all — see
            `stranded`. The refinement beside it is the point of showing the
@@ -1622,7 +1680,8 @@
     const rp = relicRows.filter(([rname]) =>
       (!relicTier || tierOf(rname) === relicTier) &&
       (showVarzia || !isVarzia(rname)) &&
-      (showTrade || !isTrade(rname)));
+      (showTrade || !isTrade(rname)) &&
+      (showBaro || !isBaro(rname)));
     /* Appended to whatever the list says, empty or not, because the fact it
        reports is true either way: there are relics you need that this list is
        not showing. Worded as what it is rather than as an apology — the reader
@@ -1914,12 +1973,18 @@
        Trade-only relics — the fully-vaulted case, `stranded` — sit in the same
        bucket for the same reason and are further from farmable still: those need
        another player. */
-    /* 0 farmable, 1 Varzia, 2 trade-only. Keyed off the relic name, which is
-       the entry's own key — the plan object does not carry it. */
+    /* 0 farmable, 1 Varzia, 1 Baro, 2 trade-only. Keyed off the relic name,
+       which is the entry's own key — the plan object does not carry it.
+
+       Baro shares Varzia's rank rather than getting one of his own: both are
+       "go and buy it with something you farmed", which is the distinction this
+       ordering is drawing. Splitting them would claim a difference in kind that
+       is really a difference in how long the shop is open, and the badge
+       already says which shop. */
     const errand = (rname) => {
       const rec = RELICS[rname] || {};
       if (!rec.vaulted) return 0;
-      return rec.resurgence ? 1 : 2;
+      return (rec.resurgence || isBaro(rname)) ? 1 : 2;
     };
     const rpAll = Array.from(relicPlan.entries()).sort((a, b) => {
       const ar = errand(a[0]), br = errand(b[0]);
@@ -2352,6 +2417,7 @@
       errandBar.addEventListener("change", (e) => {
         if (e.target.id === "p-varzia") opts.varzia = showVarzia = e.target.checked;
         else if (e.target.id === "p-trade") opts.trade = showTrade = e.target.checked;
+        else if (e.target.id === "p-baro") opts.baro = showBaro = e.target.checked;
         else return;
         save(KEY_PLAN, opts);
         /* The owner found this missing on 2026-09-01: the tier tabs went on

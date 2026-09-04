@@ -1559,6 +1559,68 @@ def test_resurgence_reads_from_the_first_party_worldstate() -> None:
           "None is what makes the caller fall back to the proxy")
 
 
+def test_baro_sells_relics_read_off_his_own_manifest() -> None:
+    """
+    Baro's shelf, which unlike Varzia's is published as a literal list — but
+    only for the two days a fortnight he is on a relay.
+
+    Everything here is invented rather than sampled, on purpose: his real
+    manifest is empty twelve days in fourteen, so a test built on live data
+    would pass this week and be unrunnable the next. The shapes are the ones
+    measured on 2026-09-04 during an actual visit.
+    """
+    # The two facts the join rests on: a vendor sells StoreItems, and the item
+    # database names the type path underneath.
+    items = [
+        {"category": "Relics", "name": "Axi M5 Intact",
+         "uniqueName": "/Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze"},
+        {"category": "Relics", "name": "Axi M5 Radiant",
+         "uniqueName": "/Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimePlatinum"},
+        {"category": "Relics", "name": "Lith Q1 Intact",
+         "uniqueName": "/Lotus/Types/Game/Projections/T1VoidProjectionQuietBronze"},
+        # not a relic, and it is on his manifest below
+        {"category": "Mods", "name": "Primed Something",
+         "uniqueName": "/Lotus/Upgrades/Mods/Rifle/Expert/PrimedSomething"},
+    ]
+    doc = {"VoidTraders": [{
+        "Character": "Baro'Ki Teel", "Node": "EarthHUB",
+        "Manifest": [
+            {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze",
+             "PrimePrice": 125, "RegularPrice": 55000},
+            {"ItemType": "/Lotus/StoreItems/Upgrades/Mods/Rifle/Expert/PrimedSomething",
+             "PrimePrice": 400, "RegularPrice": 140000},
+            {"ItemType": ""},
+        ],
+    }]}
+
+    got = build_data.build_baro_relics(items, doc)
+    check("baro: the relic on his manifest is found", sorted(got), ["Axi M5"])
+    check("baro: the refinement he stocks is not part of the name",
+          [n for n in got if " Intact" in n or " Bronze" in n], [],
+          "one relic is one entry however many refinements exist")
+    check("baro: a relic he is NOT selling stays off the shelf",
+          "Lith Q1" in got, False,
+          "the manifest is the shelf — being a relic is not enough")
+    check("baro: the forty non-relic rows are ignored rather than half-mapped",
+          len(got), 1)
+
+    # The `/StoreItems` hop is the whole join. If it stops being dropped, the
+    # lookup silently matches nothing and the shelf goes quietly empty - which
+    # looks exactly like an away week, so nothing else would catch it.
+    unstripped = {"VoidTraders": [{"Manifest": [
+        {"ItemType": "/Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze"},
+    ]}]}
+    check("baro: a type path that never went through StoreItems still resolves",
+          sorted(build_data.build_baro_relics(items, unstripped)), ["Axi M5"],
+          "replace() leaves a path alone when the segment is absent")
+
+    # Away, which is the normal state and must not read as a fault.
+    check("baro: an empty manifest is an empty shelf",
+          build_data.build_baro_relics(items, {"VoidTraders": [{"Manifest": []}]}), set())
+    check("baro: no trader in the document at all is also an empty shelf",
+          build_data.build_baro_relics(items, {}), set())
+
+
 def test_artwork_prefers_digital_extremes() -> None:
     """
     Artwork is first party since 2026-08-27. DE's `ExportManifest.json` gives a
@@ -3797,6 +3859,7 @@ def main() -> int:
                          test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,
+                         test_baro_sells_relics_read_off_his_own_manifest,
                          test_the_rotation_letter_is_read_then_cross_checked,
                          test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,

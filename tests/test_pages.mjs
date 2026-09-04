@@ -1177,6 +1177,94 @@ page_test("the errand boxes appear only when there is that errand to hide", asyn
   assert.deepEqual(errors, []);
 });
 
+page_test("Baro's relic is on the crack list while he is here, and a trade after", async () => {
+  /* The owner's decision of 2026-09-04: *we keep the relic as long as Baro is
+     here, and then we forget he had it.*
+
+     Both halves are staged rather than waited for. He is on a relay two days in
+     fourteen, so a test that asserted what the calendar happens to say today
+     would pass this week, fail on the 6th, and pass again around the 18th —
+     the exact shape `CLAUDE.md` warns about. The window is replaced before the
+     page loads instead, so the assertion is about the gate and not about the
+     date the suite is run on.
+
+     The subject is chosen from raw payload properties — a vaulted relic that is
+     not on Varzia's shelf, and the Prime that wants it — never by asking the
+     code under test what it thinks a Baro relic is. */
+  const { page, errors } = await open("/plan.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    for (const it of D.items) {
+      const names = (it.parts || []).flatMap((p) => (p.relics || []).map((r) => r.relic));
+      const pick = names.find((n) => D.relics[n] && D.relics[n].vaulted
+                                     && !D.relics[n].resurgence);
+      if (pick) return { item: it.id, name: it.name, relic: pick };
+    }
+    return null;
+  });
+  assert.ok(subject, "no vaulted, non-Varzia relic in the payload — pick another property");
+
+  /* Stage the world: this relic is on his manifest, and the window is whatever
+     the half being tested needs. Installed as a setter so it lands on the
+     payload the page's own data script assigns, before any of plan.js runs. */
+  const stage = (relic, from, to) => page.addInitScript(
+    ([rname, act, exp]) => {
+      let held;
+      Object.defineProperty(window, "WFPRIME_DATA", {
+        configurable: true,
+        get() { return held; },
+        set(next) {
+          if (next && next.relics && next.relics[rname]) next.relics[rname].baro = true;
+          if (next && next.meta) {
+            next.meta.baro = { activation: act, expiry: exp,
+                               node: "EarthHUB", character: "Baro'Ki Teel" };
+          }
+          held = next;
+        },
+      });
+    }, [relic, from, to]);
+
+  await page.evaluate((id) =>
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([id])), subject.item);
+
+  // ── He is here: an hour ago until an hour from now, whatever today is. ──
+  await stage(subject.relic,
+              new Date(Date.now() - 3600e3).toISOString(),
+              new Date(Date.now() + 3600e3).toISOString());
+  await page.reload({ waitUntil: "load" });
+
+  const row = page.locator(`#planRelics .relic-row:has-text("${subject.relic}")`);
+  assert.equal(await row.count(), 1,
+    `${subject.relic} is vaulted, so it reaches the list only because Baro has it`);
+  assert.equal(await row.locator(".from-baro").count(), 1,
+    "the row says which shop, and it is his");
+  assert.equal(await row.locator(".from-trade").count(), 0,
+    "a relic he is selling today must not read as one another player has to give you");
+  assert.equal(await page.locator("#relicErrands #p-baro").count(), 1,
+    "his errand gets a control while the errand exists");
+
+  /* Unticking it takes his relic away and leaves the rest — the box is a filter
+     on his shelf, not on the vault. */
+  await page.click("#relicErrands .mini-check:has(#p-baro)");
+  assert.equal(await row.count(), 0, "his box hides his relic");
+
+  // ── He has gone: the window closed a minute ago. Same payload, same relic. ──
+  await stage(subject.relic,
+              new Date(Date.now() - 7200e3).toISOString(),
+              new Date(Date.now() - 60e3).toISOString());
+  await page.reload({ waitUntil: "load" });
+
+  assert.equal(await page.locator("#relicErrands #p-baro").count(), 0,
+    "the control goes when he does — absent, not a box reading zero");
+  const after = page.locator(`#planRelics .relic-row:has-text("${subject.relic}")`);
+  assert.equal(await after.locator(".from-baro").count(), 0,
+    "nothing remembers he had it");
+  assert.equal(await after.locator(".from-trade").count(), await after.count(),
+    "with him gone it is a vaulted relic again, and says so");
+  assert.deepEqual(errors, []);
+});
+
 page_test("the crack-list controls survive a reload", async () => {
   /* Reported by the owner on 2026-09-01: Varzia's box came back ticked on every
      refresh. It was deliberate and documented — the tier and both errand boxes

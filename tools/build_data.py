@@ -426,6 +426,66 @@ def build_varzia_relics(items_raw: list, vault_trader: dict) -> set[str]:
     return {name for tag in live for name in by_tag[tag]}
 
 
+def build_baro_relics(items_raw: list, worldstate: dict) -> set[str]:
+    """
+    Which relics Baro Ki'Teer is selling **right now**, read off his manifest.
+
+    Varzia's shelf has to be inferred from a naming convention because DE do not
+    publish it (`build_varzia_relics` above). Baro's needs no inference at all -
+    he publishes a literal list - but only while he is standing on a relay.
+    Measured 2026-08-27, eight days before a visit: `Manifest` is `[]`. Measured
+    2026-09-04, 24 minutes into a visit: 41 rows, exactly one of them a relic.
+
+    Two things make the join work, and both are already here:
+
+    **A vendor can only sell StoreItems.** Every `ItemType` is a
+    `/Lotus/StoreItems/...` path, and it reaches the real type path by dropping
+    the one `/StoreItems` segment:
+
+        /Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze
+        /Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze
+
+    **The item database already names that path.** No new request and no new
+    manifest: the same rows `build_varzia_relics` walks carry
+    `"Axi M5 Intact"` for the Bronze one, and the other three refinements
+    besides. DE's `ExportRelicArcane_en.json` says the same thing and was the
+    first route found, but it is a 3.2 MB fetch to learn something already on
+    disk.
+
+    Returns bare relic names - `{"Axi M5"}` - with the refinement word dropped,
+    exactly as Varzia's shelf does, so one relic is one entry however many
+    refinements exist.
+
+    **This says nothing about whether he is here.** An empty set means "no relics
+    in the manifest we can see", which is also what an away week looks like, and
+    the two are told apart by `meta.baro` and the page's own clock - never by
+    this function. See PROJECT.md section 7.
+    """
+    trader = (worldstate.get("VoidTraders") or [None])[0]
+    if not isinstance(trader, dict):
+        return set()
+    selling = {
+        str(row.get("ItemType") or "").replace("/Lotus/StoreItems/", "/Lotus/", 1)
+        for row in (trader.get("Manifest") or [])
+        if isinstance(row, dict)
+    }
+    selling.discard("")
+    if not selling:
+        return set()
+
+    out: set[str] = set()
+    for row in items_raw or []:
+        if row.get("category") != "Relics":
+            continue
+        if str(row.get("uniqueName", "")) not in selling:
+            continue
+        # "Axi M5 Intact" -> "Axi M5": the relic, not the refinement he stocks.
+        name = " ".join(str(row.get("name", "")).split()[:2])
+        if name:
+            out.add(name)
+    return out
+
+
 # --------------------------------------------------------------------------
 # bounties: which rotation is live, and which limited-time ones exist today
 # --------------------------------------------------------------------------
@@ -1468,6 +1528,19 @@ def main() -> int:
             "Either DE renamed the convention or the item database is stale; "
             "Prime Resurgence relics will not be offered this build.")
 
+    # Baro's shelf, which exists only while he does. Logged either way, because
+    # "empty" is the normal state twelve days in fourteen and a silent empty set
+    # is indistinguishable from a broken join.
+    baro_relics = build_baro_relics(items_raw, worldstate or {})
+    baro_window = official.void_trader_from_worldstate(worldstate or {})
+    if baro_relics:
+        log(f"baro: {len(baro_relics)} relic(s) on the manifest — "
+            f"{', '.join(sorted(baro_relics))}")
+    else:
+        log("baro: no relics on the manifest — normal while he is away "
+            f"(window {(baro_window or {}).get('activation', '?')[:16]} -> "
+            f"{(baro_window or {}).get('expiry', '?')[:16]})")
+
     bounties = build_bounty_meta(rotation_pools, syndicate_missions, world_events,
                                  checked=bool(rotation_pools and syndicate_missions))
     if bounties["families"]:
@@ -1810,6 +1883,14 @@ def main() -> int:
             # 2026-08-27: any relic holding a part of an offered Prime counted,
             # which marked 88 where she was selling 6.
             "resurgence": rname in varzia_relics,
+            # The same idea for Baro, and deliberately the same shape: a relic
+            # you cannot farm but can go and buy. The difference is that his is
+            # true for two days a fortnight, so the page gates it on
+            # `meta.baro` against its own clock - the build only reports what
+            # the manifest said when it ran. Owner's decision, 2026-09-04: we
+            # keep the relic while he is here and then forget he had it, like
+            # any other live feed.
+            "baro": rname in baro_relics,
         }
 
     categories = []
@@ -1850,7 +1931,7 @@ def main() -> int:
             # Baro Ki'Teer's visit window. The collection view opens its Baro
             # filter only while he is actually on a relay, and it decides that
             # against its own clock rather than one frozen at build time.
-            "baro": official.void_trader_from_worldstate(worldstate or {}),
+            "baro": baro_window,
             # which bounty rotation is live, and which limited-time bounties
             # exist at all today. A bounty run pays one rotation - the one the
             # clock says - so without this the planner counts rewards you

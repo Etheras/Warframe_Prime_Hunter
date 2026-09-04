@@ -55,7 +55,7 @@ was ever going to:
 | The freshness fingerprint asks DE directly, and DE mostly refuse CI | **defect** — `upstream_signature` skips the `from_chain` fallback, so ~92% of CI builds fingerprint a reused worldstate and skip a rebuild that was due | session |
 | The scheduled task steals focus every ten minutes | **defect** — no `-Principal` on `Register-ScheduledTask`; the S4U fix may break `gh`'s keyring and that is unmeasured | small, blocked on a decision |
 | An anchor for the ten-minute refresh, from the data rather than a grid | the boundary is published (`18:00 UTC`); the grid ignores it | owner's call |
-| Baro's relic should live only while he is on the relay | **decided**, not built — the app has no Baro errand at all yet | session |
+| Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
 | Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
 
 **A row was added on 2026-08-26 and deleted on 2026-08-27**, in the same two days
@@ -194,7 +194,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
-| Baro's relics should be crackable, the way Varzia's are | session — the owner's, 2026-09-01; the pattern already exists, this is applying it |
+| Baro is on the crack list, and one thing about it is still unknown | **shipped 2026-09-04** — what is left is whether one relic a visit is his habit, answerable only while he is here (~09-18) |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -734,14 +734,24 @@ the twelve empty days needs to say anything at all. That removes the "what does
 the row say while he is away" problem rather than solving it, because there is no
 row while he is away.
 
-**Still to build, and none of it exists yet** — as of this entry the app has no
-Baro errand whatsoever, which is why *How to crack them* shows only `Varzia` and
-`Trade`. The work: fetch `ExportRelicArcane_en.json` (add it to `EXPORT_WANTED`
-in `tools/sources.py`; it is already named in the export index, `max-age` ~356
-days, so it is nearly free), strip `/StoreItems` from each `Manifest` row's
-`ItemType`, keep the rows that resolve to a relic, mark those relics on the
-payload the way `resurgence` is marked, and add the third errand checkbox beside
-`Varzia` and `Trade` in `assets/plan.js`. Docs and tests in the same commit.
+**Built and shipped 2026-09-04**, in the visit it was measured in. The plan in
+this entry named `ExportRelicArcane_en.json` as a new fetch, and **that was
+wrong and was not needed**: the item database already fetched for names, images
+and vault state carries the same rows — `/Lotus/Types/Game/Projections/
+T4VoidProjectionBaroAkmagnusPrimeBronze` is `"Axi M5 Intact"` in it, with the
+other three refinements beside it. DE's relic manifest says the same thing and
+costs 3.2 MB to learn it. So the build gained **no new source at all**:
+`build_baro_relics` in `tools/build_data.py` drops the `/StoreItems` segment
+from each `Manifest` row and looks the result up in rows `build_varzia_relics`
+already walks.
+
+What shipped: `relics[n].baro` on the payload; `isBaro` in `assets/plan.js`
+gating on `ROT.traderWindow` against the **page's** clock so his relic leaves
+with him and reverts to a trade row with no rebuild in between; a third errand
+checkbox that is absent rather than zero while he is away; a `from Baro` badge
+in `--blue`, the colour `.badge.baro` already uses on the collection view. The
+sort ranks him with Varzia — both are "buy it with something farmed" — rather
+than giving him a bucket of his own.
 
 ## Defects found by the documentation sweep of 2026-08-15
 
@@ -794,6 +804,9 @@ shelf. Whether that is his habit or this fortnight's draw needs a second sample
 — see the note at the end of this entry.
 
 **That relic resolves to `Axi M5`, first-party, with no wiki marker and no WFCD.**
+*Two* routes do it, and the one below is **not** the one that shipped — see the
+note at the end of this entry: the item database already fetched for names and
+vault state carries the same mapping, so no new source was added.
 `ExportRelicArcane_en.json` — a manifest DE already list in the export index and
 this build does **not** fetch — names it outright: `"name": "Axi M5 Relic"`, with
 a `relicRewards` table that matches the payload's `Axi M5` reward-for-reward
@@ -913,74 +926,34 @@ The control is the other half. The crosshair is a two-state `role="checkbox"`
 different control or a modifier — plus a line in `STYLE.md`, since a new colour with
 a new meaning is exactly what that document exists to arbitrate.
 
-### Baro's relics should be crackable, the way Varzia's are
+### Baro is on the crack list, and one thing about it is still unknown
 
-**Asked for by the owner 2026-09-01.** Baro Ki'Teer should behave like Prime
-Resurgence: **you buy the relic from him, and it then appears in *How to crack
-them*** with a refinement and an openings figure, like any other relic you hold a
-route to.
+**The entry that stood here — *Baro's relics should be crackable, the way
+Varzia's are*, asked for by the owner 2026-09-01 — shipped on 2026-09-04 and its
+reasoning is in `PROJECT.md §7`** under *Baro's shelf is published too, and only
+while he is standing on it*. What is left is the one thing a single visit could
+not answer.
 
-**The pattern already exists and is shipped**, which is most of why this is worth
-doing. A Resurgence relic is vaulted by definition — that is what being in
-Resurgence means — so `rec.vaulted` alone dropped every one of them out of the
-plan, and a Resurgence Prime produced a planner with nothing to say. The fix was
-to let a relic reach the crack list when it is *obtainable* rather than when it
-*drops*, and to badge the row with where it comes from: `from-varzia` on the row,
-no ranked node underneath, and a sentence saying why there is nowhere to run.
-Baro wants exactly that shape with a different badge.
+**Is one relic per visit his habit, or was it this fortnight's draw?** Measured
+2026-09-04: 41 manifest rows, exactly one of them a relic. Everything built
+handles any number — `build_baro_relics` returns a set and the errand control
+counts it — so nothing breaks either way. But two things downstream were sized
+against "a short list" rather than reasoned from evidence: he shares Varzia's
+sort bucket, and his control sits between hers and Trade. If he turns up with
+fifteen relics one fortnight, both are worth re-reading.
 
-**Why it is not a one-line change.** Two things differ from Varzia:
+**Cheap to answer and it has to be done live**: he returns around **2026-09-18**,
+and `data/feed-log.json` will not help — it records which source answered, not
+what was in it. One `python -c` against `VoidTraders[0].Manifest` while he is
+present, and the count goes in this entry. Three or four visits would settle it.
 
-- **Varzia's shelf is known and Baro's now is too — measured 2026-09-04.** This
-  bullet said his was unknowable outside the window and that DE publish neither
-  directly; both halves are now answered and the second was wrong. His
-  `Manifest` carries his stock while he is present (41 rows, of which **one** is
-  a relic), and `ExportRelicArcane_en.json` — a first-party manifest already
-  named in the export index, not currently fetched — resolves that row to
-  **`Axi M5`** with a reward table matching the payload's. See the entry above
-  for the verbatim row. What remains true is the shape of the problem: it was
-  **one relic on this visit** — one sample, not a proven rule — so a Baro errand
-  is likely a much shorter list than Varzia's six, and the manifest is empty for
-  twelve days in every fourteen — a build
-  that runs while he is away sees nothing and must not conclude "no Baro relics
-  exist".
-- **He is only there two days a fortnight.** Varzia is continuous, so her relics
-  are always buyable; Baro's are buyable now or in twelve days. A crack list that
-  says "buy it from Baro" while he is away is the same wrong-`true` the
-  availability filter already avoids — `meta.baro` ships his window and the page
-  decides against its own clock, so the row has that fact available and should use
-  it.
-
-**So the order of work was:** read his manifest while he is here, and only then
-decide whether this is "the relics he is selling today" or the weaker "the relics
-he is known to sell sometimes". **The manifest was read on 2026-09-04 and the
-first is now buildable** — it names one relic, `Axi M5`, at 125 Ducats and
-55,000 credits, Intact only. The weaker version stays not worth building: the
-wiki marker `flags.baro` already covers *sometimes*, and on this visit it
-over-claims by seven items out of nine.
-
-**What is not yet decided is what the row says while he is away**, which is the
-same wrong-`true` problem as the filter: twelve days in fourteen his manifest is
-empty, and a crack list that has quietly dropped its Baro errand is indistinct
-from one that never had it. `meta.baro` already ships the window, so the page can
-tell those apart — but only if the build records that it *looked* and found
-nothing, rather than emitting nothing. That distinction is the owner's call and
-is the first thing to settle if this is built.
-
-**The place he goes now exists**, which takes a piece off this. *How to crack
-them* gained a control strip on 2026-09-01 — tier tabs, and a checkbox per
-errand shown only when that errand is on the list: `Varzia 6` and `Trade 717`.
-Baro is a third errand in exactly that shape, so the interface half is a few
-lines rather than a design. **The hard part is no longer hard.** This paragraph
-said "there is no such thing as a Baro relic in the payload" and that a box built
-on `flags.baro` would answer a visibly different question from Varzia's — the
-second half still holds, but the first is now false by measurement. A Baro relic
-is nameable from first-party data: `VoidTraders[0].Manifest` gives the
-uniqueName, `ExportRelicArcane_en.json` gives the relic name, and the result
-(`Axi M5`) is already a key in `relics`. The build work is a manifest fetch plus
-a `resurgence`-shaped flag; the box then answers exactly the question Varzia's
-does, which is what made it worth doing. `PROJECT.md §7` has why the
-`flags.baro` version was refused.
+**The item-level marker is a separate question and is still open.** `flags.baro`
+comes from the wiki and means "he sometimes sells this Prime"; it sits on nine
+items, and on the 2026-09-04 visit his actual stock covered two of them. That
+gap is now measured rather than suspected, but nothing has been decided about
+it — the relic-level shelf shipped and the item-level marker was left exactly as
+it was. See *Baro's actual stock is published, and never read* above for what
+that entry still holds open.
 
 Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still

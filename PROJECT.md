@@ -3315,6 +3315,72 @@ names any disagreement, asserts that over 500 parts came from a DE recipe, and
 pins the fallback list to exactly `["Kavasa Prime Collar"]` so a second name
 appearing there means the join has started missing.
 
+### Baro's shelf is published too, and only while he is standing on it
+
+**Read 2026-09-04, built the same day, inside the two-day window that made it
+possible.** Two `TODO.md` entries had been waiting on this since 2026-08-14 and
+2026-09-01, both blocked on one unknown: `VoidTraders[0].Manifest` is `[]`
+between visits — measured at 0 rows on 2026-08-27 — so nobody knew whether it
+named his stock, or in what shape, until he arrived.
+
+It does. Measured 13:24Z, 24 minutes into the visit: **41 rows**, an entry being
+`ItemType` plus `PrimePrice` (Ducats) and `RegularPrice` (credits), with `Limit`
+optional and present on exactly one row. **Exactly one of the 41 is a relic** —
+`T4VoidProjectionBaroAkmagnusPrimeBronze`, 125 Ducats — and the other forty are
+mods, skins, decorations and a treasure box this catalogue does not model. So
+the honest answer to *what is he really selling* is one relic on this visit,
+against the nine items the wiki marker `flags.baro` puts behind "he sometimes
+sells this Prime". One visit is one sample; whether one relic is his habit is
+not yet known.
+
+**The join needs no new source, which was the surprise.** The first route found
+was DE's `ExportRelicArcane_en.json`, and it works — it names the row `Axi M5
+Relic` with a reward table matching ours. It is also 3.2 MB to learn something
+already on disk. Two facts make it unnecessary:
+
+- **A vendor can only sell StoreItems.** Every `ItemType` is a
+  `/Lotus/StoreItems/...` path and reaches the real type path by dropping that
+  one segment. Found by hand here for a single row; both `browse.wf` and
+  `warframe-public-export-plus` state it as the general rule, with bundles as
+  the documented exception. Read as a technique — no code and no data taken.
+- **The item database already names the result.** The same rows
+  `build_varzia_relics` walks carry `"Axi M5 Intact"` for that path, and the
+  other three refinements beside it.
+
+So `build_baro_relics` is the cheaper sibling of `build_varzia_relics`: hers has
+to be *inferred* from a naming convention because DE do not publish it; his is
+published, and only needs the `/StoreItems` hop. **No fetch was added.**
+
+**The decision that shaped it, owner's, 2026-09-04:** *we keep the relic as long
+as Baro is here, and then we forget he had it — just like all the other relic.*
+That makes his shelf a **live feed rather than a catalogue fact**, and it
+dissolves the problem the backlog had been circling. The open question had been
+what a crack-list row should say during the twelve days a fortnight he is away —
+the same wrong-`true` the availability filter refuses. The answer is that there
+is no row: `relics[n].baro` says what the manifest held when the build ran, and
+`isBaro` in `plan.js` requires `ROT.traderWindow` to agree against the **page's**
+clock. Both, always. A tab open across his departure loses the badge, the errand
+control and the row on its own, with no rebuild in between — the same mechanism
+the collection view's Baro filter already used, reused rather than reinvented.
+
+**Three smaller calls.** The errand control is **absent** while he is away
+rather than showing zero, because `STYLE.md §6` only offers a control for
+something in front of you, and a box that is dead twelve days in fourteen is
+worse than none. The badge is `--blue`, which is what `.badge.baro` already uses
+on the collection view — one fact wearing one colour on both pages; teal was the
+first choice and was wrong, because `STYLE.md §1` gives teal to the Exceptional
+row background these badges sit on. And the sort ranks him **with** Varzia
+rather than between her and trade: both are "go and buy it with something you
+farmed", and the badge already says which shop.
+
+**What the page test does not do is wait for him.** It stages both halves by
+replacing `meta.baro` before load, so the assertion is about the gate and never
+about the date the suite runs on — a test written against the real calendar
+would have passed that week, failed on the 6th and passed again around the 18th.
+It also caught a real defect during development: the errand filter was applied
+to the counts and not to `paintRelicList`, so unticking his box moved the number
+and left the row.
+
 ### Varzia's shelf is published, but not where anyone looks for it
 
 **Found by the owner 2026-08-27, from the in-game store, and fixed the same
@@ -4488,13 +4554,15 @@ A page test asserts the counts by arithmetic against the DOM — each tab claims
 exactly what pressing it shows — rather than against expected numbers, which
 would need rewriting every time DE vault something.
 
-**Baro Ki'Teer is deliberately absent from a strip he obviously belongs in.**
-There is no such thing as a Baro relic in the payload: `flags.baro` sits on nine
-*items* and means "he sometimes sells this Prime". A box built on that, next to
-one built on Varzia's actual shelf, would answer a visibly different question in
-an identical shape. His manifest measures empty between visits and has to be read
-while he is on a relay — `TODO.md` carries it, and the strip is now the thing it
-plugs into.
+**Baro Ki'Teer was deliberately absent from a strip he obviously belongs in, and
+joined it on 2026-09-04.** The reason for the delay is worth keeping: there was
+no such thing as a Baro relic in the payload — `flags.baro` sits on nine *items*
+and means "he sometimes sells this Prime", so a box built on that, beside one
+built on Varzia's actual shelf, would have answered a visibly different question
+in an identical shape. What unblocked it was reading his manifest during a visit;
+*Baro's shelf is published too, and only while he is standing on it* above has
+that. His box is the third in the strip and is **absent rather than zero**
+whenever he is away, which is twelve days in fourteen.
 
 **Two defects found by building it**, both invisible at desktop width and both
 now fixed with tests or notes:

@@ -340,9 +340,14 @@ Neither list knows anything about the other's question, which is the point.
 
 **How to crack them narrows.** Above it sit a tier strip — `All · Lith · Meso ·
 Neo · Axi`, each with its count — and a checkbox for each kind of errand on the
-list: **Varzia**, for the relics she sells for Aya, and **Trade**, for relics
-belonging to Primes with no way in at all. A tier with nothing in it gets no tab,
-and an errand you do not have gets no box. Every count answers to the other
+list: **Varzia**, for the relics she sells for Aya, **Baro**, for the relics
+Baro Ki'Teer is selling for Ducats *while he is actually on a relay*, and
+**Trade**, for relics belonging to Primes with no way in at all. A tier with
+nothing in it gets no tab, and an errand you do not have gets no box — so
+**Baro's box is there for the two days a fortnight he is, and gone the rest of
+the time**, along with the *from Baro* label on his relic. Nothing records that
+he had it; the moment he leaves, that relic reads as a trade again, and a tab
+left open across his departure is right without a reload. Every count answers to the other
 controls, so unticking **Trade** lowers the tier counts too and each tab always
 claims exactly what pressing it shows. They only narrow what is on screen — the
 surviving rows keep the order and the figures they already had — and nothing is
