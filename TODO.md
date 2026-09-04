@@ -171,7 +171,7 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| Baro's actual stock is published, and never read | what he is really selling — **his `Manifest` is empty between visits, so check it 2026-09-04 to 09-06.** The *say when* half shipped 2026-08-27 | session |
+| Baro's actual stock is published, and never read | **read 2026-09-04: 41 rows, one relic — `Axi M5`, resolved first-party.** No longer blocked on a window; what is left is whether to build it | session |
 
 ### Model and ranking
 
@@ -268,9 +268,13 @@ looked. So the preparation is the part with a deadline:
   `eventRunning` see it, does the Plague Star bounty leave the *include event
   nodes* gate, and does the Hemocyte row stop being unreachable.
 
-**And the second date on this page is Baro, 2026-09-04 to 09-06** — his `Manifest`
-is empty between visits, so *Baro's actual stock is published, and never read* has
-a two-day window of its own, five days before Plague Star opens.
+**The second date on this page was Baro, 2026-09-04 to 09-06, and it has been
+kept.** His manifest was read at 13:24Z on the 04th, 24 minutes into the window:
+41 rows, one of them a relic, resolved first-party to `Axi M5`. Both Baro entries
+carry the measurement and neither is waiting on a window any more. He empties
+again at 2026-09-06T13:00Z and returns around 09-18, so **anything that wants a
+live manifest as a test fixture has to be committed before the 6th** — the raw
+captures are in a session scratchpad, not the repo.
 
 *Seven rotation-bearing mission types* used to sit in this table waiting on "wiki
 checking; tedious, not blocked". **The wiki checking was done on 2026-08-26** and
@@ -602,16 +606,54 @@ view's *Baro Ki'Teer* filter opens only while he is actually on a relay, decided
 against the **page's** clock rather than the build's, so a tab left open across
 his arrival is right without a reload.
 
-**What is left is the stock itself, and it cannot be checked yet.** His
-`Manifest` is **empty between visits** — measured at 0 entries on 2026-08-27,
-eight days before he arrives — so whether it names what he is selling, and in
-what shape, is unknown. **Check it while he is present: 2026-09-04 to
-2026-09-06.** Until then anything written here about his inventory would be a
-guess, and this project has already been caught once reading a field whose name
-matched and whose contents did not (`Events` versus `Goals`).
+**The stock is published, and it was read on 2026-09-04.** Measured 13:24Z, 24
+minutes into the window: `VoidTraders[0].Manifest` holds **41 entries**, against
+the 0 measured on 2026-08-27. It is real stock, not a placeholder. Each entry is
+four keys — `ItemType`, `PrimePrice` (Ducats), `RegularPrice` (credits), `Limit`
+— and `ItemType` is a `/Lotus/StoreItems/...` path, not a display name.
 
-If the manifest does carry his stock, it answers the *"what is he really
-selling"* half below with first-party data and no wiki marker involved.
+**Exactly one of the 41 is a relic**, and it is the only row this project has any
+use for:
+
+```json
+{"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze",
+ "PrimePrice": 125, "RegularPrice": 55000, "Limit": 1}
+```
+
+The other 40 are mods, skins, ship decorations, Prisma/Vandal/Wraith weapons and
+a `BaroTreasureBox` — nothing the catalogue models. So *"what is he really
+selling"* is answerable, and the honest answer is **one relic per visit**, not a
+shelf.
+
+**That relic resolves to `Axi M5`, first-party, with no wiki marker and no WFCD.**
+`ExportRelicArcane_en.json` — a manifest DE already list in the export index and
+this build does **not** fetch — names it outright: `"name": "Axi M5 Relic"`, with
+a `relicRewards` table that matches the payload's `Axi M5` reward-for-reward
+(Magnus Prime Barrel `RARE`, Receiver `UNCOMMON`, Akmagnus Prime Link `UNCOMMON`,
+both blueprints and Forma `COMMON`). 3261 rows, 3073 of them projections,
+`max-age` ~356 days, `Last-Modified` 2026-06-23 — a static manifest, the
+politest kind of fetch this project makes. **`ExportResources_en.json`, which the
+build does read, cannot do this job**: it carries 32 projection rows covering
+Varzia's `…Vault…` set and the bare tier names, and Baro's relic is not among
+them. That is the whole reason this looked like it needed WFCD.
+
+All four refinements exist in the manifest (`…Bronze/Silver/Gold/Platinum`, all
+named `Axi M5 Relic`); **he sells only `Bronze`, which is Intact.** The `Baro`
+infix in the uniqueName is what marks his, the way `Vault` marks Varzia's.
+
+**The static flag over-claims, and now there is a number for it.** Nine items
+carry `flags.baro`; the single relic he is actually selling covers **two** of
+them — Akmagnus Prime (`Axi M5` is its only relic) and Magnus Prime, which shares
+that relic. The other seven — Volt, Gotva, Aklex, Akvasto, Lex, Vasto and Odonata
+Prime — he is not selling anything for today. So *sometimes* and *today* differ
+by seven items out of nine on this visit, which is the measurement the
+"today versus sometimes" choice below was waiting for.
+
+Raw captures taken during the window (DE worldstate, the isolated `VoidTraders`
+block, WFCD's `voidTrader`, and `ExportRelicArcane_en.json`) are **not in the
+repo** — they were taken to a scratchpad and the decisive rows quoted above.
+`Manifest` empties again at 2026-09-06T13:00Z and he returns around 2026-09-18,
+so if a fixture is wanted for a test, it has to be committed before then.
 
 **The proposal has two halves and only one is safe.** Disabling the checkbox while
 he is away changes what the flag means, and he is present roughly two days in
@@ -703,13 +745,18 @@ Baro wants exactly that shape with a different badge.
 
 **Why it is not a one-line change.** Two things differ from Varzia:
 
-- **Varzia's shelf is known and Baro's is not.** DE publish neither directly, but
-  Varzia's rotation is recoverable from the relic naming — `...VoidProjection<Rotation>Vault...`
-  against the packs she is selling — and that is how her six are found. Baro has
-  no equivalent: `PrimeVaultTraders` carries her; `VoidTraders` carries him, and
-  his `Manifest` was **measured empty between visits** on 2026-08-27. Whether it
-  names relics while he is present is still unknown, and the window to find out
-  is the two days a fortnight he is on a relay. **Check it 2026-09-04 to 09-06.**
+- **Varzia's shelf is known and Baro's now is too — measured 2026-09-04.** This
+  bullet said his was unknowable outside the window and that DE publish neither
+  directly; both halves are now answered and the second was wrong. His
+  `Manifest` carries his stock while he is present (41 rows, of which **one** is
+  a relic), and `ExportRelicArcane_en.json` — a first-party manifest already
+  named in the export index, not currently fetched — resolves that row to
+  **`Axi M5`** with a reward table matching the payload's. See the entry above
+  for the verbatim row. What remains true is the shape of the problem: it is
+  **one relic per visit**, so a Baro errand is a much smaller list than Varzia's
+  six, and the manifest is empty for twelve days in every fourteen — a build
+  that runs while he is away sees nothing and must not conclude "no Baro relics
+  exist".
 - **He is only there two days a fortnight.** Varzia is continuous, so her relics
   are always buyable; Baro's are buyable now or in twelve days. A crack list that
   says "buy it from Baro" while he is away is the same wrong-`true` the
@@ -717,22 +764,36 @@ Baro wants exactly that shape with a different badge.
   decides against its own clock, so the row has that fact available and should use
   it.
 
-**So the order of work is:** read his manifest while he is here, and only then
+**So the order of work was:** read his manifest while he is here, and only then
 decide whether this is "the relics he is selling today" or the weaker "the relics
-he is known to sell sometimes". The first is worth building; the second may not
-be, since the wiki marker `flags.baro` already covers *sometimes* and nine items
-sit behind it.
+he is known to sell sometimes". **The manifest was read on 2026-09-04 and the
+first is now buildable** — it names one relic, `Axi M5`, at 125 Ducats and
+55,000 credits, Intact only. The weaker version stays not worth building: the
+wiki marker `flags.baro` already covers *sometimes*, and on this visit it
+over-claims by seven items out of nine.
+
+**What is not yet decided is what the row says while he is away**, which is the
+same wrong-`true` problem as the filter: twelve days in fourteen his manifest is
+empty, and a crack list that has quietly dropped its Baro errand is indistinct
+from one that never had it. `meta.baro` already ships the window, so the page can
+tell those apart — but only if the build records that it *looked* and found
+nothing, rather than emitting nothing. That distinction is the owner's call and
+is the first thing to settle if this is built.
 
 **The place he goes now exists**, which takes a piece off this. *How to crack
 them* gained a control strip on 2026-09-01 — tier tabs, and a checkbox per
 errand shown only when that errand is on the list: `Varzia 6` and `Trade 717`.
 Baro is a third errand in exactly that shape, so the interface half is a few
-lines rather than a design. What is still missing is the only hard part, and it
-is unchanged: **there is no such thing as a Baro relic in the payload.**
-`flags.baro` sits on nine *items* and means "he sometimes sells this Prime", so
-a box built on it would sit beside Varzia's answering a visibly different
-question. That is why it was left out rather than approximated — see
-`PROJECT.md §7`.
+lines rather than a design. **The hard part is no longer hard.** This paragraph
+said "there is no such thing as a Baro relic in the payload" and that a box built
+on `flags.baro` would answer a visibly different question from Varzia's — the
+second half still holds, but the first is now false by measurement. A Baro relic
+is nameable from first-party data: `VoidTraders[0].Manifest` gives the
+uniqueName, `ExportRelicArcane_en.json` gives the relic name, and the result
+(`Axi M5`) is already a key in `relics`. The build work is a manifest fetch plus
+a `resurgence`-shaped flag; the box then answers exactly the question Varzia's
+does, which is what made it worth doing. `PROJECT.md §7` has why the
+`flags.baro` version was refused.
 
 Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still
