@@ -3495,6 +3495,42 @@ feeds rather than beside the relic join that consumes it, because
 `fell_back_to_cache` is read a few lines below and an assignment after that
 point would have been silently too late.
 
+**How often does he actually carry a relic? Rarely — 13.4% of visits.** The
+build shipped against a single sample, and the owner pointed out that the wiki
+keeps per-visit history, which settles it without waiting a fortnight.
+`Module:Baro/data` is a Lua table rather than prose — every item carries a `Type`
+and the list of dates it was offered on — so it can be counted deterministically.
+Read for research only; it is **not** wired into the build and prose sources stay
+out of the pipeline (§2).
+
+Over **313 visits, 2015-02-20 to 2026-09-04**:
+
+| relics offered on a visit | visits |
+|---|---|
+| **none** | **271 (86.6%)** |
+| one | 37 |
+| two | 3 |
+| three | 2 |
+
+Six relics have ever been offered in eleven years — Axi A2, A5, A8, M5, V8 and
+Neo O1 — and **since 2024 it has been Axi M5 and nothing else**, on 15 of 76
+visits. The wiki also lists 2026-09-04's offering as Axi M5, which is an
+independent confirmation of what `build_baro_relics` read off his manifest that
+day: two sources, same answer, and the wiki was edited three minutes after he
+arrived.
+
+Three design consequences, all of which happen to favour what was already built:
+
+- **The errand control is absent far more often than it is present**, and not
+  only while he is away — on roughly seven visits in eight he is standing on the
+  relay with no relic at all. `STYLE.md §6`'s "only offer a control for something
+  in front of you" is doing more work here than it looked like it was.
+- **Sharing Varzia's sort bucket is safe.** The worst case ever recorded is three
+  rows, against her six.
+- **Nothing needs re-reading if he turns up with a longer list**, which was the
+  open worry: `build_baro_relics` returns a set and the control counts it, and
+  the historical ceiling is three.
+
 **The general lesson, which is the reason this is written down at length:** this
 was the *third* instance of the same trap in one project, and the second found
 in a single day — `from_chain` closed it for the feeds on 2026-08-28,

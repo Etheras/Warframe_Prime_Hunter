@@ -194,7 +194,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
-| Baro is on the crack list, and one thing about it is still unknown | **shipped 2026-09-04** — what is left is whether one relic a visit is his habit, answerable only while he is here (~09-18) |
+| Baro's item-level marker still over-claims, and now there is a number for it | the relic half shipped 2026-09-04 and the "how often" question is settled from the wiki's own per-visit history — 271 of 313 visits carry no relic at all |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -884,28 +884,16 @@ The control is the other half. The crosshair is a two-state `role="checkbox"`
 different control or a modifier — plus a line in `STYLE.md`, since a new colour with
 a new meaning is exactly what that document exists to arbitrate.
 
-### Baro is on the crack list, and one thing about it is still unknown
+### Baro's item-level marker still over-claims, and now there is a number for it
 
-**The entry that stood here — *Baro's relics should be crackable, the way
-Varzia's are*, asked for by the owner 2026-09-01 — shipped on 2026-09-04 and its
-reasoning is in `PROJECT.md §7`** under *Baro's shelf is published too, and only
-while he is standing on it*. What is left is the one thing a single visit could
-not answer.
+**The relic half is done and settled** — *Baro's relics should be crackable, the
+way Varzia's are* shipped 2026-09-04 and its reasoning is in `PROJECT.md §7`,
+along with the answer to *"is one relic per visit his habit"*, which the owner
+pointed at the wiki to settle rather than waiting for another visit. Short
+version: **no relic at all is the norm** (271 of 313 visits), one is the usual
+case when there is any, and three is the most he has ever carried.
 
-**Is one relic per visit his habit, or was it this fortnight's draw?** Measured
-2026-09-04: 41 manifest rows, exactly one of them a relic. Everything built
-handles any number — `build_baro_relics` returns a set and the errand control
-counts it — so nothing breaks either way. But two things downstream were sized
-against "a short list" rather than reasoned from evidence: he shares Varzia's
-sort bucket, and his control sits between hers and Trade. If he turns up with
-fifteen relics one fortnight, both are worth re-reading.
-
-**Cheap to answer and it has to be done live**: he returns around **2026-09-18**,
-and `data/feed-log.json` will not help — it records which source answered, not
-what was in it. One `python -c` against `VoidTraders[0].Manifest` while he is
-present, and the count goes in this entry. Three or four visits would settle it.
-
-**The item-level marker is a separate question and is still open.** `flags.baro`
+**The item-level marker is the part still open.** `flags.baro`
 comes from the wiki and means "he sometimes sells this Prime"; it sits on nine
 items, and on the 2026-09-04 visit his actual stock covered two of them. That
 gap is now measured rather than suspected, but nothing has been decided about
