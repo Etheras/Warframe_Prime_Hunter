@@ -608,22 +608,25 @@ his arrival is right without a reload.
 
 **The stock is published, and it was read on 2026-09-04.** Measured 13:24Z, 24
 minutes into the window: `VoidTraders[0].Manifest` holds **41 entries**, against
-the 0 measured on 2026-08-27. It is real stock, not a placeholder. Each entry is
-four keys — `ItemType`, `PrimePrice` (Ducats), `RegularPrice` (credits), `Limit`
-— and `ItemType` is a `/Lotus/StoreItems/...` path, not a display name.
+the 0 measured on 2026-08-27. It is real stock, not a placeholder. An entry is
+**three** keys — `ItemType`, `PrimePrice` (Ducats), `RegularPrice` (credits) —
+and `ItemType` is a `/Lotus/StoreItems/...` path, not a display name. **`Limit`
+is optional and appeared on exactly one of the 41 rows**, the `BaroTreasureBox`,
+at `1`. Do not write a reader that assumes it: 40 of 41 rows do not have it.
 
-**Exactly one of the 41 is a relic**, and it is the only row this project has any
-use for:
+**Exactly one of the 41 is a relic** — counted, not eyeballed — and it is the
+only row this project has any use for:
 
 ```json
 {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze",
- "PrimePrice": 125, "RegularPrice": 55000, "Limit": 1}
+ "PrimePrice": 125, "RegularPrice": 55000}
 ```
 
 The other 40 are mods, skins, ship decorations, Prisma/Vandal/Wraith weapons and
 a `BaroTreasureBox` — nothing the catalogue models. So *"what is he really
-selling"* is answerable, and the honest answer is **one relic per visit**, not a
-shelf.
+selling"* is answerable, and on this visit the answer is **one relic**, not a
+shelf. Whether that is his habit or this fortnight's draw needs a second sample
+— see the note at the end of this entry.
 
 **That relic resolves to `Axi M5`, first-party, with no wiki marker and no WFCD.**
 `ExportRelicArcane_en.json` — a manifest DE already list in the export index and
@@ -649,11 +652,29 @@ Prime — he is not selling anything for today. So *sometimes* and *today* diffe
 by seven items out of nine on this visit, which is the measurement the
 "today versus sometimes" choice below was waiting for.
 
-Raw captures taken during the window (DE worldstate, the isolated `VoidTraders`
-block, WFCD's `voidTrader`, and `ExportRelicArcane_en.json`) are **not in the
-repo** — they were taken to a scratchpad and the decisive rows quoted above.
-`Manifest` empties again at 2026-09-06T13:00Z and he returns around 2026-09-18,
-so if a fixture is wanted for a test, it has to be committed before then.
+**The raw captures were deliberately not committed, and this entry is the
+record instead.** DE's worldstate, the isolated `VoidTraders` block, WFCD's
+`voidTrader` and `ExportRelicArcane_en.json` were all captured verbatim during
+the window and then discarded. `.gitignore` opens by saying DE's game data is
+not redistributed here — it is why `data/prime-data.js` and `assets/img/` are
+excluded — and `git log` confirms no DE data has ever been tracked: the only
+upstream-shaped file ever committed was `data/feed-log.json`, our own record,
+and that was untracked again on 2026-09-01. A 3.2 MB DE manifest checked in as a
+test fixture would be the first exception to a policy the repository states in
+its own first sentence, so it was not made. **What is preserved is what is
+quoted above**: the counts, the entry shape, the relic row verbatim, and the
+resolution path. That is enough to build against without holding DE's data.
+
+**What was seen and not written down**: the other 40 manifest rows — mods,
+skins, ship decorations, Prisma/Vandal/Wraith weapons, two 2026 TennoCon items
+and the treasure box. None is a Prime part or a relic, so none joins to
+anything in this catalogue. They are omitted on purpose, not lost.
+
+`Manifest` empties again at **2026-09-06T13:00Z** and he returns around
+**2026-09-18**. Anything that needs a live manifest — a fixture, a second
+sample to confirm "one relic per visit" is the rule rather than this visit's
+accident — has to be taken then. **One visit is one data point**: that it was a
+single relic this time is measured, that it is always one is not.
 
 **The proposal has two halves and only one is safe.** Disabling the checkbox while
 he is away changes what the flag means, and he is present roughly two days in
@@ -752,9 +773,10 @@ Baro wants exactly that shape with a different badge.
   a relic), and `ExportRelicArcane_en.json` — a first-party manifest already
   named in the export index, not currently fetched — resolves that row to
   **`Axi M5`** with a reward table matching the payload's. See the entry above
-  for the verbatim row. What remains true is the shape of the problem: it is
-  **one relic per visit**, so a Baro errand is a much smaller list than Varzia's
-  six, and the manifest is empty for twelve days in every fourteen — a build
+  for the verbatim row. What remains true is the shape of the problem: it was
+  **one relic on this visit** — one sample, not a proven rule — so a Baro errand
+  is likely a much shorter list than Varzia's six, and the manifest is empty for
+  twelve days in every fourteen — a build
   that runs while he is away sees nothing and must not conclude "no Baro relics
   exist".
 - **He is only there two days a fortnight.** Varzia is continuous, so her relics
