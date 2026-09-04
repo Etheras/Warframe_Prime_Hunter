@@ -255,7 +255,7 @@ of a worklist, not of the click, and worth deciding on its own merits.
 | Entry | Waiting on |
 |---|---|
 | Plague Star and Profit-Taker are the same shape, modelled two ways | **Plague Star, and it has a date: 2026-09-09 to 2026-09-23** |
-| The Ghoul and Plague Star detection has never seen a live event | **the same window — 2026-09-09 to 2026-09-23.** The `tag` half can be done before it opens, and should be |
+| The Ghoul and Plague Star detection has never seen a live event | **2026-09-09 to 09-23.** The `tag` half is **done, 2026-09-04** — it was coverage rather than code, and it found that DE's path form was untested and the tag branch untested. What is left needs the event |
 | Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
 
 **Two of those three now have a date, given by the owner on 2026-09-02 from DE's
@@ -268,10 +268,16 @@ while the event is live, and the thing being observed is *what the worldstate
 looks like* — which cannot be reconstructed afterwards from a memory of having
 looked. So the preparation is the part with a deadline:
 
-- **Land the `tag` half first.** It needs no event, it is described in its own
-  entry, and matching on `tag` before the keyword scan means the first sighting
-  yields a permanent identifier instead of another guess. Doing it after the event
-  opens wastes the only thing the window supplies.
+- ~~**Land the `tag` half first.**~~ **Done 2026-09-04, five days early.** The
+  matching it asked for already existed; what was missing was coverage, and
+  writing it found two untested things — DE's `Desc` is an internal path where
+  every test fed prose, and the tag branch had never been exercised at all
+  because `EVENT_TAGS` is empty until something is seen. Both are tested now,
+  and the entry below records a third finding that is **not** fixed: the
+  syndicate half of the detector cannot fire when DE answer.
+- **Capture the tag itself when it appears.** The build already logs
+  `bounties: ! <event> is running and DE tag it '<tag>'`; put that tag into
+  `EVENT_TAGS` as a fact. Nothing else in the window is cheaper or more durable.
 - **Capture the whole entry, not the answer.** Save the raw `/pc/events` and
   `/pc/syndicateMissions` rows for Plague Star verbatim into `PROJECT.md` — `tag`,
   `node`, `maximumScore`, `interimSteps`, `rewards[]`, `activation`, `expiry`. A
@@ -1865,10 +1871,53 @@ hand to do it; nothing reads it yet.
 platforms. Everything below was written not knowing when, or whether, that would
 happen — read it as a plan with a start date now rather than as a wait.
 
-**Do the `tag` half before the 9th.** It is the one piece that needs no event, and
-landing it first is what turns the sighting into a permanent identifier instead of
-one more keyword guess. Doing it during the window spends the window on work that
-did not need it.
+**The `tag` half was done on 2026-09-04, before the window.** What it turned out
+to be is not what this entry expected, because the matching it asks for was
+already shipped — `find_live_events` consults `EVENT_TAGS` before the scan, and
+`events_from_worldstate` already extracts `Tag` from `Goals`. **A `TODO.md` entry
+is not evidence**, and this one described work that existed.
+
+What was actually missing was **coverage**, and two real gaps came out of writing
+it:
+
+- **Two shapes reach the detector and only one was ever tested.** `world_events`
+  comes through `from_chain`, so DE give `Goals` — where `Desc` is an internal
+  path, `/Lotus/Language/Alerts/TacAlertWaterFight`, observed live on
+  2026-09-04 — while the WFCD proxy gives English prose. Every test fed it
+  prose. The patterns survive the path form only because `plague\s*star` matches
+  `PlagueStar` with `\s*` taking zero characters; tightening it to `\s+` goes
+  blind on the source that is asked **first**, and the old prose test keeps
+  passing while it does. Verified by making exactly that change and watching the
+  new test go red.
+- **The tag branch had no coverage at all**, because `EVENT_TAGS` is empty until
+  something is seen, so nothing exercised it. It is now tested with a planted
+  tag: a known tag decides alone, a tag naming another event beats a keyword that
+  agrees, and an **unknown tag falls through to the scan** rather than reading as
+  "not this" — which is the failure the empty map exists to avoid.
+
+**And a finding that is not fixed, because it is a behaviour change and the
+owner decides.** The syndicate half of `find_live_events` scans
+`entry["syndicate"]` for the keyword. Under DE's reader that field holds the
+*mapped* faction name, and the four in `SYNDICATE_TAGS` — `Ostrons`,
+`Solaris United`, `Entrati`, `The Holdfasts` — are the factions that **give
+out** bounties, which is why they are the ones kept. None of their names
+contains "ghoul" or "plague star", so **when DE answer, that half cannot fire**.
+It only works when the WFCD proxy answers and passes `GhoulEmergenceSyndicate`
+through raw. The comment above it still describes WFCD's behaviour and has done
+since bounties moved to DE's worldstate on 2026-08-27.
+
+**It matters much less than it first looks, and the owner's point is why.**
+Plague Star's bounty is handed out by **Ostrons**, so it arrives as an ordinary
+`CetusSyndicate` job rather than as an event syndicate of its own — there is no
+"Plague Star syndicate" for that scan to find, and there never was. The syndicate
+path was only ever the *Ghoul Purge* path, since a purge does get its own
+`GhoulEmergenceSyndicate`. For Plague Star, `Goals` is the whole detector, and
+`Goals` works and carries the tag.
+
+Measured 2026-09-04: no unmapped syndicate currently carries jobs, so nothing is
+being lost today, and the bounty rows themselves are present all year — the drop
+tables carry `Level 15 - 25 Plague Star` and both Ghoul tiers with no event
+running, which is precisely why the gating exists.
 
 The bounty clock and the event gating both shipped on 2026-08-12
 (`PROJECT.md §7`). One part of it is unverified and cannot be verified on demand:

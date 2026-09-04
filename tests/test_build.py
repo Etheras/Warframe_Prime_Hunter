@@ -1551,6 +1551,85 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
 
 
+def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> None:
+    """
+    Operation Plague Star runs 2026-09-09 to 09-23 and carries 26 relics, more
+    than any other bounty. This is the half of that work that needs no event,
+    done on 2026-09-04 while none of ours was running.
+
+    **Two shapes reach `find_live_events`, not one**, and only one of them was
+    ever tested. `world_events` comes through `from_chain`: Digital Extremes give
+    `Goals`, where `Desc` is an internal path — `/Lotus/Language/Alerts/
+    TacAlertWaterFight`, observed live on 2026-09-04 — while the WFCD proxy gives
+    English prose. The patterns were written against prose. They happen to
+    survive the path form because `plague\\s*star` matches `PlagueStar` with
+    `\\s*` taking zero characters, and that is luck worth pinning down: a pattern
+    tightened to `plague\\s+star` would keep passing the old test and go blind on
+    the source that answers first.
+
+    **And the tag branch had no coverage at all**, because `EVENT_TAGS` is empty
+    until an event is seen, so nothing ever exercised it. It is exercised here
+    with a planted tag instead.
+    """
+    de_shape = [{
+        "tag": "PlagueStar", "node": "Cetus (Earth)",
+        "description": "/Lotus/Language/Alerts/TacAlertPlagueStar",
+        "tooltip": "", "name": "PlagueStar",
+        "activation": "2026-09-09T00:00:00Z", "expiry": "2026-09-23T00:00:00Z",
+    }]
+    found = build_data.find_live_events(de_shape, [])
+    check("event: found in Digital Extremes' shape, where Desc is a path",
+          found.get("Plague Star", {}).get("expiry"), "2026-09-23T00:00:00Z",
+          "DE do not publish prose; a pattern that needs a space goes blind here")
+    check("event: and the tag is recorded, which is the point of the exercise",
+          found["Plague Star"].get("tag"), "PlagueStar",
+          "the first sighting has to leave a permanent identifier behind")
+
+    wfcd_shape = [{"description": "Operation: Plague Star", "node": "Cetus (Earth)",
+                   "activation": "2026-09-09T00:00:00Z",
+                   "expiry": "2026-09-23T00:00:00Z"}]
+    check("event: and still found in the proxy's prose shape",
+          "Plague Star" in build_data.find_live_events(wfcd_shape, []), True,
+          "the proxy answers most CI builds, so both shapes are live")
+
+    # The tag branch: a known tag decides on its own, and the text need not match.
+    planted = {"InfestedPlainsTag": "Plague Star"}
+    saved = dict(build_data.EVENT_TAGS)
+    try:
+        build_data.EVENT_TAGS.clear()
+        build_data.EVENT_TAGS.update(planted)
+        nameless = [{"tag": "InfestedPlainsTag", "description": "", "tooltip": "",
+                     "name": "", "node": "",
+                     "activation": "2026-09-09T00:00:00Z",
+                     "expiry": "2026-09-23T00:00:00Z"}]
+        check("event: a known tag identifies it with nothing else to go on",
+              "Plague Star" in build_data.find_live_events(nameless, []), True,
+              "this is what a sighting buys: prose DE can reword stops mattering")
+
+        # A tag DE gave to something else must not be read as ours.
+        wrong = [{"tag": "InfestedPlainsTag", "description": "ghoul ghoul ghoul",
+                  "tooltip": "", "name": "", "node": "",
+                  "activation": "2026-09-09T00:00:00Z",
+                  "expiry": "2026-09-23T00:00:00Z"}]
+        got = build_data.find_live_events(wrong, [])
+        check("event: a tag naming another event beats a keyword that agrees",
+              sorted(got), ["Plague Star"],
+              "the tag is the machine identifier; the blob is prose and loses")
+
+        # And an UNKNOWN tag must not suppress the scan, which is the failure the
+        # empty map exists to avoid.
+        unknown = [{"tag": "SomethingNobodyHasSeen", "tooltip": "", "name": "",
+                    "node": "", "description": "/Lotus/Language/Alerts/TacAlertPlagueStar",
+                    "activation": "2026-09-09T00:00:00Z",
+                    "expiry": "2026-09-23T00:00:00Z"}]
+        check("event: an unrecognised tag falls through to the scan",
+              "Plague Star" in build_data.find_live_events(unknown, []), True,
+              "an unknown tag must read as 'no opinion', never as 'not this'")
+    finally:
+        build_data.EVENT_TAGS.clear()
+        build_data.EVENT_TAGS.update(saved)
+
+
 def test_bounties_and_events_read_from_the_first_party_worldstate() -> None:
     """
     The last two feeds off the WFCD proxy.
@@ -4085,6 +4164,7 @@ def main() -> int:
                          test_baro_sells_relics_read_off_his_own_manifest,
                          test_the_rotation_letter_is_read_then_cross_checked,
                          test_bounties_and_events_read_from_the_first_party_worldstate,
+                         test_an_event_is_recognised_by_tag_first_and_in_either_source_shape,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
