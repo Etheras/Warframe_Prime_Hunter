@@ -2263,7 +2263,7 @@
           const done = have >= need;
           return `<button class="add-hit part-hit${done ? " has" : ""}"
             data-got="${esc(r.it.id)}" data-part="${esc(r.p.name)}">
-            <span>${esc(r.it.name)} <b>${esc(r.p.name)}</b></span>
+            <span>${esc(r.it.name)} <b>${esc(M.partLabel(r.it.name, r.p.name))}</b></span>
             <span class="add-cat">${done ? "have" : (need > 1 ? have + "/" + need : "need")}</span>
           </button>`;
         }).join("")
@@ -2282,8 +2282,8 @@
        not work, so it says which happened. */
     const where = ST.wants(it.id) ? "" : " — not on your farm list";
     lastSaid = have >= need
-      ? `${it.name} ${p.name}: have it${where}`
-      : `${it.name} ${p.name}: ${have} of ${need}${where}`;
+      ? `${it.name} ${M.partLabel(it.name, p.name)}: have it${where}`
+      : `${it.name} ${M.partLabel(it.name, p.name)}: ${have} of ${need}${where}`;
   }
   searchBox.addEventListener("input", runSearch);
   searchBox.addEventListener("focus", runSearch);

@@ -451,7 +451,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 .badge.farmable{color:var(--green);border-color:#2d5a41;background:#16281e}
 .badge.resurgence{color:var(--violet);border-color:#443463;background:#211a30}
 .badge.vaulted{color:var(--txt-dim);border-color:#333c4c;background:#171c26}
-.badge.baro{color:var(--blue);border-color:#2b4b68;background:#141f2b}
+/* Two Baro badges, and the difference between them is the whole point.
+   `.baronow` is the live one - he is on a relay with a relic for this Prime -
+   and keeps the blue it has always had. `.baro` is the wiki's "he sometimes
+   sells this", which is true of nine items and true of *today* for almost none
+   of them, so it takes the same dim grey as VAULTED: it sits beside VAULTED and
+   says the same kind of thing, that this is not a route you can take now. */
+.badge.baronow{color:var(--blue);border-color:#2b4b68;background:#141f2b}
+.badge.baro{color:var(--txt-dim);border-color:#333c4c;background:#171c26}
 .badge.founder{color:var(--gold);border-color:var(--gold-dim);background:#241d0e}
 .badge.special{color:var(--teal);border-color:#2a5a55;background:#132522}
 .badge.perm{color:var(--teal);border-color:#2a5a55;background:#132522}

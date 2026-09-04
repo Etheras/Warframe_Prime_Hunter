@@ -97,15 +97,25 @@ permissions:
 
 # Deployments to Pages have to serialise, so every run shares one group.
 #
-# **A cancelled ten-minute refresh is normal and is not a fault.** GitHub keeps
-# only one run pending per group: when a refresh is still waiting for a runner
-# and a newer run arrives, the older one is cancelled — and reported as
-# `failure`, which is what a red mark in the Actions tab against a scheduled run
-# usually means here. Dropping a superseded fissure refresh in favour of a newer
-# one is the right outcome; the data the cancelled run would have published was
-# staler than the data that replaced it. Observed on 2026-08-24: a 13:41 refresh
-# waited thirteen minutes for a runner, never ran a step, and was cancelled when
-# the 13:54 push queued behind it.
+# **A cancelled ten-minute refresh is not a fault, but do not assume that is what
+# a red mark means — it usually is not.** GitHub keeps only one run pending per
+# group: when a refresh is still waiting for a runner and a newer run arrives,
+# the older one is cancelled and reported as `failure`. Dropping a superseded
+# fissure refresh in favour of a newer one is the right outcome; the data it
+# would have published was staler than the data that replaced it. Observed
+# 2026-08-24: a 13:41 refresh waited thirteen minutes for a runner, never ran a
+# step, and was cancelled when the 13:54 push queued behind it.
+#
+# **This comment said "usually" until 2026-09-04 and had it backwards.** Counted
+# over every scheduled run in the repository's history: **six red marks, and five
+# of them ran all sixteen steps and failed on `Run the tests`.** Exactly one —
+# the 13:41 run above, the one this comment was written from — was superseded,
+# and it is recognisable because it ran **no steps at all**.
+#
+# So the check is cheap and worth making every time: `gh run view <id> --json
+# jobs` on a red scheduled run. Zero steps is a supersession and can be ignored;
+# a failed step is a real failure. A sentence that trains the reader to shrug at
+# five failures out of six is worse than no sentence.
 concurrency:
   group: pages
   cancel-in-progress: false

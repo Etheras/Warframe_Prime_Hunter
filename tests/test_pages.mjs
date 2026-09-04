@@ -1177,6 +1177,91 @@ page_test("the errand boxes appear only when there is that errand to hide", asyn
   assert.deepEqual(errors, []);
 });
 
+page_test("a Baro badge says whether he has it now, not whether he ever has", async () => {
+  /* Reported by the owner on 2026-09-04, looking at five vaulted secondaries all
+     badged `BARO` while he was on a relay selling a relic for exactly one of
+     them. `flags.baro` is the wiki's marker for "he has sold this Prime before"
+     — nine items carry it, and over his recorded history 271 of 313 visits
+     carried no relic at all.
+
+     Both halves are staged rather than waited for, for the same reason the crack
+     list test stages them: the answer otherwise depends on the fortnight the
+     suite is run in. */
+  const { page, errors } = await open("/index.html");
+
+  // Two subjects from raw payload properties: a Prime the staged shelf covers,
+  // and one it does not. Never "the first card", and never a named Prime.
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const flagged = D.items.filter((it) => (it.flags || {}).baro
+                                           && (it.relics || []).length);
+    const mine = flagged.find((it) => it.relics.length);
+    if (!mine) return null;
+    const other = flagged.find((it) =>
+      it.id !== mine.id && !it.relics.some((n) => mine.relics.includes(n)));
+    return other ? { relic: mine.relics[0], mine: mine.id, other: other.id } : null;
+  });
+  assert.ok(subject, "no pair of Baro-flagged Primes with disjoint relics — pick another property");
+
+  /* Clears every existing `baro` flag before setting the staged one. Without
+     that this is not a controlled scenario: the payload on disk may genuinely
+     have a relic on his shelf today, and the "he is not selling this" subject
+     then correctly says he is — which is exactly how this test failed first. */
+  const stage = (relic, from, to) => page.addInitScript(
+    ([rname, act, exp]) => {
+      let held;
+      Object.defineProperty(window, "WFPRIME_DATA", {
+        configurable: true,
+        get() { return held; },
+        set(next) {
+          if (next && next.relics) {
+            Object.keys(next.relics).forEach((n) => { next.relics[n].baro = false; });
+            if (next.relics[rname]) next.relics[rname].baro = true;
+          }
+          if (next && next.meta) {
+            next.meta.baro = { activation: act, expiry: exp,
+                               node: "EarthHUB", character: "Baro'Ki Teel" };
+          }
+          held = next;
+        },
+      });
+    }, [relic, from, to]);
+
+  const badgesOf = (id) => page.evaluate((i) =>
+    [...document.querySelectorAll(`[data-id="${i}"] .badge`)].map((b) => b.textContent.trim()),
+    id);
+
+  // ── He is here, holding a relic for one of the two. ──
+  await stage(subject.relic,
+              new Date(Date.now() - 3600e3).toISOString(),
+              new Date(Date.now() + 3600e3).toISOString());
+  await page.reload({ waitUntil: "load" });
+  await setCheck(page, "#f-baro", true);
+
+  const mineNow = await badgesOf(subject.mine);
+  assert.ok(mineNow.some((b) => /HERE NOW/i.test(b)),
+    `the Prime whose relic he is holding should say so — got ${JSON.stringify(mineNow)}`);
+  const otherNow = await badgesOf(subject.other);
+  assert.ok(otherNow.some((b) => /SOMETIMES/i.test(b)),
+    `a Prime he has sold before but is not selling now must not claim he has it — got ${JSON.stringify(otherNow)}`);
+  assert.ok(!otherNow.some((b) => /HERE NOW/i.test(b)),
+    "being on the relay is not enough; he has to have this Prime's relic");
+
+  // ── He has gone. Same payload, same relic flag, and nothing claims him. ──
+  await stage(subject.relic,
+              new Date(Date.now() - 7200e3).toISOString(),
+              new Date(Date.now() - 60e3).toISOString());
+  await page.reload({ waitUntil: "load" });
+  await setCheck(page, "#f-baro", true);
+
+  const after = await badgesOf(subject.mine);
+  assert.ok(!after.some((b) => /HERE NOW/i.test(b)),
+    `with him gone nothing may say he is here — got ${JSON.stringify(after)}`);
+  assert.ok(after.some((b) => /SOMETIMES/i.test(b)),
+    "the wiki marker is still true, and still says only that");
+  assert.deepEqual(errors, []);
+});
+
 page_test("Baro's relic is on the crack list while he is here, and a trade after", async () => {
   /* The owner's decision of 2026-09-04: *we keep the relic as long as Baro is
      here, and then we forget he had it.*
@@ -1215,7 +1300,12 @@ page_test("Baro's relic is on the crack list while he is here, and a trade after
         configurable: true,
         get() { return held; },
         set(next) {
-          if (next && next.relics && next.relics[rname]) next.relics[rname].baro = true;
+          // Cleared first, so the payload's own shelf cannot make this scenario
+          // say something the test did not stage.
+          if (next && next.relics) {
+            Object.keys(next.relics).forEach((n) => { next.relics[n].baro = false; });
+            if (next.relics[rname]) next.relics[rname].baro = true;
+          }
           if (next && next.meta) {
             next.meta.baro = { activation: act, expiry: exp,
                                node: "EarthHUB", character: "Baro'Ki Teel" };

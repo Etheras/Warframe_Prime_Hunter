@@ -512,12 +512,39 @@
         + " have renamed or added one.";
   }
 
+  /* A part named beside its own Prime, without saying the Prime twice.
+     "Kavasa Prime Collar" + "Kavasa Prime Band" reads as
+     *"Kavasa Prime Collar Kavasa Prime Band"* wherever the two are concatenated,
+     which is the search results and the line that says what a tick did.
+
+     **One item of 167 needs this**, and it is the same one that is odd
+     everywhere else: Kavasa Prime Collar is the only Prime whose part names
+     carry the Prime's name, and the only one with no recipe in DE's export
+     (`tools/sources.py`). Checked against the built payload rather than assumed.
+
+     Whole leading words only, and compared word by word rather than by string
+     prefix — the obvious rule, "drop it when the part starts with the item
+     name", does not fire here: the part is `Kavasa Prime Band` and the item is
+     `Kavasa Prime Collar`, so the shared part is `Kavasa Prime` and neither is
+     a prefix of the other. Returns the part unchanged when nothing is shared,
+     which is every other Prime, and never returns empty. */
+  function partLabel(itemName, partName) {
+    const item = String(itemName || "").trim().split(/\s+/);
+    const part = String(partName || "").trim().split(/\s+/);
+    let i = 0;
+    while (i < item.length && i < part.length
+           && item[i].toLowerCase() === part[i].toLowerCase()) i += 1;
+    // Never eat the whole part name: "Blueprint" against a Prime called
+    // "Blueprint" would leave the row with nothing to show.
+    return i && i < part.length ? part.slice(i).join(" ") : String(partName || "");
+  }
+
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
-    REDUNDANCY_WEIGHT, creditRelics,
+    REDUNDANCY_WEIGHT, creditRelics, partLabel,
     FILTER_SHAPE,
   };
 })();

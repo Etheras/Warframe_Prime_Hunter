@@ -47,6 +47,25 @@ VAULTED` teal it would otherwise wear. Two badges, one colour, one meaning —
 *you will need a ship*. Choosing a different colour for the card would have made
 them look like two unrelated facts.
 
+**A badge that says "sometimes" must not look like one that says "now."** Added
+2026-09-04, from the owner looking at five vaulted secondaries all wearing a
+blue `BARO` while Baro was on a relay selling a relic for exactly one of them —
+*"why are there so many Baro items, although they are not available from Baro?"*
+The flag behind it is the wiki's marker for **"he has sold this before"**, which
+is true of nine Primes and true of today for almost none of them.
+
+So there are two badges. `BARO — HERE NOW` keeps `--blue`, the colour Baro
+already owns on both pages, and is shown only when his live manifest holds a
+relic for that Prime **and** the page's own clock puts him on a relay. `BARO
+SOMETIMES` takes `--txt-dim`, the same grey as `VAULTED`, because it sits beside
+`VAULTED` and says the same kind of thing: *not a route you can take now*.
+
+The general rule, which is the part worth keeping: **colour is for what the
+reader can act on.** A marker about history wearing the colour of a live
+opportunity is a wrong claim made in the one channel a reader takes in without
+reading — and the measurement says how wrong: 271 of his 313 recorded visits
+carried no relic at all.
+
 **A rule that does not apply everywhere gets `--odd` amber** (`#e4bf9a`).
 Used on the rotation label of mission types that break the A→A→B→C cycle — currently
 only Disruption. It means "this one works differently, hover me", not "warning" and

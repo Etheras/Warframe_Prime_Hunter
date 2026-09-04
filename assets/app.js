@@ -359,7 +359,10 @@
        it was carried across into a place that has the room. */
     resurgence: ["resurgence", "RESURGENCE"],
     vaulted: ["vaulted", "VAULTED"],
-    baro: ["baro", "BARO"],
+    /* "Sometimes" is the honest word and the badge now uses it. `BARO` on its
+       own claimed availability the flag does not carry — see `badgesOf`. */
+    baro: ["baro", "BARO SOMETIMES"],
+    baronow: ["baronow", "BARO — HERE NOW"],
     founder: ["founder", "FOUNDER EXCLUSIVE"],
     special: ["special", "OTHER SOURCE"],
     vaultsoon: ["vaultsoon", "VAULTING SOON"],
@@ -388,8 +391,35 @@
        "its relics keep dropping indefinitely". Worked out from the drop table
        in rotation.js, not from the markers. */
     if (f.permanent) out.push(ROT.railjackOnly(it, RELICS) ? "railjack" : "perm");
-    if (f.baro) out.push("baro");
+    /* Two Baro badges, because `flags.baro` answers a different question from
+       the one a reader asks looking at a card.
+
+       **Reported by the owner 2026-09-04**, looking at five vaulted secondaries
+       all badged `BARO` while he was on a relay selling a relic for exactly one
+       of them: *"why are there so many Baro items, although they are not
+       available from Baro?"* `flags.baro` is the wiki's `[[Baro Ki'Teer|B]]`
+       marker and means **"he sometimes sells this Prime"** — it sits on nine
+       items and says nothing about today. Beside `VAULTED`, a bare `BARO` reads
+       as an availability claim, and it is wrong about eight of those nine most
+       of the time.
+
+       Measured over his whole recorded history (`PROJECT.md §7`): 271 of 313
+       visits carried **no relic at all**, and one is the usual number when there
+       is any. So "sometimes" is doing a lot of work and the badge should say so.
+
+       `baronow` is decided the same way the crack list decides it — his actual
+       manifest (`relics[n].baro`) **and** the page's own clock, both, so the
+       badge goes back to "sometimes" the moment he leaves with no rebuild. */
+    if (f.baro) out.push(baroSellingNow(it) ? "baronow" : "baro");
     return out;
+  }
+
+  /* Is Baro on a relay right now with a relic that holds a part of this Prime?
+     Same window helper as the filter and the planner, so the three cannot
+     disagree about whether he is here. */
+  function baroSellingNow(it) {
+    if (!baroIsHere()) return false;
+    return (it.relics || []).some((n) => (RELICS[n] || {}).baro);
   }
 
   const VAULT_SOON_WHY =
@@ -915,10 +945,17 @@
     } else if (f.farmable) {
       html += `<div class="d-callout good"><b>Farmable now.</b> Its relics drop in the
         missions listed below — no Aya needed.</div>`;
+    } else if (f.baro && baroSellingNow(it)) {
+      html += `<div class="d-callout res"><b>Baro Ki'Teer has it right now.</b> He is on a
+        relay ${esc((baroWindow().text || "").replace(/^here /, "for "))} and is selling a
+        relic for this Prime, for Ducats and Credits — both farmed. See
+        <b>How to crack them</b> on the planner.${
+          it.acquisition ? " " + esc(it.acquisition) : ""}</div>`;
     } else if (f.baro) {
-      html += `<div class="d-callout"><b>Baro Ki'Teer.</b> Sold by the Void Trader when he
-        visits, for Ducats and Credits. His stock changes every visit, so it's a matter of
-        catching the right one.${it.acquisition ? " " + esc(it.acquisition) : ""}</div>`;
+      html += `<div class="d-callout"><b>Baro Ki'Teer — sometimes.</b> The wiki marks this
+        Prime as one he has sold before, not one he is selling now. He carries a relic on
+        about one visit in eight, and one at a time, so this is a thing to watch for rather
+        than a route you can take.${it.acquisition ? " " + esc(it.acquisition) : ""}</div>`;
     } else if (f.special) {
       html += `<div class="d-callout vault"><b>Not from relics.</b> ${
         it.acquisition

@@ -912,8 +912,22 @@ says so.
   task. At ten minutes they are as good as live; hourly they were mostly right;
   daily there are never any.
 - The **"this data is old" banner** the task also exists to prevent gets the same
-  cover for free. It is patient for 14 days, so at 144 runs a day the margin is
-  absurd — which is fine, because the margin was never the binding constraint.
+  cover for free. It is patient for 14 days, so at anything like this cadence the
+  margin is absurd — which is fine, because the margin was never the binding
+  constraint.
+
+**What is actually delivered, measured rather than assumed.** `*/10` asks for 144
+runs a day and **GitHub does not deliver them** — scheduled workflows are best
+effort and are dropped under load. Counted over 26.7 days before the dispatch
+existed, the ten-minute cron delivered about **4.7 runs a day**, roughly 3% of
+what it asked for. What closed the gap is the `workflow_dispatch` from the
+owner's machine (`tools/schedule.ps1`), which is delivered exactly: 45 of 45 on a
+ten-minute rhythm when it was first measured. The deployed `data/feed-log.json`
+holds one row per build and is the place to check: **131 rows over the 24 hours
+to 2026-09-04T19:10Z**, and the shape of them says the rest — six an hour while
+that machine is awake, **nought or one an hour while it sleeps**, which is
+GitHub's cron on its own. So "144 a day" is now roughly true and is true because
+of the dispatch, not because of the cron.
 
 **Why that is not rude.** The one source polled every run is
 `api.warframestat.us/pc/fissures`, and it is 5× slower than what that endpoint asks

@@ -449,20 +449,24 @@ but the test is not what is holding it that way.
 **Size: small.** Assert on the job's step *list* — that every `run:` in the
 write-token job is one of a named allowlist — rather than on phrases.
 
-### Two figures the workflows reason from are wrong
+### Two figures the workflows reason from were wrong **[both fixed 2026-09-04]**
 
-- **`144 runs a day`** (`publish.yml:110`, `wiki.yml:15`, `PROJECT.md:836/901/904`,
-  `CLAUDE.md:530`) is four to six times what GitHub actually delivers; the
-  deployed feed log holds **23 rows**, not ~144. Scheduled workflows are
-  best-effort and skipped under load. Nothing depends on the number arithmetically
-  — but *"how often do DE answer"* is measured against it.
-- **`publish.yml:53`** says a red mark on a scheduled run *"usually"* means a
-  superseded refresh. Over 200 runs, **5 of the 6 scheduled red marks were real
-  test failures**. The sentence trains the reader to ignore exactly the signal
-  they should read.
+Kept only to record that the first one **fixed itself** and this entry was the
+stale thing by the end.
 
-**Size: small**, both — but the second is the one worth doing, because it is
-advice to disregard a failure.
+- **`144 runs a day`** was called "four to six times what GitHub delivers, the
+  feed log holds 23 rows". Re-measured 2026-09-04: the log holds **131 rows in
+  24 hours**. The figure became roughly true when the `workflow_dispatch` from
+  the owner's machine started forcing the refresh GitHub's scheduler drops — six
+  an hour while that machine is awake, nought or one while it sleeps. So the
+  number is right and the *reason* was wrong, which `PROJECT.md §6` now states
+  with the measurement.
+- **The "usually superseded" advice** is corrected, and the count was worth
+  making exactly: **six red scheduled runs in the repository's history, five of
+  which ran all sixteen steps and failed on `Run the tests`.** One was
+  superseded. The distinguishing signal is in the comment now — a superseded run
+  ran **no steps at all**, so `gh run view <id> --json jobs` settles it in one
+  command.
 
 ### Smaller things, all confirmed
 
@@ -899,7 +903,18 @@ pointed at the wiki to settle rather than waiting for another visit. Short
 version: **no relic at all is the norm** (271 of 313 visits), one is the usual
 case when there is any, and three is the most he has ever carried.
 
-**The item-level marker is the part still open.** `flags.baro`
+**The badge half shipped 2026-09-04**, reported by the owner from the collection
+view: five vaulted secondaries all wearing a blue `BARO` while he was on a relay
+selling a relic for exactly one of them — *"why are there so many Baro items,
+although they are not available from Baro?"* There are two badges now.
+`BARO — HERE NOW` is `--blue` and is shown only when his live manifest holds a
+relic for that Prime **and** the page's clock puts him on a relay; `BARO
+SOMETIMES` is `--txt-dim`, the same grey as the `VAULTED` beside it, because it
+says the same kind of thing. `STYLE.md` has the rule it generalises to: colour is
+for what the reader can act on. Verified in the browser — of the nine, exactly
+Akmagnus and Magnus Prime (both fed by `Axi M5`) read *here now*.
+
+**What is still open is the flag itself, not how it is drawn.** `flags.baro`
 comes from the wiki and means "he sometimes sells this Prime"; it sits on nine
 items, and on the 2026-09-04 visit his actual stock covered two of them. That
 gap is now measured rather than suspected, but nothing has been decided about

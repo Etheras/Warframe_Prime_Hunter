@@ -671,3 +671,43 @@ test("nothing to compare against is not a redundancy", () => {
   assert.equal(empty.spent.length, 1, "still just A21");
   assert.equal(empty.spent[0].name, "Axi A21");
 });
+
+test("a part is named beside its Prime without saying the Prime twice", () => {
+  const M = load();
+
+  /* The case this exists for. One Prime of 167 carries its own name in its part
+     names, so the search row read "Kavasa Prime Collar Kavasa Prime Band". */
+  assert.equal(M.partLabel("Kavasa Prime Collar", "Kavasa Prime Band"), "Band");
+  assert.equal(M.partLabel("Kavasa Prime Collar", "Kavasa Prime Buckle"), "Buckle");
+
+  /* And the obvious rule does not work here, which is why it is word-by-word.
+     "Kavasa Prime Band" does not start with "Kavasa Prime Collar" — neither
+     string is a prefix of the other, and only the first two words are shared. */
+  assert.ok(!"Kavasa Prime Band".startsWith("Kavasa Prime Collar"),
+            "if this ever becomes true, the simpler rule would do");
+
+  /* Every other Prime is untouched, which is the property that matters most:
+     this must not quietly rewrite 166 labels to fix one. */
+  assert.equal(M.partLabel("Ash Prime", "Neuroptics"), "Neuroptics");
+  assert.equal(M.partLabel("Ash Prime", "Blueprint"), "Blueprint");
+  assert.equal(M.partLabel("Kavasa Prime Collar", "Blueprint"), "Blueprint");
+  assert.equal(M.partLabel("Volt Prime", "Chassis"), "Chassis");
+
+  /* Whole words only. A Prime called "Ash" must not turn "Ashen Casing" into
+     "en Casing", which a string-prefix rule would. */
+  assert.equal(M.partLabel("Ash Prime", "Ashen Casing"), "Ashen Casing");
+
+  /* Never empty: a label with nothing in it is worse than a repeated word, and
+     the row would have no text to click. */
+  assert.equal(M.partLabel("Blueprint", "Blueprint"), "Blueprint");
+  assert.equal(M.partLabel("A B", "A B"), "A B");
+
+  /* Case-insensitive, because the two names come from different upstreams -
+     DE's export and the wiki - and neither guarantees the other's casing. */
+  assert.equal(M.partLabel("KAVASA PRIME COLLAR", "Kavasa Prime Band"), "Band");
+
+  // Missing or empty inputs answer rather than throw; callers concatenate blind.
+  assert.equal(M.partLabel("", "Neuroptics"), "Neuroptics");
+  assert.equal(M.partLabel("Ash Prime", ""), "");
+  assert.equal(M.partLabel(undefined, undefined), "");
+});
