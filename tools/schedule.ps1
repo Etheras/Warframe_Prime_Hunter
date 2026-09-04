@@ -158,8 +158,84 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
     throw "Cannot find $scriptPath"
 }
 
-$action = New-ScheduledTaskAction -Execute $python `
-    -Argument "`"$scriptPath`" --if-changed" -WorkingDirectory $root
+# Every action runs behind a hidden PowerShell rather than directly, and that is
+# the whole of the fix of 2026-09-04.
+#
+# **The problem.** A task registered with the default principal runs under an
+# interactive logon, so a console application gets a real console window - which
+# appeared and took focus 144 times a day. The owner's word for it was
+# "disaster", and it is: it makes the machine unusable while the refresh runs.
+#
+# **Why not the obvious fixes.** `New-ScheduledTaskSettingsSet -Hidden` is a
+# common false lead - it hides the task in the Task Scheduler UI, not the window.
+# Running as SYSTEM (`-LogonType ServiceAccount`) or as the user without stored
+# credentials (`-LogonType S4U`) both put the task in session 0 where no window
+# can exist, and both were rejected here for two measured reasons:
+#
+#   1. `Register-ScheduledTask` returns **Access is denied** for either
+#      principal without an elevated shell, so this script would stop working
+#      for anyone running it normally - which is how README documents it.
+#   2. Neither account can read the current user's DPAPI store, and `gh` keeps
+#      its token in the Windows keyring. The dispatch action would have started
+#      failing silently, taking the ten-minute refresh with it.
+#
+# **`-WindowStyle Hidden` does not work here, and that is the whole trap.** It
+# was the first fix tried and it measures as fixed if you ask the wrong
+# question: `IsWindowVisible(GetConsoleWindow())` reports False. What is on
+# screen is not that window. Windows 11 hosts consoles in **Windows Terminal**,
+# a separate process that has its own window and does not care what PowerShell's
+# host was asked to do with the legacy console inside it.
+#
+# Measured on 2026-09-04, polling every 25 ms for any visible top-level window
+# owned by a process the task started, and separately checking a marker file to
+# prove the command actually ran - because "no window" is satisfied perfectly by
+# "nothing happened", which is how an earlier version of that test passed:
+#
+#   plain action                     windows=1 (WindowsTerminal)  ran=True
+#   powershell -WindowStyle Hidden   windows=1 (WindowsTerminal)  ran=True
+#   conhost.exe --headless           windows=0                    ran=True
+#   mshta.exe vbscript:...           windows=0                    ran=False
+#
+# So: **`conhost.exe --headless`**. It hosts the console without a window at all
+# rather than making one and hiding it, so there is nothing to flash, and the
+# child processes attach to that same headless console - which is why python and
+# gh are silent too without being wrapped individually.
+#
+# The two rejected alternatives, both of which do work:
+#   - `mshta.exe vbscript:Execute(...)` (the owner's suggestion) is genuinely
+#     windowless, but it is also the textbook signature of malware persistence,
+#     so antivirus may act on it, and mshta is deprecated. The `ran=False` above
+#     is this script's quoting, not a fault in the technique.
+#   - A `.vbs` shim run by `wscript.exe` works too and needs a tracked file plus
+#     a `.gitattributes` line, for no gain over conhost.
+#
+# `-Command` with single-quoted paths rather than `-File`: the target is an
+# arbitrary executable, not a script. Single quotes survive spaces in a path,
+# and any single quote inside one is doubled the way PowerShell requires.
+function New-HiddenAction {
+    param([string]$Exe, [string[]]$Arguments)
+    $q = { param([string]$s) "'" + ($s -replace "'", "''") + "'" }
+    $parts = @((& $q $Exe))
+    foreach ($a in $Arguments) { $parts += (& $q $a) }
+    $inner = "& " + ($parts -join " ")
+    $ps = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $inner"
+
+    # conhost ships with Windows and `--headless` is what WSL uses, so it is
+    # present anywhere this script can run. Checked rather than assumed: without
+    # it the task still works and only the window comes back, which is a
+    # cosmetic regression rather than a broken refresh.
+    $conhost = Join-Path $env:SystemRoot "System32\conhost.exe"
+    if (Test-Path -LiteralPath $conhost) {
+        return New-ScheduledTaskAction -Execute $conhost `
+            -Argument "--headless $ps" -WorkingDirectory $root
+    }
+    Write-Warning ("conhost.exe not found - the task will work but its window " +
+                   "will be visible on every run.")
+    New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument ($ps -replace "^powershell\.exe ", "") -WorkingDirectory $root
+}
+
+$action = New-HiddenAction -Exe $python -Arguments @($scriptPath, "--if-changed")
 
 # One task, two actions, in order. Task Scheduler accepts an array and runs them
 # sequentially, which is what is wanted: refresh this machine, then ask the
@@ -175,8 +251,8 @@ if ($DispatchRemote) {
     # `-f full=false` is the whole point of the switch: the light build, the same
     # path the ten-minute cron takes. Without it a dispatch rebuilds every source
     # from scratch - see the FULL expression in .github/workflows/publish.yml.
-    $actions += New-ScheduledTaskAction -Execute $gh.Source `
-        -Argument "workflow run publish.yml -f full=false" -WorkingDirectory $root
+    $actions += New-HiddenAction -Exe $gh.Source `
+        -Arguments @("workflow", "run", "publish.yml", "-f", "full=false")
 }
 
 # -Once with a repetition, rather than N daily triggers: it says "every hour" in
@@ -236,6 +312,7 @@ if ($DispatchRemote) {
     Write-Host "  then: gh workflow run publish.yml -f full=false"
     Write-Host "        (forces the deployed site to rebuild, light path)"
 }
+Write-Host "  both hosted by conhost --headless, so no window appears at all."
 Write-Host "  from: $root"
 Write-Host ""
 Write-Host "Check it:    Get-ScheduledTask -TaskName '$TaskName'"

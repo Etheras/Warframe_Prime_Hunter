@@ -53,7 +53,7 @@ was ever going to:
 | Entry | What it is | Size |
 |---|---|---|
 | ~~The freshness fingerprint asks DE directly~~ | **fixed 2026-09-04**, same day it was reported; reasoning in `PROJECT.md §7` | done |
-| The scheduled task steals focus every ten minutes | **defect** — no `-Principal` on `Register-ScheduledTask`; the S4U fix may break `gh`'s keyring and that is unmeasured | small, blocked on a decision |
+| ~~The scheduled task steals focus every ten minutes~~ | **fixed 2026-09-04** with `conhost --headless`; reasoning in `PROJECT.md §6` | done |
 | An anchor for the ten-minute refresh, from the data rather than a grid | the boundary is published (`18:00 UTC`); the grid ignores it | owner's call |
 | Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
 | Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
@@ -652,36 +652,6 @@ minutes flat, or simply add a run a minute after each known boundary on top of
 the grid. **Not decided** — it trades a simple schedule for one that has to be
 re-derived, and the owner should choose. The 18:00 UTC Resurgence flip is the
 cheapest possible first case: one extra dispatch a day, at a time the data states.
-
-### The scheduled task steals focus every ten minutes
-
-**Reported by the owner 2026-09-04, and called a disaster** — a console window
-appears and takes focus 144 times a day.
-
-`tools/schedule.ps1` calls `Register-ScheduledTask` with **no `-Principal`**
-(line ~221), so the task inherits an interactive logon token and every action
-runs as a visible console process. `New-ScheduledTaskSettingsSet -Hidden` does
-not fix this and is a common false lead: it hides the task in the Task Scheduler
-UI, not the window.
-
-**The obvious fix has a trap.** `-LogonType S4U` runs the task in session 0 with
-no window at all, but S4U grants a token with no credential material, and this
-machine's `gh` keeps its token in the **keyring** (`gh auth status` reports
-`Logged in to github.com account Etheras (keyring)`; there is no plaintext
-`~/.config/gh/hosts.yml`). DPAPI-protected secrets are typically unreadable under
-S4U, so the second action — `gh workflow run publish.yml` — would likely start
-failing silently, taking the refresh with it. **This was not measured**: the
-probe that would settle it registers a scheduled task, which the permission
-layer declined, so it stays a documented risk rather than a finding.
-
-Options, cheapest first, for the owner to pick:
-1. **`-LogonType S4U`** — no window, needs the `gh` question answered first by
-   registering one throwaway task that runs `gh auth status` and writes the
-   result to a file.
-2. **Keep the interactive logon, hide the console** — wrap both actions in
-   `powershell.exe -WindowStyle Hidden`, which suppresses the window but can
-   still flash briefly on some builds.
-3. **Move the token out of the keyring** so option 1 is safe regardless.
 
 ### Vendor `ItemType` paths have a general rule, and we found one case of it
 

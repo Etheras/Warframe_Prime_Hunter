@@ -563,7 +563,9 @@ Right-click `tools\schedule.ps1` → **Run with PowerShell**, or run this in a t
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
-That sets up a Windows scheduled task that checks **every ten minutes**. When
+That sets up a Windows scheduled task that checks **every ten minutes**, and it
+runs with **no window** — it is hosted by `conhost --headless`, so nothing
+appears or takes focus while you are working. When
 nothing has changed it sends four small requests — each one asking only for what it
 does not already have, so the usual answer is "nothing new" and no data at all —
 then rebuilds from what is on disk in about a second and a half. A full download

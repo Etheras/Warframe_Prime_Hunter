@@ -821,6 +821,75 @@ regular row structure, so the whole refresh is deterministic parsing — there i
 model in the loop and no API key to hold. A scheduled task can maintain the site
 indefinitely on its own.
 
+### The task runs with no window, and `-WindowStyle Hidden` is not how
+
+**Reported by the owner on 2026-09-04 and called a disaster**: a console window
+appeared and took focus 144 times a day, which makes the machine unusable while
+the refresh runs. Fixed the same day. It is written up at length because the
+obvious fix *measures as working and does not work*.
+
+`Register-ScheduledTask` was called with no `-Principal`, so the task ran under
+an interactive logon and every console action got a real window.
+`New-ScheduledTaskSettingsSet -Hidden` is the first false lead — it hides the
+task in the Task Scheduler UI, not the window.
+
+**The session-0 options were rejected on measurement, not on taste.** Running as
+SYSTEM (`-LogonType ServiceAccount`, which is what the reference implementation
+the owner supplied uses) or as the user without stored credentials (`S4U`) both
+put the task where no window can exist. Both are wrong here:
+
+1. `Register-ScheduledTask` returns **Access is denied** for either principal
+   without an elevated shell. `README.md` documents this script as an ordinary
+   `powershell -ExecutionPolicy Bypass -File` invocation, so it would simply
+   stop working for the documented path.
+2. Neither account can read the current user's DPAPI store, and `gh` keeps its
+   token in the Windows keyring (`gh auth status` says `(keyring)`; there is no
+   plaintext `hosts.yml`). The dispatch action would have begun failing
+   silently and taken the ten-minute refresh with it.
+
+**`-WindowStyle Hidden` was tried next and it does not work on Windows 11.** It
+is worth being precise about why, because the first measurement said it did:
+`IsWindowVisible(GetConsoleWindow())` returned False, and that is true and
+irrelevant. Windows 11 hosts consoles in **Windows Terminal**, a separate
+process with its own window, which does not care what PowerShell's host was
+asked to do with the legacy console inside it. The hidden thing was not the
+thing on screen.
+
+Re-measured properly — polling every 25 ms for any visible top-level window
+owned by a process the task started, **and** checking a marker file to prove the
+command actually ran, because "no window" is satisfied perfectly by "nothing
+happened":
+
+| action | visible windows | ran? |
+|---|---|---|
+| plain | 1 (`WindowsTerminal`) | yes |
+| `powershell -WindowStyle Hidden` | **1** (`WindowsTerminal`) | yes |
+| **`conhost.exe --headless`** | **0** | **yes** |
+| `mshta.exe vbscript:…` | 0 | **no** |
+
+That last row is why the marker check exists: it scored a perfect zero by not
+executing at all.
+
+**So the actions are hosted by `conhost.exe --headless`.** It hosts a console
+without creating a window rather than creating one and hiding it, so there is
+nothing to flash; the children attach to that same headless console, which is
+why `python` and `gh` are silent without being wrapped individually. No
+elevation, no change of account, and `gh` keeps its keyring — verified by
+running the real task and watching a `workflow_dispatch` appear two seconds
+later.
+
+Two working alternatives were rejected. `mshta.exe vbscript:Execute(...)` — the
+owner's suggestion, and genuinely windowless — is the textbook signature of
+malware persistence, so antivirus may act on it, and mshta is deprecated; the
+`ran=False` above is this project's quoting, not a fault in the technique. A
+`.vbs` shim run by `wscript.exe` also works, and costs a tracked file and a
+`.gitattributes` line for no gain over conhost.
+
+A test reads the actions back off the **registered** task and asserts every one
+of them is hosted headlessly. Read back rather than grepped out of the script,
+for the same reason the rest of that test exists: registering is the layer that
+can refuse you.
+
 ### Install the ten-minute task
 
 ```powershell

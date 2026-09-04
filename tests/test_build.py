@@ -883,6 +883,13 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
          "if ($null -eq $t) { 'ABSENT' } else "
          "{ \"$($t.Triggers[0].Repetition.Interval)|$($t.Triggers[0].Repetition.Duration)\" }"],
         cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
+    actions = lambda: subprocess.run(                             # noqa: E731
+        [shell, "-NoProfile", "-Command",
+         f"$t = Get-ScheduledTask -TaskName '{probe}' -ErrorAction SilentlyContinue; "
+         "if ($null -eq $t) { 'ABSENT' } else "
+         "{ ($t.Actions | ForEach-Object { \"$($_.Execute) $($_.Arguments)\" }) "
+         "-join \"`n\" }"],
+        cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
 
     try:
         made = run()
@@ -895,6 +902,28 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
         check("schedule: with no duration, which is how it means indefinitely",
               duration, "",
               "a bounded duration registers fine and then stops refreshing")
+
+        # The owner's word for the console window this used to open was
+        # "disaster" - 144 times a day, taking focus each time.
+        #
+        # `-WindowStyle Hidden` was the first fix and it does NOT work: Windows
+        # 11 hosts consoles in Windows Terminal, which has its own window and
+        # ignores what PowerShell's host was asked to do with the legacy console
+        # inside it. Measured by polling every 25 ms for visible windows owned by
+        # processes the task started - plain and hidden both scored 1, conhost
+        # --headless scored 0. So the property asserted is the host, not a flag.
+        registered = actions()
+        lines = [ln for ln in registered.splitlines() if ln.strip()]
+        check_true("schedule: the task registered at least one action",
+                   bool(lines), f"read back {registered!r}")
+        check("schedule: every action is hosted headlessly",
+              [ln for ln in lines if "--headless" not in ln], [],
+              "a console action under an interactive logon opens a real window "
+              "and takes focus on every repetition")
+        check("schedule: by conhost, which hosts without making a window",
+              [ln for ln in lines if "conhost" not in ln.lower()], [],
+              "-WindowStyle Hidden measures as fixed and is not - Windows "
+              "Terminal owns the window that is actually on screen")
 
         half = run("-EveryMinutes", "30")
         check("schedule: -EveryMinutes reaches the trigger", half.returncode, 0,
