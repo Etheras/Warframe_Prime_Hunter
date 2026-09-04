@@ -1177,6 +1177,175 @@ page_test("the errand boxes appear only when there is that errand to hide", asyn
   assert.deepEqual(errors, []);
 });
 
+page_test("a row names the rotations that pay a relic, and prices the free one at the fissure's tier", async () => {
+  /* Both halves reported by the owner on 2026-09-04, from a farm list wanting
+     two relics.
+
+     **`rot A+B+C` where only C pays.** Mithra's rotations A and B hold seven Neo
+     relics and Aya; for a list wanting none of those Neo relics, A and B were
+     still non-zero *because of the Aya*, and the letters said so as if a relic
+     were there. Aya has its own chip on the same row, so it was being said
+     twice and the louder saying was the wrong one.
+
+     **A free relic of a tier you do not want.** Staying five rotations in a
+     fissure pays a free relic **of that fissure's tier**. The value was priced
+     at the best tier on offer instead — correct while the bonus was a flat
+     addition to every endless node, and wrong once the run started being chosen
+     by the fissure actually running there. The owner's words: *"the free relic
+     is a Neo, while I don't need Neo relics."*
+
+     Everything here is staged: the subject comes from raw payload properties,
+     and the fissure is planted, so this does not depend on what DE happen to be
+     running when the suite runs. */
+  const { page, errors } = await open("/plan.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const tierOf = (n) => String(n).split(" ")[0];
+    /* The subject has to be able to show the defect, or this test cannot fail.
+       That means a node where **Aya drops in a rotation holding none of this
+       Prime's relics** — the Mithra shape the owner reported. Picking merely
+       "an endless node" found Olympus, which carries no Aya at all, so `rot`
+       and `rotRelic` were identical there and reverting the fix still passed.
+       Verified by doing exactly that. */
+    const ayaAt = {};                       // "Node (Planet)" -> Set(rotations)
+    (D.aya || []).forEach((a) => {
+      const key = a.node + " (" + a.planet + ")";
+      (ayaAt[key] = ayaAt[key] || new Set()).add(a.rotation);
+    });
+
+    for (const it of D.items) {
+      const names = (it.relics || []).filter((n) => D.relics[n] && !D.relics[n].vaulted);
+      if (!names.length) continue;
+      const tiers = new Set(names.map(tierOf));
+      // A tier this Prime wants nothing from, so a fissure of it is provably
+      // unwanted however many tiers the Prime spans.
+      const other = ["Lith", "Meso", "Neo", "Axi"].find((t) => !tiers.has(t));
+      if (!other) continue;
+
+      // Where this Prime's relics drop, per endless node, by rotation.
+      const relicRots = {};
+      names.forEach((rn) => (D.relics[rn].sources || []).forEach((s) => {
+        if (s.kind !== "mission" || !s.rotation) return;
+        if (!/Survival|Defense|Interception|Excavation|Disruption/i.test(s.mode || "")) return;
+        const key = s.node + " (" + s.planet + ")";
+        (relicRots[key] = relicRots[key] || new Set()).add(s.rotation);
+      }));
+
+      for (const node of Object.keys(relicRots)) {
+        const aya = ayaAt[node];
+        if (!aya) continue;
+        // At least one rotation paying Aya and no relic of this Prime, and at
+        // least one paying a relic — otherwise there is nothing to tell apart.
+        const ayaOnly = [...aya].filter((r) => r && !relicRots[node].has(r));
+        if (!ayaOnly.length || !relicRots[node].size) continue;
+        return { item: it.id, name: it.name, wantTiers: [...tiers], fissureTier: other,
+                 node, ayaOnly: ayaOnly.sort() };
+      }
+    }
+    return null;
+  });
+  assert.ok(subject,
+    "no Prime with an unused tier and an endless node paying Aya in a rotation it " +
+    "wants nothing from — without that pair this test cannot fail");
+
+  await page.addInitScript(([node, tier, id]) => {
+    const staged = [{ node, tier, hard: false, storm: false,
+                      ends: new Date(Date.now() + 3600e3).toISOString() }];
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) {
+        // One fissure, on the subject's node, of a tier it wants nothing from.
+        if (next) next.fissures = staged;
+        held = next;
+      },
+    });
+    /* `watchFissures` polls `data/fissures.json` on load and splices the answer
+       over the array in place, so staging the payload alone lasts about a
+       second. The poll is answered with the same staged list instead — which
+       also means the test exercises the refresh path rather than dodging it. */
+    const realFetch = window.fetch;
+    window.fetch = (url, ...rest) =>
+      (String(url).includes("fissures.json")
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve({ fissures: staged }) })
+        : realFetch.call(window, url, ...rest));
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([id]));
+  }, [subject.node, subject.fissureTier, subject.item]);
+  await page.reload({ waitUntil: "load" });
+
+  /* The list shows the top eight and hides the rest behind *Show all N places*.
+     The subject is chosen for the shape it can prove, not for its rank, so the
+     list is opened rather than the subject being picked from the visible few —
+     which would be choosing the test's subject by the ranking it is testing. */
+  const more = page.locator("#moreNodes");
+  if (await more.count() && (await more.getAttribute("aria-expanded")) === "false") {
+    await more.click();
+  }
+  const row = page.locator(`#planNodes .spot`)
+    .filter({ hasText: subject.node.split(" (")[0] }).first();
+  assert.equal(await row.count(), 1, `${subject.node} should be ranked for ${subject.name}`);
+  const text = (await row.innerText()).replace(/\s+/g, " ");
+
+  // ── the free relic is the fissure's tier, and is marked worth nothing ──
+  assert.ok(text.includes(`free ${subject.fissureTier}`),
+    `the free relic must name the fissure's tier — got ${JSON.stringify(text)}`);
+  /* Asserted on the class rather than on a word in the row. The row deliberately
+     says only "+free Neo" and lets colour carry whether you want it — owner's
+     call, 2026-09-04 — so the property is which class it wears. */
+  const chip = row.locator(".est-nil", { hasText: `free ${subject.fissureTier}` });
+  assert.equal(await chip.count(), 1,
+    `${subject.name} wants ${subject.wantTiers.join("/")} and no ${subject.fissureTier}, ` +
+    `so the free one must be dimmed as worth nothing — got ${JSON.stringify(text)}`);
+
+  // ── the rotation letters name rotations that pay a relic ──
+  const letters = (text.match(/rot ([A-C+]+)/) || [])[1] || "";
+  const truth = await page.evaluate(([node, id]) => {
+    const D = window.WFPRIME_DATA;
+    const it = D.items.find((i) => i.id === id);
+    const rots = new Set();
+    (it.relics || []).forEach((rn) => {
+      const rec = D.relics[rn];
+      if (!rec || rec.vaulted) return;
+      (rec.sources || []).forEach((s) => {
+        if (s.node + " (" + s.planet + ")" === node && s.rotation) rots.add(s.rotation);
+      });
+    });
+    return [...rots].sort();
+  }, [subject.node, subject.item]);
+
+  /* Soundness, not equality. A rotation can drop a wanted relic and still be
+     absent from the letters because the run cannot reach it — Disruption
+     defending four conduits never sees rotation A — and those are reported
+     separately as stranded. What must never happen is the reverse: a letter
+     claimed for a rotation that drops nothing you want, which is the defect
+     this test exists for. */
+  const named = letters.split("+").filter(Boolean).sort();
+  assert.ok(named.length, `no rotation letters on the row — got ${JSON.stringify(text)}`);
+  assert.deepEqual(named.filter((r) => !truth.includes(r)), [],
+    `every letter must be a rotation that drops a wanted relic at ${subject.node} — ` +
+    `row said ${JSON.stringify(named)}, data says ${JSON.stringify(truth)}`);
+
+  /* Aya-only rotations belong to the `aya` chip's tooltip, not to the letters.
+     That placement is the owner's call of 2026-09-04: the row already says the
+     word `aya`, so putting the letters beside `rot` said it twice — which was
+     the original defect in a new shape. The subject was chosen to have at least
+     one such rotation, so this cannot pass vacuously. */
+  const ayaTip = await row.locator(".aya").getAttribute("data-tip");
+  assert.ok(ayaTip, `the row must carry an aya chip — got ${JSON.stringify(text)}`);
+  const ayaLetters = ((ayaTip.match(/rot ([A-C+]+) pays? Aya/) || [])[1] || "")
+    .split("+").filter(Boolean);
+  assert.deepEqual(ayaLetters.sort(), subject.ayaOnly,
+    `the aya chip must name the rotations that pay only Aya — tooltip said ` +
+    `${JSON.stringify(ayaLetters)}, data says ${JSON.stringify(subject.ayaOnly)}`);
+  assert.deepEqual(ayaLetters.filter((r) => named.includes(r)), [],
+    `a rotation cannot be both "pays a relic" and "aya only" — ${JSON.stringify(text)}`);
+  assert.ok(!/\+aya/.test(text),
+    `the aya letters belong in the chip's tooltip, not the row — got ${JSON.stringify(text)}`);
+  assert.deepEqual(errors, []);
+});
+
 page_test("a Baro badge says whether he has it now, not whether he ever has", async () => {
   /* Reported by the owner on 2026-09-04, looking at five vaulted secondaries all
      badged `BARO` while he was on a relay selling a relic for exactly one of
@@ -2660,9 +2829,12 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
      give also earns one — and `innerText` on a locator matching two throws a
      strict-mode violation rather than failing an assertion. Which row is picked
      depends on the ranking, so this must not assume a row's shape. */
+  /* `+free <tier>` since 2026-09-04, where it used to read `+free relic`: the
+     free relic is priced at the tier of the fissure that is actually running,
+     so the row names it. */
   const notes = await row.locator(".est").allInnerTexts();
-  assert.ok(notes.some((t) => /free relic/.test(t)),
-            `the row has to say what the fifth rotation bought, got ${JSON.stringify(notes)}`);
+  assert.ok(notes.some((t) => /\+free (Lith|Meso|Neo|Axi)\b/.test(t)),
+            `the row has to say what the fifth rotation bought, and of which tier, got ${JSON.stringify(notes)}`);
   /* No "put the box back" step any more — `rerender` never moved it. */
 
   assert.deepEqual(errors, []);

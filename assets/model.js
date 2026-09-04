@@ -182,6 +182,42 @@
      declined. */
   const REDUNDANCY_WEIGHT = 0.25;
 
+  /* What an Aya is worth when you are **not** chasing anything Varzia is
+     currently selling, as a share of what it would be worth if you were.
+
+     Owner's rule, 2026-09-04, given as three cases: a relic on your farm list is
+     100%; Aya while targeting Resurgence is 100% too, because one Aya *is* one
+     relic of your choosing; Aya with nothing in Resurgence you want but vaulted
+     Primes still missing from your collection is **30%**; and Aya with neither
+     is 0.
+
+     It is a discount rather than a gate, and that distinction is the whole
+     point. The decision of 2026-08-27 made Aya count for gaps in your
+     *collection* rather than only your farm list — right, because Aya is banked
+     rather than spent on sight, and the player who should be collecting it was
+     scoring it at zero. What that overshot was the amount: a someday-Prime was
+     priced the same as tonight's target, which put Aya nodes above nodes
+     dropping the relic actually being farmed. Same shape as `RADIANT_BONUS` and
+     `REDUNDANCY_WEIGHT` — one named constant, argued with rather than derived. */
+  const AYA_BANKED_SHARE = 0.3;
+
+  /* What the *free* relic a fissure pays is worth beyond the relic itself, when
+     Void Traces are tight.
+
+     Owner's rule, 2026-09-04: **150% — 100% for getting the relic, 50% for
+     getting it Exceptional.** It arrives already refined, so it is a relic you
+     did not have to open *and* 25 Void Traces you did not have to spend.
+
+     Sits beside `RADIANT_BONUS`, which is the same idea for the eleven nodes
+     that hand relics over Radiant, and the two numbers are deliberately not
+     ranked by trace cost: Radiant saves 100 traces against Exceptional's 25, so
+     on traces alone this would be the smaller of the two. It is the larger
+     because it is doing a different job — `RADIANT_BONUS` upgrades a relic you
+     were collecting anyway, while this one is an **extra** relic that also
+     happens to be refined. Both are switched on by the same `traces` option,
+     because both only matter to a player who is short. */
+  const FISSURE_REFINED_BONUS = 0.5;
+
   /* One node, one rotation letter, and what its relics are really worth here.
 
      `rows` is `{ name, chance, value, wants }` per relic source, `chance` a
@@ -545,6 +581,7 @@
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
     REDUNDANCY_WEIGHT, creditRelics, partLabel,
+    AYA_BANKED_SHARE, FISSURE_REFINED_BONUS,
     FILTER_SHAPE,
   };
 })();

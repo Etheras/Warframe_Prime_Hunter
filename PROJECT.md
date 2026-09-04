@@ -3349,6 +3349,83 @@ appearing there without a decision behind it fails.
 rewards for three objectives, cadence one. Retiring the cadence table must not
 empty the length table, and a test says so.
 
+### What a row claims, and what a free relic is really worth
+
+**All four reported by the owner on 2026-09-04, from one screenshot of a farm
+list wanting two relics.** Three were the row saying something the model did not
+mean; one was the model itself.
+
+**`rot A+B+C` where only C pays.** Mithra (Void, Interception) carries seven Neo
+relics in rotations A and B, seven Axi in C, and **Aya in all three**. For a list
+wanting only `Axi P10`, A and B are worth something *because of the Aya*, so
+`n.rot` was non-zero for all three and the letters said so — beside a `1 relic`
+chip, which reads as "your relic is in all three". Checked against DE's own drop
+table, which agrees with our payload exactly.
+
+The model was right and the label was wrong, and the tell is that the row already
+carries a separate `aya` chip: the letters were reporting two different facts as
+one, and the louder reading was the false one. So `rotRelic` is `rot` before Aya
+is folded in, and the letters read from it. Nothing about the ranking changed —
+`n.rot` is still what the rate divides.
+
+Verified in both directions, which matters more than the fix: **Mithra narrows to
+`rot C`, and Taranis stays `rot A+B+C`** because `Lith A12` genuinely drops there
+in all three rotations. A change that only ever narrows would have been a
+different bug.
+
+**Where the Aya letters ended up.** The first attempt spliced them back into the
+label as `rot C +aya AB`. The owner rejected it and was right — the row says
+`aya` at its end already, so that was the same defect wearing a new hat. They
+live in that chip's tooltip now.
+
+**The free relic was priced at a tier you cannot choose.** This is the one that
+was really a model error. Staying five rotations in a fissure pays a free
+Exceptional relic **of that fissure's tier**. `fissureBonus` valued it at the
+best tier for your list — correct while the bonus was a flat addition to every
+endless node, because a node-independent constant cannot reorder anything, and
+wrong from the moment the run mode started being chosen by the fissure actually
+running there. Mithra was carrying a **Neo** fissure and being credited a
+Lith-or-Axi-priced relic. The owner's words: *"the free relic is a Neo, while I
+don't need Neo relics."*
+
+`fissureBonus` returns per tier now and the node takes its own. **Measured on the
+reported list: Mithra 0.85 → 0.73 relics a run**, and nodes with no live fissure
+did not move. A tier holding nothing wanted is kept at zero rather than dropped,
+so the row can say `+free Neo` in dim rather than showing nothing.
+
+**And the row says only `+free Neo`.** An earlier version wrote `+free Neo,
+unwanted`; the owner's call is that the colour already says it — `.est` amber for
+something to act on, `.est-nil` dim for something not — and the word is clutter.
+Same rule as the Baro badge earlier the same day, and `STYLE.md` carries it.
+
+**Aya is worth less when you are not chasing it.** The owner's rule, given as
+four cases: a relic on your farm list is 100%; Aya while a Prime on that list is
+in Resurgence is 100% too, because one Aya *is* one relic of your choosing; Aya
+with nothing in Resurgence you want but vaulted Primes still missing is **30%**;
+and Aya with neither is 0. `AYA_BANKED_SHARE` is that 0.3.
+
+It is a discount rather than a gate, and that is what keeps the decision of
+2026-08-27 intact: Aya still counts for gaps in your **collection** rather than
+only your farm list, because it is banked rather than spent on sight. What that
+decision overshot was the amount — pricing a someday-Prime the same as tonight's
+target put Aya nodes above nodes dropping the relic being farmed.
+
+**A free relic is worth 150% when traces are tight.** Also the owner's:
+100% for the relic, 50% for its arriving Exceptional rather than Intact — 25
+Void Traces not spent. `FISSURE_REFINED_BONUS` is 0.5, switched on by the same
+`traces` option as `RADIANT_BONUS`, and deliberately larger than it despite
+Radiant saving four times the traces: `RADIANT_BONUS` upgrades a relic you were
+collecting anyway, while this is an **extra** relic that also happens to be
+refined.
+
+**The test for the label needed two goes, and the first could not fail.** It
+picked "an endless node where the subject's relics drop" and found Olympus, which
+carries no Aya at all — so `rot` and `rotRelic` were identical there and
+reverting the fix still passed. Confirmed by doing exactly that. The subject is
+now chosen for the shape that can show the defect: a node paying Aya in a
+rotation holding none of the subject's relics. Reverting the fix now fails it
+with `row said ["A","B","C"], data says ["A","C"]`.
+
 ### The test suite puts `data/` back
 
 **Fixed 2026-08-27.** `test_offline_build` runs `python tools/build_data.py

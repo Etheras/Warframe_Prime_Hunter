@@ -480,16 +480,39 @@
         t.wanted += 1;
       }
     });
+    /* **Per tier, and the node picks its own — corrected 2026-09-04.**
+       This returned only the best tier, on the reasoning quoted at the call
+       site: the bonus was a flat addition to every endless node, so a
+       node-independent constant could not reorder anything and pricing it at
+       the tier you would choose was right.
+
+       That reasoning stopped holding when the run mode started being chosen by
+       the fissure actually live on the node. You do not get to pick the tier of
+       a fissure that is already running: if Mithra is carrying a **Neo**
+       fissure, staying five rotations there pays a free **Neo** relic, whatever
+       Lith or Axi would have been worth.
+
+       Reported by the owner on 2026-09-04 — *"the free relic is a Neo, while I
+       don't need Neo relics"* — on a row that credited one anyway, because the
+       run was node-specific and the price was not. */
+    const byTier = {};
     let best = { tier: null, value: 0, count: 0 };
     Object.keys(tiers).forEach((tier) => {
       const t = tiers[tier];
       if (!t.n) return;
       const value = t.value / t.n;
-      if (value > best.value) {
-        best = { tier, value, count: t.wanted / t.n, pool: t.n, want: t.wanted };
-      }
+      /* 150% when traces are tight, per the owner 2026-09-04: the relic itself,
+         plus half again for arriving Exceptional rather than Intact. Off when
+         the reader has not said traces are short, because then the refinement
+         is a convenience rather than a saving. `M.FISSURE_REFINED_BONUS` has
+         the reasoning and why it is larger than `RADIANT_BONUS`. */
+      const refined = opts.traces ? 1 + M.FISSURE_REFINED_BONUS : 1;
+      byTier[tier] = { tier, value: value * refined, plain: value,
+                       refined: opts.traces,
+                       count: t.wanted / t.n, pool: t.n, want: t.wanted };
+      if (byTier[tier].value > best.value) best = byTier[tier];
     });
-    return best;
+    return { byTier, best };
   }
 
   /* ── the plan ────────────────────────────────────────────────── */
@@ -617,6 +640,15 @@
                 eventBounty: bountyEvent(s),
                 railjack: isRailjack(s), score: 0,
                 rot: { A: 0, B: 0, C: 0, none: 0 },
+                /* `rot` before Aya is folded into it. Reported by the owner
+                   2026-09-04: Mithra read `rot A+B+C` for a farm list whose only
+                   relic there is `Axi P10`, which Digital Extremes drop in
+                   rotation C alone. Rotations A and B were non-zero purely
+                   because Aya drops in them, and the row already says `aya` in
+                   its own chip — so the letters were reporting two different
+                   facts as one, and the reader has no way to tell which. The
+                   ranking still reads `rot`; only the label reads this. */
+                rotRelic: { A: 0, B: 0, C: 0, none: 0 },
                 /* The same rolls counted rather than valued: the plain chance a
                    reward here is a relic on the list, before anything is said
                    about what opening it would be worth. Kept alongside rather
@@ -672,6 +704,11 @@
         const c = M.creditRelics(n.rows[slot]);
         n.rot[slot] = c.worth;
         n.cnt[slot] = c.count;      // rolls counted, never valued
+        /* The same figure before Aya is added to it, and it exists only so the
+           row can name the rotations that actually drop a **relic** you want.
+           `n.rot` keeps the total and is what the ranking divides — nothing
+           about the scoring reads this. See `runTag`. */
+        n.rotRelic[slot] = c.worth;
         c.spent.forEach((s) => {
           /* One line per relic, not per rotation: a relic covered in both B and
              C is one redundancy the reader has to know about, not two. */
@@ -703,6 +740,7 @@
        so string matching would quietly work for Blueprint and fail for the
        other three. */
     let ayaValue = 0, ayaRelic = null, ayaRotationLive = false, ayaMissing = 0;
+    let ayaTargeting = false;
     if (opts.aya) {
       const expiry = ((DATA.meta || {}).resurgence || {}).expiry;
       const anyOnSale = Object.keys(RELICS).some((n) => RELICS[n].resurgence);
@@ -726,6 +764,26 @@
         });
       });
 
+      /* **Are you actually chasing something Varzia is selling?** Owner's rule,
+         2026-09-04, and it is a discount rather than a gate:
+
+           - a relic on your farm list is worth 100%, by definition
+           - Aya, while you are targeting Resurgence, is worth 100% too — one
+             Aya *is* one relic of your choosing, so it is the same thing
+           - Aya, when you are not, but vaulted Primes are still missing from
+             your collection, is worth 30%: real, because the vault is what you
+             are banking against, but not the same as a relic you want tonight
+           - Aya, with nothing vaulted missing and nothing in Resurgence you
+             want, is worth 0
+
+         The 30% keeps the decision of 2026-08-27 — Aya counts for gaps in your
+         **collection**, not merely your farm list, because it is banked rather
+         than spent on sight — while fixing what that decision overshot. Valuing
+         a someday-Prime the same as tonight's target put Aya nodes above nodes
+         that drop the relic you are actually here for. */
+      const targeting = ayaRotationLive && [...want.keys()].some(
+        (rname) => (RELICS[rname] || {}).resurgence);
+
       vaultWanted.forEach((entries, rname) => {
         const rec = RELICS[rname];
         if (!rec || !rec.vaulted) return;
@@ -733,6 +791,8 @@
         const { value } = bestRefinement(entries);
         if (value > ayaValue) { ayaValue = value; ayaRelic = rname; }
       });
+      ayaTargeting = targeting;
+      if (!targeting) ayaValue *= M.AYA_BANKED_SHARE;
     }
 
     if (ayaValue > 0) {
@@ -758,24 +818,38 @@
       });
     }
 
+    /* Which rotations are worth something here **only** because of the Aya.
+       Computed after the block above rather than beside `rotRelic`, because
+       until the Aya has landed the answer is always "none".
+
+       These are named in the `aya` chip's tooltip and deliberately not in the
+       `rot` letters. Splicing them into the letters was the first attempt and
+       was the original defect wearing a different hat — the row already says
+       `aya`, so the letters were saying it a second time. Owner's call,
+       2026-09-04. */
+    nodes.forEach((n) => {
+      n.ayaRots = ["A", "B", "C"].filter(
+        (r) => (n.rot[r] || 0) > 0 && !((n.rotRelic[r] || 0) > 0));
+    });
+
     // value each node as a whole run, which is what you actually commit to
     const mins = effort();
-    /* Worked out once for the whole plan rather than per node, because it is
-       the same number everywhere: a random Exceptional of the best tier is
-       worth what it is worth wherever you were standing. It used to be computed
-       only when the run mode was set to `bonus` by hand; now any node that is a
-       fissure right now uses it, so it is always needed. */
+    /* Worked out once for the whole plan because the *arithmetic* is the same
+       everywhere — the mean worth of a random Exceptional over a tier's live
+       relics does not depend on where you are standing. **Which tier does**,
+       and that is the correction of 2026-09-04: the node takes the tier of the
+       fissure running on it, not the best one on offer. See `fissureBonus`. */
     const bonus = fissureBonus(relicPlan);
     const now = Date.now();
-    const fissureHere = (n) =>
-      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack, opts.steel).length > 0;
+    const fissureAt = (n) =>
+      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack, opts.steel)[0] || null;
     nodes.forEach((n) => {
       const live = n.kind === "bounty" ? liveRotation(n.node) : null;
       /* Railjack is excluded from the fissure branch for the same reason its
          bonus is: Void Storms are their own nodes with their own tables and no
          rotations to stay for, so "run it to five rotations" means nothing. */
-      const r = runValue(n.rot, n.mode, opts.squad, live, n.cnt,
-                         !isRailjack(n) && fissureHere(n));
+      const fis = isRailjack(n) ? null : fissureAt(n);
+      const r = runValue(n.rot, n.mode, opts.squad, live, n.cnt, !!fis);
       /* The one deliberate thumb on the scale in the whole model - see
          rotation.js. Applied to the score, never to the count below it: what a
          run hands you is a fact, this is only what we think it is worth going
@@ -800,8 +874,12 @@
       /* The free relic for staying, once per run, and only where the run
          actually reaches it. `r.mode` is now the answer to "did this node
          choose to stay for it", which only a live fissure makes it do. */
+      /* Priced at the tier of the fissure that is here, which is the only tier
+         this run can pay. A tier with nothing wanted in it is worth 0 and is
+         kept rather than dropped, so the row can say "the free relic is a Neo
+         and you want no Neo" instead of quietly showing nothing. */
       n.bonus = bonus && r.mode === "bonus" && (r.rounds || 0) >= ROT.bonusRotations
-        ? bonus : null;
+        && fis ? (bonus.byTier[fis.tier] || null) : null;
       n.runMode = r.mode;         // how the model decided to run it
       // kept as the second number on the row: what a run is worth once the
       // relics are opened, which is a different question from how many arrive
@@ -902,8 +980,10 @@
        from something that hides options into something that picks the best one
        available today. */
     // the same test the scoring above used, so a group cannot be folded onto a
-    // node that was costed as a fissure while the fold thinks it is not one
-    const isFissureNow = fissureHere;
+    // node that was costed as a fissure while the fold thinks it is not one.
+    // `fissureAt` returns the fissure itself since 2026-09-04, because the free
+    // relic is priced at its tier; this only ever wanted the yes/no.
+    const isFissureNow = (n) => !!fissureAt(n);
 
     /* The picked node *becomes* the row rather than being named beside it, so
        everything else on the row - level, planet, demand badges - is that
@@ -918,7 +998,7 @@
     });
 
     return { relicPlan, ranked: folded, places: ranked.length,
-             needs, formaShort, ayaValue, ayaRelic, vaultedOut,
+             needs, formaShort, ayaValue, ayaRelic, ayaTargeting, vaultedOut,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
              blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
@@ -1017,10 +1097,26 @@
 
   function runTag(n) {
     if (n.bounty) return bountyTag(n);
+    /* **Rotations that drop a relic on your list**, not rotations worth
+       something. Those differ wherever Aya drops, which is most of the Void:
+       Mithra's rotations A and B hold seven Neo relics and Aya, and for a list
+       wanting only `Axi P10` the Neo relics are worth nothing while the Aya is
+       worth something — so `n.rot` is non-zero for all three and the row said
+       `rot A+B+C` when the answer to "where is my relic" is C.
+
+       Aya has its own chip on the same row and its own line in this tooltip, so
+       folding it into the letters said it twice and made the louder of the two
+       statements the wrong one. `ayaPays` below keeps it visible where a
+       rotation has nothing else. */
     const pays = n.counts
-      ? Object.keys(n.counts).filter((r) => (n.rot[r] || 0) > 0)
+      ? Object.keys(n.counts).filter((r) => (n.rotRelic[r] || 0) > 0)
       : [];
-    if (!pays.length && !n.rounds && !(n.stranded || []).length) return "no rotation";
+    const ayaPays = n.counts
+      ? Object.keys(n.counts).filter((r) => (n.rot[r] || 0) > 0
+                                            && !((n.rotRelic[r] || 0) > 0))
+      : [];
+    if (!pays.length && !ayaPays.length && !n.rounds
+        && !(n.stranded || []).length) return "no rotation";
 
     /* Short on purpose. This used to carry the whole Disruption tier table and
        the rotation cycle - twenty-five lines of rules nobody reads on a hover,
@@ -1070,7 +1166,11 @@
       lines.push("Tick 4-squad to let it try for rotation A.");
     }
 
+    /* The letters name relic rotations and nothing else. Aya-only rotations are
+       carried by the `aya` chip's tooltip at the end of the row, which is where
+       the row already says the word — see the chip. */
     const label = pays.length ? "rot " + pays.join("+")
+      : ayaPays.length ? "aya only"
       : (n.stranded || []).length ? "rot " + n.stranded.join("+") + " only"
       : "no rotation";
     const cls = "rot" + (n.nonStandard ? " rot-odd" : "");
@@ -1714,7 +1814,7 @@
 
   function render() {
     renderWishlist();
-    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic, vaultedOut,
+    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic, ayaTargeting, vaultedOut,
             ayaRotationLive, ayaMissing, perMinute, blocked, places } = buildPlan();
     renderEffort(ranked);
 
@@ -1787,8 +1887,14 @@
       (ayaValue > 0 ? " Aya counts too: you are still missing " + ayaMissing +
         " vaulted part" + (ayaMissing === 1 ? "" : "s") + ", so it is worth " +
         "banking. Valued at <b>" + esc(ayaRelic) + "</b>, " + pct(ayaValue) +
-        (ayaRotationLive ? " — the best relic Varzia is selling this rotation."
-                         : " — no rotation is running, so the best a future one could offer.") +
+        (ayaTargeting
+          ? " — in full, because a Prime on your farm list is in Prime Resurgence"
+            + " right now, so an Aya is a relic you want."
+          : " — at " + Math.round(M.AYA_BANKED_SHARE * 100) + "%, because nothing"
+            + " on your farm list is in Resurgence. It is banked against the"
+            + " vault rather than spent on tonight's target.") +
+        (ayaRotationLive ? " Priced on the best relic Varzia is selling this rotation."
+                         : " No rotation is running, so this is the best a future one could offer.") +
         " It only ever raises nodes already worth running." : "") +
       (ranked.some((n) => n.bounty)
         ? " Bounties are the exception to all of that: one rotation is live for " +
@@ -1865,13 +1971,29 @@
              endless node flat, on the argument that a node-independent constant
              cannot reorder them; now the run itself is chosen for the fissure,
              so the relic is real and belongs to this row alone. */
-          n.bonus ? ` · <span class="est" data-tip="${esc(
-            "Staying five rotations in a fissure pays a free Exceptional relic " +
-            "of the\ntier — worth " + pct(n.bonus.value) + " here, averaged over " +
-            "every live relic in it.\n\nThis run is five rotations because of " +
-            "that: the free relic is worth\nmore than the sixth round would have " +
-            "been.")
-          }">+free relic</span>` : ""}${
+          n.bonus ? ` · <span class="${n.bonus.want ? "est" : "est-nil"}" data-tip="${esc(
+            "Staying five rotations in a " + n.bonus.tier + " fissure pays a free "
+            + "Exceptional\n" + n.bonus.tier + " relic — worth " + pct(n.bonus.value)
+            + " here, averaged over the " + n.bonus.pool + "\nlive " + n.bonus.tier
+            + " relics, of which " + n.bonus.want + " are on your list."
+            + (n.bonus.want
+               ? (n.bonus.refined
+                   ? "\n\nCounted at " + Math.round((1 + M.FISSURE_REFINED_BONUS) * 100)
+                     + "%: the relic, and half again for arriving\nExceptional rather "
+                     + "than Intact — 25 Void Traces you do not spend,\nwhich counts "
+                     + "because you said traces are tight."
+                   : "")
+                 + "\n\nThis run is five rotations because of that: the free relic "
+                 + "is worth\nmore than the sixth round would have been."
+               : "\n\nNone of them is, so this one is worth nothing to you — the "
+                 + "tier is\nthe fissure's, not yours to choose."))
+          /* Always "+free <tier>", never a word for whether you want it: the
+             colour already carries that (`.est` amber against `.est-nil` dim,
+             the same amber-means-actionable rule as everywhere else) and the
+             tooltip has the reason. Owner's call, 2026-09-04 — an earlier
+             version wrote ", unwanted" into the row and it reads as clutter
+             next to a colour that had already said it. */
+          }">+free ${esc(n.bonus.tier)}</span>` : ""}${
           n.preRefined ? ` · <span class="${n.overshot ? "est" : "pre"}" data-tip="${esc(
             "Hands its relics over already Radiant" +
             (n.tracesSaved ? ", saving " + n.tracesSaved + " Void Traces a relic" : "") +
@@ -1931,7 +2053,19 @@
           }">est. ${n2(n.minutes)} min</span>` : ""}${
           n.aya ? ` · <span class="aya" data-tip="${esc(
             "Drops Aya at " + pct(n.aya / 100) + " a reward, counted as " +
-            pct(ayaValue) + ".\nOne Aya buys any relic Varzia is selling.")
+            pct(ayaValue) + ".\nOne Aya buys any relic Varzia is selling."
+            /* The rotations that pay Aya and no relic you want live here rather
+               than in the `rot` letters. They were spliced into the letters when
+               this was first fixed, which was the original defect wearing a
+               different hat: the row already says `aya`, so the letters were
+               saying it twice. Owner's call, 2026-09-04. */
+            + ((n.ayaRots || []).length
+                ? "\n\nAt this node rot " + n.ayaRots.join("+") + " pay"
+                  + (n.ayaRots.length > 1 ? "" : "s") + " Aya and no relic on"
+                  + "\nyour list — the aya is what makes "
+                  + (n.ayaRots.length > 1 ? "those rotations" : "that rotation")
+                  + " worth anything here."
+                : ""))
           }">aya</span>` : ""}</div>
         ${scoreBlock(n)}
       </div>`;
