@@ -2958,6 +2958,13 @@ enough" — the same three steps for every feed, every build:
 2. **WFCD**, if that errors or comes back empty.
 3. **Our cached copy of DE's worldstate**, if the proxy errors or comes back empty.
 
+**Four feeds go through it, and the fourth is a warning.** `vaultTrader`,
+`bounties` and `fissures` have since 2026-08-28; `voidTrader` — Baro's manifest —
+was added on 2026-09-04, a day after shipping without one and publishing an empty
+shelf while he was on the relay. Nothing structural stops a fifth being written
+the same way, which is why the rule is stated as **reaching into `worldstate`
+directly is the smell**, not as "remember the fallback".
+
 A **reused copy is deliberately not a first-party answer.** `from_chain` is given
 the worldstate only when `de_worldstate` is absent from `STALE`; otherwise the
 same document is offered as step 3, which is what it is — the last resort wearing
@@ -3387,7 +3394,45 @@ already on disk. Two facts make it unnecessary:
 
 So `build_baro_relics` is the cheaper sibling of `build_varzia_relics`: hers has
 to be *inferred* from a naming convention because DE do not publish it; his is
-published, and only needs the `/StoreItems` hop. **No fetch was added.**
+published, and only needs the `/StoreItems` hop.
+
+**"No fetch was added" was the claim here for one day, and it was the bug.** The
+first version read `VoidTraders` out of the `worldstate` variable directly, so
+Baro's manifest was the only live feed with no `from_chain` behind it: Digital
+Extremes or nothing. DE 403 the runner's address range, so the deployed build
+fell back to a **cached worldstate written before he arrived**, found
+`Manifest: []`, and published no Baro errand at all while he was standing on the
+relay. It worked perfectly on the owner's machine, because DE answer from there —
+which is the shape that reaches production unnoticed, and did.
+
+Reported by the owner within hours, from the deployed site: the collection view
+showed its `BARO` badges (that is `flags.baro`, the wiki marker, and unrelated)
+while *How to crack them* offered only `Varzia` and `Trade`. The payload
+confirmed it — `relics["Axi M5"].baro` was `false` and `meta.feeds` showed all
+three feeds served by the proxy, meaning DE had not answered that build.
+
+**Fixed the same day by giving it the chain like everything else.** A fourth
+entry, `voidTrader`, now sits beside `vaultTrader`, `bounties` and `fissures`;
+`official.void_trader_from_proxy` reads WFCD's `/pc/voidTrader` into the shape
+`void_trader_from_worldstate` already returns, and the join takes a **manifest**
+rather than a worldstate so it cannot know or care which source answered.
+Verified against live data on the route CI actually takes: the proxy returns the
+same 41 rows and resolves to the same `Axi M5`.
+
+Two details worth keeping. The manifest is dropped before `meta.baro` is
+written — the payload has no use for forty rows of mods and ship decorations,
+and DE's data is not ours to republish. And the chain sits with the other three
+feeds rather than beside the relic join that consumes it, because
+`fell_back_to_cache` is read a few lines below and an assignment after that
+point would have been silently too late.
+
+**The general lesson, which is the reason this is written down at length:** this
+was the *third* instance of the same trap in one project, and the second found
+in a single day — `from_chain` closed it for the feeds on 2026-08-28,
+`upstream_signature` still had it until 2026-09-04, and this shipped with it on
+the same morning that one was fixed. The rule is not "remember the fallback", it
+is structural: **a feed that does not come through `from_chain` has no fallback**,
+and reaching into `worldstate` directly is the smell.
 
 **The decision that shaped it, owner's, 2026-09-04:** *we keep the relic as long
 as Baro is here, and then we forget he had it — just like all the other relic.*

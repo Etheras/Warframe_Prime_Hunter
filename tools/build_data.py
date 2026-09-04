@@ -61,7 +61,8 @@ from sources import (CACHE_DIR, DATA_DIR, DROPS, EXPORT_INDEX,       # noqa: E40
                      EXPORT_WANTED,
                      DE_TEXTURES, FISSURES, IMG_CDN,
                      ITEMS_API, MISSING, OFFICIAL_DROPTABLES, ROOT, STALE, STALE_AGE, UA,
-                     SYNDICATE_MISSIONS, VAULT_TRADER, WORLD_EVENTS, WORLDSTATE, WIKI_RAW,
+                     SYNDICATE_MISSIONS, VAULT_TRADER, VOID_TRADER,
+                     WORLD_EVENTS, WORLDSTATE, WIKI_RAW,
                      fetch, fetch_json, head, load_state, log, save_state,
                      upstream_signature)
 from artwork import cache_images                          # noqa: E402
@@ -426,7 +427,7 @@ def build_varzia_relics(items_raw: list, vault_trader: dict) -> set[str]:
     return {name for tag in live for name in by_tag[tag]}
 
 
-def build_baro_relics(items_raw: list, worldstate: dict) -> set[str]:
+def build_baro_relics(items_raw: list, manifest: list) -> set[str]:
     """
     Which relics Baro Ki'Teer is selling **right now**, read off his manifest.
 
@@ -460,14 +461,20 @@ def build_baro_relics(items_raw: list, worldstate: dict) -> set[str]:
     in the manifest we can see", which is also what an away week looks like, and
     the two are told apart by `meta.baro` and the page's own clock - never by
     this function. See PROJECT.md section 7.
+
+    **It takes the manifest, not a worldstate, and that is the fix of
+    2026-09-04.** The first version reached into `VoidTraders` itself, which
+    meant it could only ever read Digital Extremes - no proxy, no chain. DE 403
+    the runner, so the deployed site got an empty manifest and showed nothing
+    while he was standing on the relay. The caller now hands in whichever source
+    answered, and this function no longer knows or cares which. Same trap as
+    `upstream_signature`, and it was written the same day the other one was
+    fixed.
     """
-    trader = (worldstate.get("VoidTraders") or [None])[0]
-    if not isinstance(trader, dict):
-        return set()
     selling = {
-        str(row.get("ItemType") or "").replace("/Lotus/StoreItems/", "/Lotus/", 1)
-        for row in (trader.get("Manifest") or [])
-        if isinstance(row, dict)
+        str(path).replace("/Lotus/StoreItems/", "/Lotus/", 1)
+        for path in (manifest or [])
+        if path
     }
     selling.discard("")
     if not selling:
@@ -1387,6 +1394,47 @@ def main() -> int:
         fissures_raw = []
         log("  fissures unavailable - the list will be empty")
 
+    # Baro Ki'Teer's manifest — the fourth live feed, and the one that shipped
+    # without a chain.
+    #
+    # **Fixed 2026-09-04, the same day it shipped.** The first version read
+    # `worldstate` directly: DE or nothing. DE 403 the runner's address range,
+    # so the deployed site fell back to a cached worldstate written before he
+    # arrived, found `Manifest: []`, and showed no Baro errand at all while he
+    # was standing on a relay. It worked on the owner's machine, because DE
+    # answer from there — which is exactly the shape that reaches production
+    # unnoticed.
+    #
+    # Same trap `from_chain` exists to close, and the same one
+    # `upstream_signature` had until earlier the same day. Three now, which is
+    # the argument for the rule rather than the instance: **a feed that does not
+    # come through this function has no fallback.**
+    #
+    # It sits here, with the other three, rather than beside the relic join that
+    # consumes it — `fell_back_to_cache` is read a few lines below and an
+    # assignment after that point would be silently too late.
+    log("api: Baro Ki'Teer (his manifest, while he is on a relay)")
+    baro_trader, src = from_chain(
+        "void trader",
+        lambda: official.void_trader_from_worldstate(ws_fresh),
+        lambda: official.void_trader_from_proxy(
+            fetch_json(VOID_TRADER, "api_voidtrader", off,
+                       critical=False, optional=True)),
+        lambda: official.void_trader_from_worldstate(ws_cached))
+    feed_source["voidTrader"] = src or "none"
+    if src == "worldstate":
+        log(f"  worldstate: {len((baro_trader or {}).get('manifest') or [])} rows "
+            f"on his manifest from Digital Extremes")
+    elif src == "proxy":
+        log(f"  proxy: {len((baro_trader or {}).get('manifest') or [])} rows "
+            f"on his manifest from WFCD")
+    elif src == "cache":
+        fell_back_to_cache = True
+        log("  cache: Baro from our copy of DE's worldstate — his manifest may "
+            "predate the visit")
+    else:
+        log("  void trader unavailable - no Baro errand this build")
+
     # The banner reports what reached the payload, not what `fetch` had to try.
     # If DE refused and the proxy answered, the live feeds ARE current and
     # saying otherwise would be a second wrong claim in the other direction —
@@ -1522,16 +1570,36 @@ def main() -> int:
             "Either DE renamed the convention or the item database is stale; "
             "Prime Resurgence relics will not be offered this build.")
 
-    # Baro's shelf, which exists only while he does. Logged either way, because
-    # "empty" is the normal state twelve days in fourteen and a silent empty set
-    # is indistinguishable from a broken join.
-    baro_relics = build_baro_relics(items_raw, worldstate or {})
-    baro_window = official.void_trader_from_worldstate(worldstate or {})
+    # Baro's shelf, which exists only while he does.
+    #
+    # **Through the chain, like every other live feed — fixed 2026-09-04, the
+    # same day it shipped without one.** The first version read `worldstate`
+    # directly, which meant DE or nothing. DE 403 the runner's address range, so
+    # the deployed site fell back to a cached worldstate from before he arrived,
+    # found `Manifest: []`, and showed no Baro errand at all while he was
+    # standing on the relay. Locally it worked, because DE answer this machine.
+    #
+    # That is the same trap `from_chain` exists to close and the same one
+    # `upstream_signature` had until earlier today. Three places now, which is
+    # the argument for never reaching into `worldstate` directly again: if a
+    # feed does not go through this function, it has no fallback.
+    # `manifest` is for this build only and is dropped here: the payload has no
+    # use for forty rows of mods and ship decorations, and DE's data is not ours
+    # to republish (`.gitignore`, first line). `baro_trader` came from the chain
+    # above, beside the other three live feeds.
+    baro_relics = build_baro_relics(items_raw, (baro_trader or {}).get("manifest") or [])
+    baro_window = ({k: baro_trader[k]
+                    for k in ("activation", "expiry", "node", "character")}
+                   if baro_trader else None)
+
+    # Logged either way, because "empty" is the normal state twelve days in
+    # fourteen and a silent empty set is indistinguishable from a broken join —
+    # which is exactly how the missing fallback went unnoticed for a day.
     if baro_relics:
-        log(f"baro: {len(baro_relics)} relic(s) on the manifest — "
+        log(f"baro: {len(baro_relics)} relic(s) on his manifest — "
             f"{', '.join(sorted(baro_relics))}")
     else:
-        log("baro: no relics on the manifest — normal while he is away "
+        log("baro: no relics on his manifest — normal while he is away "
             f"(window {(baro_window or {}).get('activation', '?')[:16]} -> "
             f"{(baro_window or {}).get('expiry', '?')[:16]})")
 

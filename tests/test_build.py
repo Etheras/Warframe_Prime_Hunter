@@ -539,7 +539,7 @@ def test_built_payload() -> None:
     # Which source answered each live feed.
     feeds = D["meta"].get("feeds") or {}
     check("payload: every live feed says where it came from",
-          sorted(feeds), ["bounties", "fissures", "vaultTrader"],
+          sorted(feeds), ["bounties", "fissures", "vaultTrader", "voidTrader"],
           "the 403 only happens on the runner, so the artefact is the only place "
           "the answer is true of the site people read")
     check("payload: and names a source the chain can actually return",
@@ -1683,8 +1683,13 @@ def test_baro_sells_relics_read_off_his_own_manifest() -> None:
         {"category": "Mods", "name": "Primed Something",
          "uniqueName": "/Lotus/Upgrades/Mods/Rifle/Expert/PrimedSomething"},
     ]
+    # The window is required, not decorative: `void_trader_from_worldstate`
+    # returns None without it, so `from_chain` moves to the next source. These
+    # are the real stamps for the 2026-09-04 visit.
     doc = {"VoidTraders": [{
         "Character": "Baro'Ki Teel", "Node": "EarthHUB",
+        "Activation": {"$date": {"$numberLong": "1788526800000"}},
+        "Expiry": {"$date": {"$numberLong": "1788699600000"}},
         "Manifest": [
             {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze",
              "PrimePrice": 125, "RegularPrice": 55000},
@@ -1694,7 +1699,13 @@ def test_baro_sells_relics_read_off_his_own_manifest() -> None:
         ],
     }]}
 
-    got = build_data.build_baro_relics(items, doc)
+    # Both readers produce the same shape, and the join takes that shape rather
+    # than a worldstate — which is the fix of 2026-09-04. See the chain test
+    # below for why reading DE directly was not enough.
+    from_de = official.void_trader_from_worldstate(doc)
+    check("baro: a worldstate trader with a window is read at all", bool(from_de), True,
+          "no window means None, which is how from_chain is told to move on")
+    got = build_data.build_baro_relics(items, from_de["manifest"])
     check("baro: the relic on his manifest is found", sorted(got), ["Axi M5"])
     check("baro: the refinement he stocks is not part of the name",
           [n for n in got if " Intact" in n or " Bronze" in n], [],
@@ -1708,18 +1719,46 @@ def test_baro_sells_relics_read_off_his_own_manifest() -> None:
     # The `/StoreItems` hop is the whole join. If it stops being dropped, the
     # lookup silently matches nothing and the shelf goes quietly empty - which
     # looks exactly like an away week, so nothing else would catch it.
-    unstripped = {"VoidTraders": [{"Manifest": [
-        {"ItemType": "/Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze"},
-    ]}]}
     check("baro: a type path that never went through StoreItems still resolves",
-          sorted(build_data.build_baro_relics(items, unstripped)), ["Axi M5"],
-          "replace() leaves a path alone when the segment is absent")
+          sorted(build_data.build_baro_relics(
+              items, ["/Lotus/Types/Game/Projections/T4VoidProjectionBaroAkmagnusPrimeBronze"])),
+          ["Axi M5"], "replace() leaves a path alone when the segment is absent")
 
     # Away, which is the normal state and must not read as a fault.
     check("baro: an empty manifest is an empty shelf",
-          build_data.build_baro_relics(items, {"VoidTraders": [{"Manifest": []}]}), set())
-    check("baro: no trader in the document at all is also an empty shelf",
-          build_data.build_baro_relics(items, {}), set())
+          build_data.build_baro_relics(items, []), set())
+    check("baro: no manifest at all is also an empty shelf",
+          build_data.build_baro_relics(items, None), set())
+
+    # WFCD spell the same trader differently, and the point of reading them is
+    # that DE 403 the runner. Both readers have to hand the join the same thing.
+    proxy_doc = {
+        "activation": "2026-09-04T13:00:00.000Z",
+        "expiry": "2026-09-06T13:00:00.000Z",
+        "character": "Baro Ki'Teer",
+        "location": "Strata Relay (Earth)",
+        "inventory": [
+            {"uniqueName": "/Lotus/StoreItems/Types/Game/Projections/"
+                           "T4VoidProjectionBaroAkmagnusPrimeBronze",
+             "item": "Axi M5 Relic", "ducats": 125, "credits": 55000},
+            {"uniqueName": "/Lotus/StoreItems/Upgrades/Mods/Rifle/Expert/PrimedSomething",
+             "item": "Primed Something", "ducats": 400, "credits": 140000},
+        ],
+    }
+    from_wfcd = official.void_trader_from_proxy(proxy_doc)
+    check("baro: the proxy resolves to the same shelf as DE",
+          sorted(build_data.build_baro_relics(items, from_wfcd["manifest"])),
+          sorted(build_data.build_baro_relics(items, from_de["manifest"])),
+          "one trader, two spellings — the join must not be able to tell")
+    check("baro: and carries the window, so meta.baro survives a DE refusal",
+          (from_wfcd["activation"], from_wfcd["expiry"]),
+          ("2026-09-04T13:00:00.000Z", "2026-09-06T13:00:00.000Z"))
+    check("baro: the proxy's own name for the relay is kept, not normalised",
+          from_wfcd["node"], "Strata Relay (Earth)",
+          "the page prints it, and WFCD's is the readable one")
+    check("baro: a proxy answer with no window is not a trader",
+          official.void_trader_from_proxy({"inventory": []}), None,
+          "None is what makes from_chain try the next step")
 
 
 def test_artwork_prefers_digital_extremes() -> None:

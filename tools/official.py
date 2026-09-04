@@ -721,14 +721,20 @@ def events_from_worldstate(doc: dict) -> list[dict]:
 
 
 def void_trader_from_worldstate(doc: dict) -> dict | None:
-    """Baro Ki'Teer's next or current visit — the window, not a yes/no.
+    """Baro Ki'Teer's visit — the window, and what he has while he is on it.
 
-    `VoidTraders` carries an activation and an expiry and nothing else useful
-    until he arrives (`Manifest` is empty between visits). The **window** is what
-    is emitted rather than a computed "is he here": a build is up to ten minutes
-    old and a page can be open for hours, so the page compares the window to its
-    own clock, exactly as it already does for fissure expiry. Deciding it here
-    would freeze the answer at build time and be wrong twice a fortnight.
+    `VoidTraders` carries an activation and an expiry, and a `Manifest` that is
+    **empty between visits** and holds his stock while he is present (41 rows,
+    measured 2026-09-04). The **window** is emitted rather than a computed "is
+    he here": a build is up to ten minutes old and a page can be open for hours,
+    so the page compares the window to its own clock, exactly as it does for
+    fissure expiry. Deciding it here would freeze the answer at build time and
+    be wrong twice a fortnight.
+
+    `manifest` is the raw `ItemType` paths and is **for the build only** — it is
+    stripped before `meta.baro` is written, because the payload has no use for
+    forty rows of mods and ship decorations and DE's data is not ours to
+    republish.
     """
     trader = (doc.get("VoidTraders") or [None])[0]
     if not isinstance(trader, dict):
@@ -742,6 +748,44 @@ def void_trader_from_worldstate(doc: dict) -> dict | None:
         "expiry": expiry,
         "node": str(trader.get("Node") or ""),
         "character": str(trader.get("Character") or ""),
+        "manifest": [str(row.get("ItemType") or "")
+                     for row in (trader.get("Manifest") or [])
+                     if isinstance(row, dict) and row.get("ItemType")],
+    }
+
+
+def void_trader_from_proxy(doc: dict | None) -> dict | None:
+    """The same trader, as WFCD republish him, in the same shape.
+
+    The fallback half of the chain. DE 403 a datacentre address range, so on CI
+    this is the route that actually answers — measured at 49 of 53 builds for
+    the feeds that already had a fallback. Baro's shelf shipped without one on
+    2026-09-04 and was empty on the deployed site for exactly that reason.
+
+    WFCD spell it differently and the differences are the whole of this
+    function: `inventory` rather than `Manifest`, `uniqueName` rather than
+    `ItemType`, `location` ("Strata Relay (Earth)") rather than `Node`
+    ("EarthHUB"), and ISO-8601 instants rather than millisecond stamps. The
+    `uniqueName` values are the same `/Lotus/StoreItems/...` paths, which is what
+    lets one join read either source.
+
+    `node` deliberately keeps whatever the source called it rather than being
+    normalised to DE's spelling: the page prints it, and WFCD's is the more
+    readable of the two.
+    """
+    if not isinstance(doc, dict):
+        return None
+    activation, expiry = doc.get("activation"), doc.get("expiry")
+    if not activation or not expiry:
+        return None
+    return {
+        "activation": str(activation),
+        "expiry": str(expiry),
+        "node": str(doc.get("location") or ""),
+        "character": str(doc.get("character") or ""),
+        "manifest": [str(row.get("uniqueName") or "")
+                     for row in (doc.get("inventory") or [])
+                     if isinstance(row, dict) and row.get("uniqueName")],
     }
 
 

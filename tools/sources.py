@@ -46,6 +46,13 @@ ITEMS_API = (
     "releaseDate,vaultDate,estimatedVaultDate,tradable,wikiaUrl"
 )
 VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
+# Baro Ki'Teer, for the same reason and by the same route as Varzia above: DE
+# publish him in `VoidTraders`, and this is the fallback for when they refuse the
+# runner. Added 2026-09-04 because the first version of the Baro shelf read DE
+# only, so the deployed site — where DE answer about 8% of builds — got an empty
+# manifest and showed nothing while he was standing on the relay.
+# `Cache-Control: max-age=120`, measured, so a ten-minute build is well inside it.
+VOID_TRADER = "https://api.warframestat.us/pc/voidTrader?language=en"
 # The bounties on offer right now, and the world events that add temporary
 # ones. Both proxy the game worldstate, the same route Prime Resurgence takes
 # and for the same reason: DE's own worldState.php is 404 (PROJECT.md §6).

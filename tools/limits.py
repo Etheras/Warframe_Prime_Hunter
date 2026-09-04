@@ -112,6 +112,10 @@ MAX_EXPANDED = {
     "api_syndicatemissions":             256 * KB,   #  61,126 local, 114,415 on CI
     "api_fissures":                       48 * KB,   #  11,029 with 17 fissures live
     "api_vaulttrader":                    32 * KB,   #   7,947
+    # Baro's manifest, measured 2026-09-04 during an actual visit: 41 rows,
+    # 6,219 bytes. It is `[]` twelve days in fourteen, so the measured figure is
+    # the busy case and not the usual one.
+    "api_voidtrader":                     32 * KB,   #   6,219 with 41 rows
     "api_events":                         32 * KB,   #   2,994 with NO event running
     # ── and the rest, whose size tracks the catalogue ──
     "wiki_prime":                        128 * KB,   #     56,157
