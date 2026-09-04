@@ -26,6 +26,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import limits    # noqa: E402  (local module, sits beside this file)
@@ -123,6 +124,24 @@ DE_TEXTURES = "https://content.warframe.com/PublicExport"
 WORLDSTATE = "https://api.warframe.com/cdn/worldState.php"
 
 STATE_FILE = "state.json"  # inside .cache — drives --if-changed
+
+# How old DE's worldstate may be, by its own `Time` stamp, and still count as a
+# live first-party answer.
+#
+# Not invented: DE declare `Cache-Control: max-age=23` on it, and a successful
+# fetch on 2026-08-28 returned a document 36 seconds old. The scheduled refresh
+# runs every ten minutes. So fifteen leaves room for a slow build, a clock a
+# little out, and a refresh that ran late, while still being far below the hour
+# or two a fissure lasts — which is the thing this protects.
+#
+# It is a *detector*, not a request throttle. `still_fresh` honours DE's 23
+# seconds and is what stops us asking too often; this decides whether what came
+# back can be believed.
+#
+# It lives here rather than in `build_data.py`, where it was until 2026-09-04,
+# because `upstream_signature` below needs the same judgement and two copies of
+# a threshold that must agree is a drift generator. `build_data` imports it.
+WORLDSTATE_MAX_AGE = 15 * 60
 
 
 
@@ -545,16 +564,108 @@ def upstream_signature(offline: bool = False, readonly: bool = False) -> dict:
     # spent three attempts and two sleeps failing against an endpoint that had
     # been 404 for three days — a fingerprint that cost more than the rebuild it
     # was meant to avoid.
+    #
+    # **DE, then WFCD, then our own copy — the same order the feeds take, and it
+    # was missing here until 2026-09-04.** `from_chain` in `build_data.py` closed
+    # this trap for every live feed and never for the fingerprint that decides
+    # whether to go and refresh them, which is the one place it costs the most:
+    # `fetch` answers a failed refresh by handing back cached bytes, so a 403
+    # produced a usable worldstate whose `Expiry` **cannot have moved** — it is
+    # the same file as last time. The signature then matched, `--if-changed`
+    # concluded nothing had changed, and the rebuild that was due did not happen.
+    #
+    # Reported by the owner: a Prime Resurgence rotation turned over and the
+    # deployed relic data followed about twenty minutes later, across refreshes
+    # that did run. Measured from the deployed feed log the next day: of 53
+    # consecutive builds DE answered **four**, because they 403 the runner's
+    # address range. So ~92% of ten-minute builds were fingerprinting a copy of
+    # a copy. Fissures were unaffected and that is the tell — the light build
+    # fetches them live either way, so only the trader data lagged.
+    expiry, whence = None, None
     try:
         doc = fetch_json(WORLDSTATE, "de_worldstate", offline,
                          critical=False, optional=True, readonly=readonly)
-        trader = ((doc or {}).get("PrimeVaultTraders") or [{}])[0]
-        expiry = ((trader.get("Expiry") or {}).get("$date") or {}).get("$numberLong")
-        sig["resurgence"] = str(expiry or "?")
-    except Exception:
-        pass
+        # Judged on the **content**, not on the transport, exactly as the build
+        # judges it: `de_worldstate` in STALE means the refresh failed, and a
+        # `Time` older than the ceiling means an edge cache served us an old
+        # object behind a 200. Either way it is not a first-party answer.
+        age = official.worldstate_age(doc or {})
+        reused = ("de_worldstate" in STALE
+                  or (age is not None and age > WORLDSTATE_MAX_AGE))
+        got = _resurgence_expiry(doc)
+        if got and not reused:
+            expiry, whence = got, "worldstate"
+    except Exception:                             # noqa: BLE001 - a miss, not a fault
+        got = None
 
+    if expiry is None and not offline:
+        # The fallback that was never wired up. WFCD republish the same window,
+        # and they answer from a datacentre address when DE will not.
+        try:
+            proxy = fetch_json(VAULT_TRADER, "api_vaulttrader", offline,
+                               critical=False, optional=True, readonly=readonly)
+            got = _as_millis((proxy or {}).get("expiry"))
+            if got:
+                expiry, whence = got, "proxy"
+        except Exception:                         # noqa: BLE001 - a fallback cannot raise
+            pass
+
+    if expiry is None:
+        # Both refused, or we are offline. Use the reused copy rather than
+        # nothing - a fingerprint that changes every run would rebuild forever
+        # and be no fingerprint at all - but say so, because on this path the
+        # answer genuinely cannot detect a rotation and the log is the only
+        # place that is visible.
+        try:
+            expiry = _resurgence_expiry(doc)
+            whence = "cache"
+        except Exception:                         # noqa: BLE001
+            expiry = None
+    if whence == "cache":
+        log("~ signature: no first-party or proxy worldstate — the resurgence "
+            "fingerprint is a reused copy and cannot see a rotation turn over")
+
+    sig["resurgence"] = str(expiry or "?")
     return sig
+
+
+def _as_millis(value) -> str | None:
+    """One spelling for the rotation end, whichever source named it.
+
+    DE publish `Expiry` as a millisecond `$numberLong`; WFCD republish the same
+    instant as ISO-8601. **The fingerprint is only ever compared with the
+    previous build's copy of itself**, so two spellings of one instant would
+    read as a change every time the answering source flipped — and on CI it
+    flips constantly, because DE answer about 8% of builds. That would trade the
+    missed rebuild this fix removes for a spurious one, which is better but
+    still wrong.
+    """
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if text.isdigit():
+        return text
+    try:
+        when = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return str(int(when.timestamp() * 1000))
+
+
+def _resurgence_expiry(doc: dict | None) -> str | None:
+    """Varzia's rotation end, as DE's own millisecond stamp, or `None`.
+
+    The raw `$numberLong` rather than an ISO instant on purpose: this value is
+    only ever compared with the previous build's copy of itself, so the cheapest
+    stable spelling is the right one, and parsing it would add a way to fail.
+    """
+    trader = ((doc or {}).get("PrimeVaultTraders") or [{}])[0]
+    if not isinstance(trader, dict):
+        return None
+    got = ((trader.get("Expiry") or {}).get("$date") or {}).get("$numberLong")
+    return str(got) if got else None
 
 
 # ── drop data, official first ────────────────────────────────────────────

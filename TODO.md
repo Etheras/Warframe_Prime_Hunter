@@ -52,7 +52,7 @@ was ever going to:
 
 | Entry | What it is | Size |
 |---|---|---|
-| The freshness fingerprint asks DE directly, and DE mostly refuse CI | **defect** — `upstream_signature` skips the `from_chain` fallback, so ~92% of CI builds fingerprint a reused worldstate and skip a rebuild that was due | session |
+| ~~The freshness fingerprint asks DE directly~~ | **fixed 2026-09-04**, same day it was reported; reasoning in `PROJECT.md §7` | done |
 | The scheduled task steals focus every ten minutes | **defect** — no `-Principal` on `Register-ScheduledTask`; the S4U fix may break `gh`'s keyring and that is unmeasured | small, blocked on a decision |
 | An anchor for the ten-minute refresh, from the data rather than a grid | the boundary is published (`18:00 UTC`); the grid ignores it | owner's call |
 | Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
@@ -232,7 +232,7 @@ keeps asking entries to be**, which is why a one-row drift is worth a line.
 |---|---|
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
-| The page tests flake in a full run and pass on their own | watching — two causes removed and the runner now names the failing assertion; six clean runs since |
+| The page tests flake in a full run and pass on their own | watching — a third occurrence 2026-09-04 named `ERR_NO_BUFFER_SPACE`, the first evidence pointing at socket exhaustion rather than timing |
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
@@ -592,55 +592,17 @@ stamp beside the numbers so the next mismatch is legible instead of alarming.
 
 ## Findings of 2026-09-04
 
-### The freshness fingerprint asks DE directly, and DE mostly refuse CI
-
-**Reported by the owner**: the Prime Resurgence rotation flipped and the relic
-data on the deployed site did not follow for about twenty minutes, across
-refreshes that did happen in between. Measured, and it is a real defect with a
-clean cause.
-
-The boundary is **18:00 UTC exactly**, and it is published in the data rather
-than inferred: `PrimeVaultTraders[0]` in DE's worldstate carries
-`Activation 2026-09-03T18:00:00Z` and `Expiry 2026-10-01T18:00:00Z`. Nothing has
-to guess when a rotation turns over.
-
-**The cause is that `upstream_signature` never got the `from_chain` fix.**
-`tools/sources.py` builds the `--if-changed` fingerprint from three keys, and the
-`resurgence` one is `PrimeVaultTraders[0].Expiry` read by a bare
-`fetch_json(WORLDSTATE, "de_worldstate", ...)` — **no DE → WFCD → cache chain, no
-proxy fallback, and no content-freshness guard.** Everywhere else that trap is
-already understood and documented: `fetch` answers a failed refresh by handing
-back cached bytes, so a 403 yields a *usable* worldstate, and `from_chain` in
-`build_data.py` exists precisely so a reused copy is not mistaken for a
-first-party answer. The live feeds were fixed. The fingerprint that decides
-whether to rebuild them was not.
-
-On CI that matters, because DE 403 the runner's address range. Measured from the
-deployed `data/feed-log.json` on 2026-09-04: of 53 consecutive builds, `de` was
-`stale` 47 times, `offline` twice and **`ok` four times** — DE answered about 8%
-of builds. So ~92% of ten-minute builds computed `sig["resurgence"]` from a
-reused cached worldstate, where the expiry cannot move, concluded nothing had
-changed, and rebuilt the trader data from the same stale cache. The rotation was
-picked up only when a run happened to draw one of the ~8% of fresh answers —
-which is exactly a lag of a couple of cycles.
-
-**Why only the relic data lagged**, and this is the confirming detail: the
-fissure list is fetched live on the light path either way (`publish.yml`, the
-*Refresh the fissure list and rebuild from cache* step), because a cached fissure
-is worthless. Fissures stayed current while Varzia's shelf did not, which is
-precisely what was reported.
-
-**Two fixes, and they are independent.** The first is the defect: route the
-signature's worldstate through `from_chain` like everything else, so the proxy
-answers when DE refuse and a reused copy is never read as fresh. The second is
-the anchor the owner asked for, and the data already provides it — see below.
-Note the daily FULL build is already anchored this way, at `40 18 * * *`, "so
-this picks up a new rotation on the same day it starts". The anchor idea is
-established here; it is the ten-minute path that flies blind.
-
 ### An anchor for the ten-minute refresh, from the data rather than a grid
 
-**Asked for by the owner 2026-09-04.** Today the light build runs on `*/10`, a
+**Asked for by the owner 2026-09-04, and still open** — the defect that shared
+this reporting is fixed, this is the improvement that sat behind it. The
+boundary is **18:00 UTC exactly** and is published rather than inferred:
+`PrimeVaultTraders[0]` carries `Activation 2026-09-03T18:00:00Z` and
+`Expiry 2026-10-01T18:00:00Z`, so nothing has to guess when a rotation turns
+over. The daily FULL build is already anchored to it at `40 18 * * *`; it is the
+ten-minute path that flies blind.
+
+Today the light build runs on `*/10`, a
 blind grid with no relationship to when anything upstream actually changes. Every
 feed we publish carries its own expiry: fissure `ends`, `meta.baro.expiry`,
 `PrimeVaultTraders[0].Expiry`, bounty cycle ends. The earliest of those is the
@@ -1724,6 +1686,23 @@ tests**, each of which then passed standalone:
 FAIL js: the licence and privacy notice is at the foot of both pages, identically
 FAIL js: the collection drawer can show more than its eight best places
 ```
+
+**A third on 2026-09-04, and this one named a cause the others did not:**
+
+```
+FAIL js: the search sits at the centre of the bar, whatever is beside it
+  page.goto: net::ERR_NO_BUFFER_SPACE at http://127.0.0.1:55152/index.html
+```
+
+Passed on the next full run, 602 of 602. `ERR_NO_BUFFER_SPACE` is the OS refusing
+a socket, not a missed wait — it is **ephemeral port or non-paged pool
+exhaustion on Windows**, which is what a long session of builds, subprocesses and
+short-lived servers produces. That is consistent with "the browser group runs
+last, after half a minute of everything else" without being the timing guess
+below, and it is the first evidence pointing at a resource rather than at
+Playwright. It happened in a session that had also run the suite half a dozen
+times and driven a preview server, so the machine was unusually far through its
+port range.
 
 Both pass immediately afterwards when `node --test tests/test_pages.mjs` is run
 on its own — the second was confirmed at 47 of 47. So the failures are not about

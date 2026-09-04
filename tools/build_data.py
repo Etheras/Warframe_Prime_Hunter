@@ -1031,19 +1031,13 @@ def build_fissures(raw, now: datetime) -> list:
     return out
 
 
-# How old DE's worldstate may be, by its own `Time` stamp, and still count as a
-# live first-party answer.
+# How old DE's worldstate may be and still count as a live first-party answer.
 #
-# Not invented: DE declare `Cache-Control: max-age=23` on it, and a successful
-# fetch on 2026-08-28 returned a document 36 seconds old. The scheduled refresh
-# runs every ten minutes. So fifteen leaves room for a slow build, a clock a
-# little out, and a refresh that ran late, while still being far below the hour
-# or two a fissure lasts — which is the thing this protects.
-#
-# It is a *detector*, not a request throttle. `still_fresh` honours DE's 23
-# seconds and is what stops us asking too often; this decides whether what came
-# back can be believed.
-WORLDSTATE_MAX_AGE = 15 * 60
+# **Defined in `sources.py` and imported, since 2026-09-04.** It used to live
+# here, and then `upstream_signature` needed the same judgement — a second copy
+# of a threshold that has to agree with the first is the shape this project has
+# been bitten by before. `sources.py` is the lower of the two, so it owns it.
+WORLDSTATE_MAX_AGE = sources.WORLDSTATE_MAX_AGE
 
 
 # How long the feed log keeps a build. One entry per build, and the ten-minute

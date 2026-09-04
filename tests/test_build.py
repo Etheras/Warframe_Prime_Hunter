@@ -1337,6 +1337,107 @@ def test_a_live_feed_asks_de_then_wfcd_then_its_own_cache() -> None:
     value, src = chain([], [], ["something"])
     check("chain: an empty list is a miss", (value, src), (["something"], "cache"))
 
+
+def test_the_freshness_fingerprint_takes_the_same_chain_as_the_feeds() -> None:
+    """
+    `upstream_signature` had the bug `from_chain` exists to prevent, and had it
+    in the one place it costs the most.
+
+    Reported by the owner 2026-09-04: a Prime Resurgence rotation turned over and
+    the deployed relic data followed twenty minutes later, across refreshes that
+    did run. `fetch` answers a failed refresh with cached bytes, so on CI — where
+    DE 403 the runner's address range, measured at 4 first-party answers in 53
+    consecutive builds — the fingerprint was computed from a copy of a copy. Its
+    `Expiry` cannot move, so `--if-changed` concluded nothing had changed and
+    skipped a rebuild that was due.
+
+    The network is replaced here rather than reached: what is being asserted is
+    which source is consulted and in what order, and that is a property of the
+    code, not of whether DE feel like answering during a test run.
+    """
+    # The same instant in both spellings, and a genuinely later one. DE publish
+    # milliseconds, WFCD republish ISO-8601, and the fingerprint compares only
+    # with its own previous value — so two spellings of one instant would read as
+    # a rotation every time the answering source flipped.
+    ms_now, iso_now = "1790877600000", "2026-10-01T18:00:00.000Z"
+    ms_next, iso_next = "1793296800000", "2026-10-29T18:00:00.000Z"
+    ws = {"Time": int(time.time()),
+          "PrimeVaultTraders": [{"Expiry": {"$date": {"$numberLong": ms_now}}}]}
+    asked: list[str] = []
+
+    def fake(doc_for_de, proxy_expiry):
+        def _fetch_json(url, key, offline=False, **kw):
+            if key == "de_worldstate":
+                asked.append("de")
+                return doc_for_de
+            if key == "api_vaulttrader":
+                asked.append("proxy")
+                return {"expiry": proxy_expiry} if proxy_expiry else {}
+            return {}
+        return _fetch_json
+
+    real_fetch_json, real_head, real_fetch = sources.fetch_json, sources.head_cached, sources.fetch
+    real_stale = list(sources.STALE)
+    try:
+        sources.head_cached = lambda *a, **k: {}
+        sources.fetch = lambda *a, **k: b""
+
+        # DE answer, and nothing else is asked.
+        asked.clear(); sources.STALE[:] = []
+        sources.fetch_json = fake(ws, iso_now)
+        got = sources.upstream_signature()
+        check("signature: a fresh first-party answer is used", got["resurgence"], ms_now)
+        check("signature: and the proxy is not troubled for it", asked, ["de"])
+
+        # DE's refresh failed, so `fetch` handed back the cached bytes. This is
+        # the exact case that was silently wrong: the document parses, the expiry
+        # is readable, and it is last rotation's. The proxy has the new one.
+        asked.clear(); sources.STALE[:] = ["de_worldstate"]
+        sources.fetch_json = fake(ws, iso_next)
+        got = sources.upstream_signature()
+        check("signature: a REUSED worldstate is not a first-party answer",
+              got["resurgence"], ms_next,
+              "it parsed fine and was still the wrong source — that was the bug")
+        check("signature: so the proxy is asked, in that order", asked, ["de", "proxy"])
+
+        # Content staleness too, not just transport: an edge cache serving an old
+        # object behind a 200 leaves STALE empty and the document old.
+        asked.clear(); sources.STALE[:] = []
+        old = dict(ws, Time=int(time.time()) - (sources.WORLDSTATE_MAX_AGE + 60))
+        sources.fetch_json = fake(old, iso_next)
+        got = sources.upstream_signature()
+        check("signature: an old `Time` is stale however it arrived",
+              got["resurgence"], ms_next)
+        check("signature: and falls to the proxy as well", asked, ["de", "proxy"])
+
+        # The two sources spell one instant differently, and the fingerprint must
+        # not. Without this, CI — which draws DE about 8% of the time — would
+        # rebuild on every flip between them and the fingerprint would mean
+        # nothing.
+        asked.clear(); sources.STALE[:] = ["de_worldstate"]
+        sources.fetch_json = fake(ws, iso_now)
+        viaproxy = sources.upstream_signature()["resurgence"]
+        asked.clear(); sources.STALE[:] = []
+        sources.fetch_json = fake(ws, iso_now)
+        viade = sources.upstream_signature()["resurgence"]
+        check("signature: one instant fingerprints the same from either source",
+              viaproxy, viade,
+              "DE say 1790877600000 and WFCD say 2026-10-01T18:00:00.000Z")
+
+        # Both refused. The reused copy is better than a fingerprint that changes
+        # every run — that would rebuild forever — but the build log has to say
+        # so, because on this path a rotation genuinely cannot be detected.
+        asked.clear(); sources.STALE[:] = ["de_worldstate"]
+        sources.fetch_json = fake(ws, None)
+        got = sources.upstream_signature()
+        check("signature: with nothing live it still answers rather than churn",
+              got["resurgence"], ms_now)
+        check("signature: having asked both first", asked, ["de", "proxy"])
+    finally:
+        sources.fetch_json, sources.head_cached, sources.fetch = (
+            real_fetch_json, real_head, real_fetch)
+        sources.STALE[:] = real_stale
+
     # The middle link must not be able to abort the build. `fetch` raises
     # SystemExit on a cold critical miss, and a fallback that can raise is not a
     # fallback.
@@ -3857,6 +3958,7 @@ def main() -> int:
                          test_the_feed_log_keeps_a_day_and_survives_a_runner,
                          test_the_worldstate_is_judged_on_its_own_timestamp,
                          test_a_live_feed_asks_de_then_wfcd_then_its_own_cache,
+                         test_the_freshness_fingerprint_takes_the_same_chain_as_the_feeds,
                          test_fissures_read_from_the_first_party_worldstate,
                          test_resurgence_reads_from_the_first_party_worldstate,
                          test_baro_sells_relics_read_off_his_own_manifest,

@@ -2972,6 +2972,44 @@ answers, that an **empty list is a miss** rather than an answer, and that neithe
 a `SystemExit` nor an ordinary exception from the proxy can abort the build. A
 fallback that can raise is not a fallback.
 
+**The fingerprint that decides whether to refresh them had the same bug, and
+kept it three days longer.** `from_chain` closed this trap for every live feed on
+2026-08-28 and did not touch `upstream_signature`, which builds the `--if-changed`
+fingerprint and read DE's worldstate with a bare `fetch_json` — no fallback, no
+freshness judgement. Since `fetch` answers a failed refresh with cached bytes, a
+403 produced a document that parsed perfectly and whose `PrimeVaultTraders`
+`Expiry` **could not have moved**: it was the same file as last time. The
+signature matched, `--if-changed` concluded nothing had changed, and the rebuild
+that was due did not happen.
+
+**Reported by the owner on 2026-09-04**, from watching it rather than from any
+test: a Prime Resurgence rotation turned over and the deployed relic data
+followed about twenty minutes later, across refreshes that had run in between.
+Measured from the deployed feed log the next morning: of 53 consecutive builds
+DE answered **four**, because they 403 the runner's address range — so ~92% of
+ten-minute builds were fingerprinting a copy of a copy. **Fissures were
+unaffected, and that is the tell**: the light path fetches them live either way,
+so only the trader data lagged. A local suite could not have found this; it
+needed the deployed site and somebody looking at it.
+
+Fixed the same day. `upstream_signature` now takes the same three steps, judges
+staleness on the document's own `Time` as well as on `STALE`, and says so in the
+build log on the one path where it still cannot tell — DE and WFCD both refusing,
+where it uses the reused copy rather than a value that changes every run, because
+a fingerprint that never matches is not a fingerprint.
+
+**One instant, one spelling.** DE publish the expiry as a millisecond
+`$numberLong` and WFCD republish it as ISO-8601. The fingerprint is only ever
+compared with its own previous value, so two spellings of one instant would read
+as a rotation *every time the answering source flipped* — which on CI is
+constantly. `_as_millis` normalises both, and a test asserts the two routes
+fingerprint identically. This was caught while writing that test, not in
+review: the first version of the fix traded a missed rebuild for a spurious one.
+
+`WORLDSTATE_MAX_AGE` moved from `build_data.py` to `sources.py` in the same
+change, because both now need it and two copies of a threshold that must agree
+is a drift generator this project has been bitten by before.
+
 **The banner reports what reached the payload, not what `fetch` had to try.** If
 DE refused and the proxy answered, the live feeds *are* current, and `de_worldstate`
 is removed from `STALE` before the payload is written. Leaving it would be a second
