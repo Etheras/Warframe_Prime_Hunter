@@ -21,6 +21,27 @@
     polls five times slower than the API's own cache lifetime, and answers a
     conditional request with 304 and no body when nothing has changed.
 
+    The default -Time is two minutes past the half hour rather than on it, and
+    that offset is load-bearing rather than tidy. Every boundary this dataset
+    names falls on a UTC hour - Prime Resurgence rotations flip at 18:00Z, Baro
+    arrives and leaves at 13:00Z - so a ten-minute grid aligned to :00 reads the
+    live feeds within seconds of every turnover. That is the worst moment to
+    read them: DE regenerate worldState.php about once a minute and their CDN
+    serves whatever it holds, so a read three seconds after a boundary almost
+    always carries a copy stamped before it, and the site then shows the old
+    rotation until the next run ten minutes later. Two minutes past clears that
+    window with roughly 2x margin, at no cost at all - the same cadence, the
+    same number of requests, and a boundary published within about two and a
+    half minutes instead of ten.
+
+    Measured 2026-09-05 against api.warframe.com/cdn/worldState.php, nine
+    readings about seventy seconds apart: the document's own Time stamp ran
+    between 4.8 and 55.1 seconds behind the wall clock, and Cache-Control is a
+    countdown to the next regeneration rather than a policy - max-age and Age
+    summed to exactly 60 every time, and no two readings shared a max-age. So
+    max-age is not the bound on staleness and cannot be used as one; the
+    sixty-second regeneration interval is.
+
     -EveryMinutes 30 or -EveryHours 1 if that is more than you want; the trade is
     only how fresh the fissures are. Five minutes is the floor, and that is manners
     rather than a technical limit.
@@ -45,7 +66,13 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Time = "18:30",
+    # :32 rather than :30, so the ten-minute grid lands at :02, :12, :22 and so
+    # on instead of on the hour. See .DESCRIPTION - the offset is what keeps a
+    # boundary read off the seconds either side of the turnover it is reading.
+    # Whole-hour and half-hour time zones both carry it through to UTC; a
+    # quarter-hour zone lands the grid off the hour anyway and neither gains nor
+    # loses. Anyone passing -Time explicitly is choosing their own phase.
+    [string]$Time = "18:32",
     # Five is the floor on purpose. Task Scheduler will accept one minute, and
     # the endpoint would survive it, but nothing in the data changes that fast -
     # a fissure lasts an hour or two - so anything under five is cost with no
@@ -65,10 +92,20 @@ param(
     # The local refresh above keeps this machine's `data/` current. It does
     # nothing for GitHub Pages, which can only ever be as fresh as its last
     # build - and GitHub's own scheduler is best effort, so the ten-minute cron
-    # in `publish.yml` was measured delivering about one run every forty-four
-    # minutes with a worst gap of two hundred and sixty-eight. Against a fissure
-    # that lives an hour or two, that is a published list which has expired in
-    # full more often than not.
+    # in `publish.yml` delivers a small fraction of its ticks. Re-measured
+    # 2026-09-05 over 247 hours of run history: 99 light builds, a median gap of
+    # 84 minutes, a mean of 151 and a worst of 749 - about one tick in fifteen.
+    # That is worse than the one-run-every-44-minutes this comment recorded on
+    # 2026-09-01, so it is drifting rather than settling. Against a fissure that
+    # lives an hour or two, it is a published list which has expired in full
+    # more often than not.
+    #
+    # The same rate applies to the daily FULL build anchored at 18:05 UTC, which
+    # is one tick in the same lottery: no scheduled run landed in its window on
+    # any of the six days visible on 2026-09-05. What keeps the wiki current in
+    # practice is a push, not that cron. `TODO.md` holds the question of whether
+    # this task should dispatch the full build too, which is build minutes and
+    # so the owner's to answer.
     #
     # A dispatch from here is not subject to that queue, so it turns the
     # configured cadence into the delivered one. It asks for `full=false`, the
@@ -275,7 +312,22 @@ if ($DispatchRemote) {
 # rejects it is only consulted by Register-ScheduledTask. A builder that returns
 # an object is not evidence that the object can be stored. Verify at the layer
 # that can refuse you.
-$trigger = New-ScheduledTaskTrigger -Once -At $Time `
+#
+# The start boundary is pulled back into the past, and that is a fix rather than
+# a flourish. `-At "18:32"` means *today* at 18:32, so registering the task in
+# the morning produced one that sat idle until the evening - a sixteen-hour hole
+# in a ten-minute refresh, with the task reporting State: Ready and a NextRunTime
+# most of a day away. Found on 2026-09-05 by reading NextRunTime back after
+# re-registering, which is the only thing that shows it: every other property is
+# identical either way.
+#
+# For a repeating trigger `-Time` is a phase, not a first run, so moving it to
+# yesterday keeps the grid on exactly the same minutes and starts it now. The
+# hourly and daily cadences keep their phase too, for the same reason.
+$firstRun = Get-Date -Date $Time
+if ($firstRun -gt (Get-Date)) { $firstRun = $firstRun.AddDays(-1) }
+
+$trigger = New-ScheduledTaskTrigger -Once -At $firstRun `
     -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes)
 
 $settings = New-ScheduledTaskSettingsSet `
@@ -306,7 +358,7 @@ if ($EveryMinutes -lt 60) {
 } else {
     $every = "$EveryMinutes minutes"
 }
-Write-Host "Scheduled '$TaskName' every $every, first run $Time."
+Write-Host "Scheduled '$TaskName' every $every, on the $Time phase (running now)."
 Write-Host "  runs: $python `"$scriptPath`" --if-changed"
 if ($DispatchRemote) {
     Write-Host "  then: gh workflow run publish.yml -f full=false"

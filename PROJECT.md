@@ -302,7 +302,7 @@ sends `Retry-After`, and there is no usage policy in the WFCD READMEs or on
 
 | Source | Says | Meaning |
 |---|---|---|
-| `api.warframe.com/cdn/worldState.php` | `max-age=28` | built to be polled |
+| `api.warframe.com/cdn/worldState.php` | `max-age` counting down from 60 | regenerated once a minute, built to be polled |
 | `www.warframe.com/droptables` | `max-age=86400` | about daily |
 | `content.warframe.com/PublicExport/index_en.txt.lzma` | `no-cache` + `ETag` | always revalidate, and it answers 304 |
 | `api.warframestat.us/items` | `max-age=120` | |
@@ -1446,7 +1446,7 @@ other becomes an automatic fallback.
 | **[DE Public Export](https://origin.warframe.com/PublicExport/index_en.txt.lzma)** | Catalogue cross-check — Primes that exist in game data | First party, refreshed on every game build. Catches a new Prime **before the wiki is edited** |
 | [wiki.warframe.com/w/Prime](https://wiki.warframe.com/w/Prime) | Categories and the (V)/(P)/(B)/(S)/Founder markers | The grouping you asked for; the export fills any gaps |
 | [api.warframestat.us/items](https://api.warframestat.us/items) | Which relics drop each component, vault state, release and vault dates, `tradable` | Convenience layer. The part list, the quantities and the Ducat values left it for DE's own manifests on 2026-08-27 |
-| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **All four live feeds**, first party, since 2026-08-27: Void Fissures, Prime Resurgence, the bounty boards and limited-time events | `max-age=28`. Raw shapes, so each has an adapter in `official.py`; §7 has what each one had to resolve |
+| [`api.warframe.com/cdn/worldState.php`](https://api.warframe.com/cdn/worldState.php) | **All four live feeds**, first party, since 2026-08-27: Void Fissures, Prime Resurgence, the bounty boards and limited-time events | Regenerated every 60s, `max-age` counting down to the next one. Raw shapes, so each has an adapter in `official.py`; §7 has what each one had to resolve |
 | `/pc/vaultTrader`, `/pc/fissures`, `/pc/syndicateMissions`, `/pc/events` on `api.warframestat.us` | **Fallback only** since 2026-08-27, and unused on a healthy build | Kept rather than deleted: they normalise the same document, and they can name the Proxima nodes DE's export omits. All four were 404 from 2026-08-24 |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
@@ -3972,9 +3972,29 @@ the build says how many went, and they are dropped; putting `CrewBattleNode522`
 on a card would be worse, and inventing a name worse still. The proxy can name
 them, so this is the fallback tier earning its place rather than a defect.
 
-**`max-age=28`.** DE built this endpoint to be polled, so a ten-minute build is
-comfortably inside what they ask for — see *"Ask no more often than the source
-says to"*.
+**`max-age` is a countdown, not a policy — measured 2026-09-05.** This section
+said **`max-age=28`** and `sources.py` said `max-age=23`, each recording one
+sample as though it were the constant. Nine readings about seventy seconds apart
+settle it: `max-age` and the `Age` header **sum to exactly 60 every time** —
+5+55, 6+54, 11+49, 18+42, 23+37, 28+32, 39+21, 44+16, 55+5, and **no two
+readings shared a `max-age`**. So DE regenerate the
+worldstate on a **sixty-second cycle**, the CDN serves whatever it is holding,
+and `max-age` is the time left before the next one. The number is real and
+should still be honoured; what is wrong is treating any one value as *the*
+figure.
+
+Two consequences, and the second is the one that mattered:
+
+- **A ten-minute build is comfortably inside what they ask for** either way —
+  see *"Ask no more often than the source says to"*. That conclusion never
+  depended on which point of the countdown we happened to sample.
+- **The copy we read is 0–60 seconds behind DE's own `Time` stamp**, spread
+  right across that range: 4.8, 11.5, 16.2, 21.2, 32.5, 37.5, 42.5, 53.8 and
+  55.1 seconds, median 37.5 over the eight-sample run.
+  `sources.py` had already recorded "a document 36 seconds old" on 2026-08-28
+  and filed it as a curiosity. It is not one — it is the whole reason the
+  refresh grid cannot sit on the hour. See *The refresh grid moves two minutes
+  off the hour* below.
 
 One thing this cost, worth recording because it is the failure mode of writing a
 parser against a live source: the first draft of the test asserted an expiry four
@@ -5526,6 +5546,12 @@ wished for, 116 places ranked:
 | randoms | 1 | 21 | 44 | **0** |
 | 4-man premade | – | 15 | 50 | **1** |
 
+*Taken 2026-09-01 with the fissure feed empty, against a payload whose build
+stamp was not written down — which is the whole reason the next reader could not
+tell drift from a broken model. Both omissions are corrected in* **The six-round
+table reproduces once you say what the fissure feed was doing** *below, where the
+four-round column has since read 43/49 and held there.*
+
 So six-round plans did not move from everyone to premades. They very nearly
 **stopped existing**: exactly one row of 66 qualifies even with a team, because
 "wants nothing but rotation A" is rare once a real farm list is loaded. Twelve
@@ -5888,6 +5914,16 @@ sixty-eight. A request sent from the owner's machine turns the configured cadenc
 into the delivered one, and the remaining ceiling is Pages' own ~10 deployments
 an hour — ten-minute triggers sit at six, inside it.
 
+**Re-measured 2026-09-05, and it is getting worse rather than settling.** Over
+247 hours of run history: **99 delivered light builds**, a median gap of **84
+minutes**, a mean of **151** and a worst of **749** — roughly **one tick in
+fifteen**, against one in four and a half when the figure above was taken. The
+dispatch is doing more of the work than this entry claimed, not less. The same
+rate applies to the daily FULL build anchored at `5 18 * * *`, which is one tick
+in the same lottery and landed on **none** of the six days visible; what keeps
+the wiki current in practice is a push. Whether the machine should dispatch that
+one too is in `TODO.md` — it spends build minutes, so it is the owner's call.
+
 **The trap, and it is the whole reason this needed a workflow change first.**
 `FULL` was `github.event_name != 'schedule' || ...`, so **every** dispatch took
 the full path: the wiki, the drop tables and DE's export, re-downloaded. Firing
@@ -6079,12 +6115,124 @@ four-round column reads 43/49 today against a recorded 44/50, while every other
 cell and the 116-place total match exactly. Nothing on screen is wrong and the
 decision stands; one endless node moved in a daily rebuild. **A table of live
 measurements needs the payload's build stamp beside it**, or its next reader
-cannot tell drift from a broken model.
+cannot tell drift from a broken model. *Followed up 2026-09-05 — see* **The
+six-round table reproduces once you say what the fissure feed was doing** *below;
+the missing condition turned out to matter more than the missing row.*
 
 **And the sweep itself is evidence for the browser rule.** The static checks that
 matter here — `node --check`, `ast.parse`, the XML test — pass on all of this and
 say nothing about any of it. The connection cap, the read-only cache and the
 panel geometry each needed the thing actually running.
+
+### The six-round table reproduces once you say what the fissure feed was doing
+
+**Re-measured 2026-09-05**, closing the entry the 2026-09-02 sweep opened. The
+build is stamped `2026-09-04T23:20:02+00:00`; 35 farmable Primes wished, ranked
+list expanded, `.rounds` read off every row on the real `plan.html`:
+
+| rounds | 2 | 3 | 4 | 6 | total |
+|---|---:|---:|---:|---:|---:|
+| randoms, recorded 2026-09-01 | 1 | 21 | **44** | 0 | 66 |
+| randoms, 2026-09-02 | 1 | 21 | **43** | 0 | 65 |
+| **randoms, 2026-09-05** | 1 | 21 | **43** | 0 | **65** |
+| premade, recorded 2026-09-01 | – | 15 | **50** | 1 | 66 |
+| premade, 2026-09-02 | – | 15 | **49** | 1 | 65 |
+| **premade, 2026-09-05** | – | 15 | **49** | 1 | **65** |
+
+116 places both ways, as recorded. So the one-row move was a **single event
+between 2026-09-01 and 2026-09-02, not drift** — three days and a Prime
+Resurgence rotation flip later (the current window activated 2026-09-03T18:00Z,
+so 09-02 and 09-05 sit on either side of it) the numbers are identical to the
+digit. That is worth more than recovering which node left: it says the model is
+steady and the catalogue moved once.
+
+**The missing condition was the real defect, and it was not the build stamp.**
+The 2026-09-02 note recorded *"with no row showing a fissure"* as an
+observation. It is not an observation, it is a **precondition**: a live fissure
+changes an endless node's run length, and the first re-run today — with 19
+fissures in the payload — read `2r:1 3r:21 4r:39 5r:4` for randoms and
+`3r:15 4r:45 5r:4 6r:1` for a premade. Every recorded figure moves, and a
+five-round column appears that the table has no space for. Both earlier runs
+matched only because the feed happened to be quiet, which `CLAUDE.md` already
+warns is the common state.
+
+So the recipe, and it is the thing that makes this re-runnable at any hour
+rather than only on a lucky one:
+
+1. Serve the pages, open `plan.html` on a cold profile.
+2. Write every item with `farmableRelics` into `wfprimes.wishlist.v1`, reload.
+3. **Serve `data/prime-data.js` with `fissures` emptied *and* `data/fissures.json`
+   emptied.** Emptying the payload alone does nothing — `shared.js` polls that
+   second file after load and splices the live list back in, which is how the
+   first attempt measured 8 fissure rows on a payload showing none.
+4. Click `#moreNodes` until `aria-expanded="true"`, then count `.rounds` per row.
+5. Record the `meta.generated` stamp beside the numbers.
+
+**No test was added, deliberately.** The numbers are a property of DE's current
+drop tables, so an assertion on 43 would go red on a vault rotation and mean
+nothing when it did. What the entry needed was a stated precondition and a build
+stamp, and it now has both.
+
+### The refresh grid moves two minutes off the hour
+
+**Decided and shipped 2026-09-05**, answering *An anchor for the ten-minute
+refresh, from the data rather than a grid*, which the owner left to this session.
+
+**The answer to the question asked is no.** The dispatch should not be driven
+from the boundaries the payload names. Three reasons, in order of weight:
+
+- **Every boundary this dataset has already falls on a UTC hour.** Prime
+  Resurgence flips at 18:00Z (`meta.resurgence`, monthly), Baro arrives and
+  leaves at 13:00Z (`meta.baro`, fortnightly). A ten-minute grid hits all of
+  them for free. There is nothing a derived schedule would reach that the grid
+  does not.
+- **Task Scheduler triggers are local time**, so a UTC boundary needs converting
+  at registration and then breaks at the next DST change — and Baro's window
+  moves every fortnight, so a static daily trigger would fire fourteen times per
+  useful firing.
+- The backlog entry's own objection stands: it trades a simple schedule for one
+  that has to be re-derived.
+
+**But the question was pointing at something real, and it is the phase.** The
+grid was aligned to `:00`, and the local task fires 2–3 seconds after its tick
+(measured across a day of `data/feed-log.json`: every row at `:00:02`, `:10:02`,
+… with two twenty-minute gaps). So the one run in six hundred that reads a
+turnover was reading it **three seconds after it turned** — and DE regenerate
+`worldState.php` on a sixty-second cycle, serving a copy 0–60 seconds behind its
+own `Time` stamp (nine readings, §7 above). A read three seconds past a boundary
+therefore usually carries a copy stamped **before** it, and the site shows the
+old rotation until the next run ten minutes later.
+
+**So the default `-Time` moved from `18:30` to `18:32`** in `schedule.ps1`, and
+`AT` likewise in `schedule.sh`, which puts the grid on `:02, :12, :22, …` and the
+cron line on `2-59/10`. Two minutes clears DE's whole cycle with 2x margin — the
+same margin `publish.yml` takes for the daily build. It costs **nothing**: same
+cadence, same request count, no new machinery, no re-derivation, and a boundary
+now published within about two and a half minutes instead of ten. Whole-hour and
+half-hour time zones both carry the offset through to UTC; a quarter-hour zone
+never lands on the hour anyway.
+
+Pinned by a test, because every other property of the task looks identical either
+way: the registered trigger's start minute modulo the repetition interval must be
+at least 2. Verified by moving it back to `18:30` and re-running — exactly that
+check goes red, and nothing else does.
+
+**`publish.yml`'s `*/10` was deliberately left alone.** Shifting its phase would
+be a change that reads as a fix and is not: GitHub delivers that cron a median
+**5.4 minutes late** (30 runs; min 0, max 9.8 minutes), so its phase is already
+effectively random and there is nothing to align.
+
+**Two things found on the way that are not fixed here.** GitHub's scheduler
+delivers about **one tick in fifteen** — 99 light builds over 247 hours, median
+gap 84 minutes, worst 749 — and the daily FULL build anchored at `5 18 * * *`
+draws from the same lottery and landed on **none** of the six days visible. And
+`New-ScheduledTaskTrigger -Once -At "18:32"` means *today* at 18:32, so
+re-registering in the morning built a task that reported `State: Ready`,
+`Interval PT10M` and an empty duration — every property the suite already
+checked — and then sat idle for sixteen hours. Found by reading `NextRunTime`
+back, which is the only field that showed it. Fixed by phasing the start
+boundary back a day, since for a repeating trigger `-Time` is a phase and not a
+first run, and pinned by its own assertion.
 
 ---
 

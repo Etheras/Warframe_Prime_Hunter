@@ -21,11 +21,22 @@ on:
     #
     # **Five minutes, not forty** (owner, 2026-09-04). Forty was arbitrary and
     # left the site a rotation behind for most of an hour. Five is the smallest
-    # offset that is safely *after* the turnover: DE declare `max-age=28` on the
-    # worldstate and WFCD `max-age=120` on their copy, so the new rotation is
-    # visible within ~2.5 minutes even by the fallback route. That is roughly
-    # 2x margin, and GitHub's scheduler only ever runs a cron LATE, never early,
-    # so the offset cannot be eaten from the front.
+    # offset that is safely *after* the turnover: DE regenerate the worldstate
+    # every 60 seconds and WFCD declare `max-age=120` on their copy, so the new
+    # rotation is visible within ~2.5 minutes even by the fallback route. That
+    # is 5x margin on the first-party route and 2.5x on the fallback, and
+    # GitHub's scheduler only ever runs a cron LATE, never early, so the offset
+    # cannot be eaten from the front.
+    #
+    # This comment said `max-age=28` until 2026-09-05, when nine readings showed
+    # max-age is a countdown to DE's next regeneration rather than a fixed
+    # window (`PROJECT.md §7`). The choice of five minutes is unaffected - it
+    # was always the margin that mattered, and the margin got larger.
+    #
+    # **What is NOT working is the delivery.** GitHub ran this cron on none of
+    # the six days visible on 2026-09-05; scheduled runs of this workflow land
+    # about one tick in fifteen, and a once-a-day tick draws from the same
+    # lottery. What actually rebuilds the wiki is a push. `TODO.md` holds it.
     #
     # **It is deliberately not anchored to DE's patch cadence, which cannot be
     # anchored to.** Measured 2026-09-04 from Last-Modified on the export

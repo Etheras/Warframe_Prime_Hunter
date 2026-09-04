@@ -124,8 +124,12 @@ DE_TEXTURES = "https://content.warframe.com/PublicExport"
 # endpoints above serve: ActiveMissions and VoidStorms (fissures),
 # SyndicateMissions and Events (bounties), PrimeVaultTraders (Resurgence).
 #
-# `Cache-Control: max-age=28` — DE built this to be polled, so a ten-minute build
-# is well inside what they ask for. The two hosts `PROJECT.md §6` records as 404
+# `Cache-Control` counts down from 60 rather than declaring a fixed window: DE
+# regenerate this once a minute and the header says how long until the next one,
+# so max-age and Age always sum to 60 (measured across nine readings 2026-09-05,
+# `PROJECT.md §7`). This comment said `max-age=28` and the one below said 23;
+# both were single samples of a countdown. Either way DE built this to be polled
+# and a ten-minute build is well inside it. The two hosts `PROJECT.md §6` records as 404
 # are `/dynamic/worldState.php` on content. and origin.warframe.com; those are
 # still 404 and this is a third host nobody had tried until 2026-08-27.
 WORLDSTATE = "https://api.warframe.com/cdn/worldState.php"
@@ -135,15 +139,18 @@ STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 # How old DE's worldstate may be, by its own `Time` stamp, and still count as a
 # live first-party answer.
 #
-# Not invented: DE declare `Cache-Control: max-age=23` on it, and a successful
-# fetch on 2026-08-28 returned a document 36 seconds old. The scheduled refresh
-# runs every ten minutes. So fifteen leaves room for a slow build, a clock a
-# little out, and a refresh that ran late, while still being far below the hour
-# or two a fissure lasts — which is the thing this protects.
+# Not invented: DE regenerate the worldstate every 60 seconds and their CDN
+# serves whatever it holds, so what arrives is 0-60 seconds behind its own `Time`
+# stamp — measured right across that range on 2026-09-05, and the "36 seconds
+# old" this comment recorded on 2026-08-28 is one draw from it rather than the
+# curiosity it was filed as. The scheduled refresh runs every ten minutes. So
+# fifteen minutes leaves room for a slow build, a clock a little out, and a
+# refresh that ran late, while still being far below the hour or two a fissure
+# lasts — which is the thing this protects.
 #
-# It is a *detector*, not a request throttle. `still_fresh` honours DE's 23
-# seconds and is what stops us asking too often; this decides whether what came
-# back can be believed.
+# It is a *detector*, not a request throttle. `still_fresh` honours whatever
+# max-age the response carried and is what stops us asking too often; this
+# decides whether what came back can be believed.
 #
 # It lives here rather than in `build_data.py`, where it was until 2026-09-04,
 # because `upstream_signature` below needs the same judgement and two copies of

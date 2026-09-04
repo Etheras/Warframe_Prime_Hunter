@@ -890,6 +890,18 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
          "{ ($t.Actions | ForEach-Object { \"$($_.Execute) $($_.Arguments)\" }) "
          "-join \"`n\" }"],
         cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
+    # "<StartBoundary>|<is it already in the past>", read separately rather than
+    # appended to `read` above, whose two fields are unpacked by position in
+    # three places. The comparison is done in PowerShell because StartBoundary
+    # carries a UTC offset and [datetime] reads one correctly, where
+    # re-implementing ISO parsing here would be a second thing to get wrong.
+    boundary = lambda: subprocess.run(                            # noqa: E731
+        [shell, "-NoProfile", "-Command",
+         f"$t = Get-ScheduledTask -TaskName '{probe}' -ErrorAction SilentlyContinue; "
+         "if ($null -eq $t) { 'ABSENT' } else "
+         "{ \"$($t.Triggers[0].StartBoundary)|\" + "
+         "[bool]([datetime]$t.Triggers[0].StartBoundary -le (Get-Date)) }"],
+        cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
 
     try:
         made = run()
@@ -902,6 +914,49 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
         check("schedule: with no duration, which is how it means indefinitely",
               duration, "",
               "a bounded duration registers fine and then stops refreshing")
+
+        # The grid must not land on the hour, and that is correctness rather
+        # than taste. Every boundary this dataset names falls on a UTC hour -
+        # Prime Resurgence flips at 18:00Z, Baro arrives and leaves at 13:00Z -
+        # so a ten-minute grid phased to :00 reads each turnover seconds after
+        # it turns. Measured 2026-09-05 against DE's worldState.php over nine
+        # readings: max-age and Age sum to exactly 60 every time (5+55, 6+54,
+        # 11+49, 18+42, 23+37, 28+32, 39+21, 44+16, 55+5), so DE regenerate it
+        # once a minute, the copy served is 0-60 seconds behind its own Time
+        # stamp, and a read three seconds past a boundary usually carries one
+        # stamped before it. The site then shows the old rotation until the
+        # next run ten minutes on.
+        #
+        # The lower bound is the property; the exact phase is not. One minute
+        # would clear DE's cycle, two is the same 2x margin publish.yml uses
+        # for the daily build, and anything up to :08 only delays pickup.
+        #
+        # `% 10` rather than the interval, because this runs before the
+        # -EveryMinutes cases below and so is reading the default cadence.
+        stamp = boundary()
+        found = re.search(r"T\d{2}:(\d{2}):", stamp)
+        check_true("schedule: the trigger reports a start time to phase from",
+                   bool(found), f"read back {stamp!r}")
+        phase = int(found.group(1)) % 10 if found else 0
+        check_true("schedule: the ten-minute grid does not land on the hour",
+                   phase >= 2,
+                   f"start minute {stamp[11:16]} puts the grid {phase} minute(s) "
+                   "past the hour, inside the 60-second window DE's worldstate "
+                   "cache serves from - so the run that reads a boundary is the "
+                   "one most likely to miss it")
+
+        # And the trigger has to have started. `-At "18:32"` means TODAY at
+        # 18:32, so registering in the morning built a task that reported
+        # State: Ready, Interval PT10M, an empty duration - every property this
+        # test already checked - and then did nothing at all until the evening.
+        # A sixteen-hour hole in a ten-minute refresh, visible only in
+        # NextRunTime. Fixed 2026-09-05 by phasing the start boundary back a
+        # day; asserted here because nothing else about the task looks wrong.
+        check("schedule: and the repetition has already started",
+              stamp.rpartition("|")[2], "True",
+              f"start boundary {stamp.partition('|')[0]} is still in the future, "
+              "so the task will sit idle until it arrives - a repeating trigger "
+              "takes -Time as a phase, not as a first run")
 
         # The owner's word for the console window this used to open was
         # "disaster" - 144 times a day, taking focus each time.

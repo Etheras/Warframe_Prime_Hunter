@@ -1229,8 +1229,8 @@ def main() -> int:
     items_raw = fetch_json(ITEMS_API, "api_items", off, critical=False) or []
 
     # One document, several feeds. DE publish the whole worldstate in one place
-    # and it is `max-age=28`, so it is fetched once here and read by everything
-    # below that used to have its own endpoint on the proxy.
+    # and regenerate it every 60 seconds, so it is fetched once here and read by
+    # everything below that used to have its own endpoint on the proxy.
     log("worldstate: Digital Extremes' live worldstate")
     worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
                             critical=False, optional=True, max_age=3 * 3600)

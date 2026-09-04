@@ -54,7 +54,8 @@ was ever going to:
 |---|---|---|
 | ~~The freshness fingerprint asks DE directly~~ | **fixed 2026-09-04**, same day it was reported; reasoning in `PROJECT.md §7` | done |
 | ~~The scheduled task steals focus every ten minutes~~ | **fixed 2026-09-04** with `conhost --headless`; reasoning in `PROJECT.md §6` | done |
-| An anchor for the ten-minute refresh, from the data rather than a grid | the boundary is published (`18:00 UTC`); the grid ignores it | owner's call |
+| ~~An anchor for the ten-minute refresh, from the data rather than a grid~~ | **decided and shipped 2026-09-05**: no derived schedule, but the grid moved two minutes off the hour; reasoning in `PROJECT.md §7` | done |
+| The daily FULL build's anchor is not being delivered | found while answering the above — GitHub ran that cron on none of the six days visible; the remedy spends build minutes | owner's call |
 | Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
 | Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
 
@@ -218,13 +219,13 @@ app rather than by anything written here.
 *Seven rotation-bearing mission types* is what remains of the entry that gated the
 unit question — tedious rather than hard, and blocking nothing.
 
-**One measurement in this family stopped reproducing**, found by the sweep of
-2026-09-02 and filed below as *The six-round table's four-round column no longer
-reproduces*. The decision it supports is untouched — 116 places, zero six-round
-rows for randoms and exactly one for a premade all still measure exactly — but
-one four-round row has gone missing since the table was written, so a re-run no
-longer matches the page. **A measurement nobody can re-run is the thing this file
-keeps asking entries to be**, which is why a one-row drift is worth a line.
+**One measurement in this family stopped reproducing** and was **settled
+2026-09-05** — reasoning in `PROJECT.md §7`. Short version: the four-round column
+has read 43/49 on every re-run since 2026-09-02, across a Resurgence rotation
+flip, so the missing row was one event rather than drift. The useful finding was
+elsewhere — the table's real omission was not the build stamp but the **state of
+the fissure feed**, which changes every figure in it and was recorded as an
+observation rather than a precondition.
 
 ### Interface
 
@@ -588,39 +589,28 @@ A third option worth naming only to reject it: publishing an emptier list is not
 better, because the page already renders the empty case correctly and the reader
 still learns nothing.
 
-### The six-round table's four-round column no longer reproduces
-
-`PROJECT.md:5144` records the measurement that settled *Six rounds is a premade's
-option*:
-
-| rounds | 2 | 3 | 4 | 6 |
-|---|---:|---:|---:|---:|
-| recorded | 1 | 21 | **44** | 0 |
-| 2026-09-02 | 1 | 21 | **43** | 0 |
-
-Driven through the real page the way the entry describes — every farmable Prime
-wished for — **116 places ranked**, matching exactly, and the load-bearing
-figures match exactly too: **zero** six-round rows for randoms and **exactly one**
-for a 4-man premade. Only the four-round cell is one short, in both rows
-(premade reads 49 against a recorded 50), so the recorded totals of 66 are 65
-today. Not fissure-driven — re-measured after the live feed settled, with no row
-showing a fissure.
-
-Something in the daily rebuild moved one endless node between 2026-09-01 21:47
-and now. **Nothing is wrong on screen** and the decision the table supports is
-untouched. What it costs is the property that made the entry good: a measurement
-somebody can re-run. **Size: small** — re-measure, and record the payload's build
-stamp beside the numbers so the next mismatch is legible instead of alarming.
-
 ---
 
 ## Findings of 2026-09-04
 
-### An anchor for the ten-minute refresh, from the data rather than a grid
+### ~~An anchor for the ten-minute refresh, from the data rather than a grid~~
 
-**Asked for by the owner 2026-09-04, and still open** — the defect that shared
-this reporting is fixed, this is the improvement that sat behind it. The
-boundary is **18:00 UTC exactly** and is published rather than inferred:
+**Decided and shipped 2026-09-05**, reasoning in `PROJECT.md §7` under *The
+refresh grid moves two minutes off the hour*. The answer to the question as
+asked was **no** — every boundary this dataset names already falls on a UTC hour,
+so the grid reaches all of them, and a derived schedule would cost DST fragility
+and fourteen firings per useful one for a fortnightly trader. What was actually
+wrong was the grid's **phase**: it sat on `:00` and fired 2–3 seconds after each
+tick, inside the sixty-second cycle DE regenerate the worldstate on, so the one
+run that read a turnover usually read a copy stamped before it. The default
+moved to `:02` in both schedule scripts and is pinned by a test.
+
+**What is left of it is a different question and is below**: *The daily FULL
+build's anchor is not being delivered*. The rest of this entry is kept because
+the patch-cadence measurement in it is still the reason nothing is scheduled
+against DE's release times.
+
+The boundary is **18:00 UTC exactly** and is published rather than inferred:
 `PrimeVaultTraders[0]` carries `Activation 2026-09-03T18:00:00Z` and
 `Expiry 2026-10-01T18:00:00Z`, so nothing has to guess when a rotation turns
 over. The daily FULL build is anchored to it, and moved from `40 18 * * *` to
@@ -668,14 +658,45 @@ retrying hard, and countdowns between fetches are recomputed locally from an
 expiry attribute instead of costing a request. Our pages already do the second
 of those for Baro's label and the fissure countdowns.
 
-**What this would change here.** GitHub's cron cannot be steered — five minutes
-is its floor and runs are dropped under load, which is why the dispatch from this
-machine exists at all. But the dispatch *is* steerable: `tools/schedule.ps1`
-could fire on the boundaries the payload already names instead of every ten
-minutes flat, or simply add a run a minute after each known boundary on top of
-the grid. **Not decided** — it trades a simple schedule for one that has to be
-re-derived, and the owner should choose. The 18:00 UTC Resurgence flip is the
-cheapest possible first case: one extra dispatch a day, at a time the data states.
+**What this changed here, 2026-09-05.** Neither of the two options this entry
+offered. `tools/schedule.ps1` does not fire on derived boundaries and does not
+add a run after each one; the grid it already had was **moved two minutes off
+the hour**, which reaches every boundary in the data for nothing, because all of
+them are on a UTC hour to begin with. `PROJECT.md §7` has the full reasoning and
+the measurements. The `browse.wf` refresh-at technique above stays a *reference*
+and is not adopted: re-deriving a deadline is the cost this entry named, and a
+static two-minute offset buys the same correctness without it.
+
+### The daily FULL build's anchor is not being delivered
+
+**Found 2026-09-05** while answering the entry above, and it is the more
+consequential half. The daily FULL build was moved to `5 18 * * *` on 2026-09-04
+so it would sit just after the Resurgence turnover. Measured on 2026-09-05:
+**no scheduled run has landed in that window on any of the six days visible**
+(`gh run list --workflow publish.yml --event schedule`; the same holds for the
+`40 18` it replaced, on the days that one was live).
+
+It is not a bug in the cron expression. GitHub delivers scheduled runs of this
+workflow at about **one tick in fifteen** — 99 light builds over 247 hours,
+median gap 84 minutes, mean 151, worst 749 — and a once-a-day tick draws from
+exactly the same lottery. A daily cron delivered at that rate arrives roughly
+**once every three weeks**.
+
+**What actually keeps the wiki current is a push.** `FULL` is true for `push`,
+for a dispatch with `full=true`, and for the `5 18` schedule. On a week with no
+commits, the wiki, the drop tables and DE's export are not re-read at all — and
+nothing says so, because the light build succeeds and publishes a fresh-looking
+site the whole time.
+
+**The obvious remedy is one line, and it spends money, so it is the owner's.**
+`tools/schedule.ps1` already dispatches `publish.yml -f full=false` every ten
+minutes and is not in GitHub's queue. A second trigger once a day asking for
+`full=true` would deliver the anchored build the same way the light one is
+delivered. The cost is one full rebuild a day of build minutes and Pages quota
+that is currently only being paid when it happens to fire — so this is an
+*increase*, not a substitution, and hard rule 11 wants it deliberate. **Size:
+small.** Worth checking first whether pushes alone have been keeping it current
+often enough to matter.
 
 ### Vendor `ItemType` paths have a general rule, and we found one case of it
 
@@ -935,6 +956,36 @@ gap is now measured rather than suspected, but nothing has been decided about
 it — the relic-level shelf shipped and the item-level marker was left exactly as
 it was. See *Baro's actual stock is published, and never read* above for what
 that entry still holds open.
+
+**The nine, re-read from the payload 2026-09-05** so that whoever decides this
+is looking at the actual set rather than a count:
+
+| item | relics | still dropping | on his shelf today |
+|---|---:|---:|---|
+| Volt Prime | 12 | 0 | |
+| Gotva Prime | 0 | 0 | |
+| Aklex Prime | 2 | 0 | |
+| **Akmagnus Prime** | 1 | 0 | **`Axi M5`** |
+| Akvasto Prime | 1 | 0 | |
+| Lex Prime | 127 | 8 | |
+| **Magnus Prime** | 20 | 0 | **`Axi M5`** |
+| Vasto Prime | 27 | 0 | |
+| Odonata Prime | 17 | 0 | |
+
+Two things that table makes plain and the count did not. **The two he is
+actually selling are fed by a single relic** — `Axi M5` carries Akmagnus
+Blueprint and Link plus Magnus Barrel, Blueprint and Receiver — so "his stock
+covers two of nine" is one relic, not two independent hits. And **Gotva Prime
+carries the flag with no relics at all**, which is the separate wiki
+disagreement already filed under *Gotva Prime is marked `(S)` but is a Baro
+Ki'Teer item*; whatever is decided here has to say what a marker means on an
+item no relic can produce.
+
+The asymmetry worth naming before choosing: `flags.baro` is a **static wiki
+marker** read once per build, while the shelf is a **live feed** that is empty
+between visits and held 41 rows with one relic on 2026-09-04. They are not two
+views of one fact, and a change that quietly replaced the first with the second
+would drop seven items off the collection view entirely.
 
 Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still

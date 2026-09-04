@@ -39,19 +39,32 @@ ROOT=$(pwd -P)
 
 EVERY=0            # hours; 0 means "not given", so the minute cadence stands
 EVERY_MIN=10
-AT="18:30"
+# :32, not :30, so the ten-minute grid lands at 2-59/10 rather than on the hour.
+# The offset is load-bearing and the reasoning is in schedule.ps1's .DESCRIPTION:
+# every boundary this dataset names falls on a UTC hour, DE regenerate the
+# worldstate about once a minute, and a grid aligned to :00 therefore reads each
+# turnover a few seconds before it has actually turned over. Two minutes past
+# clears it with roughly 2x margin and costs nothing - same cadence, same
+# requests. --at picks your own phase if you want one.
+AT="18:32"
 ACTION=install
 # --dispatch-remote: also force the DEPLOYED site to rebuild, on the same
 # schedule. The job above keeps this machine's data/ current and does nothing
 # for GitHub Pages, which is only ever as fresh as its last build -- and
-# GitHub's scheduler is best effort, measured at about one run every 44 minutes
-# against a configured ten, with a worst gap of 268. A dispatch from here is not
-# in that queue, so it turns the configured cadence into the delivered one.
+# GitHub's scheduler is best effort. Re-measured 2026-09-05 over 247 hours of
+# run history: 99 light builds against a configured ten minutes, a median gap of
+# 84 minutes, a mean of 151 and a worst of 749 - about one tick in fifteen, and
+# worse than the one-run-every-44-minutes measured on 2026-09-01. A dispatch
+# from here is not in that queue, so it turns the configured cadence into the
+# delivered one.
 #
 # It asks for full=false, the light path: restore the cache read-only and run
 # build_data.py --if-changed, which fetches the export index, one HEAD to the
 # drop table, the trader window and the fissures, all conditional. The wiki and
-# the drop tables are NOT re-downloaded -- those stay on the daily 18:40 build.
+# the drop tables are NOT re-downloaded -- those stay on the daily build, which
+# moved from 18:40 to 18:05 UTC on 2026-09-04 to sit just after the Resurgence
+# turnover. That daily cron draws from the same lottery as the ten-minute one
+# and has been missing: TODO.md holds the question of dispatching it too.
 #
 # Needs the GitHub CLI, authenticated, with permission to run workflows here.
 # Off by default: it spends build minutes and Pages quota.

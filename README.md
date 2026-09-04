@@ -581,6 +581,14 @@ That is well inside what the source asks for. The fissure list is served with a
 two-minute cache lifetime of its own, so this asks five times *less* often than the
 API is happy to answer, and asks conditionally on top of that.
 
+The task runs at **two minutes past** each ten-minute mark rather than on it, and
+that is on purpose. The things that change on a schedule in this game change on
+the hour — Prime Resurgence rotations turn over at 18:00 UTC, Baro arrives and
+leaves at 13:00 UTC — while Digital Extremes rebuild the live world state once a
+minute. A check that ran exactly on the hour would usually be reading the state
+from *just before* the turnover, and would then show the old one for another ten
+minutes. Two minutes past clears that with room to spare, and costs nothing.
+
 While the page is open it re-reads the fissure list on the same ten minutes, from
 this site and nowhere else, so a tab you left open in the morning is still right
 after lunch without a reload.
@@ -590,8 +598,13 @@ Only the scheduling is Windows-specific — the build itself runs anywhere.
 Useful variations:
 
 ```bash
-powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:00
+powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:02
 ```
+
+`-Time` sets the phase the repeating checks land on, not a one-off start time —
+so pick a minute that is **not** a multiple of your interval, for the reason
+above. `08:00` with the default ten-minute cadence would put every check exactly
+on the hour, which is the one phase worth avoiding.
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryMinutes 30
@@ -772,9 +785,14 @@ only the fissure list, so the published planner marks tonight's fissures the sam
 way a local copy does. Your own scheduled task is now a preference rather than a
 necessity.
 
-Worth knowing: GitHub's schedules are best-effort. Runs are queued and can be
-delayed or skipped when the service is busy, so ten minutes is what it aims for
-rather than a promise.
+Worth knowing: GitHub's schedules are best-effort, and in practice that is a
+large gap rather than a small one. Measured on this repository over ten days:
+runs asking for every ten minutes were delivered about **one time in fifteen** —
+a median of 84 minutes between them, and a worst gap of twelve hours. So ten
+minutes is what the published copy aims for, not what it gets. If you want the
+cadence you configured, run the scheduled task on your own machine and add
+`-DispatchRemote` (below), which asks GitHub to rebuild directly instead of
+waiting in that queue.
 
 > The workflow has **read-only** access to your code and uses no secrets or API
 > keys — every source it touches is public.
