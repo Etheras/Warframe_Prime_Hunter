@@ -242,12 +242,12 @@ observation rather than a precondition.
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
-| The deployed site shows no fissures for hours at a time | session — what is left of the owner's 2026-09-02 report once the Steel Path half shipped (`PROJECT.md §7`); 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
+| The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
 | ~~Kavasa Prime Collar's search rows stutter its name~~ | **finished 2026-09-05** — the search rows already used `partLabel`; the *Still needed* rows did not, and now do |
 | ~~The server's own 404 page violates the CSP it sends~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
 | ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~ | **shipped 2026-09-05** — on means capped, default off, bonus lives on the off side; `PROJECT.md §7` |
 | ~~The two Baro badges should filter differently from each other~~ | **shipped 2026-09-05** — the Baro box answers for what he holds now, the rest need *Vaulted* too; `PROJECT.md §7` |
-| The forms are too wordy, and *Effort (optional)* changes its rows | **wording done 2026-09-05** — the traces tooltip is down 47% and the *Effort* panel's visible prose down 89%; what is left is the saved-but-unranked row, now a choice rather than a blocker |
+| The forms are too wordy, and *Effort (optional)* changes its rows | **wording done 2026-09-05**, visible prose down 89%. What is left is **decided and unbuilt**: a saved value for an unranked type must stop counting — measured to flip the whole list to per-minute ranking from a row nobody can see. Size: small |
 | ~~The *Vaulted* count includes eight Primes it cannot reveal on its own~~ | **withdrawn 2026-09-05 — it never did.** `vaulted` is a fallback bucket, not a flag-driven one, so those eight carry `["baro"]` alone; `PROJECT.md §7` |
 
 ### One refactor
@@ -590,39 +590,117 @@ closed.**
   owner's machine is awake, so the hours it is off are still covered by the same
   best-effort cron as before. Whether that is enough is a judgement to make after
   living with it, and there is nothing to build until it is made.
-- **Let the page read a live feed itself. — kept open, and expected to be
-  withdrawn.** The only version that tracks a one-hour object independently of
-  any build. It is also the bigger decision: `connect-src 'self'` forbids it
-  today, the privacy footer names the hosts the *build* contacts and would have
-  to name one the *reader* contacts, and rule 11 becomes a question about a
-  browser's request rate rather than a build's.
 
-  **This is on watch rather than on the list.** The dispatch shipped the same
-  day, and the first measurement after it is not close: at 21:15Z the deployed
-  file was **2.4 minutes old and carried 25 fissures, all 25 of them live** —
-  against 2.1 hours old, 31 published and **none** live the previous afternoon.
-  If that holds, the problem this bullet exists to solve does not, and the
-  honest outcome is to delete it rather than to build it.
+  **That judgement was made on 2026-09-05 and it went against the dispatch, on
+  architecture rather than on evidence.** The owner: *"the schedule task that
+  renews the GitHub Pages is not a permanent solution and I'd opt out of it."*
+  A tool whose deployed correctness depends on one particular desktop being
+  switched on is not a property anybody wants to keep, however well it measures
+  — and it measured well (210 builds, worst gap 19.4 min, no overnight hole; the
+  figures are under the live-feed bullet below). **So the eventual end state is
+  `-DispatchRemote` off and the page reading its own feed.** The order matters
+  and is stated below: the feed first, the dispatch removed second, because
+  removing it first returns the site to the best-effort cron that caused the
+  original report. Nothing about `tools/schedule.{ps1,sh}` changes until then —
+  the switch is already off by default, so this is a decision about what to stop
+  recommending, not code to delete.
+- **Let the page read a live feed itself. — CHOSEN by the owner, 2026-09-05.**
+  The only version that tracks a one-hour object independently of any build. It
+  was the bigger decision and it is now the direction, because the owner
+  declined the alternative rather than because the alternative failed: *"the
+  schedule task that renews the GitHub Pages is not a permanent solution and I'd
+  opt out of it."*
 
-  **What would have to be true to withdraw it**, so the judgement is not made on
-  a good afternoon: the deployed file stays inside ten minutes across a normal
-  week, including the hours the owner's machine is asleep, and no reader-facing
-  symptom survives. **What would keep it**: gaps that reopen whenever the machine
-  is off, which is the one hole the dispatch cannot cover by construction.
-  Re-read this entry once there is a week of evidence — not before, because one
-  afternoon is how the ten-minute cron looked too.
+  **The evidence was measured first and it favoured the other answer**, which is
+  worth recording so nobody re-opens this thinking the dispatch was found
+  wanting. Read from the deployed `data/feed-log.json` on 2026-09-05, covering
+  09-04 14:10Z → 09-05 14:02Z: **210 builds, median gap 9.8 min, 90th percentile
+  10.1, worst 19.4, and not one gap over an hour** — including 01:02Z, 06:22Z
+  and 23:30Z, so the overnight hole this entry expected never appeared. The
+  deployed file at the moment of reading was **9.1 minutes old with 25 of its 26
+  fissures still live**. Against 2026-09-02: 2.1 hours old, 31 published, none
+  live. **The dispatch works.** It is being retired as an architecture, not as a
+  failure.
 
-**What is actually open is now one thing: the live feed, and only if the opt-in
-above proves not to be enough.** Size: session, and the decision still comes
-first — it is a CSP change, a privacy-footer change and a rule 11 question about
-a browser's request rate rather than a build's, none of which should be started
-on a hunch. Give the dispatch a few days first; *"at most ten minutes stale while
-the machine is on"* may simply be the answer, in which case this entry closes
-without the second half ever being built.
+  Note the coupling, because it decides the order of work: with the dispatch
+  gone, all that is left is GitHub's best-effort cron — the ~1 tick in 15 that
+  produced the 2.1-hour, zero-live-fissures state in the first place. **So the
+  live feed stops being an optimisation and becomes the thing that makes the
+  page correct.** Do not remove the dispatch before the feed is running.
+
+### How `browse.wf/live` does it, and what measuring it settled
+
+Asked by the owner in the same breath — *"have we investigated how
+`https://browse.wf/live` does it?"* Read 2026-09-05 by driving the page and
+reading its own network requests. **Reference, not a dependency** (`calamity-inc`,
+MIT): nothing copied, no data used, hard rule 9's permitted category.
+
+**They have a backend, which is the way we cannot.** Every request the page makes
+goes to their own origin, and the worldstate comes from
+`https://oracle.browse.wf/worldState.min.json` — their server, fetching DE and
+republishing it. The browser never contacts Digital Extremes. That is our build
+pipeline with a shorter fuse rather than a technique available to a static site
+on GitHub Pages, so the answer to the question as asked is *"not applicably"*.
+
+**Checking it answered a better question.** Headers read with
+`Origin: https://etheras.github.io`:
+
+| source | CORS | `Cache-Control` | size |
+|---|---|---|---|
+| `oracle.browse.wf/worldState.min.json` | `*` | **max-age=10** | 55 KB |
+| **`api.warframe.com/cdn/worldState.php`** (DE, first-party) | **none** | max-age=53, `Age: 7` | — |
+| `api.warframestat.us/pc/fissures` (WFCD) | `*` | **max-age=120** | 10.8 KB |
+
+Three findings, and each one narrows the work:
+
+1. **Digital Extremes is closed to the browser.** No `Access-Control-Allow-Origin`
+   at all, so a `fetch` from our page is blocked by the browser whatever our CSP
+   says. *"The page reads DE directly"* was never an option, and this entry did
+   not know that. A third of the design space is gone.
+2. **WFCD is open, and it publishes the answer to rule 11 rather than leaving it
+   to us.** `max-age=120` **is** the poll rate a reader is allowed — the rule
+   says honour the window the server declares, so two minutes is the source's own
+   number, not one we invent. That was this entry's hardest open question and it
+   turns out to have been answered all along. The fissures-only endpoint is also
+   a fifth the size of a whole worldstate.
+3. **`oracle.browse.wf` is open too and should still be declined.** It is one
+   person's server. Rule 11's hospitality argument is far sharper against a
+   private VPS than against WFCD's public API, and it would make our readers'
+   correctness depend on an individual's uptime.
+
+**The asymmetry to weigh before building.** WFCD is our *fallback*, not our
+first-party source — `from_chain` goes DE → WFCD → cache. A page reading WFCD
+directly means the reader's live list comes from the proxy while the build's
+comes from DE, and the two can disagree. That is a change in provenance rather
+than plumbing, and it belongs in `PROJECT.md §7` when this ships.
+
+**What is left to decide is nothing; what is left to do is scoped.** A CSP
+`connect-src` widened to `https://api.warframestat.us`, the privacy footer
+extended to name a host **the reader** contacts (the `meta.sources.imageHosts`
+list already established that shape), a two-minute poll in `shared.js` beside the
+existing `watchFissures`, and the provenance paragraph. **Size: session.** The
+dispatch stays until it runs.
 
 A third option worth naming only to reject it: publishing an emptier list is not
 better, because the page already renders the empty case correctly and the reader
 still learns nothing.
+
+### The local build published no Void Storms and the deployed build published six
+
+Found 2026-09-05 while measuring the above, and **not investigated** — recorded
+so it is not lost. Both files were generated in the same minute:
+
+| | generated | rows | ordinary | Steel Path | **Void Storm** |
+|---|---|---:|---:|---:|---:|
+| local `data/fissures.json` | 14:02:03Z | 20 | 10 | 10 | **0** |
+| deployed | 14:02:26Z | 26 | 11 | 9 | **6** |
+
+Twenty-three seconds apart, so this is not staleness: the entire difference is
+the six Void Storms, which the local build does not have and the deployed one
+does. Void Storms are the Railjack fissures, so this is reachable from the
+planner whenever *Include Railjack* is on. Cause unknown — a different feed
+source between the two builds is the first thing to check (`meta.feeds` on each
+payload says who answered). Size: small to diagnose, unknown to fix.
 
 ---
 
@@ -1108,17 +1186,46 @@ unranked type has **no unit to print**, because `unit` comes off a node
 (`objectivesOf`), not off the mission type, so a type with nothing ranked has no
 "min / round" or "min / run" to show.
 
-**That blocker was re-checked on 2026-09-05 and it is real, but it is now a
-choice rather than a wall.** `objectivesOf(n)` branches on `isHeist(n)`,
-`n.bounty`, `n.counts` and `n.rounds` — every one of them a property of a
-*node*, so there is genuinely nothing to ask when a mission type has no node on
-the list. What the re-check adds is that an answer already exists and does not
-have to be invented: **the model's universal unit is one reward draw**, settled
-2026-08-27 when `PER_REWARD` was emptied, and *round*, *vault*, *stage* and
-*run* are only that mission's name for it. So a saved-but-unranked row can print
-`min / reward` truthfully, without guessing which word this type would have
-used. **The owner still picks** — that, or leave the row hidden, or go to a
-declared vocabulary — but none of the three is now waiting on a measurement.
+**That blocker was re-checked on 2026-09-05 and it is real**: `objectivesOf(n)`
+branches on `isHeist(n)`, `n.bounty`, `n.counts` and `n.rounds` — every one of
+them a property of a *node*, so there is genuinely nothing to ask when a mission
+type has no node on the list.
+
+**But measuring the harm underneath it dissolved the question, and the harm is
+larger than this entry said.** Driven on the served page with
+`minutes: {Skirmish: 9}` saved and *Include Railjack* switched off, which is
+Skirmish's only home:
+
+| read off the page | |
+|---|---|
+| Effort rows shown | **27** |
+| rows with a value in them | **none** |
+| Skirmish's row | **absent** |
+| the state line | *"**1 set.** Every other type is costed at their average, **9 min**"* |
+| the ranking heading | **"per minute"** |
+| the unit on every row | **"relics / min"** |
+
+So it is not *"it keeps weighing the ranking the moment that type comes back"*.
+**One invisible number flips the whole list from reward-count to per-minute
+ranking and becomes the assumed cost of all 27 visible mission types, now** —
+under a state line reading "1 set" above a panel where nothing is set. `effort()`
+returns non-null on `Object.keys(opts.minutes).length` alone, and `mean` averages
+every saved key whether or not its mission type is ranked. The only escape is
+*clear all*, which clears everything.
+
+**Decided by the owner, 2026-09-05: count only ranked modes.** `minutesSet()`
+filters to the mission types on the current list. The saved number is left
+untouched and counts again when its type returns; nothing invisible ever weighs
+anything; *"1 set"* stops lying. **This needs no unit and adds no row, so the
+`min / reward` question is not answered — it is retired**, along with the
+declared-vocabulary option and the "show the row but keep counting it" option.
+
+Two things to get right when it is built. `renderEffort` reads `minutesSet()`
+too, for the *"N set"* line and for `#effortClear`'s hidden state, so both have
+to move to the filtered set or the note goes on miscounting. And `effort()`'s
+`if (!set.length) return null` is what returns the list to reward-count ranking,
+which is the assertion a test should pin: **a value saved for an unranked type
+must leave the heading reading *per reward***. **Size: small.**
 
 **The wording half is done, 2026-09-05.** The *Capped Void Traces* tooltip went
 from 683 characters to 361 when that switch shipped, and the *Effort (optional)*
