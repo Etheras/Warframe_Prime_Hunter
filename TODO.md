@@ -247,7 +247,7 @@ observation rather than a precondition.
 | ~~The server's own 404 page violates the CSP it sends~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
 | ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~ | **shipped 2026-09-05** — on means capped, default off, bonus lives on the off side; `PROJECT.md §7` |
 | ~~The two Baro badges should filter differently from each other~~ | **shipped 2026-09-05** — the Baro box answers for what he holds now, the rest need *Vaulted* too; `PROJECT.md §7` |
-| The forms are too wordy, and *Effort (optional)* changes its rows | **part done 2026-09-05** — the traces tooltip is down 47%; the *Effort* trim, and the unit an unranked row would print, are what is left |
+| The forms are too wordy, and *Effort (optional)* changes its rows | **wording done 2026-09-05** — the traces tooltip is down 47% and the *Effort* panel's visible prose down 89%; what is left is the saved-but-unranked row, now a choice rather than a blocker |
 | ~~The *Vaulted* count includes eight Primes it cannot reveal on its own~~ | **withdrawn 2026-09-05 — it never did.** `vaulted` is a fallback bucket, not a flag-driven one, so those eight carry `["baro"]` alone; `PROJECT.md §7` |
 
 ### One refactor
@@ -381,11 +381,21 @@ twice.** A third review will file it again. The entry costs a paragraph and
 saves the next reader the work of re-deciding it.
 
 The one thing that came out of looking properly the first time was a *different*
-gap — `filters` and `sort` adopted from a backup without validation. **Half of
-that shipped and half did not**, and the pointer to it has rotted; see the entry
-below.
+gap — `filters` and `sort` adopted from a backup without validation. **Both
+halves have now shipped and the entry is gone**, which is what the heading that
+stood here was pointing at: it had a title, a rotted pointer sentence above it,
+and no body at all, so a reader was sent to nothing.
 
-### A backup's `filters` are adopted whole, and the entry saying so is gone
+Measured 2026-09-05 before deciding what belonged under it. The `filters` half
+shipped on 2026-09-01 (`takeFilters` in `model.js`, typed key by key, pinned by
+four tests). **The half that had not shipped was the planner's `sort`**, and it
+was worse than "not validated": `SORTS[opts.sort] || SORTS.rate` is a bare read
+on an object literal, so `sort: "constructor"` returned the `Object`
+constructor and `scoreBlock` threw on `by.unit` — *Where to go* rendered
+**empty**, not mis-ordered. The collection page had fixed the identical shape
+the same day with `hasOwnProperty` and this file kept the bare read. Both are
+guarded now and a page test carries three keys through a reload.
+`PROJECT.md §7` has the reasoning.
 
 ---
 
@@ -1098,9 +1108,34 @@ unranked type has **no unit to print**, because `unit` comes off a node
 (`objectivesOf`), not off the mission type, so a type with nothing ranked has no
 "min / round" or "min / run" to show.
 
-**The wording half is part-done.** The *Capped Void Traces* tooltip went from 683
-characters to 361 when that switch shipped. The *Effort (optional)* text — the
-"minimize by A LOT" — is untouched.
+**That blocker was re-checked on 2026-09-05 and it is real, but it is now a
+choice rather than a wall.** `objectivesOf(n)` branches on `isHeist(n)`,
+`n.bounty`, `n.counts` and `n.rounds` — every one of them a property of a
+*node*, so there is genuinely nothing to ask when a mission type has no node on
+the list. What the re-check adds is that an answer already exists and does not
+have to be invented: **the model's universal unit is one reward draw**, settled
+2026-08-27 when `PER_REWARD` was emptied, and *round*, *vault*, *stage* and
+*run* are only that mission's name for it. So a saved-but-unranked row can print
+`min / reward` truthfully, without guessing which word this type would have
+used. **The owner still picks** — that, or leave the row hidden, or go to a
+declared vocabulary — but none of the three is now waiting on a measurement.
+
+**The wording half is done, 2026-09-05.** The *Capped Void Traces* tooltip went
+from 683 characters to 361 when that switch shipped, and the *Effort (optional)*
+panel followed: **907 characters of visible prose down to 98**, a single line
+naming the unit, with the reasoning moved into the `<summary>` tooltip where
+`STYLE.md §6` says it belongs. Counting the tooltip, all the panel's text
+together is down 43%. `PROJECT.md §7` has what was cut and why none of it was
+lost. What is left of this entry is the hidden-value half above.
+
+**One thing found while cutting and recorded rather than fixed.** `README.md`'s
+*How long a run costs you — Effort* still says everything is costed **per
+objective**, three paragraphs above saying the row reads *per reward*. The word
+was settled on 2026-08-27 — an objective is whatever pays a reward, and the
+screen was changed to say *reward* then — so the README is carrying the older
+half of a decision it also states correctly further down. One sentence, and it
+is the reader-facing document, so it is worth doing deliberately rather than in
+passing.
 
 ## Defects found by the documentation sweep of 2026-08-15
 

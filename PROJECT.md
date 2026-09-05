@@ -6674,6 +6674,90 @@ right. Hard rule 13 in `CLAUDE.md` says to verify against the tree rather than a
 summary — that applies to a summary this project wrote itself, most of all when
 it is one you wrote yesterday.
 
+### The Effort panel says one thing and hovers the rest
+
+The owner asked for the form text to be trimmed and the *Effort (optional)* text
+"minimized by A LOT", from a screenshot of the deployed site. Measured before
+cutting: **907 characters of visible prose**, in two paragraphs, above a form
+whose whole sidebar is 290px wide.
+
+**Most of it was already on screen twice**, which is what made the cut easy
+rather than a judgement call. `#effortState` — the live hint *under* the rows —
+already says *"Nothing set, so every mission is costed by its reward count —
+four rounds, three vaults, one run"*, which was the first paragraph's opening
+claim verbatim. It already says *"Getting in and out is saved and waits for
+them: a flat N min cannot be charged against a reward count"*, which was the
+second paragraph's closing sentence. And the visual separation the second
+paragraph opened with — *"Below them, the part of a run that is the same however
+far you take it"* — is done by `.effort-run`'s `border-top`, which exists for
+exactly that reason and says so in its own comment.
+
+So what shipped is **98 characters visible**: `Minutes for one reward — a
+Defense round, a Spy vault, a bounty stage.` The reasoning that was not
+duplicated — why one reward is the only unit that holds still, and what 35
+seconds of overhead does to a Capture — moved into the `<summary>` tooltip,
+which is where `STYLE.md §6` puts it: *"default-off options that need explaining
+live under Advanced options with the reasoning in a tooltip, not in surrounding
+prose."* That tooltip went 390 → 637 characters absorbing them, so the panel's
+text **all together** is down 43% while the part you have to read is down 89%.
+
+**Nothing was deleted that only existed here**, and that was checked rather than
+assumed: the two figures worth keeping — a Defense reward is three waves against
+a Survival reward's five minutes, and 35 seconds making a Capture cost 39% more
+— are both in the tooltip. No test read any of the removed prose.
+
+The trim is not the interesting part. **A form that explains itself three times
+does not read as thorough, it reads as a form that does not trust its own
+controls**, and each of those three copies has to be kept true separately. The
+live hint is the one that can never go stale, because it is computed.
+
+### A restored `sort` could empty the ranking, and the guard existed one file away
+
+Found on 2026-09-05 while working out what belonged under a `TODO.md` heading
+that had a title and no body. The rotted pointer above it said the backup
+`filters` work was half shipped; the half that had not shipped turned out to be
+in `plan.js`, and it was not a validation gap so much as a live defect.
+
+`sort` reaches the planner from a restored backup through `PLAN_OPTIONS`, a bare
+list with no shape check. That is deliberate and documented — *a planner option
+of the wrong type is a wrong number, which the page's own reads clamp* — and it
+holds for the twenty numbers in that list. **`sort` is the one entry that is not
+a number**, and its clamp was `SORTS[opts.sort] || SORTS.rate`: a bare property
+read on an object literal, which answers truthily for every name
+`Object.prototype` carries.
+
+Measured, not reasoned about. With `sort: "constructor"` saved:
+
+| | |
+|---|---|
+| `sortBy()` returns | the `Object` constructor — truthy, so the fallback never fires |
+| `scoreBlock` calls | `by.unit(perMin)` at `plan.js:1255`, and `Object.unit` is not a function |
+| what the reader sees | ***Where to go* renders empty** — no rows at all |
+
+So the symptom is a blank ranking rather than a mis-ordered one, which is the
+part worth remembering: the failure is total and looks like "nothing to farm",
+a state the page renders legitimately every day.
+
+**The fix was already written, in the other file.** `app.js` hit the identical
+shape on 2026-09-01 and guarded it with `Object.prototype.hasOwnProperty.call(
+SORTS, state.sort)`, with a comment explaining why. The planner kept the bare
+read for four days — one job, two pages, two spellings, and only one of them
+safe. `plan.js` now normalises `opts.sort` once at load and asks through an
+`isSort` helper at all three read sites.
+
+A page test carries `"constructor"`, `"toString"` and an ordinary unknown key
+through a reload and asserts the list still ranks, the control still names a real
+sort, and the big numbers are still in descending order — `STYLE.md §5`'s rule,
+which is the assertion an unknown key actually breaks, since a `<select>`
+refusing an unknown value can repair the heading while the order stays arbitrary.
+Verified red before the fix, on the first key.
+
+**The general lesson is about where the second copy lives.** This was not an
+un-thought-about case; it was a case somebody had thought about carefully, fixed
+properly, and fixed in one of the two places it occurred. A defect that has
+already been named and repaired somewhere in the tree is the easiest kind to walk
+past, because searching for the *bug* finds the fix and stops.
+
 ---
 
 ## 8. Gotchas discovered while building

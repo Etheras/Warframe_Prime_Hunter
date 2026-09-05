@@ -220,7 +220,26 @@
            heading: () => "ranked on relics per run",
            option: () => "per run" },
   };
-  const sortBy = () => SORTS[opts.sort] || SORTS.rate;
+  /* Asked with `hasOwnProperty`, never as a bare read, and normalised once here
+     rather than clamped at each site.
+
+     `sort` reaches this file from a restored backup through `PLAN_OPTIONS`,
+     which is a bare list with no shape check — the stated reasoning being that
+     a planner option of the wrong type is a wrong *number*, which the page's
+     own reads clamp. `sort` is the one entry in that list which is not a
+     number, and `SORTS[opts.sort]` answers truthily for every name
+     `Object.prototype` carries. Measured 2026-09-05: `sort: "constructor"`
+     returned the `Object` constructor, whose `.unit` is not a function, so
+     `scoreBlock` threw at the first row and *Where to go* rendered **empty** —
+     a blank ranking, not a mis-ordered one.
+
+     The collection page fixed this exact shape on 2026-09-01 (`app.js`, the
+     `hasOwnProperty` line under its own `SORTS`) and this file kept the bare
+     read, so the two pages were doing one job two ways. This is the other
+     half. */
+  const isSort = (k) => Object.prototype.hasOwnProperty.call(SORTS, k);
+  if (!isSort(opts.sort)) opts.sort = "rate";
+  const sortBy = () => (isSort(opts.sort) ? SORTS[opts.sort] : SORTS.rate);
 
   const needOf = (p) => p.itemCount || 1;
   const haveOf = (id, name) => ST.owns(id, name);
@@ -2490,7 +2509,7 @@
   /* ── options ─────────────────────────────────────────────────── */
   const sortSel = $("#p-sort");
   if (sortSel) {
-    sortSel.value = SORTS[opts.sort] ? opts.sort : "rate";
+    sortSel.value = isSort(opts.sort) ? opts.sort : "rate";
     sortSel.addEventListener("change", () => {
       opts.sort = sortSel.value; save(KEY_PLAN, opts); render();
     });

@@ -2948,6 +2948,64 @@ page_test("the ranked number, the order and the heading all say the same thing",
   assert.deepEqual(errors, []);
 });
 
+page_test("a restored sort that is not a sort cannot reach the ranking", async () => {
+  /* `sort` rides in on a backup: it is in `PLAN_OPTIONS`, which is a bare list
+     with no shape check, on the stated reasoning that a planner option of the
+     wrong type is a wrong *number* the page's own reads clamp. `sort` is the
+     one entry in that list which is not a number, and its clamp was
+     `SORTS[opts.sort] || SORTS.rate` — a bare property read on an object
+     literal, so every name `Object.prototype` carries answers truthily.
+
+     `"constructor"` is not a string anyone has to author maliciously. It is the
+     first one a fuzzer finds, it is a plausible key in a hand-edited file, and
+     the resulting object has no `key` and no `unit`, so the list is ordered on
+     `undefined` while the row goes on printing numbers.
+
+     **The collection page already does this correctly** and has since
+     2026-09-01 — `Object.prototype.hasOwnProperty.call(SORTS, state.sort)` in
+     `app.js`, with a comment explaining it. The planner does the same job one
+     file away and kept the bare read. This pins the planner's half.
+
+     The subjects are JavaScript facts rather than anything read off our own
+     data, so none of them goes stale when a vault rotation turns over. */
+  const { page, errors } = await open("/plan.html");
+  await page.evaluate(() => {
+    const ids = window.WFPRIME_DATA.items
+      .filter((i) => (i.farmableRelics || []).length).slice(0, 4).map((i) => i.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ids));
+  });
+
+  /* The last is the ordinary unknown key, which has always fallen back
+     correctly — it is here so the test says what right looks like as well as
+     what wrong looked like. */
+  for (const bad of ["constructor", "toString", "nonsense"]) {
+    await page.evaluate((s) => {
+      const plan = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
+      plan.sort = s;
+      localStorage.setItem("wfprimes.plan.v1", JSON.stringify(plan));
+    }, bad);
+    await page.reload({ waitUntil: "load" });
+
+    const seen = await page.evaluate(() => ({
+      big: [...document.querySelectorAll("#planNodes .spot-score b")].map((b) => Number(b.textContent)),
+      named: document.querySelector("#p-sort").selectedOptions.length
+        ? document.querySelector("#p-sort").selectedOptions[0].textContent.trim() : "",
+    }));
+
+    assert.ok(seen.big.length > 2,
+              `a plan carrying sort:"${bad}" still has to rank something`);
+    assert.match(seen.named, /per (reward|minute|run)/,
+                 `the control has to name a real sort, not "${bad}"`);
+    /* `STYLE.md §5`: the list is ordered by the number the row shows largest.
+       That is the assertion an unknown sort key actually breaks — the heading
+       can be repaired by a <select> refusing an unknown value while the order
+       stays arbitrary. */
+    assert.deepEqual(seen.big, [...seen.big].sort((a, b) => b - a),
+                     `sort:"${bad}" must fall back to a real order, not order on undefined`);
+  }
+  assert.deepEqual(errors, []);
+});
+
 page_test("a fissure changes how far the row says to run, on both pages", async () => {
   /* *How far you run* was a control with one answer for the whole list. It is
      decided per node now, and a live fissure is the one input that overrides
