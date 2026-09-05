@@ -103,9 +103,8 @@ param(
     # The same rate applies to the daily FULL build anchored at 18:05 UTC, which
     # is one tick in the same lottery: no scheduled run landed in its window on
     # any of the six days visible on 2026-09-05. What keeps the wiki current in
-    # practice is a push, not that cron. `TODO.md` holds the question of whether
-    # this task should dispatch the full build too, which is build minutes and
-    # so the owner's to answer.
+    # practice is a push. So -DispatchRemote registers a SECOND task for it -
+    # see -FullTime below.
     #
     # A dispatch from here is not subject to that queue, so it turns the
     # configured cadence into the delivered one. It asks for `full=false`, the
@@ -116,7 +115,31 @@ param(
     # run workflows on this repository. Off by default: it is somebody's build
     # minutes and somebody's Pages quota, so it is opted into rather than
     # assumed.
-    [switch]$DispatchRemote
+    [switch]$DispatchRemote,
+
+    # When the daily FULL rebuild is asked for, local time. Only used with
+    # -DispatchRemote, and it registers a SECOND scheduled task rather than
+    # another trigger on the first one - Task Scheduler runs every action of a
+    # task for every one of its triggers, so a daily trigger added to the task
+    # above would have fired the light dispatch too, and the ten-minute trigger
+    # would have fired the full one. That second half would be a full rebuild
+    # every ten minutes, which is exactly what hard rule 11 forbids.
+    #
+    # **The hour genuinely does not matter here**, which is why this is a plain
+    # local time with no UTC conversion and no DST handling. The daily build's
+    # unique job is the wiki: the drop tables and DE's export are fingerprinted
+    # and the ten-minute build already catches them, and Prime Resurgence turns
+    # over in the worldstate, which every light build reads. Editors update the
+    # wiki over the hours following a patch, so a daily cadence suits it and the
+    # hour does not change it. 18:07 is simply a quiet minute that does not
+    # collide with the ten-minute grid.
+    #
+    # Once a day is also exactly what the heaviest source asks for:
+    # www.warframe.com/droptables declares `max-age=86400`.
+    [string]$FullTime = "18:07",
+
+    # Opt out of that second task while keeping the ten-minute dispatch.
+    [switch]$NoDailyFull
 )
 
 if ($EveryHours -gt 0) { $EveryMinutes = $EveryHours * 60 }
@@ -127,6 +150,12 @@ if ($EveryHours -gt 0) { $EveryMinutes = $EveryHours * 60 }
 # finding it, and re-registering would leave two tasks doing the same refresh
 # twice a day. Both paths below clean it up.
 $LegacyTaskName = "VorFrame data refresh"
+
+# The companion task that asks for the daily FULL rebuild. Derived from
+# $TaskName so a custom -TaskName still owns both halves, and removed on every
+# path that does not want it - including a plain re-register without
+# -DispatchRemote, so turning the dispatch off does not strand it.
+$FullTaskName = "$TaskName (daily full rebuild)"
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
@@ -174,6 +203,7 @@ function Remove-TaskIfPresent {
 if ($Remove) {
     $gone = Remove-TaskIfPresent -Name $TaskName
     if (Remove-TaskIfPresent -Name $LegacyTaskName) { $gone = $true }
+    if (Remove-TaskIfPresent -Name $FullTaskName) { $gone = $true }
     if (-not $gone) {
         Write-Host "No scheduled task named '$TaskName' (or '$LegacyTaskName')."
     }
@@ -330,9 +360,24 @@ if ($firstRun -gt (Get-Date)) { $firstRun = $firstRun.AddDays(-1) }
 $trigger = New-ScheduledTaskTrigger -Once -At $firstRun `
     -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes)
 
+# The two battery switches are here because their DEFAULTS are wrong for this
+# job and were never examined. `New-ScheduledTaskSettingsSet` defaults
+# DisallowStartIfOnBatteries and StopIfGoingOnBatteries to True - read back off
+# the registered task on 2026-09-05 - which on a laptop means the refresh
+# silently does not run whenever it is unplugged, and is killed mid-run if the
+# charger comes out. README promises a check every ten minutes; on battery it
+# was promising nothing. The cost of overriding them is four conditional
+# requests and about a second and a half of CPU, which is far less than the
+# browser tab the reader has this site open in.
+#
+# Invisible on this machine, which is a desktop with no battery at all - which
+# is exactly why it survived: the setting that only bites other people's
+# hardware is the one nobody measures.
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -DontStopOnIdleEnd `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
     -MultipleInstances IgnoreNew
 
@@ -348,6 +393,75 @@ if ($TaskName -ne $LegacyTaskName) { Remove-TaskIfPresent -Name $LegacyTaskName 
 
 Register-ScheduledTask -TaskName $TaskName -Action $actions -Trigger $trigger `
     -Settings $settings -Description $description -Force | Out-Null
+
+# -- the daily FULL rebuild, as a task of its own --------------------------
+#
+# Added 2026-09-05, because the cron that was supposed to do this is not being
+# delivered: GitHub ran `5 18 * * *` on none of the six days visible, and it
+# delivers this workflow's scheduled runs at roughly one tick in fifteen. What
+# was actually keeping the wiki current was a push, which is not a schedule.
+#
+# **A second task, not a second trigger.** Task Scheduler runs every action of a
+# task for every one of its triggers, so a daily trigger on the task above would
+# have fired the light dispatch as well - and, worse, the ten-minute trigger
+# would have fired the full one. A full rebuild every ten minutes re-downloads
+# the wiki and the drop tables 144 times a day, which is the exact breach hard
+# rule 11 exists to prevent. There is no per-trigger action list, so this is the
+# only shape that works.
+#
+# **The first occurrence is pushed FORWARD, which is the opposite of the trigger
+# above and deliberate.** A repeating trigger needs a start boundary in the past
+# or its repetition has not begun; a daily trigger wants one in the future, so
+# that the boundary it stores is genuinely its first run. Same reasoning,
+# opposite direction: put the boundary where the trigger means what it says.
+#
+# This is belt and braces rather than a fix for an observed bug, and the
+# distinction is worth keeping honest. It was written believing a past boundary
+# plus StartWhenAvailable would ask for a full rebuild the moment anyone
+# re-registered - and measurement says otherwise: a probe registering a daily
+# trigger thirty minutes in the past did not run at all, reported LastRunTime as
+# never, and put NextRunTime a day out. So Task Scheduler declines to backfill
+# an occurrence from before the task existed. That is behaviour nobody
+# documents, though, and depending on it costs a full rebuild per registration
+# if it ever changes; two lines is cheaper than finding out.
+#
+# **If the machine is off at 18:07, `-StartWhenAvailable` runs it on the next
+# boot** rather than skipping to the following day. That is worth stating
+# because the setting does NOT do the same for the ten-minute task above -
+# missed repetitions are simply missed, measured as two twenty-minute gaps in
+# `data/feed-log.json` on 2026-09-04 - and it does not need to there, since the
+# next repetition is ten minutes away. A once-a-day trigger has no such safety
+# net, so this is the setting the whole design leans on.
+$wantDailyFull = $DispatchRemote -and (-not $NoDailyFull)
+if ($wantDailyFull) {
+    $fullFirst = Get-Date -Date $FullTime
+    if ($fullFirst -le (Get-Date)) { $fullFirst = $fullFirst.AddDays(1) }
+
+    $fullAction = New-HiddenAction -Exe $gh.Source `
+        -Arguments @("workflow", "run", "publish.yml", "-f", "full=true")
+    $fullTrigger = New-ScheduledTaskTrigger -Daily -At $fullFirst
+    $fullSettings = New-ScheduledTaskSettingsSet `
+        -StartWhenAvailable `
+        -DontStopOnIdleEnd `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
+        -MultipleInstances IgnoreNew
+    $fullDescription =
+        "Asks the deployed Warframe Prime Hunter site to rebuild from scratch " +
+        "once a day, which is the only run that re-reads the wiki. GitHub's own " +
+        "daily schedule for it is best effort and largely undelivered. Sends one " +
+        "workflow_dispatch and nothing else; no data is downloaded here."
+
+    Register-ScheduledTask -TaskName $FullTaskName -Action $fullAction `
+        -Trigger $fullTrigger -Settings $fullSettings `
+        -Description $fullDescription -Force | Out-Null
+} else {
+    # Dropping -DispatchRemote, or passing -NoDailyFull, has to take the
+    # companion with it - otherwise turning the dispatch off leaves a task
+    # quietly spending build minutes with nothing pointing at it.
+    Remove-TaskIfPresent -Name $FullTaskName | Out-Null
+}
 
 if ($EveryMinutes -lt 60) {
     $every = "$EveryMinutes minutes"
@@ -366,6 +480,15 @@ if ($DispatchRemote) {
 }
 Write-Host "  both hosted by conhost --headless, so no window appears at all."
 Write-Host "  from: $root"
+if ($wantDailyFull) {
+    Write-Host ""
+    Write-Host "Also scheduled '$FullTaskName' daily at $FullTime."
+    Write-Host "  runs: gh workflow run publish.yml -f full=true"
+    Write-Host "        (the one build that re-reads the wiki; GitHub's own"
+    Write-Host "         daily cron for it is largely undelivered)"
+    Write-Host "  missed while the machine was off? it runs on the next boot."
+    Write-Host "  -NoDailyFull leaves this one out."
+}
 Write-Host ""
 Write-Host "Check it:    Get-ScheduledTask -TaskName '$TaskName'"
 Write-Host "Run it now:  Start-ScheduledTask -TaskName '$TaskName'"

@@ -64,17 +64,41 @@ ACTION=install
 # the drop tables are NOT re-downloaded -- those stay on the daily build, which
 # moved from 18:40 to 18:05 UTC on 2026-09-04 to sit just after the Resurgence
 # turnover. That daily cron draws from the same lottery as the ten-minute one
-# and has been missing: TODO.md holds the question of dispatching it too.
+# and was landing on none of the six days visible, so since 2026-09-05 this
+# switch installs a second line that dispatches it too -- see FULL_AT below.
 #
 # Needs the GitHub CLI, authenticated, with permission to run workflows here.
 # Off by default: it spends build minutes and Pages quota.
 DISPATCH=0
+
+# --dispatch-remote also installs a SECOND line, once a day, asking for the FULL
+# rebuild. That is the only run which re-reads the wiki, and GitHub's own daily
+# cron for it is largely undelivered -- measured 2026-09-05, it ran on none of
+# the six days visible. Once a day is also exactly what the heaviest source asks
+# for: www.warframe.com/droptables declares max-age=86400.
+#
+# The hour does not matter and is not converted to UTC. The drop tables and DE's
+# export are fingerprinted and the ten-minute job already catches them, and
+# Prime Resurgence turns over in the worldstate that every light run reads. What
+# is left is the wiki, which editors update over the hours after a patch.
+#
+# **cron has no equivalent of Task Scheduler's "run it when the machine comes
+# back".** A cron job whose time passes while the machine is off is simply not
+# run, and the next attempt is the following day. The .ps1 twin sets
+# -StartWhenAvailable and does recover. If a machine that sleeps needs the same
+# guarantee here, the platform answers are anacron or a systemd timer with
+# Persistent=true; neither is installed by this script, and neither is a
+# dependency of this project.
+FULL_AT="18:07"
+DAILY_FULL=1
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --every) EVERY="${2:-}"; shift 2 ;;
     --every-minutes) EVERY_MIN="${2:-}"; shift 2 ;;
     --at)    AT="${2:-}";    shift 2 ;;
+    --full-at) FULL_AT="${2:-}"; shift 2 ;;
+    --no-daily-full) DAILY_FULL=0; shift ;;
     --remove) ACTION=remove; shift ;;
     --show)   ACTION=show;   shift ;;
     --dispatch-remote) DISPATCH=1; shift ;;
@@ -103,6 +127,16 @@ START_H=$((10#${AT%%:*}))
 MINUTE=$((10#${AT##*:}))
 if [ "$START_H" -gt 23 ] || [ "$MINUTE" -gt 59 ]; then
   echo "--at wants a real time of day."; exit 1
+fi
+
+case "$FULL_AT" in
+  [0-9]:[0-9][0-9]|[0-9][0-9]:[0-9][0-9]) ;;
+  *) echo "--full-at wants a 24-hour time, such as 18:07."; exit 1 ;;
+esac
+FULL_H=$((10#${FULL_AT%%:*}))
+FULL_M=$((10#${FULL_AT##*:}))
+if [ "$FULL_H" -gt 23 ] || [ "$FULL_M" -gt 59 ]; then
+  echo "--full-at wants a real time of day."; exit 1
 fi
 
 # cron gets a minimal PATH, so the interpreter is resolved now and written out
@@ -188,8 +222,24 @@ fi
 
 LINE="$MINUTES $HOURS * * * cd $(sq "$ROOT") && $(sq "$PY") tools/build_data.py --if-changed >/dev/null 2>&1$DISPATCH_CMD $MARKER"
 
+# The daily FULL rebuild, as its own line. It carries the same MARKER, so
+# --remove takes both out with the one grep it already does, and re-installing
+# without --dispatch-remote drops it because every managed line is rewritten
+# from scratch each time.
+#
+# The `cd` is not decoration: `gh workflow run` resolves which repository it is
+# talking to from the git remote of the working directory, and cron starts in
+# $HOME. Without it the line runs and fails every day, silently, because the
+# output is discarded. The .ps1 twin gets this from -WorkingDirectory on the
+# action; here it has to be said.
+FULL_LINE=""
+if [ "$DISPATCH" = 1 ] && [ "$DAILY_FULL" = 1 ]; then
+  FULL_LINE="$FULL_M $FULL_H * * * cd $(sq "$ROOT") && gh workflow run publish.yml -f full=true >/dev/null 2>&1 $MARKER"
+fi
+
 if [ "$ACTION" = show ]; then
   printf '%s\n' "$LINE"
+  [ -n "$FULL_LINE" ] && printf '%s\n' "$FULL_LINE"
   exit 0
 fi
 
@@ -215,7 +265,7 @@ if [ "$ACTION" = remove ]; then
   exit 0
 fi
 
-printf '%s\n%s\n' "$kept" "$LINE" | sed '/^$/d' | crontab -
+printf '%s\n%s\n%s\n' "$kept" "$LINE" "$FULL_LINE" | sed '/^$/d' | crontab -
 
 if [ "$EVERY" = "0" ]; then
   if [ "$EVERY_MIN" -eq 60 ]; then
@@ -230,6 +280,14 @@ else
 fi
 echo "  runs: $PY tools/build_data.py --if-changed"
 echo "  from: $ROOT"
+if [ -n "$FULL_LINE" ]; then
+  echo
+  echo "Also scheduled the FULL rebuild daily at $FULL_AT."
+  echo "  runs: gh workflow run publish.yml -f full=true"
+  echo "        (the one build that re-reads the wiki)"
+  echo "  cron does not make up a run missed while the machine was off;"
+  echo "  --no-daily-full leaves this line out."
+fi
 echo
 echo "Check it:   crontab -l"
 echo "Run it now: ./refresh-data.sh --if-changed"

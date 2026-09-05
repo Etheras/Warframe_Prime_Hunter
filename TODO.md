@@ -55,7 +55,9 @@ was ever going to:
 | ~~The freshness fingerprint asks DE directly~~ | **fixed 2026-09-04**, same day it was reported; reasoning in `PROJECT.md §7` | done |
 | ~~The scheduled task steals focus every ten minutes~~ | **fixed 2026-09-04** with `conhost --headless`; reasoning in `PROJECT.md §6` | done |
 | ~~An anchor for the ten-minute refresh, from the data rather than a grid~~ | **decided and shipped 2026-09-05**: no derived schedule, but the grid moved two minutes off the hour; reasoning in `PROJECT.md §7` | done |
-| The daily FULL build's anchor is not being delivered | found while answering the above — GitHub ran that cron on none of the six days visible; the remedy spends build minutes | owner's call |
+| ~~The daily FULL build's anchor is not being delivered~~ | found and **fixed 2026-09-05** on the owner's direction: `-DispatchRemote` installs a second daily job for it; reasoning in `PROJECT.md §7` | done |
+| Does a missed daily task really run on the next boot? | the `-StartWhenAvailable` fallback is documented and set, not measured — one field to read the first morning the machine was off at 18:07 | nil |
+| Two battery defaults were never examined | `DisallowStartIfOnBatteries`/`StopIfGoingOnBatteries` shipped True since the script was written; **overridden 2026-09-05**. Invisible here — this machine is a desktop | done |
 | Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
 | Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
 
@@ -667,36 +669,56 @@ the measurements. The `browse.wf` refresh-at technique above stays a *reference*
 and is not adopted: re-deriving a deadline is the cost this entry named, and a
 static two-minute offset buys the same correctness without it.
 
-### The daily FULL build's anchor is not being delivered
+### ~~The daily FULL build's anchor is not being delivered~~
 
-**Found 2026-09-05** while answering the entry above, and it is the more
-consequential half. The daily FULL build was moved to `5 18 * * *` on 2026-09-04
-so it would sit just after the Resurgence turnover. Measured on 2026-09-05:
-**no scheduled run has landed in that window on any of the six days visible**
-(`gh run list --workflow publish.yml --event schedule`; the same holds for the
-`40 18` it replaced, on the days that one was live).
+**Found and fixed 2026-09-05**, both in the same session — the owner asked for
+the dispatch on being shown the measurement. Reasoning in `PROJECT.md §7` under
+*The daily full rebuild is dispatched from this machine, as a second task*.
+Short version: GitHub delivers this workflow's scheduled runs at about one tick
+in fifteen, so the once-a-day `5 18 * * *` arrives roughly every three weeks and
+landed on none of the six days visible; what had been keeping the wiki current
+was a push. `-DispatchRemote` now installs a second job for it. It had to be a
+second *task*, not a second trigger, because Task Scheduler runs every action of
+a task for every one of its triggers — a daily trigger on the refresh task would
+have made the ten-minute trigger fire a full rebuild 144 times a day.
 
-It is not a bug in the cron expression. GitHub delivers scheduled runs of this
-workflow at about **one tick in fifteen** — 99 light builds over 247 hours,
-median gap 84 minutes, mean 151, worst 749 — and a once-a-day tick draws from
-exactly the same lottery. A daily cron delivered at that rate arrives roughly
-**once every three weeks**.
+**What is left of it is one thing to confirm, below.**
 
-**What actually keeps the wiki current is a push.** `FULL` is true for `push`,
-for a dispatch with `full=true`, and for the `5 18` schedule. On a week with no
-commits, the wiki, the drop tables and DE's export are not re-read at all — and
-nothing says so, because the light build succeeds and publishes a fresh-looking
-site the whole time.
+### Does a missed daily task really run on the next boot?
 
-**The obvious remedy is one line, and it spends money, so it is the owner's.**
-`tools/schedule.ps1` already dispatches `publish.yml -f full=false` every ten
-minutes and is not in GitHub's queue. A second trigger once a day asking for
-`full=true` would deliver the anchored build the same way the light one is
-delivered. The cost is one full rebuild a day of build minutes and Pages quota
-that is currently only being paid when it happens to fire — so this is an
-*increase*, not a substitution, and hard rule 11 wants it deliberate. **Size:
-small.** Worth checking first whether pushes alone have been keeping it current
-often enough to matter.
+**Open, and it is a falsification test rather than work.** The whole
+machine-is-off case for the daily full rebuild rests on Task Scheduler's
+`-StartWhenAvailable`, which is set. What could be measured on 2026-09-05 was
+measured and is in `PROJECT.md §7`: the setting does nothing for missed
+*repetitions* (two twenty-minute gaps in `data/feed-log.json` prove it), and a
+missed occurrence is **not** backfilled at registration (a probe registering a
+daily trigger thirty minutes in the past waited fourteen minutes, never ran, and
+put `NextRunTime` a day out). That second result **cuts against the fallback**:
+`StartWhenAvailable` is not a blanket "run anything you missed". It is a
+different scenario — a brand-new task has no last-run time for Task Scheduler to
+judge a miss against, where a task that ran yesterday and was off through today
+does — but it is a reason to actually check rather than assume.
+
+**The power-off case itself was not reproduced and is documented rather than
+measured.** The Task Scheduler service cannot be stopped to simulate it, this
+machine had been up for twenty hours so nothing had been missed, and the
+`Microsoft-Windows-TaskScheduler/Operational` log is disabled by default so
+there is no history. A promising built-in task that looked like it had recovered
+a missed noon run nine minutes after boot turned out to be **a mis-join between
+two tasks sharing a name**.
+
+**The test, and it costs one command.** The first morning the machine has been
+off through 18:07:
+
+```powershell
+Get-ScheduledTaskInfo -TaskName 'Warframe Prime Hunter data refresh (daily full rebuild)'
+```
+
+`LastRunTime` shortly after that boot means the fallback works and this entry is
+closed. `LastRunTime` on the previous day means it does not, the site went a day
+without re-reading the wiki, and the honest sentence in `README.md` about `cron`
+— *a missed day is simply missed* — applies to Windows too. **Size: nil** — read
+one field. Do not close this from documentation; that is what put it here.
 
 ### Vendor `ItemType` paths have a general rule, and we found one case of it
 

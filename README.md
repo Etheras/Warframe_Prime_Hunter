@@ -593,6 +593,13 @@ While the page is open it re-reads the fissure list on the same ten minutes, fro
 this site and nowhere else, so a tab you left open in the morning is still right
 after lunch without a reload.
 
+**On a laptop it now runs on battery too.** Windows' own default for a scheduled
+task is to skip it whenever the machine is unplugged, and to kill it if the
+charger comes out mid-run — which would have made the promise above quietly
+false for anyone not at a desk. The task overrides both. What it costs on
+battery is four conditional requests and about a second and a half of CPU, six
+times an hour.
+
 Only the scheduling is Windows-specific — the build itself runs anywhere.
 
 Useful variations:
@@ -629,19 +636,27 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -DispatchRemote
 
 > **Why this exists.** A published site is only ever as fresh as its last build,
 > and GitHub's own scheduler is best effort — it queues and drops runs under
-> load. Measured on this repository: a workflow asking for a run every ten
-> minutes was delivered about one every forty-four, with a worst gap of over four
-> hours. Void Fissures live an hour or two, so the published list had often
-> expired in full before the next build. A request sent from your machine is not
-> in that queue.
+> load. Re-measured over ten days: a workflow asking for a run every ten minutes
+> was delivered about **one time in fifteen**, a median of 84 minutes apart with
+> a worst gap of twelve hours. Void Fissures live an hour or two, so the
+> published list had often expired in full before the next build. A request sent
+> from your machine is not in that queue.
 >
 > It runs the **light** build — the same one the ten-minute schedule uses, which
 > refreshes the worldstate and rebuilds everything else from cache. The wiki and
-> the drop tables are not re-downloaded; those stay on the daily build.
+> the drop tables are not re-downloaded.
+>
+> **It also adds a second, once-a-day job for the full rebuild**, at 18:07 by
+> default. That is the only run which re-reads the wiki, and GitHub's own daily
+> schedule for it is delivered no more reliably than the ten-minute one — on the
+> six days measured, not once. If your machine is switched off at that time,
+> Windows runs it when the machine next starts; `cron` has no equivalent, so on
+> macOS and Linux a missed day is simply missed. `-NoDailyFull`
+> (`--no-daily-full`) leaves it out, and `-FullTime` (`--full-at`) moves it.
 >
 > It needs the [GitHub CLI](https://cli.github.com/) installed and signed in
-> (`gh auth login`), and it only helps while your machine is awake. It is off by
-> default because it spends your Actions minutes and your Pages deployments.
+> (`gh auth login`). It is off by default because it spends your Actions minutes
+> and your Pages deployments.
 
 ### Automatically — macOS and Linux
 

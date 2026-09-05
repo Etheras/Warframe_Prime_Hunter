@@ -993,15 +993,104 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
         check("schedule: and converts to minutes on the way",
               read().partition("|")[0], "PT8H")
 
+        # ── the daily FULL rebuild, which is a second task ─────────────────
+        #
+        # It has to be a second task: Task Scheduler runs every action of a task
+        # for every one of its triggers, so a daily trigger on the refresh task
+        # would have fired the light dispatch as well - and the ten-minute
+        # trigger would have fired the FULL one, which is a complete rebuild
+        # every ten minutes and a straight breach of hard rule 11.
+        #
+        # Driven with -DispatchRemote, so it needs gh. The task registered here
+        # would ask GitHub for a real full build if it ever ran, which is why
+        # the first-occurrence assertion below is the important one and why the
+        # finally at the end removes this name too.
+        if not shutil.which("gh"):
+            print("  skip daily-full task (no gh on PATH, and -DispatchRemote "
+                  "refuses without it)")
+        else:
+            full_probe = f"{probe} (daily full rebuild)"
+            full = lambda field: subprocess.run(                  # noqa: E731
+                [shell, "-NoProfile", "-Command",
+                 f"$t = Get-ScheduledTask -TaskName '{full_probe}' "
+                 "-ErrorAction SilentlyContinue; "
+                 "if ($null -eq $t) { 'ABSENT' } else " + field],
+                cwd=ROOT, capture_output=True, text=True, timeout=120).stdout.strip()
+
+            made = run("-DispatchRemote")
+            check("schedule: -DispatchRemote exits 0", made.returncode, 0,
+                  (made.stderr or made.stdout)[-400:])
+            check("schedule: it registers the daily full rebuild beside the refresh",
+                  full("{ 'PRESENT' }"), "PRESENT",
+                  "the wiki is only re-read by a full build, and GitHub's own "
+                  "daily cron for it delivered on none of six days")
+            check("schedule: on a daily trigger, not the ten-minute one",
+                  full("{ $t.Triggers[0].CimClass.CimClassName }"),
+                  "MSFT_TaskDailyTrigger",
+                  "a repetition here would rebuild everything every ten minutes")
+            check("schedule: asking for the full path, exactly once",
+                  full("{ ($t.Actions | ForEach-Object { $_.Arguments }) -join '|' }")
+                      .count("full=true"), 1,
+                  "full=false here would make the second task pointless, and two "
+                  "actions would double the build")
+
+            # `-Daily -At` takes TODAY at that time, so the script moves a time
+            # already gone to tomorrow, and this pins that.
+            #
+            # **Not because a past boundary was seen firing a build.** It was
+            # written believing that, and a probe on 2026-09-05 said otherwise:
+            # a daily trigger registered thirty minutes in the past did not run,
+            # reported LastRunTime as never, and put NextRunTime a day out. What
+            # this guards is the dependency, not a bug - declining to backfill
+            # an occurrence from before the task existed is undocumented, and if
+            # it ever changes the cost is a full rebuild per registration.
+            #
+            # **Driven with an explicitly past -FullTime, and that is the whole
+            # point of the argument.** Asserting this against the 18:07 default
+            # is a test that cannot fail for most of the day: run it at 04:20
+            # and today's 18:07 is in the future whether the script phases the
+            # boundary forward or not. Checked by deleting the phasing and
+            # watching it still pass. `00:00` is in the past at every instant of
+            # the day bar one, so the assertion has teeth whenever it runs.
+            past = run("-DispatchRemote", "-FullTime", "00:00")
+            check("schedule: -FullTime reaches the daily trigger",
+                  past.returncode, 0, (past.stderr or past.stdout)[-400:])
+            check("schedule: and a time already gone today moves to tomorrow, so "
+                  "registering cannot spend a build",
+                  full("{ [bool]([datetime]$t.Triggers[0].StartBoundary -gt "
+                       "(Get-Date)) }"), "True",
+                  "the stored boundary is in the past, so whether registering "
+                  "costs a full rebuild is Task Scheduler's undocumented choice "
+                  "rather than ours")
+            check("schedule: keeping the minute it was given",
+                  full("{ ([datetime]$t.Triggers[0].StartBoundary).ToString('HH:mm') }"),
+                  "00:00",
+                  "moving the day must not move the time of day")
+
+            # Dropping the switch has to take the companion with it, or turning
+            # the dispatch off leaves a task spending build minutes daily with
+            # nothing pointing at it.
+            plain = run()
+            check("schedule: re-registering without -DispatchRemote exits 0",
+                  plain.returncode, 0, (plain.stderr or plain.stdout)[-400:])
+            check("schedule: and takes the daily full rebuild with it",
+                  full("{ 'PRESENT' }"), "ABSENT",
+                  "an orphaned companion keeps dispatching full builds after "
+                  "the switch that created it is gone")
+
         gone = run("-Remove")
         check("schedule: -Remove exits 0", gone.returncode, 0, gone.stderr[-300:])
         check("schedule: -Remove actually removes it", read(), "ABSENT")
     finally:
-        # belt and braces: a failed assertion above must not leave a task behind
-        subprocess.run([shell, "-NoProfile", "-Command",
-                        f"Unregister-ScheduledTask -TaskName '{probe}' -Confirm:$false "
-                        "-ErrorAction SilentlyContinue"],
-                       cwd=ROOT, capture_output=True, text=True, timeout=120)
+        # Belt and braces: a failed assertion above must not leave a task behind.
+        # Both names, because the companion's action asks GitHub for a full
+        # rebuild - an orphan of that one would spend build minutes every day
+        # until somebody noticed it in Task Scheduler.
+        for name in (probe, f"{probe} (daily full rebuild)"):
+            subprocess.run([shell, "-NoProfile", "-Command",
+                            f"Unregister-ScheduledTask -TaskName '{name}' "
+                            "-Confirm:$false -ErrorAction SilentlyContinue"],
+                           cwd=ROOT, capture_output=True, text=True, timeout=120)
 
 
 def test_a_blocked_host_is_routed_around() -> None:

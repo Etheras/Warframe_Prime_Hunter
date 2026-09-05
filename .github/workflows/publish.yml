@@ -33,10 +33,17 @@ on:
     # window (`PROJECT.md §7`). The choice of five minutes is unaffected - it
     # was always the margin that mattered, and the margin got larger.
     #
-    # **What is NOT working is the delivery.** GitHub ran this cron on none of
-    # the six days visible on 2026-09-05; scheduled runs of this workflow land
-    # about one tick in fifteen, and a once-a-day tick draws from the same
-    # lottery. What actually rebuilds the wiki is a push. `TODO.md` holds it.
+    # **What is NOT working is the delivery, so this cron is now a backstop.**
+    # GitHub ran it on none of the six days visible on 2026-09-05; scheduled
+    # runs of this workflow land about one tick in fifteen, and a once-a-day
+    # tick draws from the same lottery, so it arrives roughly once every three
+    # weeks. Until then what rebuilt the wiki was a push, which is not a
+    # schedule. Since 2026-09-05 `tools/schedule.{ps1,sh} -DispatchRemote`
+    # registers a daily job of its own that dispatches this workflow with
+    # full=true, the same way the ten-minute one dispatches full=false. This
+    # entry is kept because it costs nothing and covers anyone who has not set
+    # that up - a duplicate is harmless, since the two land at different times
+    # and the `pages` concurrency group queues rather than cancels.
     #
     # **It is deliberately not anchored to DE's patch cadence, which cannot be
     # anchored to.** Measured 2026-09-04 from Last-Modified on the export

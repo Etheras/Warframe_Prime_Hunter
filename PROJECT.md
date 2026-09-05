@@ -6234,6 +6234,111 @@ back, which is the only field that showed it. Fixed by phasing the start
 boundary back a day, since for a repeating trigger `-Time` is a phase and not a
 first run, and pinned by its own assertion.
 
+### The daily full rebuild is dispatched from this machine, as a second task
+
+**Shipped 2026-09-05**, at the owner's direction, closing the finding the entry
+above opened. `tools/schedule.{ps1,sh} -DispatchRemote` now installs a second
+job that dispatches `publish.yml` with `full=true` once a day, default 18:07
+local. GitHub's `5 18 * * *` cron is kept as a backstop for anyone who has not
+set that up; a duplicate is harmless, because the two land at different times
+and the `pages` concurrency group queues rather than cancels.
+
+**A second task, not a second trigger, and that is forced rather than chosen.**
+Task Scheduler runs *every action of a task for every one of its triggers*.
+There is no per-trigger action list. So a daily trigger added to the refresh
+task would have fired the light dispatch as well — and, far worse, the existing
+ten-minute trigger would have fired the **full** one, re-downloading the wiki
+and the drop tables 144 times a day. That is the exact shape hard rule 11
+exists to prevent, and it would have looked like a one-line change.
+
+**The start boundary goes the opposite way from the ten-minute trigger, and
+both directions are deliberate.** A repeating trigger needs a boundary in the
+*past* or its repetition has not begun — that was the sixteen-hour hole fixed
+earlier the same day. A daily trigger wants one in the *future*, so the boundary
+it stores is genuinely its first run. Same principle both times: put the
+boundary where the trigger means what it says.
+
+**That second half was written as a bug fix and is not one — the probe below
+caught the over-claim.** The reasoning offered was *"otherwise registering after
+18:07 asks for a full rebuild there and then"*, and it is wrong: a daily trigger
+registered thirty minutes in the past did not run, reported `LastRunTime` as
+never, and put `NextRunTime` a day out. Task Scheduler declines to backfill an
+occurrence from before the task existed. The forward phasing stays because that
+behaviour is **undocumented** and the cost of it changing is a full rebuild on
+every registration — but it is belt and braces, and the code, the test and this
+entry now say so rather than claiming a fix.
+
+**The hour does not matter, so nothing is converted to UTC.** This is the one
+place the DST objection from the entry above does not apply, because there is
+nothing to be late for: the drop tables and DE's export are fingerprinted and
+the ten-minute build already catches them, and Prime Resurgence turns over in
+the worldstate that every light build reads. What is left is the **wiki**, which
+editors update over the hours *following* a patch. Once a day is also exactly
+what the heaviest source asks for — `www.warframe.com/droptables` declares
+`max-age=86400`.
+
+#### What happens if the machine is off at 18:07 — and what is actually known
+
+The owner asked, and it is the right question for a once-a-day job: the
+ten-minute task does not need an answer because its next attempt is ten minutes
+away, and this one's is twenty-four hours away.
+
+Measured here, on this machine:
+
+- **`StartWhenAvailable` is set**, read back off the registered task — and it is
+  what Windows offers for exactly this case.
+- **It does nothing for missed *repetitions*, which is not a contradiction.**
+  `data/feed-log.json` for 2026-09-04 carries two twenty-minute gaps — one
+  skipped ten-minute tick each — with the setting already on. The setting
+  applies to a trigger's occurrences, and a repetition interval is not one.
+- **A missed occurrence is not backfilled at registration.** A probe registering
+  a daily trigger thirty minutes in the past waited fourteen minutes and never
+  ran: `LastRunTime` never, `LastTaskResult` 267011, `NextRunTime` a day out.
+  So `StartWhenAvailable` is **not** a blanket "run anything you missed" — and
+  that cuts against the fallback rather than for it, which is the honest way to
+  read it.
+
+  It is not the same scenario, though, and the difference is the whole question.
+  A brand-new task has no last-run time, so Task Scheduler has nothing to judge
+  a miss against. A task that ran at 18:07 yesterday and was off through 18:07
+  today does. That second case is the documented one and is the one that has not
+  been reproduced here.
+
+**And what is not known: the power-off case itself was not reproduced.** The
+Task Scheduler service cannot be stopped to simulate it, this machine had been
+up continuously for twenty hours so nothing had been missed to recover, and the
+`Microsoft-Windows-TaskScheduler/Operational` log is disabled by default, so
+there is no history to read. One promising-looking piece of evidence — a
+built-in `Backup` task that appeared to have run nine minutes after boot rather
+than at its scheduled noon — **turned out to be a mis-join between two tasks of
+the same name**, and evaporated on inspection. Filtering to tasks whose *only*
+triggers are daily left nothing that had missed anything.
+
+So the fallback is **documented behaviour that is switched on, not a measured
+one**, and it is written down that way on purpose. `TODO.md` carries the
+falsification test: the first morning the machine is off at 18:07, read
+`(Get-ScheduledTaskInfo).LastRunTime` on the companion task — shortly after boot
+means it works, the previous day means it does not and cron's honest "a missed
+day is missed" applies to Windows too.
+
+#### Two battery defaults that were never examined
+
+Read back off the registered task the same day: `DisallowStartIfOnBatteries` and
+`StopIfGoingOnBatteries` were both **True**, which is what
+`New-ScheduledTaskSettingsSet` defaults to and what the script had therefore
+been shipping since it was written. On a laptop that means the refresh does not
+run at all while unplugged, and is killed mid-run if the charger comes out —
+against a README that promises a check every ten minutes.
+
+Both are now overridden. The cost is four conditional requests and about a
+second and a half of CPU, six times an hour, which is far less than the browser
+tab the reader has the site open in.
+
+**It survived because it is invisible here.** This machine is a desktop with no
+battery at all, so the setting could only ever have bitten somebody else — which
+is the general shape worth keeping: a default that does nothing on the machine
+you develop on is one nothing you run will ever report.
+
 ---
 
 ## 8. Gotchas discovered while building
