@@ -243,6 +243,9 @@ observation rather than a precondition.
 | The deployed site shows no fissures for hours at a time | session — what is left of the owner's 2026-09-02 report once the Steel Path half shipped (`PROJECT.md §7`); 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
 | Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
 | The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
+| *Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it | **owner, 2026-09-05** — the rename inverts the switch's sense, so the 25% thumb has to move sides; three questions to answer before any code |
+| The two Baro badges should filter differently from each other | **owner, 2026-09-05** — needs a *here now* bucket the filter can see, on the page's clock, and it is the first AND in an otherwise pure-OR filter |
+| The forms are too wordy, and *Effort (optional)* changes its rows | **owner, 2026-09-05** — why they change is answered (the rows are derived from `ranked`); what is left is a wording trim, a real hidden-value defect, and whether the list becomes declared |
 
 ### One refactor
 
@@ -777,6 +780,152 @@ checkbox that is absent rather than zero while he is away; a `from Baro` badge
 in `--blue`, the colour `.badge.baro` already uses on the collection view. The
 sort ranks him with Varzia — both are "buy it with something farmed" — rather
 than giving him a bucket of his own.
+
+## Asked for by the owner, 2026-09-05
+
+Three, reported from the deployed site with a screenshot of the *Effort
+(optional)* panel. The third arrived as a question rather than a request and the
+question has an answer, so it is written up first as a finding and second as the
+work.
+
+### *Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it
+
+**Asked for by the owner 2026-09-05.** The label is the small half; the switch's
+meaning is the real change and it is **not yet defined**.
+
+What is there now. `plan.html:110` reads *Short on Void Traces?*, the option is
+`traces` in `PLAN_OPTIONS`, and it splits at `TRACE_PIVOT = 500` in `shared.js` —
+five Radiants. It defaults **on**, and while on, a node that hands the relic over
+already Radiant scores **25% higher** (`creditRelics` / `refineAdvice` in
+`model.js`, `bonus: !!(opts && opts.traces) && given === "Radiant"`). The framing
+is *"you are rationing, so a free Radiant is worth something"*.
+
+**Renaming it to *Capped* inverts the sense, and that is the part to settle
+before writing any code.** "Short" is a floor — you have few and are rationing.
+"Capped" is a ceiling — you are sitting at the maximum and traces cost you
+nothing, which is the state in which a free Radiant saves you **nothing at all**.
+So the same tick means the opposite thing, and the bonus has to move to the other
+side of the switch or the ranking will be exactly backwards for everyone.
+
+Three things the owner needs to say, because none is recoverable from the name:
+
+- **Does the tick mean "I am capped" or "I am not capped"?** The default has to
+  move with it. Today's default-on describes *almost everyone*; if the tick
+  becomes "I am capped", the default is presumably off.
+- **Which cap?** `traceCap(mr)` in `shared.js` already computes the real one from
+  Mastery Rank — `min(mr, 30) * 50 + 100`, so 1600 at MR30. That is a genuine
+  number the app already knows, and it is a better pivot than the invented 500.
+  Note `traceCapped(mr)` already exists and means something *different* — "this
+  player's cap is at or below the 500 pivot", which is true below MR9. **That
+  name is about to become actively misleading and should be renamed in the same
+  pass.**
+- **Is it still a 25% thumb, or does the bonus simply switch off?** If "capped"
+  means traces are free, the honest model is no bonus rather than a smaller one.
+
+**Size: small once decided, and it must not ship half-done** — the label and the
+logic are one change. `PROJECT.md` requires an announced thumb, and this is the
+project's only one.
+
+### The two Baro badges should filter differently from each other
+
+**Asked for by the owner 2026-09-05.** The badges shipped 2026-09-04 and are
+right; the *filtering* still treats all nine `flags.baro` items alike.
+
+Wanted:
+
+- **`BARO — HERE NOW` items** toggle with the **Baro Ki'Teer** checkbox alone,
+  as they do today.
+- **`BARO SOMETIMES` items** appear only when **Vaulted** *and* **Baro Ki'Teer**
+  are both ticked, and are hidden otherwise.
+
+**Two things in the way, and both are structural rather than fiddly.**
+
+**The filter has no "here now" bucket to filter on.** `bucketsOf(item)` in
+`model.js` reads `item.flags`, and the only flag is `flags.baro` — the wiki's
+`[[Baro Ki'Teer|B]]` marker, static for the whole build. *Here now* is computed
+at render time in `app.js` from the live manifest **and the page's own clock**
+(`relics[n].baro` plus `ROT.traderWindow`), which is what lets the badge expire
+without a rebuild. So this needs the live answer to reach the filter, and it must
+keep doing so **on the page's clock**, or the 2026-09-04 fix regresses: a card
+would stay in the wrong bucket until the next build.
+
+**And it is the first conjunction in a filter that is otherwise a pure OR.**
+Today a card is on screen if *any* bucket it belongs to is ticked — that is the
+whole point of `bucketsOf` returning every bucket rather than just
+`statusOf`'s primary one, and it is why unticking *Farmable* stopped hiding Lex
+Prime. *Vaulted AND Baro* is a different shape, and dropping it in as a special
+case is how a filter model stops being explicable. Worth deciding whether it is
+*the* rule ("a marker that says only 'sometimes' needs its own bucket ticked
+too") or an exception that gets written on the tin.
+
+Related: *Baro's item-level marker still over-claims*, which is the same nine
+items one level up. If that entry is settled first — say, by dropping the flag
+from items his shelf never covers — this one may shrink to nothing. **Decide
+them in that order.**
+
+### The forms are too wordy, and *Effort (optional)* changes its rows
+
+**Asked for by the owner 2026-09-05**, from the screenshot. Three separate
+things, and the third is a question that turned out to have an answer.
+
+**The wording.** Trim the form text, and *Effort (optional)* "by A LOT". Not
+specified further, so treat it as licence rather than a spec. For scale: the
+tooltip on *Short on Void Traces?* alone is four paragraphs and about 700
+characters, in one `data-tip` attribute.
+
+**Why the rows change — answered, and nothing was changed to cause it.**
+`assets/plan.js:1401` builds the list from `ranked`:
+
+```js
+ranked.forEach((n) => { ...unit.set(n.mode, n.unit)... });
+const modes = Array.from(unit.keys()).sort();
+```
+
+So the form lists **exactly the mission types on your current ranked list, and
+nothing else.** It moves when any of three things moves: the farm list, what is
+currently dropping (a vault rotation changes which relics are farmable), and the
+reachability switches (*Railjack*, *event*, Steel Path), which drop whole nodes
+before the walk gets to them. A push only matters because it rebuilds the data.
+
+**So, the screenshot, item by item.** The payload carries **31 distinct
+`mode` values**; twelve were on screen.
+
+- **Void Flood is in the data** — 15 sources, one node, *Everview Arc* on the
+  Zariman. It ranked in this session's own measurement with every farmable Prime
+  wished. It is absent from the screenshot because that farm list did not reach
+  it, not because anything was removed.
+- **Faceoff is on screen already, under `Special`.** `rotation.js:578` calls
+  `Special` "the bucket holding Void Storms and Faceoff", and the four tables —
+  `Faceoff: Single Squad`, `Squad VS Squad`, and both Steel Path variants — carry
+  `mode: "Special"` with `kind: "transient"`. So the *Special* row **is** the
+  Faceoff row, plus Void Storms. That is one of the four invented types.
+- **Mirror Defense is there under DE's internal name.** The payload has
+  `Shrine Defense`, one node, *Saya's Visions*. Player-facing that mission is
+  **Mirror Defense** — worth confirming against the wiki before acting, but if it
+  holds, we are showing a name no player uses, which belongs under *Should be
+  fixed on the wiki, not here* only if the wiki is the one that is wrong.
+- **Infested Salvage is not a "special".** It is a real DE mission type with its
+  own node, *Oestrus* on Eris. `Special` is **our** invented bucket, not DE's, so
+  the two are not comparable — which is exactly the confusion named in *Our four
+  invented "mission types" leak into the ranking*.
+
+**The defect underneath, which the question found.** A row disappearing does not
+discard what you typed: `opts.minutes[m]` is keyed by mode and survives in the
+saved options, but the row is only rendered for modes in `ranked`. So a number
+you set for Void Flood is **still weighing the ranking whenever Void Flood comes
+back, while being invisible and un-editable in the meantime.** That is a real
+trap and is worth fixing whatever is decided about the list.
+
+**What to decide.** Whether the panel keeps deriving its rows (fewer rows, but
+they come and go and hide saved values) or shows a **fixed, declared set** of
+mission types. The owner's instinct — *"if there is no solid reason, create a
+rule that they need to be clearly defined"* — points at the second, and there is
+a middle option: derive as now, but always render any mode that already has a
+saved value, so nothing is ever hidden while still counting. **Size: small for
+the wording, small for the hidden-value fix, medium if the list becomes a
+declared vocabulary** — that last one wants the invented-types entry settled
+first, because `Special` and `Bounty` are the rows that would be hardest to name
+honestly.
 
 ## Defects found by the documentation sweep of 2026-08-15
 
