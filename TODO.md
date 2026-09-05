@@ -633,7 +633,7 @@ these measurable: the cache holds **Revenant/Baruuk** (2026-08-06 → 09-03) and
 DE's worldstate holds **Banshee/Mirage** (2026-09-03 → 10-01), so every claim
 below is checked against two rotations rather than one.
 
-### `build_varzia_relics` works around a limitation that does not exist
+### ~~`build_varzia_relics` works around a limitation that does not exist~~
 
 Its docstring is the load-bearing sentence: *"**Digital Extremes do not publish
 the shelf as a list.** `PrimeVaultTraders` carries a `Manifest` of 22 rows —
@@ -665,7 +665,7 @@ and t in o for o in live)}` keeps only the longest matching rotation tag, becaus
 both rotations were ever live at once the filter would silently drop three
 relics. Reading the rows removes the question.
 
-### `flags.resurgence` misses a Prime per rotation, and it is measured
+### ~~`flags.resurgence` misses a Prime per rotation, and it is measured~~
 
 `build_resurgence_set` matches each catalogue name against a normalised blob of
 the manifest's `uniqueName`s. That fails whenever DE's internal path does not
@@ -694,7 +694,7 @@ strictly more to match on than the first-party one. `vault_trader_from_worldstat
 claims the two "produce the same five Primes", which was checked on a rotation
 where the paths happened to carry the names.
 
-### The fix is a join this project already trusts
+### ~~The fix is a join this project already trusts~~
 
 Resolve each manifest row by dropping the `/StoreItems` segment and looking it up
 in the item database — **exactly what `build_baro_relics` does for Baro's relic**,
@@ -876,7 +876,7 @@ Not adopted, and worth recording as considered-and-rejected: their relic naming
 builds a display name from era plus category through a localisation dictionary.
 We do not need it — `ExportRelicArcane_en.json` carries `name` outright.
 
-### Baro's relic should live only while he is on the relay
+### ~~Baro's relic should live only while he is on the relay~~
 
 **Decided by the owner 2026-09-04**, and it settles the question the entry
 *Baro's relics should be crackable, the way Varzia's are* was holding open:
@@ -1102,7 +1102,7 @@ The one below is what is left of the group, and it is the cause the group was ma
 for: a capability landed and the sentences explaining why it was absent stayed where
 they were.
 
-### Baro's actual stock is published, and never read
+### ~~Baro's actual stock is published, and never read~~
 
 `flags.baro` comes from a wiki marker — `[[Baro Ki'Teer|B]]`, `tools/catalogue.py:159`
 — and it means *he sells this sometimes*, not *he is here now*. Eight items carry
@@ -1206,10 +1206,12 @@ arrives while a tab is open twice a fortnight, and flipping it under a reader wh
 has touched nothing would shift nine items between buckets with nothing on screen
 saying why. `PROJECT.md §7` has the reasoning.
 
-What is left of that half is the part that needs him present: **while he is
+What was left of that half was the part that needs him present: **while he is
 actually here, mark the items he is really selling** — the only thing on this
-list that today's static flag genuinely cannot tell you, and it waits on the
-manifest above.
+list that a static flag genuinely cannot tell you. **That shipped 2026-09-05**:
+the `BARO — HERE NOW` badge says it on the card, and his availability box holds
+his live counter rather than the wiki's marker. `PROJECT.md §7`, *The wiki's Baro
+marker is a badge, and his box is his counter*. Nothing in this entry is open.
 
 See also the worldstate entry below: the responses already cached carry more than
 is read, and this would be a third endpoint rather than a third use of one.
@@ -1826,7 +1828,7 @@ roll currently assumed. Getting that right is arithmetic; getting it *checked*
 needs the event live, which is the same blocker as the detection below. Do both
 in the same sitting.
 
-### A Radiant node is worth 25% more, and still nobody can see it
+### ~~A Radiant node is worth 25% more, and still nobody can see it~~
 
 **Shipped 2026-08-25.** The owner's ruling replaced two failed attempts at
 pricing Void Traces: traces are almost always tight, the planner must never talk
