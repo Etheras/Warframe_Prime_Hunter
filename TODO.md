@@ -186,6 +186,8 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
+| Varzia's shelf is published outright, and we infer it instead | **found 2026-09-05** — `Manifest` has carried six relic rows in both rotations; the docstring saying otherwise was wrong when written | small |
+| `flags.resurgence` misses a Prime whose path is a codename | **found 2026-09-05, live now** — Euphona Prime this rotation, Cobra & Crane last; 22 of 167 items are exposed | small |
 | Baro's actual stock is published, and never read | **read 2026-09-04: 41 rows, one relic — `Axi M5`, resolved first-party.** No longer blocked on a window; what is left is whether to build it | session |
 
 ### Model and ranking
@@ -613,6 +615,107 @@ better, because the page already renders the empty case correctly and the reader
 still learns nothing.
 
 ---
+
+## Findings of 2026-09-05 — Varzia is published outright, and we infer her
+
+Asked for by the owner: *are we filtering Varzia's live relics a reliable way,
+could we optimise*, and — mid-question — *we have now seen a switch from one
+shelf to the next, so look for caveats there*. The switch is what made both of
+these measurable: the cache holds **Revenant/Baruuk** (2026-08-06 → 09-03) and
+DE's worldstate holds **Banshee/Mirage** (2026-09-03 → 10-01), so every claim
+below is checked against two rotations rather than one.
+
+### `build_varzia_relics` works around a limitation that does not exist
+
+Its docstring is the load-bearing sentence: *"**Digital Extremes do not publish
+the shelf as a list.** `PrimeVaultTraders` carries a `Manifest` of 22 rows —
+packs, Primes, cosmetics… Neither has a relic row, and neither does the WFCD
+proxy of them. Two sessions looked there and concluded it could not be done."*
+
+**It has six relic rows, and so did the previous rotation.** Read from the
+cache, no request made:
+
+```
+/Lotus/StoreItems/Types/Game/Projections/T1VoidProjectionBansheeMirageVaultABronze   1 credit
+                                          …VaultBBronze, T2…A, T3…A, T4…A, T4…B
+```
+
+The Revenant/Baruuk copy carries the same six shapes. So this was **wrong when
+it was written**, not made wrong by a change — which is the entry's real lesson,
+because the inference built to work around it is a page of naming-convention
+machinery that a `/StoreItems` strip would have replaced.
+
+**The inference is nonetheless correct today**, which is why nothing is on fire:
+run against the live worldstate it returns `Axi A12, Axi H5, Lith K5, Lith M7,
+Meso E5, Neo B6` — **identical** to the six literal rows resolved through the
+item database, no unresolved rows either way.
+
+**One hazard, and it is exactly one.** `live = {t for t in live if not any(t != o
+and t in o for o in live)}` keeps only the longest matching rotation tag, because
+`EmberRhino` is a substring of `EmberRhinos`. Measured: the item database knows
+**28 rotation tags and that is the only pair** where one contains the other. If
+both rotations were ever live at once the filter would silently drop three
+relics. Reading the rows removes the question.
+
+### `flags.resurgence` misses a Prime per rotation, and it is measured
+
+`build_resurgence_set` matches each catalogue name against a normalised blob of
+the manifest's `uniqueName`s. That fails whenever DE's internal path does not
+contain the Prime's display name, and it is failing **right now**:
+
+| rotation | name-matcher marks | actually unvaulted | missed |
+|---|---:|---:|---|
+| Banshee/Mirage (live) | 5 | 6 | **Euphona Prime** — `/Weapons/Tenno/Pistols/AllNew1hSG/AllNew1hSG` |
+| Revenant/Baruuk (previous) | 5 | 6 | **Cobra & Crane Prime** — `PrimeCobraAndCrane`, where the name has `&` and the path has `And` |
+
+**Euphona Prime is on the collection view as a plain `VAULTED` card today**,
+with no Resurgence badge and invisible to the *Prime Resurgence* box, while four
+of Varzia's six relics carry its parts. The relic-level data is right — only the
+item-level flag is wrong, which is the same shape as Baro's marker one page up.
+
+**The exposure is 22 of 167.** That many catalogue items have a `uniqueName` that
+does not contain their own name — Hildryn is `IronFrame`, Nidus is `Infestation`,
+Oberon is `Paladin`, Vauban is `Trapper`, Paris is `PrimeHuntingBow`, Spira is
+`PrimeLiDagger`. So this is not a freak: roughly one rotation slot in eight is a
+codename, and a Prime Vault rotation has six.
+
+**And the DE-first switch made it worse.** `vault_trader_from_worldstate` sets
+`"item": ""` because DE publish no display name, while the WFCD proxy carries a
+mangled one. The haystack is `uniqueName + " " + item`, so the fallback route has
+strictly more to match on than the first-party one. `vault_trader_from_worldstate`
+claims the two "produce the same five Primes", which was checked on a rotation
+where the paths happened to carry the names.
+
+### The fix is a join this project already trusts
+
+Resolve each manifest row by dropping the `/StoreItems` segment and looking it up
+in the item database — **exactly what `build_baro_relics` does for Baro's relic**,
+and the rule both `browse.wf` and `warframe-public-export-plus` state as general.
+Measured over both rotations:
+
+| rotation | resolved catalogue Primes |
+|---|---|
+| Banshee/Mirage | Akbolto, Banshee, **Euphona**, Helios, Kogake, Mirage — **6** |
+| Revenant/Baruuk | Afuris, Baruuk, **Cobra & Crane**, Phantasma, Revenant, Tatsu — **6** |
+
+Exactly six each, both missing Primes recovered, and the rows that do not resolve
+are the ones that should not: the `MPV…Pack` bundles are not items, and the
+syandanas, ephemera and noggle statues resolve to real items that `catalogue.py`
+cuts. **No new request** — the item database is already fetched for names, images
+and vault state, and the relic rows resolve through the same table.
+
+**One wrong way to fix it, worth naming so nobody takes it.** Deriving the
+unvaulted Primes from *what the shelf relics pay* over-marks: on Revenant/Baruuk
+it returns eight, adding Braton Prime and Orthos Prime, whose parts sit in those
+relics without being in the rotation. That is the *"88 badged where the shelf held
+six"* bug in a new coat — "a relic on her shelf can give me a part of this" and
+"this Prime is unvaulted this rotation" are different sentences.
+
+**Size: small**, and it deletes more than it adds — `build_resurgence_set`'s
+matching, `RELIC_VAULT_TAG`, `build_varzia_relics` and its longest-match filter
+all go, replaced by one resolver shared with Baro. Keep the inference as a
+**fallback** if the manifest ever carries no relic rows, the way every live feed
+here keeps one.
 
 ## Findings of 2026-09-04
 
