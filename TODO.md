@@ -1644,7 +1644,7 @@ Five types, five different outcomes:
 |---|---|---|
 | `Legacyte Harvest` | *"The order of the rotations is AABC"*, rewards offered every capture, endless | **verified** — no longer an assumption |
 | `Rush` | a single-completion race paying **one** reward: 1/2/3 transports destroyed gives rotation A/B/C | **defect, see below** |
-| `Skirmish` | the Railjack page documents no reward rotations at all | still unverified, and not for want of looking |
+| `Skirmish` | the Railjack page documents no reward rotations at all; the *Empyrean* page says a completion grants **one major reward** | still unverified on cadence, but the evidence now points at fixed-length rather than AABC — see below |
 | `The Circuit` | tier-based with weekly caps and no rotation cycle — while DE's table publishes A/B/C for the same node | **the two sources disagree**; see the note below |
 | `The Perita Rebellion` | not endless, a 12-minute timer; rotation A every 3 Orders, B every Order, C on completion | structure differs from AABC, effect unmeasured |
 
@@ -1652,6 +1652,45 @@ Five types, five different outcomes:
 that disagree.** Worth knowing before the next pass: reading five wiki pages
 produced one confirmation and one bug, which is a better yield than this entry
 had assumed when it called the work "tedious rather than hard".
+
+#### Skirmish, looked at again 2026-09-05 — and the shapes are the news
+
+The owner's reading was that the wiki settles this: the locations table names a
+drop table per node and the rewards fold by planet, so *"seems clear cut to me"*.
+**That is right about which table applies and does not reach the cadence**, which
+is the only thing still assumed. Two pages read:
+
+- `wiki.warframe.com/w/Railjack` — no rotations, no locations table, no rewards
+  section at all. Not where any of it lives.
+- `wiki.warframe.com/w/Empyrean` — rewards are listed per node, and the **only**
+  mention of a rotation letter is for caches: *"Boarding these structures and then
+  hacking a marked terminal will produce a 'Cache' (rotation B for Corpus Proxima
+  nodes)"*, which is the `Caches` mode we already model separately at A then B.
+
+**The one sentence that does bear on it** is about the mission rather than the
+caches: *"Completing the mission's main objective (or one rotation of it, in case
+of endless missions) grants a major reward."* Read plainly that is **one reward
+per completion** for a Skirmish, which points at fixed-length rather than an AABC
+cycle — the `Spy` and `Caches` shape, not the Defense shape.
+
+**What stops that being enough is our own data.** The 16 rotation-bearing nodes
+are not one shape but three, measured off the payload:
+
+| shape | nodes |
+|---|---:|
+| A, B and C | 8 |
+| A and B | 4 |
+| **B only** | 4 |
+
+A node whose relics sit **only in rotation B** is hard to explain under any cycle
+that starts at A, and it is equally hard to explain under "one major reward per
+completion". Until those three shapes have a story, changing the model would be
+swapping one assumption for a better-dressed one. **What would settle it is a
+run**: complete a Proxima Skirmish and count the reward screens. Ten minutes in
+game against a wiki that does not say.
+
+**And 22 of the 38 nodes are already right** whatever the answer — they publish no
+rotation, take `runValue`'s flat path, and are not waiting on this.
 
 ### `The Perita Rebellion` is a time box, and the model has no clock for it
 
