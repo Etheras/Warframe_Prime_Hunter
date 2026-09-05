@@ -6448,6 +6448,80 @@ read 113 and 9, which partitions it exactly. **Cutting the half that could not b
 explained was still the right call** — it just turned out there was nothing to
 explain, because there was no defect.
 
+### Varzia publishes her shelf, and we were inferring it
+
+**Shipped 2026-09-05.** The owner asked whether we filter her live relics
+reliably and whether it could be optimised, then pointed at the shelf switching
+as the place to look. That switch is what made it measurable: the HTTP cache
+holds **Revenant/Baruuk** (2026-08-06 → 09-03) and the worldstate holds
+**Banshee/Mirage** (09-03 → 10-01), so every figure below is checked against two
+rotations rather than one, from disk, with no request made.
+
+**`build_varzia_relics` was working around a limitation that did not exist.** Its
+docstring said *"Digital Extremes do not publish the shelf as a list… Neither has
+a relic row, and neither does the WFCD proxy of them. Two sessions looked there
+and concluded it could not be done."* `Manifest` carries six
+`.../T1VoidProjectionBansheeMirageVaultABronze` rows at one credit each — and the
+cached previous rotation carries the same six shapes. **The sentence was wrong
+when it was written**, not made wrong by a change, which is the same shape as
+`bundle.py`'s docstring being wrong by ten about its own artefact.
+
+**The inference was nonetheless correct**, which is why nothing was on fire: run
+live it returned exactly the six the rows resolve to. It is kept as the fallback,
+for a manifest carrying no relic row, the way every live feed here keeps one.
+
+**The item-level flag was wrong, and was wrong on screen.** `build_resurgence_set`
+matched catalogue names against the manifest's paths, so it missed any Prime whose
+internal path is a codename:
+
+| rotation | matched | actually unvaulted | missed |
+|---|---:|---:|---|
+| Banshee/Mirage | 5 | 6 | **Euphona Prime** — `/Pistols/AllNew1hSG/AllNew1hSG` |
+| Revenant/Baruuk | 5 | 6 | **Cobra & Crane Prime** — name has `&`, path has `And` |
+
+Euphona Prime was a plain `VAULTED` card while four of Varzia's six relics
+carried its parts. **22 of 167 catalogue items have a `uniqueName` that does not
+contain their own name** — Hildryn is `IronFrame`, Nidus `Infestation`, Oberon
+`Paladin`, Paris `PrimeHuntingBow` — and a rotation has six slots, so this was
+not a freak.
+
+**Both are fixed by a join this project already trusted**: drop `/StoreItems` and
+look the row up in the item database, which is how Baro's relic has been resolved
+since 2026-09-04. It returns exactly six Primes on both rotations, recovers both
+missing ones, needs no new request, and the rows that fail to resolve are the ones
+that should — the `MPV…Pack` bundles are not items, and the syandanas, ephemera
+and noggle statues resolve to items `catalogue.py` cuts.
+
+**One wrong fix, recorded because it is the tempting one.** Deriving the unvaulted
+Primes from what her relics *pay* over-counts: on Revenant/Baruuk it returns
+eight, adding Braton and Orthos Prime, whose parts sit in those relics without
+being in the rotation. *"A relic on her shelf can give me a part of this"* and
+*"this Prime is unvaulted"* are different sentences — and shipping the first as
+the second is the 88-badged-where-six-were bug this very function exists to
+remember.
+
+**And the DE-first switch had quietly made the matcher weaker.**
+`vault_trader_from_worldstate` sets `"item": ""` because DE publish no display
+name, while the WFCD proxy carries a mangled one, so the fallback route had
+strictly more to match on than the first-party one. That function claims the two
+"produce the same five Primes" — true on a rotation whose paths carried the names,
+and the kind of check that cannot see what it is missing.
+
+#### The test needed two attempts to be able to fail
+
+Worth keeping, because the first version looked fine. Asserting *"the shelf is
+read off the manifest"* on an ordinary relic row cannot fail: the fallback builds
+its haystack from the **whole inventory, relic rows included**, so a relic on her
+counter always supplies its own rotation tag and the two paths agree by
+construction. Disabling the literal read left every assertion green.
+
+The one case where they genuinely diverge is the hazard the fallback's
+longest-match filter was written for — `EmberRhino` inside `EmberRhinos`, **the
+only such pair among the 28 rotation tags the item database knows**. With both on
+the manifest the rows return both relics and the convention drops the shorter
+tag's. The fixture uses that pair, and the assertion now goes red when the fix is
+removed.
+
 ### The wiki's Baro marker is a badge, and his box is his counter
 
 **Shipped 2026-09-05**, settling *Baro's item-level marker still over-claims*,

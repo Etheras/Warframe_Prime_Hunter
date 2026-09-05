@@ -186,8 +186,8 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| Varzia's shelf is published outright, and we infer it instead | **found 2026-09-05** — `Manifest` has carried six relic rows in both rotations; the docstring saying otherwise was wrong when written | small |
-| `flags.resurgence` misses a Prime whose path is a codename | **found 2026-09-05, live now** — Euphona Prime this rotation, Cobra & Crane last; 22 of 167 items are exposed | small |
+| ~~Varzia's shelf is published outright, and we infer it instead~~ | **found and shipped 2026-09-05** — the rows are read first, the convention is the fallback; `PROJECT.md §7` | done |
+| ~~`flags.resurgence` misses a Prime whose path is a codename~~ | **found and shipped 2026-09-05** — resolving the manifest recovers Euphona Prime, live now, and Cobra & Crane on the previous rotation | done |
 | Baro's actual stock is published, and never read | **read 2026-09-04: 41 rows, one relic — `Axi M5`, resolved first-party.** No longer blocked on a window; what is left is whether to build it | session |
 
 ### Model and ranking
@@ -616,7 +616,15 @@ still learns nothing.
 
 ---
 
-## Findings of 2026-09-05 — Varzia is published outright, and we infer her
+## ~~Findings of 2026-09-05 — Varzia is published outright, and we infer her~~
+
+**All of it shipped the same day**, reasoning in `PROJECT.md §7` under *Varzia
+publishes her shelf, and we were inferring it*. The manifest rows are read
+first through the `/StoreItems` join Baro already used, the naming convention is
+kept underneath as the fallback, and `flags.resurgence` now resolves the rows
+instead of matching names — which recovered **Euphona Prime** this rotation and
+**Cobra & Crane Prime** on the previous one. What follows is the state it was
+decided from.
 
 Asked for by the owner: *are we filtering Varzia's live relics a reliable way,
 could we optimise*, and — mid-question — *we have now seen a switch from one

@@ -1943,7 +1943,10 @@ def test_resurgence_reads_from_the_first_party_worldstate() -> None:
     check("resurgence: the evergreen stock is deliberately not in it",
           [r for r in got["inventory"] if "Braton" in r["uniqueName"]], [])
 
-    # And the matcher gets what it needs out of it, end to end.
+    # And the matcher gets what it needs out of it, end to end. This is the
+    # FALLBACK path since 2026-09-05 - no `items_raw`, so nothing resolves and
+    # the name match is all there is. It is kept because a manifest with no
+    # resolvable row still has to answer.
     active, window = build_data.build_resurgence_set(got, ["Revenant Prime", "Braton Prime"])
     check("resurgence: a pack name still identifies its Prime",
           sorted(active), ["Revenant Prime"])
@@ -1951,9 +1954,128 @@ def test_resurgence_reads_from_the_first_party_worldstate() -> None:
           (window["character"], window["location"]), (None, None),
           "the drawer writes Varzia itself and defaults the place")
 
+    # ── and the first-party path, which is what actually runs ─────────────
+    #
+    # The name match misses any Prime whose internal path is a codename, and it
+    # was missing one per rotation: **Euphona Prime** this rotation, whose store
+    # row is `/Weapons/Tenno/Pistols/AllNew1hSG/AllNew1hSG`, and **Cobra & Crane
+    # Prime** the one before, where the name has "&" and the path has "And".
+    # 22 of 167 catalogue items have a uniqueName that does not contain their
+    # own name, and a Prime Vault rotation has six slots.
+    #
+    # Both shapes are here at once, because the point is that one is invisible
+    # to the matcher and the other is not.
+    live = {"PrimeVaultTraders": [{
+        "Node": "TradeHUB1",
+        "Activation": {"$date": {"$numberLong": str(ms)}},
+        "Expiry": {"$date": {"$numberLong": str(ms)}},
+        "Manifest": [
+            {"ItemType": "/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVBansheeMiragePrimeDualPack"},
+            {"ItemType": "/Lotus/Types/StoreItems/Packages/MegaPrimeVault/MPVBansheePrimeSinglePack"},
+            {"ItemType": "/Lotus/StoreItems/Powersuits/Banshee/BansheePrime"},
+            {"ItemType": "/Lotus/StoreItems/Weapons/Tenno/Pistols/AllNew1hSG/AllNew1hSG"},
+            {"ItemType": "/Lotus/StoreItems/Types/Items/ShipDecos/BansheePrimeBobbleHead"},
+            {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T1VoidProjectionBansheeMirageVaultABronze"},
+            # Two rotations whose tags are in substring relation, which is the
+            # ONE case where the convention and the rows disagree. `EmberRhino`
+            # inside `EmberRhinos` is the only such pair among the 28 tags the
+            # item database knows, and the fallback's longest-match filter -
+            # written for exactly this - drops the shorter one.
+            #
+            # It has to be this pair rather than an invented one: the fallback
+            # builds its haystack from the WHOLE inventory, relic rows included,
+            # so a relic on her counter always supplies its own tag and the two
+            # paths otherwise agree by construction. A first attempt at teeth
+            # here used a tag in no pack name and could not fail.
+            {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T1VoidProjectionEmberRhinoVaultABronze"},
+            {"ItemType": "/Lotus/StoreItems/Types/Game/Projections/T1VoidProjectionEmberRhinosVaultABronze"},
+        ],
+    }]}
+    items = [
+        {"name": "Banshee Prime", "category": "Warframes",
+         "uniqueName": "/Lotus/Powersuits/Banshee/BansheePrime"},
+        {"name": "Euphona Prime", "category": "Primary",
+         "uniqueName": "/Lotus/Weapons/Tenno/Pistols/AllNew1hSG/AllNew1hSG"},
+        {"name": "Noggle Statue - Banshee Prime", "category": "Misc",
+         "uniqueName": "/Lotus/Types/Items/ShipDecos/BansheePrimeBobbleHead"},
+        {"name": "Lith K5 Intact", "category": "Relics",
+         "uniqueName": "/Lotus/Types/Game/Projections/T1VoidProjectionBansheeMirageVaultABronze"},
+        {"name": "Lith E1 Intact", "category": "Relics",
+         "uniqueName": "/Lotus/Types/Game/Projections/T1VoidProjectionEmberRhinoVaultABronze"},
+        {"name": "Lith E2 Intact", "category": "Relics",
+         "uniqueName": "/Lotus/Types/Game/Projections/T1VoidProjectionEmberRhinosVaultABronze"},
+    ]
+    catalogue = ["Banshee Prime", "Euphona Prime", "Braton Prime"]
+
+    # Through the adapter, exactly as the build does — this takes the trader in
+    # the shape the chain hands over, never a raw worldstate.
+    live = official.vault_trader_from_worldstate(live)
+
+    named, _ = build_data.build_resurgence_set(live, catalogue)
+    check("resurgence: the name match cannot see a codename path",
+          sorted(named), ["Banshee Prime"],
+          "if this ever finds Euphona the fallback got better and this test is stale")
+
+    resolved, _ = build_data.build_resurgence_set(live, catalogue, items)
+    check("resurgence: resolving the manifest finds it", sorted(resolved),
+          ["Banshee Prime", "Euphona Prime"],
+          "dropping /StoreItems reaches a path the item database already names")
+    check_true("resurgence: and a relic row is not mistaken for a Prime",
+               "Lith K5 Intact" not in resolved,
+               "relics are build_varzia_relics' answer, not this one")
+    check_true("resurgence: nor is a cosmetic the catalogue does not carry",
+               "Noggle Statue - Banshee Prime" not in resolved)
+
+    # The pack row must not be what carries it: `MPV...DualPack` is not an item,
+    # so a build that resolved packs would find nothing and fall back silently.
+    packs_only = dict(live, inventory=[r for r in live["inventory"]
+                                       if "MegaPrimeVault" in r["uniqueName"]])
+    check("resurgence: the packs-only case has both pack shapes",
+          len(packs_only["inventory"]), 2)
+    fell_back, _ = build_data.build_resurgence_set(packs_only, catalogue, items)
+    check("resurgence: a manifest of packs alone falls back to the name match",
+          sorted(fell_back), ["Banshee Prime"],
+          "the fallback is the only thing that reads a pack name")
+
+    # And the fallback needs the SINGLE pack to do even that: the dual is
+    # `MPVBansheeMiragePrimeDualPack`, where no Prime's name is adjacent to
+    # "Prime", so neither Banshee nor Mirage is visible in it. One more reason
+    # the resolved path above is the one that runs.
+    dual_only = dict(live, inventory=[r for r in live["inventory"]
+                                      if "DualPack" in r["uniqueName"]])
+    nothing, _ = build_data.build_resurgence_set(dual_only, catalogue)
+    check("resurgence: and a dual pack alone tells the name match nothing",
+          sorted(nothing), [],
+          "BansheeMiragePrime has no <name>Prime in it for either of them")
+
     check("resurgence: no trader in the document is None, not an empty shell",
           official.vault_trader_from_worldstate({"PrimeVaultTraders": []}), None,
           "None is what makes the caller fall back to the proxy")
+
+    # ── her shelf, which she also publishes outright ──────────────────────
+    #
+    # `build_varzia_relics` was written believing DE do not list the relics.
+    # They do, and did on the previous rotation too - six VoidProjection rows at
+    # one credit each, in DE's Manifest and in WFCD's copy of it. The naming
+    # convention it inferred them from is kept as the fallback and nothing more.
+    shelf = build_data.build_varzia_relics(items, live)
+    check("resurgence: her shelf is read off the manifest, not inferred",
+          sorted(shelf), ["Lith E1", "Lith E2", "Lith K5"],
+          "Lith E1 is only reachable by reading the rows — the convention's "
+          "longest-match filter drops EmberRhino for being inside EmberRhinos")
+
+    # Strip the relic rows and the convention answers instead, with the same
+    # relic — which is the whole reason nothing was on fire before this changed.
+    # Measured the same way on live data: run against the 2026-09-05 worldstate
+    # the inference returned exactly the six the literal rows resolve to.
+    check("resurgence: with no relic row the convention still answers",
+          sorted(build_data.build_varzia_relics(items, packs_only)), ["Lith K5"],
+          "the fallback reads the rotation tag out of the pack name")
+
+    # And it answers with nothing rather than guessing when there is no signal
+    # at all — an empty shelf is a real state, not a failure to look.
+    check("resurgence: and with neither, it says nothing",
+          sorted(build_data.build_varzia_relics(items, dict(live, inventory=[]))), [])
 
 
 def test_baro_sells_relics_read_off_his_own_manifest() -> None:

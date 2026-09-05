@@ -329,16 +329,79 @@ def as_int(value, default=None):
     return int(value)
 
 
-def build_resurgence_set(vault_trader: dict, catalog_names: list[str]) -> tuple[set[str], dict]:
-    """
-    Varzia's live inventory is the only trustworthy Prime Resurgence signal -
-    the wiki's (R) markers on the Prime page are stale.
+def store_items_to_real(paths) -> set[str]:
+    """`/Lotus/StoreItems/...` -> the real type path, by dropping the one segment.
 
-    Inventory names are mangled ("Prime Tatsu Weapon", "Phantasma Prime
-    Shotgun"), so match on uniqueName instead: the path always contains the
-    item's base word next to "Prime" in one order or the other.
+    A vendor can only sell StoreItems, and every vendor manifest in this build
+    is a list of them. Both `warframe-public-export-plus` and `browse.wf` state
+    the rule generally (read as reference, nothing copied - `TODO.md`), and it
+    is what lets one join read Baro's shelf, Varzia's, and the Primes she has
+    unvaulted, all against the item database already fetched for names.
+
+    Only `/Lotus/StoreItems/` is rewritten, never `/StoreItems` wherever it
+    appears. Varzia's pack rows are `/Lotus/Types/StoreItems/Packages/...` and
+    are meant to fall through unresolved: they are Regal Aya bundles, out of
+    scope by `PROJECT.md §2`, and the Primes inside them are named by their own
+    rows anyway.
+    """
+    out = {str(p).replace("/Lotus/StoreItems/", "/Lotus/", 1) for p in (paths or []) if p}
+    out.discard("")
+    return out
+
+
+def build_resurgence_set(vault_trader: dict, catalog_names: list[str],
+                         items_raw: list | None = None) -> tuple[set[str], dict]:
+    """
+    Which Primes Prime Resurgence has unvaulted - Varzia's live inventory, which
+    is the only trustworthy signal. The wiki's (R) markers are stale.
+
+    **Her manifest names them outright, and this reads that.** Each row is a
+    StoreItem path; dropping `/StoreItems` reaches a path the item database
+    already carries, exactly as Baro's relic is resolved. Rows that resolve to
+    nothing are meant to: the `MPV...Pack` bundles are not items, and the
+    syandanas, ephemera and noggle statues are items `catalogue.py` cuts.
+
+    **The fallback below matched names against the paths, and under-counted by
+    one Prime per rotation.** Measured 2026-09-05 over two rotations, which is
+    what the shelf switching on 09-03 made possible:
+
+        Banshee/Mirage   matcher 5, manifest 6 - missed Euphona Prime, whose
+                         path is /Weapons/Tenno/Pistols/AllNew1hSG/AllNew1hSG
+        Revenant/Baruuk  matcher 5, manifest 6 - missed Cobra & Crane Prime,
+                         where the name has "&" and the path has "And"
+
+    It is not a freak: **22 of 167 catalogue items have a `uniqueName` that does
+    not contain their own name** - Hildryn is `IronFrame`, Nidus `Infestation`,
+    Oberon `Paladin`, Paris `PrimeHuntingBow`. A rotation has six slots.
+
+    **One wrong fix, named so nobody takes it.** Deriving the unvaulted Primes
+    from what her *relics pay* over-counts: on Revenant/Baruuk it returns eight,
+    adding Braton and Orthos Prime, whose parts sit in those relics without being
+    in the rotation. "A relic on her shelf can give me a part of this" and "this
+    Prime is unvaulted" are different sentences, and shipping the first as the
+    second is the 88-badged-where-six-were bug that `build_varzia_relics` exists
+    to remember.
+
+    The name matcher is kept as the fallback, for a manifest that carries no
+    resolvable row at all, and is the only path when `items_raw` is absent.
     """
     inv = vault_trader.get("inventory") or []
+
+    wanted = set(catalog_names)
+    if items_raw:
+        selling = store_items_to_real(row.get("uniqueName") for row in inv)
+        # Relics are on the same manifest and are `build_varzia_relics`'s answer,
+        # not this one. They do not appear in `catalog_names` today, so this is
+        # belt and braces rather than a fix - but "Lith K5 Intact" arriving in a
+        # set of unvaulted Primes is the kind of thing that is obvious once and
+        # baffling a month later.
+        resolved = {str(row.get("name", "")) for row in items_raw
+                    if str(row.get("uniqueName", "")) in selling
+                    and row.get("category") != "Relics"}
+        resolved &= wanted
+        if resolved:
+            return resolved, _resurgence_window(vault_trader)
+
     blobs = []
     for row in inv:
         blobs.append(norm(row.get("uniqueName", "")) + " " + norm(row.get("item", "")))
@@ -354,13 +417,20 @@ def build_resurgence_set(vault_trader: dict, catalog_names: list[str]) -> tuple[
         if (base + "prime") in haystack or ("prime" + base) in haystack:
             active.add(name)
 
-    window = {
+    return active, _resurgence_window(vault_trader)
+
+
+def _resurgence_window(vault_trader: dict) -> dict:
+    """The rotation's own dates, shipped as `meta.resurgence` so the page can
+    say when it turns over. `character` and `location` are absent from DE's
+    document and deliberately not invented - `official.vault_trader_from_worldstate`
+    has why."""
+    return {
         "activation": vault_trader.get("activation"),
         "expiry": vault_trader.get("expiry"),
         "character": vault_trader.get("character"),
         "location": vault_trader.get("location"),
     }
-    return active, window
 
 
 # The rotation tag inside a vaulted relic's uniqueName:
@@ -380,13 +450,28 @@ def build_varzia_relics(items_raw: list, vault_trader: dict) -> set[str]:
     part of an offered Prime counted, which sweeps in every historical relic
     those parts ever appeared in.
 
-    **Digital Extremes do not publish the shelf as a list.** `PrimeVaultTraders`
-    carries a `Manifest` of 22 rows - packs, Primes, cosmetics, all priced in
-    Regal Aya - and an `EvergreenManifest` of Twitch cosmetics. Neither has a
-    relic row, and neither does the WFCD proxy of them. Two sessions looked
-    there and concluded it could not be done.
+    **Digital Extremes publish it outright, and the inference below is the
+    fallback.** This docstring said the opposite until 2026-09-05 - *"neither has
+    a relic row, and neither does the WFCD proxy of them; two sessions looked
+    there and concluded it could not be done"* - and it was wrong when it was
+    written rather than made wrong by a change. `Manifest` carries six
+    `.../T1VoidProjectionBansheeMirageVaultABronze` rows at one credit each, and
+    the cached Revenant/Baruuk copy from the previous rotation carries the same
+    six shapes. Both were read from disk, no request made.
 
-    It is published, though, in the item database, as a naming convention: a
+    So the literal rows are taken first, through the same `/StoreItems` join
+    Baro's relic uses. The inference is kept underneath for a manifest that
+    carries no relic row at all, which is what every live feed here keeps.
+
+    **The inference is nonetheless correct**, which is why nothing was on fire:
+    run against the live worldstate on 2026-09-05 it returned exactly the six
+    the literal rows resolve to. It carries one hazard, and exactly one - the
+    longest-match filter below exists because `EmberRhino` is a substring of
+    `EmberRhinos`, and those are **the only such pair among the 28 rotation tags
+    the item database knows**. Were both ever live at once it would silently drop
+    three relics. Reading the rows removes the question.
+
+    The convention it relies on: a
     relic minted for a Prime Vault rotation is
     `.../T1VoidProjection<Rotation>Vault<Letter><Refinement>`, and `<Rotation>`
     is the same word DE build the pack names from - `MPVRevenantBaruukPrimeDualPack`
@@ -400,8 +485,24 @@ def build_varzia_relics(items_raw: list, vault_trader: dict) -> set[str]:
     exactly the six - Lith T13, Lith A9, Meso R6, Neo P8, Axi C9, Axi B9. No
     misses and no extras.
     """
-    packs = " ".join(str(row.get("uniqueName", ""))
-                     for row in (vault_trader.get("inventory") or []))
+    inv = vault_trader.get("inventory") or []
+
+    # What she is selling, said outright. One relic is one entry however many
+    # refinements exist, exactly as the inference below returns it.
+    selling = store_items_to_real(row.get("uniqueName") for row in inv)
+    literal = set()
+    for row in items_raw or []:
+        if row.get("category") != "Relics":
+            continue
+        if str(row.get("uniqueName", "")) not in selling:
+            continue
+        name = " ".join(str(row.get("name", "")).split()[:2])
+        if name:
+            literal.add(name)
+    if literal:
+        return literal
+
+    packs = " ".join(str(row.get("uniqueName", "")) for row in inv)
     if not packs:
         return set()
 
@@ -471,12 +572,7 @@ def build_baro_relics(items_raw: list, manifest: list) -> set[str]:
     `upstream_signature`, and it was written the same day the other one was
     fixed.
     """
-    selling = {
-        str(path).replace("/Lotus/StoreItems/", "/Lotus/", 1)
-        for path in (manifest or [])
-        if path
-    }
-    selling.discard("")
+    selling = store_items_to_real(manifest)
     if not selling:
         return set()
 
@@ -1554,7 +1650,8 @@ def main() -> int:
             by_name.setdefault(norm(n), it)
 
     catalog_names = [c["name"] for c in catalog]
-    resurgence, resurgence_window = build_resurgence_set(vault_trader, catalog_names)
+    resurgence, resurgence_window = build_resurgence_set(
+        vault_trader, catalog_names, items_raw)
     log(f"resurgence: {len(resurgence)} items live at Varzia "
         f"({resurgence_window.get('activation', '?')[:10]} -> {resurgence_window.get('expiry', '?')[:10]})")
 
