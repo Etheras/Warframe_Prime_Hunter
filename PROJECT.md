@@ -6448,7 +6448,7 @@ read 113 and 9, which partitions it exactly. **Cutting the half that could not b
 explained was still the right call** — it just turned out there was nothing to
 explain, because there was no defect.
 
-### The wiki's Baro marker is a bucket, and the shelf is a badge
+### The wiki's Baro marker is a badge, and his box is his counter
 
 **Shipped 2026-09-05**, settling *Baro's item-level marker still over-claims*,
 which had been open since the badges shipped on 2026-09-04.
@@ -6462,76 +6462,106 @@ recorded history, **271 of 313 visits carried no relic at all**. So for most of
 any fortnight the marker is true of nobody, and a reader ticking his box got nine
 Primes he was selling nothing for.
 
-**Both are kept, and they are kept in different places.** The marker stays an
-availability bucket — *"Baro sells this sometimes"* is a real long-term route,
-and it is the reason these nine are not simply unobtainable. The live shelf is
-carried by the **badge** (`BARO — HERE NOW` against `BARO — MAYBE`) and by the
-planner's crack list, where it is actionable. And a Prime whose **only** source
-is that marker now also joins *Vaulted*, because nothing drops it — `bucketsOf`
-could not see that, since it falls back to `vaulted` only when a flag left it
-with nothing, and the marker counts as something.
+**His box holds his counter, because every box beside it already works that
+way.** That is the argument that settled it, and it is a fact about the build
+rather than a preference: `flags.farmable` is `bool(farmable_relics)` — *"can a
+relic for this be farmed right now"* — and `flags.resurgence` is Varzia's live
+rotation (`build_data.py:1823`). Both change membership every build as the game
+changes. **`baro` was the only availability bucket driven by a static wiki
+marker**, and that is what made the reader's actual selection — *Farmable,
+Resurgence, Railjack, Baro, because he is live* — carry seven Primes he was
+selling nothing for.
 
-**The first attempt went further and was wrong.** For about an hour the marker
-was demoted to a badge outright and the bucket became the live shelf. It reads
-well — a bucket should answer *how do I get this*, and "he might, one day" is
-not a route — but it threw away a category the reader actually wants: with him
-away, which is twelve days in fourteen, his box was empty and the nine were
-scattered into vaulted, farmable and special with no way to ask *"what does Baro
-deal in?"*. The owner caught it: **"when he is away, I want it to work the way it
-was, classified as Baro Primes."** Emptying a box for most of a fortnight is not
-honesty, it is a category deleted.
+So `baro` is live too, and the marker is the **badge**. The precedent is exact:
+a Prime that *used* to be farmable is not in *Farmable*, it is in *Vaulted*, and
+nobody wants a "was farmable once" box. The wiki marker is the "might be, one
+day" version of the same statement.
 
-**A third checkbox for live Baro Primes was proposed and rejected, on a number.**
-It would narrow nine items to **at most three** — his record across 313 visits,
-where one is the usual count when there is any — while sitting empty twelve days
-in fourteen, and it would be a box that is a strict subset of the box above it,
-which none of the other seven are (`STYLE.md §6`: one control shape per kind of
-question). A badge already picks two items out of nine at a glance, which is what
-a badge is for.
+**Nothing disappears, which is what makes that safe.** A Prime whose only source
+is the marker also joins *Vaulted* — statically, because whether a relic drops is
+a fact about the drop tables and does not move when his van arrives. `bucketsOf`
+could not see this: it falls back to `vaulted` only when a flag left it with
+nothing, and the marker counts as something. The status sort still groups the
+marked Primes together as well.
 
-**And the second attempt overreached in the other direction**, which is worth
-recording because it looked like the careful version. It made the *`vaulted`*
-bucket live instead — a marked Prime gained it while he was not selling and lost
-it while he was — on the reading that `vaulted` means *no way to get this right
-now*. Measured immediately: it produced a card wearing a `VAULTED` **badge** that
-the *Vaulted* **box** would not show, because the badge reads `flags.vaulted` and
-the bucket had started reading the clock. **Vaulted is a fact about the drop
-tables, not about this fortnight.** So neither box moves with his van, and the
-whole live answer sits in the badge — which is where the reader already looks.
+**And the shelf decides the bucket, not the marker** — including for a Prime the
+wiki has never marked. `flags.baro` is a historical record kept by editors, so
+the first time he sells a relic for something new it is not on the page yet; his
+manifest is. Reading the bucket as *marked AND selling* would have let the wiki
+hold a veto over first-party data, which is the opposite of how every other rule
+here runs.
+
+#### Three arrangements were tried in an afternoon, and two are worth keeping
+
+**Marker as bucket, badge as shelf** — the state before this. Honest about the
+category and wrong about availability: ticking his box while he was on a relay
+offered nine Primes for one relic, and put seven un-gettable Primes into a
+can-get-now list.
+
+**Marker demoted, bucket live** — shipped for an hour and reverted. Right about
+availability and it deleted a category: with him away, twelve days in fourteen,
+his box was empty and there was no way to ask *"what does Baro deal in?"*. The
+owner's correction was **"when he is away, I want it to work the way it was."**
+What resolved it was not choosing between the two but noticing the seven were
+never actually lost — they are in *Vaulted*, badged, and grouped by the status
+sort. The category survives without a box of its own.
+
+**A box whose meaning followed the other boxes** — the owner's proposal, and the
+one worth writing down because it fails for a reason that generalises. It read:
+all nine with his box alone, only the live two beside *Farmable*, seven beside
+*Vaulted*. That is **non-monotonic** — ticking one more box would have taken
+seven Primes off the screen — and no other box in this sidebar can do that. A
+filter set that is an OR everywhere else cannot have one member that subtracts,
+and there is nothing you could put on screen to explain it.
+
+**A second checkbox for the live half** was also rejected: it would be a strict
+subset of the box above it, which none of the other seven are (`STYLE.md §6`),
+and it would sit empty twelve days in fourteen. The one argument for it that did
+land — that a badge cannot filter a combined forty-item list, only decorate it —
+is answered by making the box itself live.
+
+One of those three left a trap worth naming on its own. Making *`vaulted`* the
+live bucket — gained while he is not selling, lost while he is — reads as the
+careful version and produced a card wearing a `VAULTED` **badge** that the
+*Vaulted* **box** would not show, because the badge reads `flags.vaulted` while
+the bucket had started reading the clock. **A badge and a box that disagree about
+the same word is the shape to watch for**; it is how both wrong turns announced
+themselves.
 
 **Three things this deliberately does not touch.** `statusOf` and `BUCKET_ORDER`
 are unchanged, so Gotva Prime keeps the ordering override that puts Baro above
-the wrong `(S)` its wiki page carries. `bucketsOf` in `model.js` is unchanged —
-the `vaulted` addition happens in `app.js`, beside the `railjack` one and for the
-same reason: `model.js` deliberately knows about neither the relic table nor the
-clock. And the badge label moved from `BARO SOMETIMES` to **`BARO — MAYBE`**, the
-owner's word, which pairs with `BARO — HERE NOW` in shape as well as sense.
+the wrong `(S)` its wiki page carries, and the status sort still groups the
+marked Primes. `bucketsOf` in `model.js` is unchanged — both the `vaulted`
+addition and the live `baro` answer happen in `app.js`, beside the `railjack` one
+and for the same reason: `model.js` deliberately knows about neither the relic
+table nor the clock. And the badge moved from `BARO SOMETIMES` to **`BARO —
+MAYBE`**, the owner's word, pairing with `BARO — HERE NOW` in shape as well as
+sense.
 
 **The conjunction from the day before dissolved, which is how the diagnosis was
 confirmed.** *Vaulted AND Baro Ki'Teer* had been a special case in a filter that
 is a plain OR everywhere else; it existed because one flag was doing two jobs.
-Give the seven their honest second bucket and it is not needed — `passesAvail` is
-one line again. A rule that stops being necessary once the data model is
-corrected was a symptom of the data model.
+Separate them and it is not needed — `passesAvail` is one line again. A rule that
+stops being necessary once the data model is corrected was a symptom of the data
+model.
 
-Measured on the served page, other buckets unticked, in both halves of his cycle:
+Measured on the served page, the owner's own four cases, his box ticked
+throughout and Railjack, Resurgence, Special and Founder off:
 
-| boxes | on screen | *Baro* count | *Vaulted* count |
-|---|---|---:|---:|
-| Baro only | all nine | 9 | 120 |
-| Vaulted only | the seven with no other source | 9 | 120 |
-| **he is away** | **all nine, unchanged** | **9** | **120** |
+| also ticked | marked Primes on screen | grid |
+|---|---:|---:|
+| — | **2** — Akmagnus and Magnus, his whole counter | 2 |
+| Farmable | **3** — plus Lex Prime, which is farmable | 31 |
+| Vaulted | **7** | 120 |
+| Farmable + Vaulted | **8**, and 9 once Special joins for Gotva | 149 |
 
-Nothing moves when he does, which is the point: the boxes answer what a Prime
-*is*, the badges answer what *today* is. Verified on the card as well — while he
-is on the relay Akmagnus Prime reads `VAULTED` + `BARO — HERE NOW`, and with him
-gone the same card reads `VAULTED` + `BARO — MAYBE`, on the page's own clock and
-with no rebuild.
+**2 → 3 → 7 → 8, and every step is a superset of the last.** That is the property
+the rejected design broke. His count reads 2 while *Vaulted* reads 120, and
+neither moves when the other box does.
 
-**One behaviour changed that the owner's earlier filter spec had said otherwise
-about**, and they confirmed it: that spec said a *sometimes* Prime should be
-*"hidden otherwise"* — invisible unless both boxes were ticked. It is visible
-under *Vaulted* alone now, because that is what it is.
+With him away: his box holds **nothing** and counts **0**, *Vaulted* still holds
+the seven at 120, and the card flips from `BARO — HERE NOW` to `BARO — MAYBE` on
+the page's own clock with no rebuild.
 
 ### The small-items sweep of 2026-09-05, where three of six were already done
 

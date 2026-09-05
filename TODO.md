@@ -1170,21 +1170,20 @@ for what the reader can act on. Verified in the browser — of the nine, exactly
 Akmagnus and Magnus Prime (both fed by `Axi M5`) read *here now*.
 
 **The flag itself was settled 2026-09-05**, reasoning in `PROJECT.md §7` under
-*The wiki's Baro marker is a bucket, and the shelf is a badge*. Short version:
-both facts are kept and kept apart. The marker **stays a bucket**, because
-"Baro deals in this Prime" is a real long-term route — and a Prime whose only
-source is that marker also joins *Vaulted*, because nothing drops it. The live
-shelf is the **badge's** job (`BARO — HERE NOW` against `BARO — MAYBE`) and the
-planner's, where it is actionable. The conjunction added the day before
-dissolved with it: it had been standing in for one flag doing two jobs.
+*The wiki's Baro marker is a badge, and his box is his counter*. Short version:
+**his box is live, because every box beside it already is** — `flags.farmable`
+is "can a relic for this be farmed right now" and `flags.resurgence` is Varzia's
+current rotation, so `baro` was the only availability bucket driven by a static
+wiki marker. Nothing is lost by it: a Prime whose only source is the marker also
+joins *Vaulted*, statically, and the status sort still groups the marked ones.
+The marker's remaining job is the `BARO — MAYBE` badge.
 
-Two wrong turns are recorded there rather than deleted, because both read well:
-demoting the marker to a badge outright emptied his box for twelve days in
-fourteen and deleted a category the reader wants, and making `vaulted` live
-instead produced a card wearing a `VAULTED` badge the *Vaulted* box would not
-show. A third checkbox for live Baro Primes was proposed and rejected on a
-number — it would narrow nine items to at most three, his record over 313
-visits.
+Three arrangements were tried in an afternoon and all three are recorded there,
+because two of them read well and one is the owner's own proposal. The one worth
+carrying forward: a filter set that is an OR everywhere else **cannot have one
+member that subtracts** — a box whose meaning followed the other boxes would
+have taken seven Primes off screen for ticking one more, and nothing on screen
+could explain it.
 
 The rest of this entry is the state it was decided from.
 

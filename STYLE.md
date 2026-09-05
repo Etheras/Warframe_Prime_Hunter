@@ -62,11 +62,14 @@ MAYBE` takes `--txt-dim`, the same grey as `VAULTED`, because it sits beside
 
 **Both carry the same stem on purpose** — it was `BARO SOMETIMES` until
 2026-09-05, and matching the em-dash shape makes them read as one question
-answered two ways rather than as two unrelated badges. And **the badge is where
-the live answer lives**: the availability boxes beside the grid say what a Prime
-*is* and do not move when his van does, so the card is the only thing that
-changes across his arrival. `PROJECT.md §7` has why a third checkbox for it was
-rejected.
+answered two ways rather than as two unrelated badges.
+
+**`BARO — MAYBE` is the marker's only remaining job**, and that is what keeps
+this section's rule honest rather than merely stated. His availability box holds
+what is on his counter, like every box beside it — so the grey badge is the one
+thing on the page still saying *he deals in this, some day*, which is exactly the
+kind of claim a badge should make and a filter should not. `PROJECT.md §7` has
+the three arrangements this took to arrive at.
 
 The general rule, which is the part worth keeping: **colour is for what the
 reader can act on.** A marker about history wearing the colour of a live

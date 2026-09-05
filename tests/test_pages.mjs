@@ -381,50 +381,75 @@ page_test("banking a part keeps the focus on the button that was clicked", async
 });
 
 page_test("a Prime with two sources survives unticking either of them", async () => {
-  /* Lex Prime's relics still drop AND Baro sells it. Each item displays as one
-     bucket, which is right for the badge and was wrong for the filter: it filed
-     under Farmable, so unticking Farmable took it away from the Baro box that
-     was still ticked, with nothing on screen saying where it had gone.
+  /* The bug: each item displays as ONE bucket, which is right for the badge and
+     was wrong for the filter — a Prime filed under Farmable vanished when
+     Farmable was unticked even though a second box covering it was still on,
+     with nothing on screen saying where it had gone.
 
-     Named subject, because no property of the raw data picks out "an item with
-     two sources" without reimplementing the classifier (PROJECT.md section 2). */
+     **Both sources are staged now**, and that is a change of 2026-09-05 rather
+     than a convenience. The second source used to be the wiki's Baro marker,
+     which was an availability bucket; his box holds his live counter now, so a
+     Prime is only in two buckets while he is actually carrying a relic for it.
+     Staging is also what makes this deterministic — it used to depend on the
+     fortnight, since his box opens two days in fourteen.
+
+     The subject is asked for by property: farmable, with a relic that still
+     drops, so putting that relic on his counter gives it a genuine second
+     source. Never a named Prime — which this test did name until today. */
   const { page, errors } = await open("/index.html");
-  const flags = await page.evaluate(() => {
-    const it = window.WFPRIME_DATA.items.find((i) => i.name === "Lex Prime");
-    return it && it.flags;
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const it = D.items.find((i) => (i.flags || {}).farmable
+      && (i.farmableRelics || []).length && !(i.flags || {}).vaulted);
+    return it ? { id: it.id, name: it.name, relic: it.farmableRelics[0] } : null;
   });
-  assert.ok(flags && flags.farmable && flags.baro,
-            "Lex Prime is the subject because it is farmable and a Baro item");
+  assert.ok(subject, "no farmable Prime with a relic still dropping to stage");
 
-  /* Both of its boxes on before anything is measured. *Baro Ki'Teer* opens only
-     while he is actually on a relay — two days a fortnight — so its default is
-     a fact about the calendar rather than about this test, and asking for the
-     state outright is what makes this run the same in either week. */
+  /* Put that relic on his counter and put him on a relay. Every other `baro`
+     flag is cleared first, or the payload's own shelf leaks into the scenario. */
+  await page.addInitScript(([rname, act, exp]) => {
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) {
+        if (next && next.relics) {
+          Object.keys(next.relics).forEach((n) => { next.relics[n].baro = false; });
+          if (next.relics[rname]) next.relics[rname].baro = true;
+        }
+        if (next && next.meta) {
+          next.meta.baro = { activation: act, expiry: exp,
+                             node: "EarthHUB", character: "Baro'Ki Teel" };
+        }
+        held = next;
+      },
+    });
+  }, [subject.relic,
+      new Date(Date.now() - 3600e3).toISOString(),
+      new Date(Date.now() + 3600e3).toISOString()]);
+  await page.reload({ waitUntil: "load" });
+
   await setChecks(page, { "#f-farmable": true, "#f-baro": true });
-
-  const card = page.locator('[data-id="secondary-lex-prime"]');
-  await page.locator("#search").fill("Lex Prime");
+  const card = page.locator(`[data-id="${subject.id}"]`);
+  await page.locator("#search").fill(subject.name);
   assert.equal(await card.count(), 1, "it has to be on screen before anything is unticked");
 
-  /* Either box holds it on its own, which is the whole point of the entry.
-     Lex is also the case that keeps `bucketsNow` honest: it is Baro-marked but
-     **not vaulted**, so it must never pick up the `vaulted` bucket a marked
-     Prime gains while he is not selling it — Lex has a source of its own and
-     eight relics still dropping. */
   await setCheck(page, "#f-farmable", false);
   assert.equal(await card.count(), 1,
-               "Baro deals in it, so his box holds it with Farmable off");
+               "he is carrying its relic, so his box holds it with Farmable off");
 
   await setChecks(page, { "#f-farmable": true, "#f-baro": false });
   assert.equal(await card.count(), 1,
                "and its OWN source holds it with his box off — this is the "
                + "two-source bug and it must not come back");
 
+  /* And it must never pick up `vaulted`. That bucket is added to a Prime whose
+     only source is the marker; this one has relics still dropping. */
   await setCheck(page, "#f-vaulted", true);
   await setCheck(page, "#f-farmable", false);
   assert.equal(await card.count(), 0,
-               "and Vaulted must not find it: a Prime with relics still dropping "
-               + "is not vaulted, whatever Baro is doing");
+               "Vaulted must not find a Prime with relics still dropping, "
+               + "whatever Baro is doing");
 
   await setCheck(page, "#f-vaulted", false);
   await setCheck(page, "#f-baro", false);
@@ -1466,17 +1491,16 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
   assert.deepEqual(errors, []);
 });
 
-page_test("his box keeps every Prime he deals in, and Vaulted keeps them too", async () => {
-  /* Owner's call, 2026-09-05. Two facts wear the name Baro: `flags.baro` is a
-     static wiki marker on nine items, and his shelf is a live feed that covered
-     two of them on his last visit — with 271 of his 313 recorded visits
-     carrying no relic at all.
+page_test("his box holds his counter, and the seven stay findable in Vaulted", async () => {
+  /* Owner's call, 2026-09-05. His box is live, like every box beside it:
+     `flags.farmable` is "can a relic for this be farmed right now" and
+     `flags.resurgence` is Varzia's current rotation, so a *what can I get now*
+     selection — Farmable, Resurgence, Railjack, Baro — has to mean that for all
+     four. The wiki marker is the "might be, one day" version and it is a badge.
 
-     Both are kept, in different places. The **marker stays a bucket**, because
-     "Baro deals in this" is a real long-term route, and a Prime whose only
-     source is that marker also joins *Vaulted*, because nothing drops it. The
-     **live shelf is the badge's job** — and the planner's, where it is
-     actionable. Neither box moves with his van.
+     The seven with no other source carry `vaulted` **statically**, so they never
+     vanish: what they stop doing is claiming to be available. Whether a relic
+     drops is a fact about the drop tables and does not move when his van does.
 
      Staged rather than waited for, the same way the badge test stages it — the
      answer otherwise depends on the fortnight the suite runs in. */
@@ -1526,54 +1550,67 @@ page_test("his box keeps every Prime he deals in, and Vaulted keeps them too", a
 
   const shown = (id) => page.locator(`[data-id="${id}"]`).count();
 
-  /* **His box keeps all nine**, marker and all — the category "Primes Baro
-     deals in" is a real one and is the reason these are not simply
-     unobtainable. What the live shelf decides is the OTHER bucket. */
+  /* **His box is his counter.** This is the assertion the whole arrangement is
+     for: a reader ticking Farmable, Resurgence, Railjack and Baro is asking
+     what they can get now, and seven Primes he is selling nothing for do not
+     belong in that answer. */
   await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
   assert.equal(await shown(subject.now), 1,
-               "the Prime whose relic he is holding is in his box");
-  assert.equal(await shown(subject.sometimes), 1,
-               "and so is one he only sometimes sells — the marker is a bucket, "
-               + "and the badge is what separates them");
+               "the Prime whose relic he is holding is on his counter");
+  assert.equal(await shown(subject.sometimes), 0,
+               "one he merely deals in is not — his box would otherwise put "
+               + "nine Primes into a can-get-now list while carrying one relic");
 
-  /* **And the *Vaulted* box finds them too**, because a Prime whose only source
-     is his marker has no farm route at all — `bucketsOf` cannot see that, since
-     it falls back to `vaulted` only when a flag left it with nothing and the
-     marker counts as something.
-
-     Both subjects, including the one he is holding a relic for. Being on his
-     shelf today does not make a Prime un-vaulted: nothing drops it, which is a
-     fact about the drop tables rather than about this fortnight. A version that
-     moved the bucket with his shelf was tried the same day and produced a card
-     wearing a `VAULTED` badge that the *Vaulted* box would not show. */
+  /* **And nothing is lost, which is what makes the above safe.** Both subjects
+     are in *Vaulted* — including the one he is holding a relic for, because
+     nothing drops it either way. That bucket is static: a version that moved it
+     with his shelf was tried the same day and produced a card wearing a
+     `VAULTED` badge that the *Vaulted* box would not show. */
   await setChecks(page, { "#f-baro": false, "#f-vaulted": true });
   assert.equal(await shown(subject.sometimes), 1,
-               "Vaulted alone finds a Prime whose only source is his marker");
+               "the one he is not selling is still findable, under Vaulted");
   assert.equal(await shown(subject.now), 1,
-               "and still finds it while he is holding its relic — the badge is "
-               + "what says he has it, not the bucket");
+               "and so is the one he is — being on his counter does not make a "
+               + "Prime un-vaulted");
 
-  /* The number beside his box counts the marker, because that is what the box
-     holds. Asserted as a relation, not a figure: how many Primes carry the
-     marker is a property of the wiki and how many he is carrying is a property
-     of the fortnight. */
+  /* The number beside his box is what he is carrying. Asserted as a relation
+     rather than a figure — how many Primes carry the marker is a property of
+     the wiki, and how many he is holding is a property of the fortnight. */
   const countOf = (k) => page.evaluate((key) =>
     Number(document.querySelector(`[data-count="${key}"]`).textContent), k);
   const flaggedTotal = await page.evaluate(() =>
     window.WFPRIME_DATA.items.filter((i) => (i.flags || {}).baro).length);
+  /* Counted WITHOUT asking about `flags.baro`, which is the point: his box is
+     driven by the shelf, so a Prime the wiki has never marked is in it the
+     moment he carries a relic for it. Filtering this by the marker as well was
+     this assertion's first mistake and it read 2 where the box held 5. */
+  const sellingNow = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    return D.items.filter((i) =>
+      (i.relics || []).some((n) => (D.relics[n] || {}).baro)).length;
+  });
+  assert.ok(sellingNow > 0 && sellingNow < flaggedTotal,
+            `the staging should leave him carrying SOME but not all of the `
+            + `${flaggedTotal} marked Primes — read ${sellingNow}`);
 
   await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
-  assert.equal(await countOf("baro"), flaggedTotal,
-               "his box holds every Prime he deals in, so its count says so");
+  assert.equal(await countOf("baro"), sellingNow,
+               "his box counts his counter, not the wiki's marker");
 
-  /* And it does not move when *Vaulted* does. The two boxes overlap — these
-     Primes are counted beside both, which is the existing rule for anything
-     with two sources — but neither decides the other. A conjunction between
-     them stood here for one day, standing in for a single flag doing two jobs,
-     and this is what asserts it has not come back. */
+  /* **And ticking another box never removes anything**, which is the property
+     the rejected design broke: one where his box meant all nine alone and only
+     the live ones beside *Farmable* would have taken seven Primes off screen
+     for ticking one more box. No other box in this sidebar can do that. */
+  const seen = () => page.evaluate(() =>
+    [...document.querySelectorAll("#grid .card[data-id]")].map((e) => e.dataset.id));
+  const baroAlone = await seen();
   await setCheck(page, "#f-vaulted", true);
-  assert.equal(await countOf("baro"), flaggedTotal,
-               "whatever else is ticked");
+  const withVaulted = await seen();
+  assert.ok(baroAlone.every((id) => withVaulted.includes(id)),
+            "ticking Vaulted must only ever add — "
+            + `${baroAlone.filter((id) => !withVaulted.includes(id))} went away`);
+  assert.equal(await countOf("baro"), sellingNow,
+               "and his number does not move when another box does");
 
   /* The live shelf shows up on the card, which is the whole division of labour:
      the bucket says what a Prime is, the badge says what today is. */
