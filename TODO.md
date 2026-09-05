@@ -852,7 +852,22 @@ without re-reading the wiki, and the honest sentence in `README.md` about `cron`
 — *a missed day is simply missed* — applies to Windows too. **Size: nil** — read
 one field. Do not close this from documentation; that is what put it here.
 
-### Vendor `ItemType` paths have a general rule, and we found one case of it
+### ~~Vendor `ItemType` paths have a general rule, and we found one case of it~~
+
+**Closed 2026-09-05, owner's call: credit it as *inspired by*, not as copied
+code.** `README.md`'s *Licence and attribution* now names both projects and says
+plainly that no code, data or table of theirs is used and the implementation is
+ours. Hard rule 9 already put this in the permitted category — *"reading how
+somebody else solved something and writing our own is fine"* — so nothing was
+pending but the acknowledgement.
+
+**Two things changed while it sat here.** It stopped being a "reference" and
+became **load-bearing**: Baro's relic (2026-09-04), Varzia's shelf and
+`flags.resurgence` (2026-09-05) all resolve through it. And **we stopped
+depending on their claim** — the rule is now verified against DE's own data,
+6/6 relic rows and 6/6 Prime rows on the current rotation, 6/6 on the previous
+one, plus Baro's single row. If those projects were wrong about it, our own
+manifests would have said so.
 
 **Reference, not a dependency** — read from `warframe-public-export-plus` and
 `browse.wf` (`calamity-inc`, MIT). Neither their code nor their data is used.
@@ -1644,6 +1659,18 @@ had assumed when it called the work "tedious rather than hard".
 fix is wrong in a way that only shows up once it is built, and the next reader
 will otherwise reach for it exactly as this session did.
 
+**Asked by the owner 2026-09-05 — *"it seems pretty well documented, what is
+holding us back?"* — and the answer is that documentation is not what is
+missing.** The wiki describes the structure completely; what it explicitly
+declines to give is the one number the model needs. A run pays rotation A **every
+3 Orders until a 12-minute clock stops**, so the number of A draws is a function
+of how fast the player is, and the wiki says there is no typical or maximum
+count. `FIXED_LENGTH` takes a count, not a rate. Modelling it as "just another
+`special` non-AABC" is exactly the one-letter cycle measured below, which
+**halves the default case** — 2 A draws to 1 — because `reset` means *run to the
+last round that pays* and with a cycle of 1 that is round one. The blocker is a
+missing number that the mission structurally does not have, not a missing page.
+
 **What it actually is.** A 12-minute mission, not endless and not fixed-length:
 *"Players are given 12 minutes to complete as many objectives, called Orders, as
 they can before facing down the boss enemy."* Every 3 Orders pays rotation A,
@@ -1683,9 +1710,25 @@ on is plausible. Left alone deliberately, not overlooked.
 
 ### `The Circuit` may be two different modes wearing one name
 
-**The owner's, 2026-09-02, to be settled in game.** The wiki calls The Circuit
-tier-based with weekly-capped rewards and no rotation cycle; DE's `Missions:`
-table publishes a `Duviri/The Circuit (The Circuit)` node with explicit
+**Half settled in game by the owner, 2026-09-05:** *"Normal `The Circuit` doesn't
+appear to have a rotation that drops endo, relics, or anything. Only the weekly
+caps. Observed in-game. Haven't run Steel Path `The Circuit` yet."*
+
+So the wiki is right about the normal node and **DE's table is publishing a
+rotation the mission does not run** — which is the first time a first-party table
+has been contradicted by observation rather than by another document, and worth
+saying plainly because this project's default is that DE's tables win.
+
+**What that leaves.** Steel Path Circuit is unrun, and it is the half that could
+still carry a rotation — the two are separate progressions with separate reward
+tables. Our data has **one** Circuit node with rotations and a live relic, so
+whichever it is, it is one node. Until Steel Path is checked, the honest state is
+*normal Circuit contradicted, Steel Path unknown*, and nothing should change on
+one observation covering half the case.
+
+The original framing, kept because the disagreement is the entry: the wiki calls
+The Circuit tier-based with weekly-capped rewards and no rotation cycle; DE's
+`Missions:` table publishes a `Duviri/The Circuit (The Circuit)` node with explicit
 rotations A, B and C, where A pays credits and endo and B and C each hold the
 same seven Lith relics.
 

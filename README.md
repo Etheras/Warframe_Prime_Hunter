@@ -861,6 +861,17 @@ item and worldstate data from WFCD under MIT) are listed in
 [NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
 fresh on every build, so nothing is redistributed from here.
 
+**Inspired by, not taken from.** One structural fact about Digital Extremes' data
+was learned by reading two other open-source projects —
+[`warframe-public-export-plus`](https://github.com/calamity-inc/warframe-public-export-plus)
+and [`browse.wf`](https://github.com/calamity-inc/browse.wf), both MIT: that a
+vendor can only sell *StoreItems*, and a StoreItem path reaches the real type
+path by dropping the one `/StoreItems` segment. It is how this project reads what
+Baro Ki'Teer and Varzia are actually selling. **No code, data or table of theirs
+is used here** — the implementation is our own, and the rule has since been
+verified independently against Digital Extremes' own manifests. Credit where it
+is due all the same: it is a great deal quicker to be told than to work out.
+
 > ### Not affiliated with Digital Extremes
 >
 > Warframe Prime Hunter is an unofficial fan project. It is not affiliated with, endorsed,
