@@ -221,10 +221,10 @@ from you would be wrong. The field is there to *tell* you things.
 
 The first of those is your **Void Trace cap**, which is `(rank × 50) + 100` —
 750 at MR13, 1600 at MR30. Hover the field and it tells you your cap, how many
-Radiants that buys, and the rank's name. It also mentions the case worth knowing:
-at MR8 or below your cap is 500 or less, so the *over 500* side of the planner's
-**Short on Void Traces?** switch is not something you can reach yet. It says so
-and leaves the switch alone — nothing here is decided for you.
+Radiants that buys, and the rank's name. That cap is the ceiling the planner's
+**Capped Void Traces** switch is about, which is why it is stated here rather
+than under the switch: a cap belongs to the rank that sets it. Nothing here is
+decided for you — the field tells you your number and leaves the switch alone.
 
 **Past rank 30 the label becomes `LR`** and the box holds the Legendary number —
 so `LR` with `2` in it is Legendary 2. Typing `31` while it still says `MR` rolls

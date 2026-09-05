@@ -4256,9 +4256,19 @@ own worked examples are MR13 = 750 and MR30 = 1600, and both are asserted in
 it. Legendary ranks keep counting from 30, so LR1 is 31; that continuation is ours,
 since the wiki's table stops at 30.
 
-The cap earns its place because the planner already splits on traces at **500** —
-five Radiants. `(rank × 50) + 100 ≤ 500` up to **MR8**, so at or below MR8 the far
-end of *"Short on Void Traces?"* cannot be reached at all. **The rank field says so
+The cap earned its place because the planner split on traces at **500** — five
+Radiants — and `(rank × 50) + 100 ≤ 500` up to **MR8**, so at or below MR8 the far
+end of *"Short on Void Traces?"* could not be reached at all, and the rank field
+said so.
+
+> **Superseded 2026-09-05.** That switch now asks *Capped Void Traces* — whether
+> you are at your **own** ceiling, which every rank can be — so there is no
+> unreachable far side and the warning was removed along with `TRACE_PIVOT`. The
+> cap itself is still stated here, and the reasoning below for *why here* is
+> unchanged and is the durable half. See *The traces switch asks whether you are
+> capped, and the bonus moved sides* in §7.
+
+**The rank field says so
 and leaves the switch alone.** That is the whole rule for this field, made concrete: it
 gates nothing, by the owner's decision, and the wiki is why — a bounty above your
 rank *"can still be played, when an eligible squad member selects one"*, so hiding a

@@ -263,7 +263,7 @@ of a worklist, not of the click, and worth deciding on its own merits.
 |---|---|
 | Plague Star and Profit-Taker are the same shape, modelled two ways | **Plague Star, and it has a date: 2026-09-09 to 2026-09-23** |
 | The Ghoul and Plague Star detection has never seen a live event | **2026-09-09 to 09-23.** The `tag` half is **done, 2026-09-04** — it was coverage rather than code, and it found that DE's path form was untested and the tag branch untested. What is left needs the event |
-| Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* was answered at 500 on 2026-08-25; this is now ordinary work |
+| Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* has an answer on screen, and since 2026-09-05 it is the reader's own Mastery Rank cap rather than a flat 500; this is ordinary work |
 
 **Two of those three now have a date, given by the owner on 2026-09-02 from DE's
 own announcement: Operation Plague Star runs 2026-09-09 to 2026-09-23, all

@@ -302,8 +302,9 @@
   /* The Void Trace cap is derived from the Mastery Rank, and it is stated on
      the rank badge's own tooltip rather than under this switch. It had a line
      there for one revision and the line was the wrong length for the job: the
-     switch already names both its ends — *under 500* and *over 500* — so a
-     sentence beneath it explaining 500 was restating the control it sat under.
+     switch already names both its ends — *room to spare* and *at the cap* — so
+     a sentence beneath it explaining the cap was restating the control it sat
+     under.
      A cap belongs to the rank, not to the switch, and the badge is where a
      reader goes to ask what their rank means. See `traceCap` in shared.js. */
 
