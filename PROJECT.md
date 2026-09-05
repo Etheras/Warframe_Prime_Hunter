@@ -6339,6 +6339,93 @@ battery at all, so the setting could only ever have bitten somebody else — whi
 is the general shape worth keeping: a default that does nothing on the machine
 you develop on is one nothing you run will ever report.
 
+### The traces switch asks whether you are capped, and the bonus moved sides
+
+**Shipped 2026-09-05**, owner's ruling: *the pill toggled on is Capped, the
+default is toggled off, the ceiling depends on Mastery Rank, and we want juiced
+relics as long as we are not capped.*
+
+*Short on Void Traces?* split at an invented 500 and defaulted **on**; while on,
+a node handing the relic over already Radiant scored 25% higher. *Capped Void
+Traces* asks the opposite question and defaults **off**, so the 25% now lives on
+the **off** side. **The behaviour a reader gets by default is unchanged** — that
+is the point. Only the sentence changed, from "you are rationing, so a free
+Radiant is worth something" to "you have room, so a free Radiant saves you the
+100 traces it would have cost". Both describe the same default state; the second
+is the one a reader can check against their own game.
+
+**500 is gone and nothing replaced it.** The switch is a self-declaration now,
+so there is no pivot to compute. `traceCap(mr)` — `min(mr, 30) × 50 + 100`, 1600
+at MR30 — is the real ceiling and the tooltip states the formula rather than a
+number, because the number is the Mastery Rank field's job. `TRACE_PIVOT` and
+`traceCapped` were **deleted rather than left unused**: `traceCapped(mr)` meant
+"this rank's ceiling is at or below 500", and beside a control called *Capped
+Void Traces* that name would read as "this reader is capped". A test asserts both
+are gone.
+
+**The rename inverted a saved value, so it carries a migration.** `traces`
+became `capped` with the opposite sense, and a straight copy would have restored
+every old backup backwards — the reader who said traces were tight would come
+back capped, losing the bonus they had asked for. `migrateCapped` does
+`capped = !traces` and only when `capped` is absent, so a setting made since the
+rename is never overwritten; `traces` stays in `PLAN_OPTIONS` for that one
+purpose and is the only entry there nothing reads. Both directions are tested,
+because inverting is exactly the change that gets applied twice.
+
+**One default that had to be got right in the code, not just the UI.**
+`sourceValue` tests `!(opts && opts.capped)` rather than truth, so an options
+object that has never been touched — every caller passing `{}`, and every test —
+behaves as *not capped*. Reading it the other way round would have quietly taken
+the bonus away from everyone until they found the switch.
+
+**And the knob turned round.** `STYLE.md §6` recorded a deliberate reversal: the
+on state sat on the **left**, safe only because both ends carry a word. The
+question it served is gone, the control now reads as a plain on/off pill, so off
+is left and on is right. The older rule is kept where it still applies — a
+reversed knob is defensible only on a labelled switch, never on a bare track.
+
+### The Baro box answers for what he is holding, not for what he has ever sold
+
+**Shipped 2026-09-05**, and it is the filter half of the two badges that shipped
+on 2026-09-04. *Baro Ki'Teer* on its own now shows only the Primes his live
+manifest covers; a Prime he merely *sometimes* sells needs *Vaulted* ticked
+beside it, and is hidden otherwise. Measured on his 2026-09-04 visit: the box
+went from offering **nine** items to **two**, and the two are the ones `Axi M5`
+feeds.
+
+**The framing in `TODO.md` was wrong and the owner corrected it.** That entry
+called this two obstacles needing a decision — that the filter had no *here now*
+bucket, and that *Vaulted AND Baro* was the first conjunction in a pure-OR
+filter. Neither was a decision. The first is a small refactor the page already
+does for the badges, and the owner said so plainly: *"we need to rebuild the
+logic of figuring out if Baro Relics are active or inactive before render time
+and store them."* The second had already been specified in the same message.
+**Naming a structural consideration is useful; dressing it up as an open
+question is not.**
+
+**The condition is scoped to two buckets, and that is the whole subtlety.**
+Written as a blanket "sometimes ⇒ needs both boxes" it hides **Lex Prime** —
+farmable, eight relics still dropping, Baro-marked — from the *Farmable* box.
+That is the exact bug `bucketsOf` exists to prevent and that this project has
+already fixed once. So only the `baro` and `vaulted` routes are conditioned;
+Lex keeps its *Farmable* answer and Gotva Prime keeps its *Special* one.
+Verified in the browser: with everything else unticked, *Baro* alone shows 2,
+*Baro* + *Vaulted* shows all 9 plus Lex, and *Vaulted* alone shows none of them.
+
+**It is asked at match time, on the page's clock.** `_buckets` is cached onto the
+item at load and cannot hold this, because whether he is here changes without a
+rebuild — which is what lets a tab left open across his departure re-filter
+itself, exactly as the badge already re-labels itself.
+
+**The count beside the box was the same bug one line up.** It read **9** while
+the box revealed **2** — *"why are there so many Baro items"* all over again — so
+the counts ask the same question the grid does. The symmetric half, where the
+*Vaulted* number also stops counting a sometimes-Prime while *Baro* is off, was
+written, **measured wrong** (113 where the grid had 121) and **cut rather than
+shipped unexplained**. What is left is that *Vaulted* counts eight Primes it
+cannot reveal alone; `TODO.md` has it. Shipping half a fix you can explain beats
+shipping all of one you cannot.
+
 ---
 
 ## 8. Gotchas discovered while building

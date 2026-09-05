@@ -243,9 +243,10 @@ observation rather than a precondition.
 | The deployed site shows no fissures for hours at a time | session — what is left of the owner's 2026-09-02 report once the Steel Path half shipped (`PROJECT.md §7`); 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
 | Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
 | The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
-| *Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it | **owner, 2026-09-05** — the rename inverts the switch's sense, so the 25% thumb has to move sides; three questions to answer before any code |
-| The two Baro badges should filter differently from each other | **owner, 2026-09-05** — needs a *here now* bucket the filter can see, on the page's clock, and it is the first AND in an otherwise pure-OR filter |
-| The forms are too wordy, and *Effort (optional)* changes its rows | **owner, 2026-09-05** — why they change is answered (the rows are derived from `ranked`); what is left is a wording trim, a real hidden-value defect, and whether the list becomes declared |
+| ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~ | **shipped 2026-09-05** — on means capped, default off, bonus lives on the off side; `PROJECT.md §7` |
+| ~~The two Baro badges should filter differently from each other~~ | **shipped 2026-09-05** — the Baro box answers for what he holds now, the rest need *Vaulted* too; `PROJECT.md §7` |
+| The forms are too wordy, and *Effort (optional)* changes its rows | **part done 2026-09-05** — the traces tooltip is down 47%; the *Effort* trim, and the unit an unranked row would print, are what is left |
+| The *Vaulted* count includes eight Primes it cannot reveal on its own | small — fallout of the Baro filter rule; the Baro number was fixed and the symmetric half measured wrong, so it was cut rather than shipped unexplained |
 
 ### One refactor
 
@@ -788,10 +789,13 @@ Three, reported from the deployed site with a screenshot of the *Effort
 question has an answer, so it is written up first as a finding and second as the
 work.
 
-### *Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it
+### ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~
 
-**Asked for by the owner 2026-09-05.** The label is the small half; the switch's
-meaning is the real change and it is **not yet defined**.
+**Shipped 2026-09-05**, the owner answering the three questions below the same
+day: *the pill toggled on is Capped, the default is toggled off, the ceiling
+depends on Mastery Rank, and we want juiced relics as long as we are not
+capped.* Reasoning in `PROJECT.md §7`. The rest of this entry is the state it
+shipped from.
 
 What is there now. `plan.html:110` reads *Short on Void Traces?*, the option is
 `traces` in `PLAN_OPTIONS`, and it splits at `TRACE_PIVOT = 500` in `shared.js` —
@@ -826,10 +830,22 @@ Three things the owner needs to say, because none is recoverable from the name:
 logic are one change. `PROJECT.md` requires an announced thumb, and this is the
 project's only one.
 
-### The two Baro badges should filter differently from each other
+### ~~The two Baro badges should filter differently from each other~~
 
-**Asked for by the owner 2026-09-05.** The badges shipped 2026-09-04 and are
-right; the *filtering* still treats all nine `flags.baro` items alike.
+**Shipped 2026-09-05.** Reasoning in `PROJECT.md §7`.
+
+**This entry framed it as two obstacles needing a decision, and the owner was
+right to push back: neither was one.** *"What is there to decide here? as far as
+I understand we need to rebuild the logic of figuring out if Baro Relics are
+active or inactive before render time and store them."* That is exactly what it
+needed and exactly what it got — a `passesAvail` that asks the live question at
+match time, which the page already does once per render for the badges. The
+"first conjunction in a pure-OR filter" was not a decision either; the owner had
+already specified the rule in the sentence above it. **Naming a structural
+consideration is useful; dressing it up as an open question is not, and it cost
+a round trip.**
+
+The rest of this entry is the state it shipped from.
 
 Wanted:
 
@@ -926,6 +942,22 @@ the wording, small for the hidden-value fix, medium if the list becomes a
 declared vocabulary** — that last one wants the invented-types entry settled
 first, because `Special` and `Bounty` are the rows that would be hardest to name
 honestly.
+
+**Where this stands after 2026-09-05.** The owner's answer was *"the row
+disappearing shouldn't discard the number"* — which is already true and has
+always been true, so **no code was written for it**: `opts.minutes` is keyed by
+mission type and survives in the saved options whatever the panel is rendering.
+What is still open is the half that is not about discarding: such a number is
+**invisible and un-editable** while its mission type is off the ranked list, and
+it keeps weighing the ranking the moment that type comes back. The middle option
+above fixes exactly that and needs one thing decided first — a row for an
+unranked type has **no unit to print**, because `unit` comes off a node
+(`objectivesOf`), not off the mission type, so a type with nothing ranked has no
+"min / round" or "min / run" to show.
+
+**The wording half is part-done.** The *Capped Void Traces* tooltip went from 683
+characters to 361 when that switch shipped. The *Effort (optional)* text — the
+"minimize by A LOT" — is untouched.
 
 ## Defects found by the documentation sweep of 2026-08-15
 

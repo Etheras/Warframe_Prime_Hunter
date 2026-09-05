@@ -114,20 +114,22 @@
   // rather than filtered on every read by whichever page remembered to
   ST.pruneWishlist((id) => BY_ID.has(id));
   const opts = Object.assign(
-    /* `traces` defaults ON, unlike every other assumption here. The owner's
-       ruling of 2026-08-25 is that traces are almost always tight, so the
-       common case is the ticked one and leaving it off would make the app
-       almost always understate a Radiant source. Untick it if you are sitting
-       on a pile. */
+    /* `capped` defaults OFF, and that is the same ruling as before wearing the
+       other name. The owner's call of 2026-08-25 was that traces are almost
+       always tight, so the app should assume a free Radiant is worth something;
+       renaming the switch on 2026-09-05 to ask "are you at the cap" inverted
+       the tick without changing the assumption. Off is still the common case,
+       and it is still the state in which a Radiant source scores higher.
+       `M.migrateCapped` below carries an old saved `traces` across. */
     /* `railjack` on by default since 2026-08-27, at the owner's direction. It
        gates whether Proxima nodes are ranked at all, and six Primes have no
        route that is not Railjack — with it off the planner silently declines to
        rank the only places those can be farmed, which is the shape of omission
        this project has had to fix before. Anyone without a ship unticks it once
        and the choice is saved. */
-    { squad: false, event: false, railjack: true, aya: true, traces: true,
+    { squad: false, event: false, railjack: true, aya: true, capped: false,
       minutes: {}, sort: "rate", tier: null, varzia: true, trade: true },
-    load(KEY_PLAN, {}));
+    M.migrateCapped(load(KEY_PLAN, {})));
 
   /* Whether the ranked list is showing all of itself or just the top eight.
      Deliberately NOT in `opts` and not saved: `opts` holds assumptions about the
@@ -506,9 +508,9 @@
          the reader has not said traces are short, because then the refinement
          is a convenience rather than a saving. `M.FISSURE_REFINED_BONUS` has
          the reasoning and why it is larger than `RADIANT_BONUS`. */
-      const refined = opts.traces ? 1 + M.FISSURE_REFINED_BONUS : 1;
+      const refined = !opts.capped ? 1 + M.FISSURE_REFINED_BONUS : 1;
       byTier[tier] = { tier, value: value * refined, plain: value,
-                       refined: opts.traces,
+                       refined: !opts.capped,
                        count: t.wanted / t.n, pool: t.n, want: t.wanted };
       if (byTier[tier].value > best.value) best = byTier[tier];
     });
@@ -2001,10 +2003,10 @@
             (n.overshot
               ? "Scored lower: this plan wanted them less refined."
               : "This plan wanted Radiant anyway.") + "\n" +
-            (opts.traces
+            (!opts.capped
               ? "Scored " + Math.round(M.RADIANT_BONUS * 100) +
-                "% higher for it — you said Void Traces are tight."
-              : "No bonus: you have said traces are not a constraint."))
+                "% higher for it — it saves you the refinement."
+              : "No bonus: you said you are at the Void Trace cap."))
           }">${n.overshot ? "pre-refined" : "radiant"}</span>` : ""}${
           n.halved ? ` · <span class="est" data-tip="${esc(
             "Scored at half on purpose — nobody runs Railjack for caches.\n" +
@@ -2493,7 +2495,7 @@
   }
   [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
    ["p-railjack", "railjack"], ["p-steel", "steel"],
-   ["p-traces", "traces"]].forEach(([id, key]) => {
+   ["p-capped", "capped"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];
     el.addEventListener("change", () => { opts[key] = el.checked; save(KEY_PLAN, opts); render(); });

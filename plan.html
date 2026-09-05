@@ -106,12 +106,12 @@
       <span class="lbl" data-tip="A Steel Path fissure runs on a second star chart, so it is a different instance of the node than the one you reach normally — running the ordinary node cracks nothing. Left out by default; switch on if you farm the Steel Path.">Include Steel Path fissures</span>
     </label>
     <label class="check check-switch">
-      <input type="checkbox" id="p-traces" checked="checked" />
-      <span class="lbl" data-tip="A Radiant costs 100 Void Traces and a fissure run returns roughly 18 to 33, so refining never pays for itself — it always comes out of the pile you have. Under 500 you are rationing: five Radiants and it is empty.&#10;&#10;Set to under 500 by default, because that is almost everyone. While it is, a node that hands the relic over already Radiant is scored 25% higher — it saves you the whole refinement.&#10;&#10;This never tells you to crack something at a lower refinement to save traces. You are pointed at Radiant and expected to find them; this only says where Radiant comes free.&#10;&#10;Switch it to over 500 if you are sitting on a pile and the saving means nothing to you.">Short on Void Traces?</span>
+      <input type="checkbox" id="p-capped" />
+      <span class="lbl" data-tip="Your ceiling is (Mastery Rank × 50) + 100 — 1600 at rank 30. A Radiant costs 100 of it.&#10;&#10;Off, the default: you have room, so a node handing the relic over already Radiant saves you that 100 and is scored 25% higher.&#10;&#10;On: you are at the cap, the saving is not real, and the bonus comes off. Either way this never tells you to crack a relic at a lower refinement.">Capped Void Traces</span>
       <span class="switch-group">
-        <span class="switch-end end-tight">under 500</span>
+        <span class="switch-end end-off">room to spare</span>
         <span class="switch" aria-hidden="true"><span class="switch-knob"></span></span>
-        <span class="switch-end end-plenty">over 500</span>
+        <span class="switch-end end-on">at the cap</span>
       </span>
     </label>
 

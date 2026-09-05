@@ -292,7 +292,7 @@ condensed view; it must not be the only route to it.
   stored value stays one integer. A field whose text you must retype to change its
   units is a field nobody edits twice.
 - **A control that names its own ends needs no paragraph explaining them.** The
-  Void Trace switch is labelled *under 500* / *over 500*; a line beneath it saying
+  Void Trace switch is labelled *room to spare* / *at the cap*; a line beneath it saying
   *"At MR 9 your Void Trace cap is 550 — 5 Radiants at 100 traces each"* was
   restating the control it sat under, and it went the day it shipped. Where a
   derived fact genuinely belongs is with **the thing it is derived from** — the
@@ -320,19 +320,26 @@ condensed view; it must not be the only route to it.
 
 **A checkbox for *include this*, a switch for *which of two*.** Four of the
 planner's assumptions are include-X questions and a tick reads correctly as "yes,
-count it". *Short on Void Traces?* is not that shape — it asks which of two
-ordinary situations you are in, and neither is a default the other departs from.
-That gets a pill switch, and **both ends are labelled**: `under 500` and
-`over 500` sit either side of the track, the knob says which one is chosen, and
-the live end is the bright one. Nothing depends on reading a colour.
+count it". *Capped Void Traces* is not that shape — it asks which of two ordinary
+situations you are in, and neither is a fault. That gets a pill switch, and
+**both ends are labelled**: `room to spare` and `at the cap` sit either side of
+the track, the knob says which one is chosen, and the live end is the bright one.
+Nothing depends on reading a colour.
 
-`under 500` is the **left** end, which puts the knob left in the *on* state — the
-reverse of the usual off-left convention. That is safe only because both ends
-carry their own word; do not do it on a switch with a bare track.
+**Off is the left end and on is the right, the usual way round.** This said the
+opposite until 2026-09-05: the switch used to ask *Short on Void Traces?* with
+`under 500` on the **left** as the *on* state, reversing the convention, and the
+note here defended that as safe because both ends carry a word. It was safe, and
+it stopped being worth it the moment the question changed — the switch now reads
+as a plain on/off pill ("capped: yes or no"), so it behaves like one. The older
+rule still holds where it applies: a reversed knob is only ever defensible on a
+switch whose ends are labelled, never on a bare track.
 
-Gold, like every other control here, so it borrows no new meaning. A reference
-sketch used teal and red; §1 reserves red for *something here is wrong*, and being
-short of Void Traces is not an error.
+Gold, like every other control here, so it borrows no new meaning. Gold marks
+*this toggle is on*, which is a state and not an approval — here it means "you
+are at the cap", which is neither good nor bad. A reference sketch used teal and
+red; §1 reserves red for *something here is wrong*, and being capped is not an
+error.
 
 **Do not spread the switch to the include-X boxes.** One control shape per kind of
 question is the point; two shapes chosen at random is what this section exists to

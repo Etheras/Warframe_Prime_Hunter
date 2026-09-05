@@ -406,15 +406,26 @@ page_test("a Prime with two sources survives unticking either of them", async ()
   await page.locator("#search").fill("Lex Prime");
   assert.equal(await card.count(), 1, "it has to be on screen before anything is unticked");
 
+  /* Unticking *Farmable* used to leave it on screen under the still-ticked Baro
+     box, and since 2026-09-05 it does not — the Baro box on its own answers only
+     for Primes he is selling **right now**, and a Prime he merely sometimes
+     sells needs *Vaulted* beside it. Lex is the awkward case that proves the
+     exception is scoped rather than blanket: it is not vaulted at all, so what
+     keeps it on screen is its own *Farmable* box, which is exactly the bug this
+     test was written for and is asserted first. */
   await setCheck(page, "#f-farmable", false);
+  assert.equal(await card.count(), 0,
+               "Baro alone must not answer for a Prime he only sometimes sells");
+
+  await setCheck(page, "#f-farmable", true);
   assert.equal(await card.count(), 1,
-               "Baro is still ticked and still sells it, so it must stay");
+               "and its OWN source must still hold it, whatever Baro is doing — "
+               + "this is the two-source bug and it must not come back");
+
+  await setCheck(page, "#f-farmable", false);
   await setCheck(page, "#f-baro", false);
   assert.equal(await card.count(), 0,
                "with both of its sources unticked it must finally go");
-
-  await setCheck(page, "#f-baro", true);
-  assert.equal(await card.count(), 1, "and come back when either one returns");
   assert.deepEqual(errors, []);
 });
 
@@ -428,9 +439,11 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
      Aklex Prime's own part list, spelled out, because the point is that the
      sub-weapon is named once and asked for twice. */
   const { page, errors } = await open("/index.html");
-  /* Aklex Prime is a Baro item and nothing else, so it is on screen exactly
-     while he is — ask for the box rather than for the fortnight. */
-  await setCheck(page, "#f-baro", true);
+  /* Aklex Prime is a vaulted Baro item and nothing else. Both boxes, not one:
+     since 2026-09-05 a Prime he only *sometimes* sells needs *Vaulted* beside
+     *Baro Ki'Teer*, and whether he happens to be holding an Aklex relic today
+     is a fact about the fortnight rather than about this test. */
+  await setChecks(page, { "#f-baro": true, "#f-vaulted": true });
   await page.locator("#search").fill("Aklex Prime");
   await page.locator('[data-id="secondary-aklex-prime"]').click();
 
@@ -816,12 +829,18 @@ page_test("the rank badge states the Void Trace cap it implies", async () => {
                       "MR30 is the wiki's own worked example, so nothing to hedge");
   assert.match(known, /1600/, "and it is the figure the plateau holds at");
 
+  /* MR8 caps at exactly 500, and until 2026-09-05 this field said so and warned
+     that the planner's switch — which split at 500 — had a far side this reader
+     could not reach. The switch asks whether you are at your OWN ceiling now, so
+     there is no unreachable side and the warning is gone. The cap itself is
+     still stated, because that is this field's job. */
   await setRank(8);
   const poor = await tip();
-  assert.match(poor, /500/, "MR8 caps at exactly the pivot");
-  assert.match(poor, /cannot hold more/, "so the far end of the switch is unreachable");
-  assert.equal(await page.locator("#p-traces").isDisabled(), false,
-               "and it still must not disable the control — this informs, never filters");
+  assert.match(poor, /500/, "the rank's own cap is still named");
+  assert.doesNotMatch(poor, /cannot hold more/,
+                      "the unreachable-far-side warning went with the 500 pivot");
+  assert.doesNotMatch(poor, /Short on Void Traces/i,
+                      "and so did the name of the switch it was about");
 
   assert.deepEqual(errors, []);
 });
@@ -1411,7 +1430,10 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
               new Date(Date.now() - 3600e3).toISOString(),
               new Date(Date.now() + 3600e3).toISOString());
   await page.reload({ waitUntil: "load" });
-  await setCheck(page, "#f-baro", true);
+  /* Both boxes: this test is about what the BADGES say, so it has to keep both
+     subjects on screen whatever the filter rule is. Since 2026-09-05 a Prime he
+     only sometimes sells needs *Vaulted* beside *Baro Ki'Teer*. */
+  await setChecks(page, { "#f-baro": true, "#f-vaulted": true });
 
   const mineNow = await badgesOf(subject.mine);
   assert.ok(mineNow.some((b) => /HERE NOW/i.test(b)),
@@ -1427,13 +1449,123 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
               new Date(Date.now() - 7200e3).toISOString(),
               new Date(Date.now() - 60e3).toISOString());
   await page.reload({ waitUntil: "load" });
-  await setCheck(page, "#f-baro", true);
+  /* Both boxes: this test is about what the BADGES say, so it has to keep both
+     subjects on screen whatever the filter rule is. Since 2026-09-05 a Prime he
+     only sometimes sells needs *Vaulted* beside *Baro Ki'Teer*. */
+  await setChecks(page, { "#f-baro": true, "#f-vaulted": true });
 
   const after = await badgesOf(subject.mine);
   assert.ok(!after.some((b) => /HERE NOW/i.test(b)),
     `with him gone nothing may say he is here — got ${JSON.stringify(after)}`);
   assert.ok(after.some((b) => /SOMETIMES/i.test(b)),
     "the wiki marker is still true, and still says only that");
+  assert.deepEqual(errors, []);
+});
+
+page_test("the Baro box answers for what he has now; the rest need Vaulted too", async () => {
+  /* Owner's call, 2026-09-05, and the filter half of the two badges. `flags.baro`
+     is a static wiki marker on nine items; his live shelf covered two of them on
+     his last visit. So *Baro Ki'Teer* on its own shows only what he is actually
+     holding, and a Prime he merely sometimes sells needs *Vaulted* beside it.
+
+     Staged rather than waited for, the same way the badge test stages it — the
+     answer otherwise depends on the fortnight the suite runs in. */
+  const { page, errors } = await open("/index.html");
+
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    /* Both subjects picked on raw payload properties. The "sometimes" one must
+       be vaulted, because *Vaulted* is the box the rule pairs with — a
+       Baro-marked Prime that is farmable instead (there is one) is held on
+       screen by its own box and would prove nothing here. */
+    const flagged = D.items.filter((it) => (it.flags || {}).baro
+                                           && (it.relics || []).length);
+    const now = flagged.find((it) => it.relics.length);
+    if (!now) return null;
+    const sometimes = flagged.find((it) => it.id !== now.id
+      && (it.flags || {}).vaulted
+      && !it.relics.some((n) => now.relics.includes(n)));
+    return sometimes
+      ? { relic: now.relics[0], now: now.id, sometimes: sometimes.id } : null;
+  });
+  assert.ok(subject,
+            "need a Baro-flagged pair with disjoint relics, one of them vaulted");
+
+  // He is on the relay, holding a relic for exactly one of the two.
+  await page.addInitScript(([rname, act, exp]) => {
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) {
+        if (next && next.relics) {
+          Object.keys(next.relics).forEach((n) => { next.relics[n].baro = false; });
+          if (next.relics[rname]) next.relics[rname].baro = true;
+        }
+        if (next && next.meta) {
+          next.meta.baro = { activation: act, expiry: exp,
+                             node: "EarthHUB", character: "Baro'Ki Teel" };
+        }
+        held = next;
+      },
+    });
+  }, [subject.relic,
+      new Date(Date.now() - 3600e3).toISOString(),
+      new Date(Date.now() + 3600e3).toISOString()]);
+  await page.reload({ waitUntil: "load" });
+
+  const shown = (id) => page.locator(`[data-id="${id}"]`).count();
+
+  await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
+  assert.equal(await shown(subject.now), 1,
+               "the Prime whose relic he is holding answers to the Baro box alone");
+  assert.equal(await shown(subject.sometimes), 0,
+               "a Prime he only sometimes sells must not, or the box claims nine "
+               + "items when he is carrying one");
+
+  await setCheck(page, "#f-vaulted", true);
+  assert.equal(await shown(subject.sometimes), 1,
+               "Vaulted beside Baro is what reveals it");
+  assert.equal(await shown(subject.now), 1, "and the live one has not gone anywhere");
+
+  /* Vaulted on its own is not enough either — "hidden otherwise", owner's
+     words. This is the half most likely to be dropped by a later refactor,
+     because it reads as a Prime disappearing from a box it belongs in. */
+  await setCheck(page, "#f-baro", false);
+  assert.equal(await shown(subject.sometimes), 0,
+               "Vaulted alone must not bring it back");
+
+  /* And the number beside the box has to agree with the grid. A Baro box
+     reading nine while it reveals two is the reader's original complaint moved
+     up one line. Asserted as a relation rather than as a figure, because how
+     many Primes he is carrying is a fact about the fortnight. */
+  const baroCount = () => page.evaluate(() =>
+    Number(document.querySelector('[data-count="baro"]').textContent));
+  const flaggedTotal = await page.evaluate(() =>
+    window.WFPRIME_DATA.items.filter((i) => (i.flags || {}).baro).length);
+
+  await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
+  const narrow = await baroCount();
+  assert.ok(narrow < flaggedTotal,
+            `with Vaulted off the Baro box reaches fewer than all ${flaggedTotal} `
+            + `flagged Primes, so its count must too — read ${narrow}`);
+  /* Exactly the Primes he is holding — not "flagged Primes on screen", which
+     is a different set and was this assertion's first mistake: the one
+     Baro-marked Prime that is farmable is on screen via its OWN box, and
+     counting it here made the number look wrong when it was right. */
+  const sellingNow = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    return D.items.filter((i) => (i.flags || {}).baro
+      && (i.relics || []).some((n) => (D.relics[n] || {}).baro)).length;
+  });
+  assert.ok(sellingNow > 0, "the staging should have put a relic on his shelf");
+  assert.equal(narrow, sellingNow,
+               "with Vaulted off the box covers exactly what he is carrying");
+
+  await setCheck(page, "#f-vaulted", true);
+  assert.equal(await baroCount(), flaggedTotal,
+               "with Vaulted beside it the box covers every flagged Prime again");
+
   assert.deepEqual(errors, []);
 });
 
@@ -3060,9 +3192,12 @@ page_test("ranking per run does not undo the thumbs on the scale", async () => {
       .map((el) => el.querySelector(".spot-where").childNodes[0].textContent.trim()));
   };
 
+  /* One click takes the bonus away, and since 2026-09-05 that click turns the
+     switch ON rather than off: it asks *Capped Void Traces*, and being at the
+     cap is what makes a free Radiant worth nothing. */
   const rankedWith = (await order()).indexOf(subject.node);
-  await page.locator("label:has(#p-traces)").click();
-  assert.equal(await page.locator("#p-traces").isChecked(), false);
+  await page.locator("label:has(#p-capped)").click();
+  assert.equal(await page.locator("#p-capped").isChecked(), true);
   const rankedWithout = (await order()).indexOf(subject.node);
 
   assert.ok(rankedWith >= 0, "subject was not in the ranking to begin with");
@@ -3153,7 +3288,7 @@ page_test("the ranking can be seen whole, not just its top eight", async () => {
   assert.deepEqual(errors, []);
 });
 
-page_test("the Void Traces switch names both its ends and puts under 500 on the left", async () => {
+page_test("the Void Traces switch names both its ends and puts off on the left", async () => {
   /* It is a two-state question, not an include-X one, so it is a switch rather
      than a checkbox — and both ends are labelled so the answer never depends on
      reading a colour.
@@ -3165,45 +3300,48 @@ page_test("the Void Traces switch names both its ends and puts under 500 on the 
      actually says. */
   const { page, errors } = await open("/plan.html");
 
-  const box = page.locator("#p-traces");
-  assert.equal(await box.isChecked(), true, "short-on-traces is the default");
+  const box = page.locator("#p-capped");
+  assert.equal(await box.isChecked(), false,
+               "not capped is the default — the state the Radiant bonus lives on");
 
-  // the two ends, in document order, with under 500 first
+  /* Off left, on right, the usual way round since 2026-09-05. It was reversed
+     before that, when the on state was `under 500` and sat on the left; the
+     switch it served is gone and the knob follows the convention now. */
   const ends = await page.evaluate(() =>
     [...document.querySelectorAll(".check-switch .switch-group > *")]
       .map((el) => ({ cls: el.className, text: el.textContent.trim() })));
   assert.equal(ends.length, 3, "left label, track, right label");
-  assert.match(ends[0].text, /under 500/, "under 500 is the LEFT end");
+  assert.match(ends[0].text, /room to spare/, "the off state is the LEFT end");
   assert.ok(/switch$/.test(ends[1].cls), "the track sits between the two words");
-  assert.match(ends[2].text, /over 500/, "over 500 is the right end");
+  assert.match(ends[2].text, /at the cap/, "and the on state is the right end");
 
   const state = () => page.evaluate(() => {
     const q = (s) => document.querySelector(s);
     return {
-      tightLit: q(".end-tight").matches(".check input:checked ~ .switch-group .end-tight"),
-      plentyLit: q(".end-plenty")
-        .matches(".check input:not(:checked) ~ .switch-group .end-plenty"),
+      onLit: q(".end-on").matches(".check input:checked ~ .switch-group .end-on"),
+      offLit: q(".end-off")
+        .matches(".check input:not(:checked) ~ .switch-group .end-off"),
       knobRight: q(".switch-knob")
-        .matches(".check input:not(:checked) ~ .switch-group .switch-knob"),
+        .matches(".check input:checked ~ .switch-group .switch-knob"),
     };
   });
 
-  const on = await state();
-  assert.deepEqual(on, { tightLit: true, plentyLit: false, knobRight: false },
-                   "short on traces lights the left word and rests the knob left");
-
-  await page.locator("label:has(#p-traces)").click();
-  assert.equal(await box.isChecked(), false);
   const off = await state();
-  assert.deepEqual(off, { tightLit: false, plentyLit: true, knobRight: true },
-                   "plenty lights the right word and sends the knob right");
+  assert.deepEqual(off, { onLit: false, offLit: true, knobRight: false },
+                   "room to spare lights the left word and rests the knob left");
+
+  await page.locator("label:has(#p-capped)").click();
+  assert.equal(await box.isChecked(), true);
+  const on = await state();
+  assert.deepEqual(on, { onLit: true, offLit: false, knobRight: true },
+                   "at the cap lights the right word and sends the knob right");
 
   // the real input still drives it, so keyboard and assistive tech work
   assert.equal(await page.locator(".check-switch input[type=checkbox]").count(), 1,
                "the switch has to be a real checkbox underneath, not a div");
 
-  await page.locator("label:has(#p-traces)").click();
-  assert.equal(await box.isChecked(), true, "and it toggles back");
+  await page.locator("label:has(#p-capped)").click();
+  assert.equal(await box.isChecked(), false, "and it toggles back");
   assert.deepEqual(errors, []);
 });
 

@@ -260,13 +260,16 @@ test("the Void Trace cap is the wiki's formula, and matches its worked examples"
   assert.ok(S.traceCap(31) >= S.traceCap(30),
             "holding must never mean going BACKWARDS at the boundary");
 
-  /* A Radiant is 100 traces and the planner's switch splits at five of them.
-     MR8 caps at exactly 500, so "over 500" first becomes reachable at MR9 -
-     the boundary is the whole point of the note the planner prints. */
-  assert.equal(S.traceCap(8), S.TRACE_PIVOT, "MR8 caps at exactly the pivot");
-  assert.equal(S.traceCapped(8), true, "so it cannot get past it");
-  assert.equal(S.traceCapped(9), false, "and MR9 is the first rank that can");
-  assert.equal(S.traceCapped(null), false, "an unset rank claims nothing either way");
+  /* `TRACE_PIVOT` and `traceCapped` were asserted here until 2026-09-05, when
+     the planner's switch stopped splitting at 500 traces and started asking
+     whether the reader is at their own ceiling. Both are gone from `shared.js`
+     rather than left unused, and this asserts they went - a helper called
+     `traceCapped` sitting beside a control called *Capped Void Traces* is a
+     trap for whoever reads it next. */
+  assert.equal(S.TRACE_PIVOT, undefined,
+               "the 500-trace pivot went with the switch that split there");
+  assert.equal(S.traceCapped, undefined,
+               "and so did the helper whose name now means something else");
 });
 
 test("a rank renders as DE writes it, titles and Legendary included", () => {

@@ -369,7 +369,7 @@ test("a Radiant source is flagged for the bonus while traces are tight", () => {
   const rp = { value: 0.40, refinement: "Radiant",
                byRefinement: { Intact: 0.30, Radiant: 0.40 } };
 
-  const tight = M.sourceValue({ refinement: "Radiant" }, rp, { traces: true });
+  const tight = M.sourceValue({ refinement: "Radiant" }, rp, { capped: false });
   assert.equal(tight.bonus, true);
   assert.equal(tight.pre, true);
   /* The value stays the honest one. The uplift is NOT applied here: the ranked
@@ -379,9 +379,17 @@ test("a Radiant source is flagged for the bonus while traces are tight", () => {
      `radiantMultiplier` to the score and the rate, where CACHE_PENALTY goes. */
   assert.equal(tight.value, 0.40, "sourceValue reports the bonus, it does not apply it");
 
-  const loose = M.sourceValue({ refinement: "Radiant" }, rp, { traces: false });
-  assert.equal(loose.bonus, false, "no bonus when traces are not a constraint");
+  const loose = M.sourceValue({ refinement: "Radiant" }, rp, { capped: true });
+  assert.equal(loose.bonus, false, "no bonus once the reader is at the cap");
   assert.equal(loose.value, 0.40);
+
+  /* The default side of the switch, and the reason `bonus` tests the option
+     for FALSEness rather than truth. `capped` defaults off, so an options
+     object that has never been touched has to behave like "not capped" - if
+     this read `!!opts.capped` the bonus would vanish for everyone until they
+     found the switch. */
+  assert.equal(M.sourceValue({ refinement: "Radiant" }, rp, {}).bonus, true,
+               "an untouched options object is not capped");
 
   assert.equal(M.RADIANT_BONUS, 0.25, "the judgement is one named constant");
 });
@@ -410,7 +418,7 @@ test("the bonus cannot collapse to zero the way both previous attempts did", () 
     const rp = { value: 0.4, refinement: chosen,
                  byRefinement: { Intact: 0.3, Exceptional: 0.34,
                                  Flawless: 0.37, Radiant: 0.4 } };
-    const w = M.sourceValue({ refinement: "Radiant" }, rp, { traces: true });
+    const w = M.sourceValue({ refinement: "Radiant" }, rp, { capped: false });
     assert.equal(w.bonus, true,
                  `a Radiant source stopped earning it when the plan chose ${chosen}`);
   }
@@ -434,7 +442,7 @@ test("only Radiant earns the bonus, and a worse refinement still scores honestly
   // wanted Radiant, given Exceptional: worth what you were actually handed
   const rp = { value: 0.40, refinement: "Radiant",
                byRefinement: { Intact: 0.30, Exceptional: 0.34, Radiant: 0.40 } };
-  const given = M.sourceValue({ refinement: "Exceptional" }, rp, { traces: true });
+  const given = M.sourceValue({ refinement: "Exceptional" }, rp, { capped: false });
   assert.equal(given.value, 0.34, "worth what you were actually handed");
   assert.equal(given.bonus, false, "no bonus below Radiant");
 
@@ -444,7 +452,7 @@ test("only Radiant earns the bonus, and a worse refinement still scores honestly
      -- so the bonus cannot turn a worse relic into a better one. */
   const wantsCommon = { value: 0.50, refinement: "Intact",
                         byRefinement: { Intact: 0.50, Radiant: 0.20 } };
-  const over = M.sourceValue({ refinement: "Radiant" }, wantsCommon, { traces: true });
+  const over = M.sourceValue({ refinement: "Radiant" }, wantsCommon, { capped: false });
   assert.equal(over.value, 0.20);
   assert.ok(over.value * M.radiantMultiplier(1) < wantsCommon.value,
             "a bonus on a worse relic must not make it better than what you wanted");
@@ -478,13 +486,35 @@ test("sourceValue survives being handed nothing", () => {
                "a plan entry with no byRefinement map falls back to its own value");
 });
 
-test("the traces option survives a backup round trip", () => {
+test("the capped option survives a backup round trip", () => {
   const M = load();
-  assert.ok(M.PLAN_OPTIONS.includes("traces"),
+  assert.ok(M.PLAN_OPTIONS.includes("capped"),
             "an option missing from PLAN_OPTIONS is silently dropped on restore");
-  const out = M.parseBackup({ collected: [], plan: { traces: true, squad: false } },
+  const out = M.parseBackup({ collected: [], plan: { capped: true, squad: false } },
                             CATALOGUE);
-  assert.equal(out.plan.traces, true);
+  assert.equal(out.plan.capped, true);
+});
+
+test("a backup written before the rename comes back the right way up", () => {
+  /* `traces` became `capped` on 2026-09-05 and its sense inverted with it, so a
+     straight copy of the old key would have restored every setting backwards -
+     the reader who said "traces are tight" would come back capped, losing the
+     Radiant bonus they had asked for. Both directions are asserted because
+     inverting is exactly the kind of change that gets applied twice. */
+  const M = load();
+  const tight = M.parseBackup({ collected: [], plan: { traces: true } }, CATALOGUE);
+  assert.equal(tight.plan.capped, false, "traces were tight, so not at the cap");
+  assert.equal(tight.plan.traces, undefined, "and the old key does not come back");
+
+  const loose = M.parseBackup({ collected: [], plan: { traces: false } }, CATALOGUE);
+  assert.equal(loose.plan.capped, true, "traces were no constraint, so capped");
+
+  /* A file carrying both is a file written after the rename by something that
+     also kept the old key. The new one wins; migrating over it would undo a
+     setting the reader had actually made. */
+  const both = M.parseBackup({ collected: [], plan: { traces: true, capped: true } },
+                             CATALOGUE);
+  assert.equal(both.plan.capped, true, "an explicit new key is never overwritten");
 });
 
 test("the run overhead survives a backup round trip, zero included", () => {

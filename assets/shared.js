@@ -882,12 +882,14 @@
     return Math.min(mr, MR_TOP) * 50 + 100;
   }
 
-  /* A Radiant costs 100 traces, and the planner's "Short on Void Traces?"
-     switch splits at 500 - five Radiants. Below MR9 the cap is at or under 500,
-     so the far side of that switch is not reachable at all. Worth SAYING and
-     not worth enforcing: same rule as the rest of this field. */
-  const TRACE_PIVOT = 500;
-  const traceCapped = (mr) => mr != null && traceCap(mr) <= TRACE_PIVOT;
+  /* `TRACE_PIVOT` and `traceCapped` lived here until 2026-09-05. They existed
+     for one sentence: the planner's switch used to split at 500 traces, and
+     below MR9 the cap is at or under 500, so that switch had a far side the
+     reader could not reach. The switch asks whether you are *at your cap* now,
+     which every rank can be, so there is no unreachable side and nothing left
+     to warn about. `traceCapped` in particular had to go rather than be kept
+     around - it meant "this rank's ceiling is below 500", and beside a control
+     called *Capped Void Traces* it would read as "this reader is capped". */
 
   /* What the box shows, which above 30 is NOT what is stored. The rank keeps
      counting as one integer - 31, 32 - and the label beside the box carries the
@@ -974,10 +976,6 @@
               "this holds at the Mastery Rank 30 figure. That is the owner's " +
               "assumption rather than a number Digital Extremes publish — if " +
               "Legendary ranks do raise it, yours is higher than this."
-            : "") +
-          (traceCapped(mr)
-            ? "\n\nAt this rank you cannot hold more than " + TRACE_PIVOT + ", so the " +
-              "planner's “Short on Void Traces?” switch has no far side to reach."
             : "");
     }
 
@@ -1029,7 +1027,7 @@
     wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     masteryLabel, masteryTitle, masteryShown, masteryTyped,
-    traceCap, traceCapped, TRACE_PIVOT, MR_TOP, wireMastery, siteFooter,
+    traceCap, MR_TOP, wireMastery, siteFooter,
     /* One store per page, made here so the `storage` listener is registered
        once and both pages share the rules rather than a copy of them. */
     state: makeState(),

@@ -296,14 +296,17 @@ button,input,select,textarea{font:inherit;color:inherit}
    switch, and **both ends are labelled**: the knob says which one you picked and
    the words say what the two are, so nothing depends on reading a colour.
 
-   `under 500` is the LEFT end on purpose — owner's call. That makes the knob sit
-   left in the on state, which is the reverse of the usual off-left convention;
-   it is unambiguous only because both ends carry their own label, and it would
-   not be safe on an unlabelled switch.
+   **Off is left and on is right, the usual way round, since 2026-09-05.** It
+   was reversed before that — `under 500` sat on the LEFT and was the *on*
+   state, an owner's call that was safe only because both ends carry a label.
+   The switch it served is gone: it asks *Capped Void Traces* now, on means
+   capped, and off is the default, so there is nothing left to justify a knob
+   that sits left when the control is on.
 
    Gold, like every other control here, so the switch borrows no new meaning.
-   `STYLE.md §1` reserves red for *something here is wrong*, and being short of
-   Void Traces is not an error. */
+   Gold marks *this toggle is on*, which is now "you are at the cap" — it is a
+   state, not an approval. `STYLE.md §1` reserves red for *something here is
+   wrong*, and being capped is not an error either. */
 .check-switch{flex-direction:column;align-items:stretch;gap:7px}
 .check-switch .lbl{flex:none}
 .switch-group{display:flex;align-items:center;gap:9px;font-size:11.5px}
@@ -325,17 +328,17 @@ button,input,select,textarea{font:inherit;color:inherit}
              inset 0 1px 0 rgba(255,255,255,.9);
   transition:transform .18s cubic-bezier(.3,1.4,.5,1);
 }
-/* checked = short of traces = the LEFT end, so the knob rests left */
+/* checked = capped = the RIGHT end, so the knob travels right */
 .check input:checked ~ .switch-group .switch{
   background:linear-gradient(180deg,var(--gold),var(--gold-dim));
   border-color:var(--gold-dim);
   box-shadow:inset 0 2px 5px rgba(0,0,0,.32), 0 0 10px rgba(217,180,91,.22);
 }
-.check input:not(:checked) ~ .switch-group .switch-knob{transform:translateX(20px)}
+.check input:checked ~ .switch-group .switch-knob{transform:translateX(20px)}
 .check input:focus-visible ~ .switch-group .switch{box-shadow:0 0 0 3px rgba(217,180,91,.3)}
 /* whichever end is live is the bright one, and it is a word, not a hue */
-.check input:checked ~ .switch-group .end-tight{color:var(--gold);font-weight:600}
-.check input:not(:checked) ~ .switch-group .end-plenty{color:var(--txt);font-weight:600}
+.check input:checked ~ .switch-group .end-on{color:var(--gold);font-weight:600}
+.check input:not(:checked) ~ .switch-group .end-off{color:var(--txt);font-weight:600}
 
 @media (prefers-reduced-motion:reduce){
   .check .switch,.check .switch-knob{transition:none}

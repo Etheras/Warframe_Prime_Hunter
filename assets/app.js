@@ -296,10 +296,7 @@
   /* ── matching ─────────────────────────────────────────────── */
   function matches(it, skip) {
     skip = skip || "";
-    /* Any bucket it belongs to, not only the one it displays as. An item with
-       two sources is on screen while either box is ticked - unticking Baro
-       must not take a farmable Prime with it just because Baro also sells it. */
-    if (skip !== "avail" && !it._buckets.some((b) => state.avail[b])) return false;
+    if (skip !== "avail" && !passesAvail(it)) return false;
     if (skip !== "cat" && !state.cats.has(it.category)) return false;
     if (skip !== "coll") {
       const has = ST.has(it.id);
@@ -422,6 +419,65 @@
     return (it.relics || []).some((n) => (RELICS[n] || {}).baro);
   }
 
+  /* Does this item pass the availability boxes as they stand?
+     ─────────────────────────────────────────────────────────
+     Any bucket it belongs to, not only the one it displays as: an item with two
+     sources is on screen while either box is ticked, and unticking Baro must
+     not take a farmable Prime with it just because Baro also sells it.
+
+     **Except for the Primes he only *sometimes* sells, which need both boxes.**
+     Owner's call, 2026-09-05, and it is the filter half of the two badges that
+     shipped on 2026-09-04. `flags.baro` is a static wiki marker sitting on nine
+     items; his live shelf covered two of them on his last visit. So a `BARO —
+     HERE NOW` item answers the Baro box on its own, and a `BARO SOMETIMES` one
+     is shown only when *Vaulted* is ticked as well.
+
+     **The exception is scoped to the two buckets it is about**, which is the
+     whole subtlety. Written as a blanket "sometimes ⇒ needs both" it would hide
+     **Lex Prime** — farmable, eight relics still dropping, and Baro-marked —
+     from the *Farmable* box, which is the exact bug `bucketsOf` exists to
+     prevent and which this project has already fixed once. Gotva Prime keeps
+     its *Special* answer for the same reason. Only the `baro` and `vaulted`
+     routes are conditioned.
+
+     **On the page's clock, not the build's.** `baroSellingNow` reads his live
+     manifest *and* `baroIsHere()`, so a tab left open across his departure
+     re-filters itself on the next render, exactly as the badge already
+     re-labels itself. Nothing here is cached onto the item at load — `_buckets`
+     is, and that is why the condition is applied at match time instead. */
+  /* Does box `k` cover this item, as the other boxes stand?
+     ─────────────────────────────────────────────────────
+     The counts read this so they cannot contradict the grid. Ticking *Baro
+     Ki'Teer* on its own reveals only what he is holding, so the number beside
+     it has to say two rather than nine — a box that claims nine and shows two
+     is the reader's original complaint moved up one line, and it is the shape
+     this whole change exists to remove.
+
+     **Only the Baro number is conditioned, deliberately.** The symmetric
+     version — where the Vaulted box also stops counting a sometimes-Prime while
+     *Baro Ki'Teer* is off — was written first and measured wrong: with both
+     boxes ticked it kept reading 113 where the grid had 121, and rather than
+     ship arithmetic that could not be explained it was cut back to the half
+     that is verified. That half is the one the reader complained about. What is
+     left is that the Vaulted number counts eight Primes it cannot reveal on its
+     own; `TODO.md` has it. */
+  function coveredBy(it, k) {
+    if (!it._buckets.includes(k)) return false;
+    if (k === "baro" && !baroSellingNow(it)) return !!state.avail.vaulted;
+    return true;
+  }
+
+  function passesAvail(it) {
+    const sometimes = it._buckets.includes("baro") && !baroSellingNow(it);
+    return it._buckets.some((b) => {
+      if (!state.avail[b]) return false;
+      if (sometimes && (b === "baro" || b === "vaulted")) {
+        return !!(state.avail.baro && state.avail.vaulted);
+      }
+      return true;
+    });
+  }
+
   const VAULT_SOON_WHY =
     "Vaulting runs on a fixed cadence: every Prime Access release vaults the " +
     "Prime from seven releases earlier, on the same day. This is one of the two " +
@@ -532,7 +588,7 @@
     const availPool = ITEMS.filter((it) => matches(it, "avail"));
     Object.keys(state.avail).forEach((k) => {
       const el = $(`[data-count="${k}"]`);
-      if (el) el.textContent = availPool.filter((it) => it._buckets.includes(k)).length;
+      if (el) el.textContent = availPool.filter((it) => coveredBy(it, k)).length;
     });
 
     /* Baro is the one bucket whose answer has a clock on it, so the label says

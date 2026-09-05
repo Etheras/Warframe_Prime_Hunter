@@ -294,7 +294,11 @@
     return {
       value: rp.byRefinement[given],
       pre: true,
-      bonus: !!(opts && opts.traces) && given === "Radiant",
+      /* `capped` inverted `traces` on 2026-09-05: the switch used to ask "are
+         traces tight" and now asks "are you at the cap", so the bonus lives on
+         the OFF side. An absent option therefore has to mean *not* capped, or
+         a caller passing `{}` would silently lose a bonus it used to get. */
+      bonus: !(opts && opts.capped) && given === "Radiant",
       traces: Math.min(TRACE_COST[given] || 0, TRACE_COST[rp.refinement] || 0),
     };
   }
@@ -365,10 +369,32 @@
      on screen, not what the model concludes. They are saved and backed up all
      the same, because a control the reader sets every single visit is one the
      app is making them repeat. */
-  const PLAN_OPTIONS = ["squad", "event", "railjack", "steel", "aya", "traces",
+  /* `traces` is kept beside `capped` on purpose, and is the only entry here
+     that nothing reads. It was renamed on 2026-09-05 and its sense inverted -
+     "traces are tight" became "you are at the cap" - so a backup written before
+     that carries the old key. Dropping it from this list would mean the restore
+     silently discarded the setting; keeping it lets `migrateCapped` below turn
+     it into the new one. Delete both once no old backup can plausibly turn up. */
+  const PLAN_OPTIONS = ["squad", "event", "railjack", "steel", "aya",
+                        "capped", "traces",
                         "minutes", "runStart", "runEnd",
                         "sort", "formaHave", "formaNeed",
                         "tier", "varzia", "trade"];
+
+  /* Old key to new, in place, for any options object on its way in - saved
+     state on load and a restored backup alike. Only fires when the new key is
+     absent, so a reader who has since set the switch keeps what they set.
+     `capped = !traces` because the sense inverted along with the name: the old
+     default was `traces: true`, "tight", which is `capped: false`. */
+  function migrateCapped(o) {
+    if (o && typeof o === "object") {
+      if (o.capped === undefined && typeof o.traces === "boolean") {
+        o.capped = !o.traces;
+      }
+      delete o.traces;
+    }
+    return o;
+  }
 
   /* What a saved filter set is allowed to be, key by key. Mirrors
      `saveFilters()` on the collection page — that is the only thing that writes
@@ -507,6 +533,9 @@
       PLAN_OPTIONS.forEach((k) => {
         if (payload.plan[k] !== undefined) plan[k] = payload.plan[k];
       });
+      // a backup written before 2026-09-05 carries `traces`, whose sense was
+      // the other way up; this is the only place it can be turned round
+      migrateCapped(plan);
     }
 
     /* The same treatment `plan` gets above, and for the same reason.
@@ -576,7 +605,7 @@
   }
 
   window.WFPrimeModel = {
-    REFINEMENTS, TRACE_COST, PLAN_OPTIONS,
+    REFINEMENTS, TRACE_COST, PLAN_OPTIONS, migrateCapped,
     needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
