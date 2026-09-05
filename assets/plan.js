@@ -2197,7 +2197,8 @@
       return `<div class="need-row${live || n.builtFrom ? "" : " need-dead"}${
         rar ? " rar-row-" + rar : ""}">
         <span class="need-name">${esc(n.item.name)}</span>
-        <span class="need-part">${esc(n.part)}${n.short > 1 ? ` ×${n.short}` : ""}</span>
+        <span class="need-part">${esc(M.partLabel(n.item.name, n.part))}${
+          n.short > 1 ? ` ×${n.short}` : ""}</span>
         <span class="need-src">${
           n.bonus ? "picked up along the way — never farmed for on its own"
             : n.builtFrom

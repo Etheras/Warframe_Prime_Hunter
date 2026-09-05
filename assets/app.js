@@ -453,14 +453,19 @@
      is the reader's original complaint moved up one line, and it is the shape
      this whole change exists to remove.
 
-     **Only the Baro number is conditioned, deliberately.** The symmetric
-     version — where the Vaulted box also stops counting a sometimes-Prime while
-     *Baro Ki'Teer* is off — was written first and measured wrong: with both
-     boxes ticked it kept reading 113 where the grid had 121, and rather than
-     ship arithmetic that could not be explained it was cut back to the half
-     that is verified. That half is the one the reader complained about. What is
-     left is that the Vaulted number counts eight Primes it cannot reveal on its
-     own; `TODO.md` has it. */
+     **Only the Baro number needs conditioning, and the reason is worth knowing
+     before touching this.** `vaulted` is not a flag-driven bucket — `bucketsOf`
+     falls back to it only for an item with **no** other source. So the eight
+     vaulted Primes Baro also sells carry `["baro"]` and nothing else: they were
+     never in the Vaulted count, and *Vaulted* on its own has never shown them,
+     before this rule or after it. 135 items carry `flags.vaulted`; 113 have it
+     as a bucket.
+
+     A symmetric version was written first, on the assumption they carried both
+     buckets, and its arithmetic looked wrong (113 where 121 was expected) for
+     the good reason that 121 was never the right number. Measured 2026-09-05:
+     with both boxes ticked the grid holds 122 and the two counts read 113 and
+     9, which partitions it exactly. */
   function coveredBy(it, k) {
     if (!it._buckets.includes(k)) return false;
     if (k === "baro" && !baroSellingNow(it)) return !!state.avail.vaulted;

@@ -1232,6 +1232,50 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     except limits.TooLarge:
         check_true("ceiling: one byte over is refused", True)
 
+    # ── the two things dropping to decompressobj silently gave up ──────────
+    #
+    # Moving off `gzip.decompress` to stop a bomb mid-expansion also dropped its
+    # end-of-stream check and its multi-member handling, and neither is
+    # announced by the lower-level API. A truncated download came back as 271
+    # bytes of a 514-byte body that looked complete — the ceilings exist to make
+    # a bad body *safe*, and this was the one path where they made a bad body
+    # quieter. Both were repaired on 2026-09-02 and neither was pinned until
+    # now, which is how the repair would have been undone by the next person
+    # simplifying this loop.
+    #
+    # Every expectation here is `gzip.decompress`'s own observed behaviour, not
+    # an invented contract: it raises on a truncated member, concatenates
+    # members, tolerates trailing zero padding and rejects trailing junk.
+    whole = gziplib.compress(b'{"hello": "' + b"x" * 500 + b'"}')
+    try:
+        limits.gunzip_capped(whole[: len(whole) // 2], 1 * limits.MB, "cut")
+        check_true("ceiling: a truncated body is refused, not silently shortened",
+                   False, "it returned a short document that looks complete")
+    except limits.Malformed:
+        check_true("ceiling: a truncated body is refused, not silently shortened",
+                   True)
+
+    check("ceiling: every member of a multi-member body is read",
+          limits.gunzip_capped(gziplib.compress(b"AAA") + gziplib.compress(b"BBB"),
+                               1 * limits.MB, "two"),
+          b"AAABBB",
+          "one decompressobj stops at the first member and leaves the rest in "
+          "unused_data, which is a silently half-read document")
+
+    check("ceiling: trailing zero padding ends the stream, as the stdlib allows",
+          limits.gunzip_capped(gziplib.compress(b"AAA") + b"\0" * 8,
+                               1 * limits.MB, "pad"),
+          b"AAA")
+
+    try:
+        limits.gunzip_capped(gziplib.compress(b"AAA") + b"not a member",
+                             1 * limits.MB, "junk")
+        check_true("ceiling: trailing bytes that are not a member are refused",
+                   False, "gzip.decompress raises BadGzipFile on this")
+    except limits.Malformed:
+        check_true("ceiling: trailing bytes that are not a member are refused",
+                   True)
+
     # The export index is LZMA, and decode_index blanks the one header field
     # that would otherwise bound the output - so this decompressor needs the
     # ceiling more than the gzip one does, not less.

@@ -173,9 +173,9 @@ Five things worth carrying forward, because none was in the findings:
 | Entry | Size |
 |---|---|
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
-| `gunzip_capped` turns a refused download into a short one | small — **the one regression of 2026-09-01**; a truncated body now returns partial bytes where the stdlib raised |
-| The wiki-permissions test matches spellings, not the property it names | small — the job split is real and verified; the test is not what holds it |
-| The pin count in `dependabot.yml` was stale the day it was written | small — nine claimed, eleven actual, all correctly pinned |
+| ~~`gunzip_capped` turns a refused download into a short one~~ | **code fixed 2026-09-02, pinned 2026-09-05** — it was repaired the day it was found and nothing asserted it; four cases now do |
+| ~~The wiki-permissions test matches spellings, not the property it names~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
+| ~~The pin count in `dependabot.yml` was stale the day it was written~~ | **fixed 2026-09-05** — eleven lines, all pinned, seven distinct actions |
 
 ### The worldstate is already cached, and barely read
 
@@ -241,12 +241,12 @@ observation rather than a precondition.
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
 | The deployed site shows no fissures for hours at a time | session — what is left of the owner's 2026-09-02 report once the Steel Path half shipped (`PROJECT.md §7`); 31 published, all expired, 28 running. Decide *build faster* vs *the page reads a live feed* first |
-| Kavasa Prime Collar's search rows stutter its name | small — the only item of 167 whose part names carry the item name |
-| The server's own 404 page violates the CSP it sends | small — an inline `style` its own `style-src 'self'` blocks |
+| ~~Kavasa Prime Collar's search rows stutter its name~~ | **finished 2026-09-05** — the search rows already used `partLabel`; the *Still needed* rows did not, and now do |
+| ~~The server's own 404 page violates the CSP it sends~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
 | ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~ | **shipped 2026-09-05** — on means capped, default off, bonus lives on the off side; `PROJECT.md §7` |
 | ~~The two Baro badges should filter differently from each other~~ | **shipped 2026-09-05** — the Baro box answers for what he holds now, the rest need *Vaulted* too; `PROJECT.md §7` |
 | The forms are too wordy, and *Effort (optional)* changes its rows | **part done 2026-09-05** — the traces tooltip is down 47%; the *Effort* trim, and the unit an unranked row would print, are what is left |
-| The *Vaulted* count includes eight Primes it cannot reveal on its own | small — fallout of the Baro filter rule; the Baro number was fixed and the symmetric half measured wrong, so it was cut rather than shipped unexplained |
+| ~~The *Vaulted* count includes eight Primes it cannot reveal on its own~~ | **withdrawn 2026-09-05 — it never did.** `vaulted` is a fallback bucket, not a flag-driven one, so those eight carry `["baro"]` alone; `PROJECT.md §7` |
 
 ### One refactor
 
@@ -427,9 +427,14 @@ would fail to parse — which is why this has not shown — but the ceiling work
 exists precisely to make malformed upstream input safe, and this is the one path
 where it made it quieter instead.
 
-**Size: small.** `if not dec.eof: raise` after the loop, plus a loop over
-`unused_data` for the multi-member case, and a test for each that feeds a
-deliberately truncated body.
+**Both halves shipped the day this was written**, 2026-09-02 — `if not dec.eof:
+raise` and the per-member loop over `unused_data`. **What did not ship was the
+test**, so for three days the repair was held in place by nothing, which is how a
+repair gets undone by the next person simplifying a loop. Pinned 2026-09-05 with
+four cases — truncated refused, both members read, trailing zero padding
+tolerated, trailing junk refused — each one `gzip.decompress`'s own observed
+behaviour rather than an invented contract, and verified red by disabling the
+`dec.eof` check.
 
 ### The pin count in `dependabot.yml` was stale the day it was written
 
@@ -442,7 +447,13 @@ Nothing is broken — the pinning itself is right and the repository-level polic
 is genuinely on — but a number written into a comment in the same commit that
 changed it is the drift shape this project keeps finding.
 
-**Size: small.**
+**Fixed 2026-09-05.** Re-measured before editing: six `uses:` in `publish.yml`,
+five in `wiki.yml`, all eleven matching `@[0-9a-f]{40}`. **Seven** is distinct
+*actions*, which is what Dependabot raises pull requests against; there are
+**eight** distinct `uses:` paths, because `actions/cache` and
+`actions/cache/restore` are two entry points into one action. The comment now
+says which of the two it means, since that ambiguity is how "five" and "seven"
+could both look defensible.
 
 ### The wiki-permissions test matches spellings **[fixed 2026-09-04]**
 
@@ -479,12 +490,18 @@ stale thing by the end.
 
 ### Smaller things, all confirmed
 
-- **Kavasa Prime Collar's search rows stutter its name.** The planner's result
-  label is item + part, and Kavasa is the **only item of 167** whose part names
-  already carry the item name, so it reads *"Kavasa Prime Collar Kavasa Prime
-  Band"*. It is also the one item with no DE recipe, which is why it is odd.
-  `plan.js:2192`. **Size: small** — drop the item prefix when the part name
-  already starts with it.
+- ~~**Kavasa Prime Collar's search rows stutter its name.**~~ **Finished
+  2026-09-05, and it was half done already.** `M.partLabel` and its test shipped
+  with the planner search, so the *search* rows had been reading "Kavasa Prime
+  Collar **Band**" for some time — the rows still stuttering were the ones this
+  entry actually cited, the *Still needed* panel at `plan.js:2199`, which built
+  its label by hand. It uses `partLabel` now. Verified on the served page with
+  that Prime wished: *Blueprint*, *Band*, *Buckle*.
+
+  The word-by-word rule is the reason this needs a helper at all and not a
+  `startsWith`: *"Kavasa Prime Band"* is not prefixed by *"Kavasa Prime
+  Collar"* — neither string contains the other, only the first two words are
+  shared. A test pins that, and pins that the other 166 items are untouched.
 - ~~**The server's own 404 page violates the CSP it sends.**~~ **Fixed
   2026-09-04.** One correction to the report: it is an inline `<style>` *element*,
   not a `style=` attribute — Python added it to `DEFAULT_ERROR_MESSAGE` in 3.11

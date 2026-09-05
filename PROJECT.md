@@ -6429,12 +6429,61 @@ itself, exactly as the badge already re-labels itself.
 
 **The count beside the box was the same bug one line up.** It read **9** while
 the box revealed **2** — *"why are there so many Baro items"* all over again — so
-the counts ask the same question the grid does. The symmetric half, where the
-*Vaulted* number also stops counting a sometimes-Prime while *Baro* is off, was
-written, **measured wrong** (113 where the grid had 121) and **cut rather than
-shipped unexplained**. What is left is that *Vaulted* counts eight Primes it
-cannot reveal alone; `TODO.md` has it. Shipping half a fix you can explain beats
-shipping all of one you cannot.
+the counts ask the same question the grid does.
+
+**A symmetric half was written for the *Vaulted* count, measured wrong, and cut —
+and on 2026-09-05 the reason it measured wrong turned out to be the interesting
+part.** `vaulted` is **not a flag-driven bucket**: `bucketsOf` falls back to it
+only for an item with *no* other source, which its own comment says and which
+nobody had connected to this. So the eight vaulted Primes Baro also sells carry
+`["baro"]` and nothing else. They were never in the Vaulted count, and *Vaulted*
+alone has never shown them — before this rule or after it. **135 items carry
+`flags.vaulted`; 113 have it as a bucket.**
+
+That retires a `TODO.md` entry filed the day before — *the Vaulted count includes
+eight Primes it cannot reveal on its own* — as a **false alarm**, and the
+"expected 121" that made the symmetric version look broken was simply a wrong
+expectation. Measured with both boxes ticked: the grid holds 122 and the counts
+read 113 and 9, which partitions it exactly. **Cutting the half that could not be
+explained was still the right call** — it just turned out there was nothing to
+explain, because there was no defect.
+
+### The small-items sweep of 2026-09-05, where three of six were already done
+
+Asked for as "take on all the smaller ones", which made it a test of the backlog
+rather than of the code. **Half the list was not work.**
+
+| Entry | What it actually was |
+|---|---|
+| `gunzip_capped` turns a refused download into a short one | **code fixed 2026-09-02**, the day it was filed — and never asserted |
+| The wiki-permissions test matches spellings | **fixed 2026-09-04**, recorded in prose the same day |
+| The server's 404 page violates its own CSP | **fixed 2026-09-04**, likewise |
+| Kavasa Prime Collar's rows stutter its name | **half done** — the search rows had `partLabel`; the *Still needed* rows did not |
+| The pin count in `dependabot.yml` | real, and wrong in both figures |
+| The *Vaulted* count includes eight it cannot reveal | **not a defect at all** — see above |
+
+Three had shipped and their summary rows outlived them, because this file's own
+rule — *when something ships, delete the entry and move the reasoning here* — was
+followed in the prose and not in the table above it. **A backlog with two places
+to say "done" will disagree with itself.**
+
+**The one with teeth was the one that looked finished.** `gunzip_capped`'s
+truncated-stream and multi-member repairs shipped the day they were found, with
+no test, so for three days a deliberate fix was held in place by nothing at all —
+and it is the kind of loop somebody simplifies. It has four cases now, each one
+`gzip.decompress`'s observed behaviour rather than an invented contract, verified
+red by disabling the `dec.eof` check. **A fix without a test is a fix with an
+expiry date**, and it does not announce itself, because the code reads as
+finished and the entry reads as open.
+
+**And one entry was simply wrong, filed by this project the day before.** It
+claimed the *Vaulted* count included eight Primes it could not reveal. It never
+did: `vaulted` is a fallback bucket rather than a flag-driven one, so those eight
+carry `["baro"]` alone. Checking the premise took one line in the browser and
+retired the entry; implementing it would have "fixed" arithmetic that was already
+right. Hard rule 13 in `CLAUDE.md` says to verify against the tree rather than a
+summary — that applies to a summary this project wrote itself, most of all when
+it is one you wrote yesterday.
 
 ---
 
