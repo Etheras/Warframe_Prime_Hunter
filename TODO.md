@@ -197,7 +197,7 @@ What is left of the entry is two fields and a warning about one of them.
 | `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
-| Baro's item-level marker still over-claims, and now there is a number for it | the relic half shipped 2026-09-04 and the "how often" question is settled from the wiki's own per-visit history — 271 of 313 visits carry no relic at all |
+| ~~Baro's item-level marker still over-claims, and now there is a number for it~~ | **settled and shipped 2026-09-05** — the marker is a badge, the bucket is his live shelf, and the seven he is not selling are vaulted; `PROJECT.md §7` |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -1149,7 +1149,7 @@ The control is the other half. The crosshair is a two-state `role="checkbox"`
 different control or a modifier — plus a line in `STYLE.md`, since a new colour with
 a new meaning is exactly what that document exists to arbitrate.
 
-### Baro's item-level marker still over-claims, and now there is a number for it
+### ~~Baro's item-level marker still over-claims, and now there is a number for it~~
 
 **The relic half is done and settled** — *Baro's relics should be crackable, the
 way Varzia's are* shipped 2026-09-04 and its reasoning is in `PROJECT.md §7`,
@@ -1169,13 +1169,15 @@ says the same kind of thing. `STYLE.md` has the rule it generalises to: colour i
 for what the reader can act on. Verified in the browser — of the nine, exactly
 Akmagnus and Magnus Prime (both fed by `Axi M5`) read *here now*.
 
-**What is still open is the flag itself, not how it is drawn.** `flags.baro`
-comes from the wiki and means "he sometimes sells this Prime"; it sits on nine
-items, and on the 2026-09-04 visit his actual stock covered two of them. That
-gap is now measured rather than suspected, but nothing has been decided about
-it — the relic-level shelf shipped and the item-level marker was left exactly as
-it was. See *Baro's actual stock is published, and never read* above for what
-that entry still holds open.
+**The flag itself was settled 2026-09-05**, reasoning in `PROJECT.md §7` under
+*The wiki's Baro marker is a badge, and the bucket is the shelf*. Short version:
+a bucket answers *how do I get this*, and "he might, one day" is not a route — so
+the marker stopped being an availability bucket and the bucket became the live
+shelf. The seven he is not selling are simply **vaulted**, which is what they
+are, and keep the grey `BARO SOMETIMES` badge. The conjunction added the day
+before dissolved with it: it had been standing in for one flag doing two jobs.
+
+The rest of this entry is the state it was decided from.
 
 **The nine, re-read from the payload 2026-09-05** so that whoever decides this
 is looking at the actual set rather than a count:

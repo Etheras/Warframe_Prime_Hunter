@@ -1462,11 +1462,13 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
   assert.deepEqual(errors, []);
 });
 
-page_test("the Baro box answers for what he has now; the rest need Vaulted too", async () => {
+page_test("the Baro box holds what he is selling; the rest are just vaulted", async () => {
   /* Owner's call, 2026-09-05, and the filter half of the two badges. `flags.baro`
      is a static wiki marker on nine items; his live shelf covered two of them on
-     his last visit. So *Baro Ki'Teer* on its own shows only what he is actually
-     holding, and a Prime he merely sometimes sells needs *Vaulted* beside it.
+     his last visit, and 271 of his 313 recorded visits carried no relic at all.
+     So the marker is a badge and the **bucket is the live shelf**: *Baro
+     Ki'Teer* holds what he is carrying, and a Prime he is not selling answers to
+     whatever it really is — vaulted, for these.
 
      Staged rather than waited for, the same way the badge test stages it — the
      answer otherwise depends on the fortnight the suite runs in. */
@@ -1524,16 +1526,20 @@ page_test("the Baro box answers for what he has now; the rest need Vaulted too",
                + "items when he is carrying one");
 
   await setCheck(page, "#f-vaulted", true);
-  assert.equal(await shown(subject.sometimes), 1,
-               "Vaulted beside Baro is what reveals it");
-  assert.equal(await shown(subject.now), 1, "and the live one has not gone anywhere");
+  assert.equal(await shown(subject.sometimes), 1, "and it is a vaulted Prime");
+  assert.equal(await shown(subject.now), 1, "the live one has not gone anywhere");
 
-  /* Vaulted on its own is not enough either — "hidden otherwise", owner's
-     words. This is the half most likely to be dropped by a later refactor,
-     because it reads as a Prime disappearing from a box it belongs in. */
+  /* **Vaulted on its own is enough, and that is the point of the marker being
+     a badge.** It needed both boxes for one day, while `flags.baro` was still
+     an availability bucket — the conjunction was standing in for a flag doing
+     two jobs. A Prime he is not selling is simply vaulted, and the *Vaulted*
+     box is where a reader looks for it; the grey `BARO SOMETIMES` badge is
+     what says he has sold it before. */
   await setCheck(page, "#f-baro", false);
-  assert.equal(await shown(subject.sometimes), 0,
-               "Vaulted alone must not bring it back");
+  assert.equal(await shown(subject.sometimes), 1,
+               "a Prime he is not selling belongs to Vaulted, not to Baro");
+  assert.equal(await shown(subject.now), 0,
+               "while the one he IS selling answers to his box and not to Vaulted");
 
   /* And the number beside the box has to agree with the grid. A Baro box
      reading nine while it reveals two is the reader's original complaint moved
@@ -1547,8 +1553,8 @@ page_test("the Baro box answers for what he has now; the rest need Vaulted too",
   await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
   const narrow = await baroCount();
   assert.ok(narrow < flaggedTotal,
-            `with Vaulted off the Baro box reaches fewer than all ${flaggedTotal} `
-            + `flagged Primes, so its count must too — read ${narrow}`);
+            `the Baro box reaches fewer than all ${flaggedTotal} flagged Primes, `
+            + `so its count must too — read ${narrow}`);
   /* Exactly the Primes he is holding — not "flagged Primes on screen", which
      is a different set and was this assertion's first mistake: the one
      Baro-marked Prime that is farmable is on screen via its OWN box, and
@@ -1562,9 +1568,12 @@ page_test("the Baro box answers for what he has now; the rest need Vaulted too",
   assert.equal(narrow, sellingNow,
                "with Vaulted off the box covers exactly what he is carrying");
 
+  /* And it stays that number whatever *Vaulted* does — the two boxes no longer
+     depend on each other, which is the simplification the marker-as-badge
+     bought. Before it, this read nine as soon as Vaulted was ticked. */
   await setCheck(page, "#f-vaulted", true);
-  assert.equal(await baroCount(), flaggedTotal,
-               "with Vaulted beside it the box covers every flagged Prime again");
+  assert.equal(await baroCount(), sellingNow,
+               "his box counts what he is carrying, whatever else is ticked");
 
   assert.deepEqual(errors, []);
 });

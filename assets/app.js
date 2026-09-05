@@ -419,32 +419,38 @@
     return (it.relics || []).some((n) => (RELICS[n] || {}).baro);
   }
 
-  /* Does this item pass the availability boxes as they stand?
-     ─────────────────────────────────────────────────────────
-     Any bucket it belongs to, not only the one it displays as: an item with two
-     sources is on screen while either box is ticked, and unticking Baro must
-     not take a farmable Prime with it just because Baro also sells it.
+  /* The buckets this item answers to RIGHT NOW.
+     ────────────────────────────────────────
+     `flags.baro` is the wiki's `[[Baro Ki'Teer|B]]` marker and means *he has
+     sold this Prime*, not *he is selling it*. Read once per build, it sat on
+     nine items while his live shelf covered two — and over his whole recorded
+     history **271 of 313 visits carried no relic at all**, so for most of any
+     fortnight the marker is true of nobody. A bucket is supposed to answer
+     "how do I get this", and "he might, one day" is not a route.
 
-     **Except for the Primes he only *sometimes* sells, which need both boxes.**
-     Owner's call, 2026-09-05, and it is the filter half of the two badges that
-     shipped on 2026-09-04. `flags.baro` is a static wiki marker sitting on nine
-     items; his live shelf covered two of them on his last visit. So a `BARO —
-     HERE NOW` item answers the Baro box on its own, and a `BARO SOMETIMES` one
-     is shown only when *Vaulted* is ticked as well.
+     So the marker is **a badge, and the bucket is the live shelf**. An item he
+     is not selling drops the `baro` bucket and answers to whatever else it has
+     — `farmable` for Lex Prime, `special` for Gotva — falling back to `vaulted`,
+     which is what the other seven actually are. `flags.baro` still drives both
+     badges and `statusOf`, so nothing about how a card is drawn or sorted moves,
+     and Gotva Prime keeps the ordering override that puts it above its wrong
+     wiki `(S)`.
 
-     **The exception is scoped to the two buckets it is about**, which is the
-     whole subtlety. Written as a blanket "sometimes ⇒ needs both" it would hide
-     **Lex Prime** — farmable, eight relics still dropping, and Baro-marked —
-     from the *Farmable* box, which is the exact bug `bucketsOf` exists to
-     prevent and which this project has already fixed once. Gotva Prime keeps
-     its *Special* answer for the same reason. Only the `baro` and `vaulted`
-     routes are conditioned.
+     **This is the fix the conjunction was standing in for.** The rule that a
+     *sometimes* Prime needed *Vaulted* AND *Baro Ki'Teer* together existed
+     because one flag was doing two jobs; with the jobs separated the filter is
+     a plain OR again, which is what it is everywhere else.
 
-     **On the page's clock, not the build's.** `baroSellingNow` reads his live
-     manifest *and* `baroIsHere()`, so a tab left open across his departure
-     re-filters itself on the next render, exactly as the badge already
-     re-labels itself. Nothing here is cached onto the item at load — `_buckets`
-     is, and that is why the condition is applied at match time instead. */
+     **It is recomputed per render and never cached**, because whether he is
+     here changes on the page's own clock — the same reason the badge can
+     re-label itself without a rebuild. `_buckets` is cached at load and cannot
+     hold this. */
+  function bucketsNow(it) {
+    if (!it._buckets.includes("baro") || baroSellingNow(it)) return it._buckets;
+    const rest = it._buckets.filter((b) => b !== "baro");
+    return rest.length ? rest : ["vaulted"];
+  }
+
   /* Does box `k` cover this item, as the other boxes stand?
      ─────────────────────────────────────────────────────
      The counts read this so they cannot contradict the grid. Ticking *Baro
@@ -453,34 +459,22 @@
      is the reader's original complaint moved up one line, and it is the shape
      this whole change exists to remove.
 
-     **Only the Baro number needs conditioning, and the reason is worth knowing
-     before touching this.** `vaulted` is not a flag-driven bucket — `bucketsOf`
-     falls back to it only for an item with **no** other source. So the eight
-     vaulted Primes Baro also sells carry `["baro"]` and nothing else: they were
-     never in the Vaulted count, and *Vaulted* on its own has never shown them,
-     before this rule or after it. 135 items carry `flags.vaulted`; 113 have it
-     as a bucket.
-
-     A symmetric version was written first, on the assumption they carried both
-     buckets, and its arithmetic looked wrong (113 where 121 was expected) for
-     the good reason that 121 was never the right number. Measured 2026-09-05:
-     with both boxes ticked the grid holds 122 and the two counts read 113 and
-     9, which partitions it exactly. */
+     It asks `bucketsNow`, so it cannot disagree with the grid: the number
+     beside a box is the items that box is holding on screen. Worth knowing
+     while reading it — `vaulted` is not a flag-driven bucket. `bucketsOf` falls
+     back to it only for an item with **no** other source, so 135 items carry
+     `flags.vaulted` and 113 have it as a bucket. That is why the seven Primes
+     Baro is not selling land in *Vaulted* when they drop his bucket, rather
+     than being counted twice. */
   function coveredBy(it, k) {
-    if (!it._buckets.includes(k)) return false;
-    if (k === "baro" && !baroSellingNow(it)) return !!state.avail.vaulted;
-    return true;
+    return bucketsNow(it).includes(k);
   }
 
+  /* Any bucket it answers to, not only the one it displays as: an item with two
+     sources is on screen while either box is ticked, and unticking Baro must not
+     take a farmable Prime with it just because Baro also sells it. */
   function passesAvail(it) {
-    const sometimes = it._buckets.includes("baro") && !baroSellingNow(it);
-    return it._buckets.some((b) => {
-      if (!state.avail[b]) return false;
-      if (sometimes && (b === "baro" || b === "vaulted")) {
-        return !!(state.avail.baro && state.avail.vaulted);
-      }
-      return true;
-    });
+    return bucketsNow(it).some((b) => state.avail[b]);
   }
 
   const VAULT_SOON_WHY =

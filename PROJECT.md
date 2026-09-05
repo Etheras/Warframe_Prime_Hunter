@@ -6448,6 +6448,63 @@ read 113 and 9, which partitions it exactly. **Cutting the half that could not b
 explained was still the right call** — it just turned out there was nothing to
 explain, because there was no defect.
 
+### The wiki's Baro marker is a badge, and the bucket is the shelf
+
+**Shipped 2026-09-05**, settling *Baro's item-level marker still over-claims*,
+which had been open since the badges shipped on 2026-09-04.
+
+**The two things called "Baro" were never the same fact.** `flags.baro` is the
+wiki's `[[Baro Ki'Teer|B]]` marker (`catalogue.py:159`) and means *he has sold
+this Prime*; it is read once per build and sits on **nine** items. His shelf is a
+live feed — `VoidTraders[0].Manifest`, 41 rows on 2026-09-04, of which exactly
+**one** was a relic, `Axi M5`, covering **two** of the nine. And over his whole
+recorded history, **271 of 313 visits carried no relic at all**. So for most of
+any fortnight the marker is true of nobody, and a reader ticking his box got nine
+Primes he was selling nothing for.
+
+**A bucket answers "how do I get this", and "he might, one day" is not a route.**
+That is the whole decision. The marker became a **badge only**, and the `baro`
+bucket became the **live shelf**: an item he is not selling drops it and answers
+to whatever it really has — `farmable` for Lex Prime, `special` for Gotva, and
+`vaulted` for the other seven, which is what they are. It generalises the rule
+the badges already follow (`STYLE.md`: colour is for what the reader can act on)
+from how a card is *drawn* to which box *holds* it.
+
+**Three things this deliberately does not touch.** `flags.baro` still drives both
+badges, so `BARO SOMETIMES` still says he has sold it before. `statusOf` and
+`BUCKET_ORDER` are untouched, so Gotva Prime keeps the ordering override that
+puts Baro above the wrong `(S)` its wiki page carries. And `bucketsOf` in
+`model.js` is untouched — the live answer is computed in `app.js`, the same place
+and for the same reason the `railjack` bucket is, because `model.js` knows about
+neither the relic table nor the clock.
+
+**The conjunction from the day before dissolved, which is how the diagnosis was
+confirmed.** *Vaulted AND Baro Ki'Teer* had been a special case in a filter that
+is a plain OR everywhere else; it existed because one flag was doing two jobs.
+Separate the jobs and it is not needed — `passesAvail` is one line again. A rule
+that stops being necessary when the data model is corrected was a symptom.
+
+Measured on the served page, with the other five buckets unticked:
+
+| boxes | on screen | *Baro* count | *Vaulted* count |
+|---|---|---:|---:|
+| Baro only | Akmagnus, Magnus — exactly his shelf | 2 | 118 |
+| Vaulted only | the five that are only vaulted | 2 | 118 |
+| both | 120 cards | 2 | 118 |
+| **he is away** | his box empty; all seven vaulted | **0** | **120** |
+
+118 + 2 = 120 partitions the grid exactly, and the *Baro* number no longer moves
+when *Vaulted* does. The away row is the one that holds twelve days in fourteen:
+his box reads nought and says when he is back, and nothing claims him meanwhile.
+
+**One behaviour changed that the owner's 2026-09-05 filter spec had said
+otherwise about**, and it is called out rather than slipped in. That spec said a
+*sometimes* Prime should be *"hidden otherwise"* — invisible unless both boxes
+were ticked. It is now visible under *Vaulted* alone, because that is what it is:
+a vaulted Prime, and the *Vaulted* box is where a reader looks for one. The strict
+reading is one condition away if it is wanted; what it costs is eight vaulted
+Primes that the *Vaulted* box does not show.
+
 ### The small-items sweep of 2026-09-05, where three of six were already done
 
 Asked for as "take on all the smaller ones", which made it a test of the backlog
