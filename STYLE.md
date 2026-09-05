@@ -56,9 +56,17 @@ is true of nine Primes and true of today for almost none of them.
 
 So there are two badges. `BARO — HERE NOW` keeps `--blue`, the colour Baro
 already owns on both pages, and is shown only when his live manifest holds a
-relic for that Prime **and** the page's own clock puts him on a relay. `BARO
-SOMETIMES` takes `--txt-dim`, the same grey as `VAULTED`, because it sits beside
+relic for that Prime **and** the page's own clock puts him on a relay. `BARO —
+MAYBE` takes `--txt-dim`, the same grey as `VAULTED`, because it sits beside
 `VAULTED` and says the same kind of thing: *not a route you can take now*.
+
+**Both carry the same stem on purpose** — it was `BARO SOMETIMES` until
+2026-09-05, and matching the em-dash shape makes them read as one question
+answered two ways rather than as two unrelated badges. And **the badge is where
+the live answer lives**: the availability boxes beside the grid say what a Prime
+*is* and do not move when his van does, so the card is the only thing that
+changes across his arrival. `PROJECT.md §7` has why a third checkbox for it was
+rejected.
 
 The general rule, which is the part worth keeping: **colour is for what the
 reader can act on.** A marker about history wearing the colour of a live

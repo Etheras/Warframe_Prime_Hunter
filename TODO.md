@@ -1170,12 +1170,21 @@ for what the reader can act on. Verified in the browser — of the nine, exactly
 Akmagnus and Magnus Prime (both fed by `Axi M5`) read *here now*.
 
 **The flag itself was settled 2026-09-05**, reasoning in `PROJECT.md §7` under
-*The wiki's Baro marker is a badge, and the bucket is the shelf*. Short version:
-a bucket answers *how do I get this*, and "he might, one day" is not a route — so
-the marker stopped being an availability bucket and the bucket became the live
-shelf. The seven he is not selling are simply **vaulted**, which is what they
-are, and keep the grey `BARO SOMETIMES` badge. The conjunction added the day
-before dissolved with it: it had been standing in for one flag doing two jobs.
+*The wiki's Baro marker is a bucket, and the shelf is a badge*. Short version:
+both facts are kept and kept apart. The marker **stays a bucket**, because
+"Baro deals in this Prime" is a real long-term route — and a Prime whose only
+source is that marker also joins *Vaulted*, because nothing drops it. The live
+shelf is the **badge's** job (`BARO — HERE NOW` against `BARO — MAYBE`) and the
+planner's, where it is actionable. The conjunction added the day before
+dissolved with it: it had been standing in for one flag doing two jobs.
+
+Two wrong turns are recorded there rather than deleted, because both read well:
+demoting the marker to a badge outright emptied his box for twelve days in
+fourteen and deleted a category the reader wants, and making `vaulted` live
+instead produced a card wearing a `VAULTED` badge the *Vaulted* box would not
+show. A third checkbox for live Baro Primes was proposed and rejected on a
+number — it would narrow nine items to at most three, his record over 313
+visits.
 
 The rest of this entry is the state it was decided from.
 

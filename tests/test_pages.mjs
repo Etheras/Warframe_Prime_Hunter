@@ -406,23 +406,27 @@ page_test("a Prime with two sources survives unticking either of them", async ()
   await page.locator("#search").fill("Lex Prime");
   assert.equal(await card.count(), 1, "it has to be on screen before anything is unticked");
 
-  /* Unticking *Farmable* used to leave it on screen under the still-ticked Baro
-     box, and since 2026-09-05 it does not — the Baro box on its own answers only
-     for Primes he is selling **right now**, and a Prime he merely sometimes
-     sells needs *Vaulted* beside it. Lex is the awkward case that proves the
-     exception is scoped rather than blanket: it is not vaulted at all, so what
-     keeps it on screen is its own *Farmable* box, which is exactly the bug this
-     test was written for and is asserted first. */
+  /* Either box holds it on its own, which is the whole point of the entry.
+     Lex is also the case that keeps `bucketsNow` honest: it is Baro-marked but
+     **not vaulted**, so it must never pick up the `vaulted` bucket a marked
+     Prime gains while he is not selling it — Lex has a source of its own and
+     eight relics still dropping. */
+  await setCheck(page, "#f-farmable", false);
+  assert.equal(await card.count(), 1,
+               "Baro deals in it, so his box holds it with Farmable off");
+
+  await setChecks(page, { "#f-farmable": true, "#f-baro": false });
+  assert.equal(await card.count(), 1,
+               "and its OWN source holds it with his box off — this is the "
+               + "two-source bug and it must not come back");
+
+  await setCheck(page, "#f-vaulted", true);
   await setCheck(page, "#f-farmable", false);
   assert.equal(await card.count(), 0,
-               "Baro alone must not answer for a Prime he only sometimes sells");
+               "and Vaulted must not find it: a Prime with relics still dropping "
+               + "is not vaulted, whatever Baro is doing");
 
-  await setCheck(page, "#f-farmable", true);
-  assert.equal(await card.count(), 1,
-               "and its OWN source must still hold it, whatever Baro is doing — "
-               + "this is the two-source bug and it must not come back");
-
-  await setCheck(page, "#f-farmable", false);
+  await setCheck(page, "#f-vaulted", false);
   await setCheck(page, "#f-baro", false);
   assert.equal(await card.count(), 0,
                "with both of its sources unticked it must finally go");
@@ -1439,7 +1443,7 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
   assert.ok(mineNow.some((b) => /HERE NOW/i.test(b)),
     `the Prime whose relic he is holding should say so — got ${JSON.stringify(mineNow)}`);
   const otherNow = await badgesOf(subject.other);
-  assert.ok(otherNow.some((b) => /SOMETIMES/i.test(b)),
+  assert.ok(otherNow.some((b) => /MAYBE/i.test(b)),
     `a Prime he has sold before but is not selling now must not claim he has it — got ${JSON.stringify(otherNow)}`);
   assert.ok(!otherNow.some((b) => /HERE NOW/i.test(b)),
     "being on the relay is not enough; he has to have this Prime's relic");
@@ -1457,18 +1461,22 @@ page_test("a Baro badge says whether he has it now, not whether he ever has", as
   const after = await badgesOf(subject.mine);
   assert.ok(!after.some((b) => /HERE NOW/i.test(b)),
     `with him gone nothing may say he is here — got ${JSON.stringify(after)}`);
-  assert.ok(after.some((b) => /SOMETIMES/i.test(b)),
+  assert.ok(after.some((b) => /MAYBE/i.test(b)),
     "the wiki marker is still true, and still says only that");
   assert.deepEqual(errors, []);
 });
 
-page_test("the Baro box holds what he is selling; the rest are just vaulted", async () => {
-  /* Owner's call, 2026-09-05, and the filter half of the two badges. `flags.baro`
-     is a static wiki marker on nine items; his live shelf covered two of them on
-     his last visit, and 271 of his 313 recorded visits carried no relic at all.
-     So the marker is a badge and the **bucket is the live shelf**: *Baro
-     Ki'Teer* holds what he is carrying, and a Prime he is not selling answers to
-     whatever it really is — vaulted, for these.
+page_test("his box keeps every Prime he deals in, and Vaulted keeps them too", async () => {
+  /* Owner's call, 2026-09-05. Two facts wear the name Baro: `flags.baro` is a
+     static wiki marker on nine items, and his shelf is a live feed that covered
+     two of them on his last visit — with 271 of his 313 recorded visits
+     carrying no relic at all.
+
+     Both are kept, in different places. The **marker stays a bucket**, because
+     "Baro deals in this" is a real long-term route, and a Prime whose only
+     source is that marker also joins *Vaulted*, because nothing drops it. The
+     **live shelf is the badge's job** — and the planner's, where it is
+     actionable. Neither box moves with his van.
 
      Staged rather than waited for, the same way the badge test stages it — the
      answer otherwise depends on the fortnight the suite runs in. */
@@ -1518,62 +1526,66 @@ page_test("the Baro box holds what he is selling; the rest are just vaulted", as
 
   const shown = (id) => page.locator(`[data-id="${id}"]`).count();
 
+  /* **His box keeps all nine**, marker and all — the category "Primes Baro
+     deals in" is a real one and is the reason these are not simply
+     unobtainable. What the live shelf decides is the OTHER bucket. */
   await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
   assert.equal(await shown(subject.now), 1,
-               "the Prime whose relic he is holding answers to the Baro box alone");
-  assert.equal(await shown(subject.sometimes), 0,
-               "a Prime he only sometimes sells must not, or the box claims nine "
-               + "items when he is carrying one");
-
-  await setCheck(page, "#f-vaulted", true);
-  assert.equal(await shown(subject.sometimes), 1, "and it is a vaulted Prime");
-  assert.equal(await shown(subject.now), 1, "the live one has not gone anywhere");
-
-  /* **Vaulted on its own is enough, and that is the point of the marker being
-     a badge.** It needed both boxes for one day, while `flags.baro` was still
-     an availability bucket — the conjunction was standing in for a flag doing
-     two jobs. A Prime he is not selling is simply vaulted, and the *Vaulted*
-     box is where a reader looks for it; the grey `BARO SOMETIMES` badge is
-     what says he has sold it before. */
-  await setCheck(page, "#f-baro", false);
+               "the Prime whose relic he is holding is in his box");
   assert.equal(await shown(subject.sometimes), 1,
-               "a Prime he is not selling belongs to Vaulted, not to Baro");
-  assert.equal(await shown(subject.now), 0,
-               "while the one he IS selling answers to his box and not to Vaulted");
+               "and so is one he only sometimes sells — the marker is a bucket, "
+               + "and the badge is what separates them");
 
-  /* And the number beside the box has to agree with the grid. A Baro box
-     reading nine while it reveals two is the reader's original complaint moved
-     up one line. Asserted as a relation rather than as a figure, because how
-     many Primes he is carrying is a fact about the fortnight. */
-  const baroCount = () => page.evaluate(() =>
-    Number(document.querySelector('[data-count="baro"]').textContent));
+  /* **And the *Vaulted* box finds them too**, because a Prime whose only source
+     is his marker has no farm route at all — `bucketsOf` cannot see that, since
+     it falls back to `vaulted` only when a flag left it with nothing and the
+     marker counts as something.
+
+     Both subjects, including the one he is holding a relic for. Being on his
+     shelf today does not make a Prime un-vaulted: nothing drops it, which is a
+     fact about the drop tables rather than about this fortnight. A version that
+     moved the bucket with his shelf was tried the same day and produced a card
+     wearing a `VAULTED` badge that the *Vaulted* box would not show. */
+  await setChecks(page, { "#f-baro": false, "#f-vaulted": true });
+  assert.equal(await shown(subject.sometimes), 1,
+               "Vaulted alone finds a Prime whose only source is his marker");
+  assert.equal(await shown(subject.now), 1,
+               "and still finds it while he is holding its relic — the badge is "
+               + "what says he has it, not the bucket");
+
+  /* The number beside his box counts the marker, because that is what the box
+     holds. Asserted as a relation, not a figure: how many Primes carry the
+     marker is a property of the wiki and how many he is carrying is a property
+     of the fortnight. */
+  const countOf = (k) => page.evaluate((key) =>
+    Number(document.querySelector(`[data-count="${key}"]`).textContent), k);
   const flaggedTotal = await page.evaluate(() =>
     window.WFPRIME_DATA.items.filter((i) => (i.flags || {}).baro).length);
 
   await setChecks(page, { "#f-baro": true, "#f-vaulted": false });
-  const narrow = await baroCount();
-  assert.ok(narrow < flaggedTotal,
-            `the Baro box reaches fewer than all ${flaggedTotal} flagged Primes, `
-            + `so its count must too — read ${narrow}`);
-  /* Exactly the Primes he is holding — not "flagged Primes on screen", which
-     is a different set and was this assertion's first mistake: the one
-     Baro-marked Prime that is farmable is on screen via its OWN box, and
-     counting it here made the number look wrong when it was right. */
-  const sellingNow = await page.evaluate(() => {
-    const D = window.WFPRIME_DATA;
-    return D.items.filter((i) => (i.flags || {}).baro
-      && (i.relics || []).some((n) => (D.relics[n] || {}).baro)).length;
-  });
-  assert.ok(sellingNow > 0, "the staging should have put a relic on his shelf");
-  assert.equal(narrow, sellingNow,
-               "with Vaulted off the box covers exactly what he is carrying");
+  assert.equal(await countOf("baro"), flaggedTotal,
+               "his box holds every Prime he deals in, so its count says so");
 
-  /* And it stays that number whatever *Vaulted* does — the two boxes no longer
-     depend on each other, which is the simplification the marker-as-badge
-     bought. Before it, this read nine as soon as Vaulted was ticked. */
+  /* And it does not move when *Vaulted* does. The two boxes overlap — these
+     Primes are counted beside both, which is the existing rule for anything
+     with two sources — but neither decides the other. A conjunction between
+     them stood here for one day, standing in for a single flag doing two jobs,
+     and this is what asserts it has not come back. */
   await setCheck(page, "#f-vaulted", true);
-  assert.equal(await baroCount(), sellingNow,
-               "his box counts what he is carrying, whatever else is ticked");
+  assert.equal(await countOf("baro"), flaggedTotal,
+               "whatever else is ticked");
+
+  /* The live shelf shows up on the card, which is the whole division of labour:
+     the bucket says what a Prime is, the badge says what today is. */
+  const badgesOfCard = (id) => page.evaluate((i) =>
+    [...document.querySelectorAll(`[data-id="${i}"] .badge`)].map((b) => b.textContent.trim()),
+    id);
+  const live = await badgesOfCard(subject.now);
+  const idle = await badgesOfCard(subject.sometimes);
+  assert.ok(live.some((b) => /HERE NOW/i.test(b)),
+            `the one he is holding says so — got ${JSON.stringify(live)}`);
+  assert.ok(idle.some((b) => /MAYBE/i.test(b)) && !idle.some((b) => /HERE NOW/i.test(b)),
+            `and the other says only that he might — got ${JSON.stringify(idle)}`);
 
   assert.deepEqual(errors, []);
 });

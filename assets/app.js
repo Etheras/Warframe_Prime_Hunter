@@ -147,6 +147,24 @@
       // it left Farmable, so the Farmable box must stop covering it too
       it._buckets = it._buckets.map((b) => (b === "farmable" ? "railjack" : b));
     }
+    /* A Prime whose ONLY source is the Baro marker is also vaulted, and the
+       *Vaulted* box has to find it. `flags.baro` is the wiki's
+       `[[Baro Ki'Teer|B]]` — it means he deals in this Prime, not that anything
+       drops it, so these seven have no farm route at all and belong under
+       *Vaulted* as much as under his box. `bucketsOf` cannot see this: it falls
+       back to `vaulted` only when a flag left it with nothing, and the marker
+       counts as something.
+
+       Deliberately NOT gated on whether he is selling it today. The badge
+       carries that — `BARO — HERE NOW` against `BARO — MAYBE` — and a version
+       that moved the bucket with his shelf was tried on 2026-09-05 and produced
+       a card wearing a `VAULTED` badge that the *Vaulted* box would not show.
+       Vaulted is a fact about the drop tables; his shelf is a fact about today,
+       and the live one already changes what it should — the planner's crack
+       list, where it is actionable. */
+    if (it._buckets.length === 1 && it._buckets[0] === "baro") {
+      it._buckets = it._buckets.concat("vaulted");
+    }
   });
 
   const CATEGORIES = DATA.categories.map((c) => c.name);
@@ -358,7 +376,10 @@
     vaulted: ["vaulted", "VAULTED"],
     /* "Sometimes" is the honest word and the badge now uses it. `BARO` on its
        own claimed availability the flag does not carry — see `badgesOf`. */
-    baro: ["baro", "BARO SOMETIMES"],
+    /* "MAYBE" rather than "SOMETIMES", owner's word, 2026-09-05: it pairs with
+       `BARO — HERE NOW` in shape as well as in sense, so the two read as one
+       question answered two ways rather than as two unrelated badges. */
+    baro: ["baro", "BARO — MAYBE"],
     baronow: ["baronow", "BARO — HERE NOW"],
     founder: ["founder", "FOUNDER EXCLUSIVE"],
     special: ["special", "OTHER SOURCE"],
@@ -419,62 +440,34 @@
     return (it.relics || []).some((n) => (RELICS[n] || {}).baro);
   }
 
-  /* The buckets this item answers to RIGHT NOW.
-     ────────────────────────────────────────
-     `flags.baro` is the wiki's `[[Baro Ki'Teer|B]]` marker and means *he has
-     sold this Prime*, not *he is selling it*. Read once per build, it sat on
-     nine items while his live shelf covered two — and over his whole recorded
-     history **271 of 313 visits carried no relic at all**, so for most of any
-     fortnight the marker is true of nobody. A bucket is supposed to answer
-     "how do I get this", and "he might, one day" is not a route.
+  /* Two facts wear the name "Baro" and they are not the same one. `flags.baro`
+     is the wiki's marker — static, nine items, *he deals in this Prime*. His
+     shelf is a live feed that held one relic on 2026-09-04 covering two of the
+     nine, and 271 of his 313 recorded visits carried no relic at all.
 
-     So the marker is **a badge, and the bucket is the live shelf**. An item he
-     is not selling drops the `baro` bucket and answers to whatever else it has
-     — `farmable` for Lex Prime, `special` for Gotva — falling back to `vaulted`,
-     which is what the other seven actually are. `flags.baro` still drives both
-     badges and `statusOf`, so nothing about how a card is drawn or sorted moves,
-     and Gotva Prime keeps the ordering override that puts it above its wrong
-     wiki `(S)`.
+     **Both are kept, in different places.** The marker is an availability
+     bucket, because "Baro sells this sometimes" is a real long-term route and
+     is why these nine are not simply unobtainable — owner's call, 2026-09-05,
+     after a day of the other arrangement. The live shelf is carried by the
+     **badge**, and by the planner's crack list where it is actually actionable.
 
-     **This is the fix the conjunction was standing in for.** The rule that a
-     *sometimes* Prime needed *Vaulted* AND *Baro Ki'Teer* together existed
-     because one flag was doing two jobs; with the jobs separated the filter is
-     a plain OR again, which is what it is everywhere else.
+     **A third checkbox for "live Baro Primes" was considered and rejected.** It
+     would narrow nine items to at most three — his record over 313 visits, and
+     one is the usual number when there is any — while sitting empty twelve days
+     in fourteen, and it would be a box that is a strict subset of the box above
+     it, which none of the other seven are. The blue badge already picks those
+     items out of a list of nine, which is what a badge is for.
 
-     **It is recomputed per render and never cached**, because whether he is
-     here changes on the page's own clock — the same reason the badge can
-     re-label itself without a rebuild. `_buckets` is cached at load and cannot
-     hold this. */
-  function bucketsNow(it) {
-    if (!it._buckets.includes("baro") || baroSellingNow(it)) return it._buckets;
-    const rest = it._buckets.filter((b) => b !== "baro");
-    return rest.length ? rest : ["vaulted"];
-  }
-
-  /* Does box `k` cover this item, as the other boxes stand?
-     ─────────────────────────────────────────────────────
-     The counts read this so they cannot contradict the grid. Ticking *Baro
-     Ki'Teer* on its own reveals only what he is holding, so the number beside
-     it has to say two rather than nine — a box that claims nine and shows two
-     is the reader's original complaint moved up one line, and it is the shape
-     this whole change exists to remove.
-
-     It asks `bucketsNow`, so it cannot disagree with the grid: the number
-     beside a box is the items that box is holding on screen. Worth knowing
-     while reading it — `vaulted` is not a flag-driven bucket. `bucketsOf` falls
-     back to it only for an item with **no** other source, so 135 items carry
-     `flags.vaulted` and 113 have it as a bucket. That is why the seven Primes
-     Baro is not selling land in *Vaulted* when they drop his bucket, rather
-     than being counted twice. */
+     So both of the readers below are plain: an item is on screen while any box
+     it belongs to is ticked, and each number says what unticking that box would
+     stop covering. Two sources means counted twice, which is why these can add
+     up to more than the catalogue. */
   function coveredBy(it, k) {
-    return bucketsNow(it).includes(k);
+    return it._buckets.includes(k);
   }
 
-  /* Any bucket it answers to, not only the one it displays as: an item with two
-     sources is on screen while either box is ticked, and unticking Baro must not
-     take a farmable Prime with it just because Baro also sells it. */
   function passesAvail(it) {
-    return bucketsNow(it).some((b) => state.avail[b]);
+    return it._buckets.some((b) => state.avail[b]);
   }
 
   const VAULT_SOON_WHY =
