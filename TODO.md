@@ -241,7 +241,7 @@ observation rather than a precondition.
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
-| Targeted Aya is worth 100% and still cannot be a reason to go anywhere | **small — owner-reported 2026-09-06.** The 100/30 split already says targeted Aya *is* a wanted relic; `if (!n) return` discards that for every node the relic walk missed. One condition, plus the tooltip it makes false. The 30% banked case is correct as it stands |
+| ~~Targeted Aya is worth 100% and still cannot be a reason to go anywhere~~ | **shipped 2026-09-06**, the day it was reported — the guard is conditional on `ayaTargeting` now, and the reported screen went from 0 places to run to 46; `PROJECT.md §7` | done |
 | One Baro relic sends the stranded message to the trade-only branch | **small, and wrong on screen today** — a plan mixing Baro and Varzia relics is told to trade for two relics that are both on sale. A regression from the Baro work of 2026-09-04 |
 | A priority flag on the farm list | session |
 | The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
@@ -1246,7 +1246,7 @@ half of a decision it also states correctly further down. One sentence, and it
 is the reader-facing document, so it is worth doing deliberately rather than in
 passing.
 
-## Reported by the owner, 2026-09-06 — *Where to go* names Aya and then goes quiet
+## Reported by the owner, 2026-09-06 — one shipped, one open
 
 From a screenshot of the deployed planner: seven parts still needed, two relics
 that can supply them — **Axi M5** *from Baro* and **Meso E5** *from Varzia* —
@@ -1255,82 +1255,13 @@ sources, since I still need Meso E5?"*
 
 **Yes. Two separate defects, and the second was found while checking the first.**
 
-### Targeted Aya is worth 100% and still cannot be a reason to go anywhere
-
-**The owner's framing, 2026-09-06, and it is the correct one — an earlier draft
-of this entry had it as an unconsidered case, which is wrong.** The rule was
-considered and is already written down. It is the code that does not keep it:
-
-> If a Varzia/Resurgence part is on my list, we **DO** run nodes, just for the
-> Aya — that is why it is at 100%. What we do not run is Aya when it is **not**
-> on the planner list; that is why it gets 30% and is folded in with the others,
-> as long as I am missing a vaulted part.
-
-`plan.js` states exactly that, in the comment above the valuation, dated
-2026-09-04:
-
-> - a relic on your farm list is worth 100%, by definition
-> - Aya, while you are targeting Resurgence, is worth 100% too — one Aya *is*
->   one relic of your choosing, **so it is the same thing**
-> - Aya, when you are not, but vaulted Primes are still missing … is worth 30%
-> - Aya, with nothing vaulted missing and nothing in Resurgence you want, is 0
-
-`targeting` is computed and the discount applied:
-
-```js
-const targeting = ayaRotationLive && [...want.keys()].some(
-  (rname) => (RELICS[rname] || {}).resurgence);
-…
-if (!targeting) ayaValue *= M.AYA_BANKED_SHARE;   // 0.3
-```
-
-**And then the next block discards it for every node the relic walk did not
-already find:**
-
-```js
-const n = nodes.get(key);
-if (!n) return;                       // never adds a node, only inflates
-```
-
-So the two halves contradict each other. The comment says targeted Aya and a
-wanted relic **are the same thing**; the code makes one a destination and the
-other a garnish. In the owner's screenshot `targeting` was **true** — Meso E5 is
-in `want` and on the live shelf — Aya was therefore valued at **100%**, and the
-page still said **0 places to run**.
-
-**The 30% case needs no change and must not get one.** Banked Aya is exactly
-what `if (!n) return` is right for: you are not chasing it tonight, so it should
-raise a node you were already going to run and never create one. The guard is
-correct; it is simply unconditional.
-
-**So the fix is the condition, not the design.** `if (!n)` should add the node
-when `targeting`, and return when not. That is one branch, and it is what the
-value model already says out loud.
-
-Measured, for what it makes visible: **87 Aya rows over 48 distinct nodes**,
-1.88% to **43.48%** per run — the best being *Level 40–60 Cambion Drift*
-rotation A, roughly one Aya every 2.3 runs, and one Aya buys any relic on
-Varzia's shelf.
-
-**Two consequences to handle in the same change**, neither of them optional:
-
-- **The *Count Aya drops* tooltip becomes false and has to be rewritten.** It
-  currently promises *"it will never put an Aya-only bounty ahead of somewhere
-  carrying a part you actually need."* Under the rule above it sometimes must —
-  while targeting, an Aya bounty **is** carrying a part you need, in the form of
-  any relic you choose, and a 43.48% Aya can honestly outrank a 2% relic. The
-  sentence is right for the 30% case and wrong for the 100% one, so it needs to
-  say which it is describing.
-- **`noNodes` stops being reached in the targeting case**, because there will
-  now be nodes. Its Resurgence branch — *"Varzia sells them at Maroo's Bazaar
-  for Aya, which is farmed"* — currently names Aya as the route and then does
-  not say where to farm it, which was the sharpest form of this defect. Once
-  nodes are added it answers itself, and the branch should be checked rather
-  than deleted: it is still correct when *Count Aya drops* is switched **off**.
-
-**Size: small** — one condition, one tooltip, one message re-checked. It is a
-bug against a stated rule rather than a design question, so it needs no decision
-first.
+**The first shipped the same day** and its reasoning is in `PROJECT.md §7` under
+*Targeted Aya is a destination, which is what the model already said*. Short
+version: the 100/30 split already draws the line — targeted Aya is worth 100%
+because one Aya *is* one relic of your choosing — and an unconditional
+`if (!n) return` discarded it, so a targeted Aya could only garnish a node the
+relic walk had already found. Making that guard conditional turned the reported
+screen from **0 places to run** into **46**.
 
 ### One Baro relic sends the stranded message to the wrong branch
 

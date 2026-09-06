@@ -823,8 +823,47 @@
         if (!opts.railjack && isRailjack(a)) return;
         if (!opts.event && isEvent(a)) return;
         const key = `${a.planet}|${a.node}|${a.mode}`;
-        const n = nodes.get(key);
-        if (!n) return;                       // never adds a node, only inflates
+        let n = nodes.get(key);
+        if (!n) {
+          /* **Whether Aya may create a destination is exactly the 100/30 split
+             above, and this line used to ignore it.** It read
+             `if (!n) return; // never adds a node, only inflates`,
+             unconditionally — so a targeted Aya, valued at 100% because the
+             comment above says one Aya *is* one relic of your choosing and
+             therefore "the same thing", could only ever garnish a node the
+             relic walk had already found. When the walk found none, the reader
+             got *0 places to run* while `ayaValue` sat at full value and 48
+             Aya-dropping nodes went unmentioned. Reported by the owner
+             2026-09-06 from the deployed site, wanting Meso E5 off Varzia's
+             shelf.
+
+             So the guard is kept and made conditional, which is what the rule
+             already said:
+
+               - **targeting** — a relic on your farm list is on Varzia's live
+                 shelf. Aya is worth 100%, it is the same thing as that relic,
+                 and somewhere that drops it is a place to go. Add the node.
+               - **banked, 30%** — nothing you are chasing tonight is on the
+                 shelf, and Aya is worth something only against the vault at
+                 large. That must raise a node you were already going to run and
+                 never invent one, which is precisely what the old line did.
+
+             A node built here has no relic rows, so `M.creditRelics` — which
+             ran in the pass above — leaves `rotRelic` all zero. That is the
+             right answer rather than a gap: no relic on the list drops here,
+             which is what `ayaRots` below reads to say the rotations are worth
+             something for the Aya alone. */
+          if (!ayaTargeting) return;
+          n = { planet: a.planet, node: a.node, mode: a.mode, kind: a.kind,
+                lvl: a.lvl || null, event: isEvent(a), eventBounty: bountyEvent(a),
+                railjack: isRailjack(a), score: 0,
+                rot: { A: 0, B: 0, C: 0, none: 0 },
+                rotRelic: { A: 0, B: 0, C: 0, none: 0 },
+                cnt: { A: 0, B: 0, C: 0, none: 0 },
+                rows: { A: [], B: [], C: [], none: [] },
+                relics: new Map() };
+          nodes.set(key, n);
+        }
         const slot = { A: "A", B: "B", C: "C" }[String(a.rotation || "").toUpperCase()] || "none";
         const prev = byNode.get(key + "|" + slot);
         if (prev != null && prev >= (a.chance || 0)) return;
@@ -1981,10 +2020,27 @@
           ${n.event ? `<span class="tag">event</span>` : ""}
           <span class="fissure-slot" data-node="${esc(nodeKey(n))}"></span></div>
         <div class="spot-meta">${runTag(n)}${
-          n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"} · ${
-          `<span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
-            rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
-            rl.length === 1 ? "" : "s"}</span>`}${
+          n.lvl ? ` · level ${n.lvl[0]}–${n.lvl[1]}` : " · level unknown"}${
+          /* A node can now be here for the Aya alone — see the Aya block, where
+             a targeted Aya is allowed to add a destination because it is worth
+             the same as a relic on the list. Such a row has no relics to count,
+             and `0 relics` above an empty tooltip reads as a fault rather than
+             as the point of the row.
+
+             **Dropped rather than relabelled.** The first attempt said
+             `Aya only` here, which made the row read
+             `aya only · 4 rounds · level unknown · Aya only · aya` — three
+             sayings of one fact, and the same mistake `runTag` records having
+             made when it spliced the Aya rotations into the letters. Two
+             statements already carry this and both earn their place: `runTag`
+             names *which rotations* pay Aya and no relic, and the `aya` chip
+             names *the rate* and what an Aya buys. A count of nothing adds a
+             third voice and no third fact. */
+          rl.length
+            ? ` · <span class="relic-count" data-tip="${esc("Relics you want from here, best first:" + "\n" +
+                rl.map((r) => "  " + r).join("\n"))}">${rl.length} relic${
+                rl.length === 1 ? "" : "s"}</span>`
+            : ""}${
           /* One line each. These markers exist to say a short thing - the
              reasoning behind each lives under *How this works*, where it can be
              read once instead of hovered eight times. */

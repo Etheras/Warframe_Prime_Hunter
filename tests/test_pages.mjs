@@ -3652,13 +3652,96 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.match(await page.locator("#planRelics .from-varzia").first().innerText(),
                /from Varzia/i, "the badge names where the relic comes from");
 
+  /* **The empty case is now conditional, and the condition is the Aya switch.**
+     Until 2026-09-06 a Resurgence Prime produced an empty ranking whatever the
+     options said, and this test asserted that flatly with the reason "ranking a
+     place to run them would be invented". Half of that was right and half was
+     not: ranking a place to run *these relics* would indeed be invented, but
+     ranking a place to farm the **Aya that buys them** is not — it is the
+     owner's stated rule, where a targeted Aya is worth 100% because one Aya is
+     one relic of your choosing.
+
+     So the silence is asserted where it is still correct — *Count Aya drops*
+     **off**, which cannot send anyone anywhere — and the message, which is what
+     this test was really protecting, is unchanged and still has to be true. */
+  await setCheck(page, "#p-aya", false);
   assert.equal(await page.locator("#planNodes .spot").count(), 0,
-               "these relics have no sources, so ranking a place to run them would be invented");
+               "with Aya not counted there is nothing here at all: these relics do not drop");
   const why = await page.locator("#planNodes .nowhere").innerText();
   assert.match(why, /Prime Resurgence/,
                `the reader has to be told why: ${why}`);
   assert.ok(!/relics drop, but nowhere you can reach/.test(why),
             "they do not drop at all — that message is true of a different situation");
+  assert.deepEqual(errors, []);
+});
+
+page_test("a relic on Varzia's shelf makes the Aya somewhere to go, not just a bonus", async () => {
+  /* Reported by the owner 2026-09-06 from the deployed site: seven parts still
+     needed, two relics that could supply them, and **0 places to run** — while
+     one of those relics was on Varzia's shelf and Aya buys any relic she is
+     selling.
+
+     The rule this pins is the owner's own, and `plan.js` had it written down
+     above the valuation before it was enforced below it: a relic on your farm
+     list is worth 100%; Aya while you are targeting Resurgence is worth 100%
+     too, "so it is the same thing"; Aya when you are not is worth 30% and is a
+     bonus rather than a destination. The 100% half was computed and then
+     discarded by an unconditional `if (!n) return`.
+
+     The subject is chosen from the payload, never from the code under test: a
+     Prime with **no farmable relic at all** — so the relic walk can find
+     nothing and any node on screen must have come from the Aya — at least one
+     of whose relics Varzia is selling today, which is what makes it targeted. */
+  const { page, errors } = await open("/plan.html");
+  const subject = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const shelf = new Set(Object.keys(D.relics).filter((n) => D.relics[n].resurgence));
+    const it = (D.items || []).find((i) =>
+      !(i.flags || {}).farmable && (i.relics || []).some((r) => shelf.has(r)));
+    if (!it) return null;
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
+    return it.name;
+  });
+  /* Asserted rather than skipped. Varzia's rotations are contiguous — DE publish
+     Activation and Expiry back to back — so a build with an empty shelf is a
+     build that failed to read one. */
+  assert.ok(subject, "Varzia always stocks a rotation, so there is always a subject");
+  await page.reload({ waitUntil: "load" });
+
+  const spots = page.locator("#planNodes .spot");
+  assert.ok(await spots.count() > 0,
+            `${subject} has no farmable relic and one of its relics is on the shelf, ` +
+            `so the Aya that buys it is somewhere to go`);
+
+  /* Every row here has to be an Aya row, because nothing else could have put
+     one on screen — and each has to say so, or the reader is being sent
+     somewhere with no stated reason. */
+  const chips = await page.evaluate(() =>
+    [...document.querySelectorAll("#planNodes .spot")].map((el) => ({
+      aya: !!el.querySelector(".aya"),
+      count: (el.querySelector(".relic-count") || {}).textContent || "",
+      meta: el.querySelector(".spot-meta").textContent.replace(/\s+/g, " ").trim(),
+    })));
+  assert.ok(chips.every((c) => c.aya),
+            "a row that exists only because of the Aya must carry the aya chip");
+  /* The defect this replaced: a node with nothing on your list dropping there
+     rendered `0 relics` over an empty tooltip. It says nothing now, because
+     `runTag` and the `aya` chip already say it twice between them. */
+  assert.ok(chips.every((c) => !/\d+ relics?/.test(c.count)),
+            `a node with no wanted relic must not count them: ` +
+            chips.map((c) => c.count).join(" | "));
+  assert.ok(chips.some((c) => /aya only/i.test(c.meta)),
+            `runTag has to say the rotations pay Aya and no relic: ` +
+            chips.map((c) => c.meta).join(" | "));
+
+  /* And the switch is what makes the difference — with Aya not counted, the
+     same list has nowhere to send you. This is the half that proves the rows
+     above came from the Aya rather than from anything else. */
+  await setCheck(page, "#p-aya", false);
+  assert.equal(await spots.count(), 0,
+               "with Count Aya drops off, a Resurgence-only list has nowhere to go");
+  await setCheck(page, "#p-aya", true);
+  assert.ok(await spots.count() > 0, "and switching it back on restores them");
   assert.deepEqual(errors, []);
 });
 

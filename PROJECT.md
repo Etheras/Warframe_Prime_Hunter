@@ -6758,6 +6758,75 @@ properly, and fixed in one of the two places it occurred. A defect that has
 already been named and repaired somewhere in the tree is the easiest kind to walk
 past, because searching for the *bug* finds the fix and stops.
 
+### Targeted Aya is a destination, which is what the model already said
+
+Reported by the owner on 2026-09-06 from the deployed planner: seven parts still
+needed, two relics that could supply them — Axi M5 from Baro, **Meso E5 from
+Varzia** — and **0 places to run**. *"Shouldn't Where to go have Aya sources,
+since I still need Meso E5?"*
+
+**The rule was already written down. The code did not keep it.** `plan.js` has
+carried the owner's four bullets above the Aya valuation since 2026-09-04:
+
+> - a relic on your farm list is worth 100%, by definition
+> - Aya, while you are targeting Resurgence, is worth 100% too — one Aya *is*
+>   one relic of your choosing, **so it is the same thing**
+> - Aya, when you are not, but vaulted Primes are still missing … is worth 30%
+> - Aya, with nothing vaulted missing and nothing in Resurgence you want, is 0
+
+`targeting` was computed, the 30% discount applied only when it was false — and
+then the next block threw the distinction away:
+
+```js
+const n = nodes.get(key);
+if (!n) return;                       // never adds a node, only inflates
+```
+
+So the two halves contradicted each other. The comment said targeted Aya and a
+wanted relic **are the same thing**; the code made one a destination and the
+other a garnish. In the reported case `targeting` was **true** — Meso E5 was on
+the shelf and on the list — Aya was valued at 100%, and the page still said
+nowhere to go while 48 Aya-dropping nodes went unmentioned.
+
+**The fix is one condition, and the 30% case keeps the old guard**, because for
+banked Aya the old guard is exactly right: you are not chasing it tonight, so it
+should lift a node you were already going to run and never invent one.
+
+Measured on the reported list — Magnus, Akmagnus and Euphona Prime:
+
+| | before | after |
+|---|---|---|
+| places to run | **0** | **46**, 8 genuinely different |
+| top rows | — | Mithra (Interception), Mot (Survival), Cambion Drift Bounty |
+
+**Two consequences handled in the same change, and one of them was a repetition
+this project has made before.** The first attempt labelled the new rows'
+relic-count chip `Aya only`, which made the row read
+`aya only · 4 rounds · level unknown · Aya only · aya` — **three sayings of one
+fact**, and precisely the mistake `runTag` already records having made when it
+spliced the Aya rotations into the rotation letters. The chip was **dropped**
+rather than relabelled: `runTag` names which rotations pay Aya and no relic, the
+`aya` chip names the rate and what an Aya buys, and a count of nothing is a third
+voice with no third fact. Removing it left a stray `·`, which is the sort of
+thing only looking at the rendered row catches.
+
+The second was the *Count Aya drops* tooltip, which promised *"it will never put
+an Aya-only bounty ahead of somewhere carrying a part you actually need."* That
+is true of the 30% case and **false of the 100% one** — while targeting, an Aya
+bounty *is* carrying a part you need, in the form of any relic you choose, and a
+43.48% Aya can honestly outrank a 2% relic. It now states both cases in a table
+rather than one of them as a rule.
+
+**One existing test changed its assertion, deliberately**, and it is worth saying
+which. *"A Prime Resurgence Prime … is told why there is nowhere to run"*
+asserted a flatly empty ranking, with the reason *"ranking a place to run them
+would be invented"*. Half of that was right: ranking a place to run **these
+relics** would be invented; ranking a place to farm the **Aya that buys them** is
+not. The silence is now asserted with *Count Aya drops* **off**, which is the
+state that still genuinely cannot send anyone anywhere, and the message it was
+really protecting is untouched. A new test pins the other half and was verified
+red against the old guard.
+
 ---
 
 ## 8. Gotchas discovered while building
