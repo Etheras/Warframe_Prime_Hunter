@@ -241,6 +241,8 @@ observation rather than a precondition.
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
+| *Where to go* names Aya as the route and never says where to farm it | **session — owner-reported 2026-09-06.** Aya can only inflate a node the relic walk already found, so 48 Aya nodes are invisible whenever the ranking is empty. Three shapes proposed; the decision is which |
+| One Baro relic sends the stranded message to the trade-only branch | **small, and wrong on screen today** — a plan mixing Baro and Varzia relics is told to trade for two relics that are both on sale. A regression from the Baro work of 2026-09-04 |
 | A priority flag on the farm list | session |
 | The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
 | ~~Kavasa Prime Collar's search rows stutter its name~~ | **finished 2026-09-05** — the search rows already used `partLabel`; the *Still needed* rows did not, and now do |
@@ -1243,6 +1245,103 @@ screen was changed to say *reward* then — so the README is carrying the older
 half of a decision it also states correctly further down. One sentence, and it
 is the reader-facing document, so it is worth doing deliberately rather than in
 passing.
+
+## Reported by the owner, 2026-09-06 — *Where to go* names Aya and then goes quiet
+
+From a screenshot of the deployed planner: seven parts still needed, two relics
+that can supply them — **Axi M5** *from Baro* and **Meso E5** *from Varzia* —
+and **0 places to run**. The owner's question: *"Shouldn't Where to go have Aya
+sources, since I still need Meso E5?"*
+
+**Yes. Two separate defects, and the second was found while checking the first.**
+
+### Aya can raise a node's score but can never be a reason to go anywhere
+
+`assets/plan.js`, in the Aya block, with the answer written on the line itself:
+
+```js
+const n = nodes.get(key);
+if (!n) return;                       // never adds a node, only inflates
+```
+
+Aya is folded onto nodes the **relic walk** already found. When the walk finds
+none — which is exactly the screenshot — there is nothing to fold onto, so the
+ranking is empty and the 48 Aya-dropping nodes in the payload are invisible.
+
+Measured from `data/prime-data.json`: **87 Aya rows over 48 distinct nodes**,
+chances from 1.88% to **43.48%** per run. The best are bounties — *Level 40–60
+Cambion Drift*, rotation A, 43.48% — so roughly one Aya every 2.3 runs, and
+**one Aya buys any relic on Varzia's shelf**, Meso E5 included.
+
+**The rule that produced this is deliberate and is right in its own case.** The
+*Count Aya drops* tooltip states it: *"It only ever raises the value of a node
+you were already going to run — it will never put an Aya-only bounty ahead of
+somewhere carrying a part you actually need."* That is the correct call when
+there **is** somewhere carrying a part you need. It has no case for when there
+is not, and it was never given one.
+
+**The sharpest version of the defect is in the message the page shows instead**,
+because the correct branch has the same hole. When every wanted relic is a
+Resurgence one, `noNodes` says: *"Varzia sells them at Maroo's Bazaar for
+**Aya**, which is farmed."* So the page **names Aya as the route and then
+declines to say where to farm it** — in the one situation where that is the only
+thing the reader still needs to know. The data to answer it is already on the
+payload and already parsed.
+
+Three shapes, and the third is probably right:
+
+1. **Let Aya add nodes when nothing else can** — seed the ranking from
+   `DATA.aya` only where `nodes` is empty. Smallest, and preserves the rule
+   above untouched, but it makes the list mean two different things depending
+   on whether it is empty.
+2. **Let Aya add nodes always**, ranked on Aya value like anything else. Cleanest
+   model, and it reverses a decision made deliberately — an Aya bounty could then
+   appear above a node carrying a part, which is what the rule exists to prevent.
+3. **A separate, labelled *Where to farm Aya* list** beneath the message, shown
+   only when Aya is the answer. Disturbs no ranking, keeps the rule intact, and
+   answers the question the message raises. More markup, no model change.
+
+**Size: session** for any of the three; the decision is which.
+
+### One Baro relic sends the stranded message to the wrong branch
+
+Found while checking the above, and it is **on screen in the owner's screenshot
+right now**. `noNodes` tests its two branches in order:
+
+```js
+if (rp.length && rp.every((n) => (RELICS[n] || {}).resurgence)) { …Varzia/Aya… }
+if (rp.length && rp.every((n) => (RELICS[n] || {}).vaulted))    { …trade-only… }
+```
+
+The reader's plan holds two relics. Checked against today's payload:
+
+| relic | `resurgence` | `vaulted` | `baro` | really |
+|---|---|---|---|---|
+| Meso E5 | **true** | true | false | on Varzia's shelf now, for Aya |
+| Axi M5 | false | **true** | **true** | on Baro's counter now, for Ducats |
+
+So `every(resurgence)` fails on Axi M5, the first branch is skipped, and
+`every(vaulted)` passes — both are vaulted — so the page prints **"They have to
+be traded for."**
+
+**Neither of them has to be traded for. Both are on sale today**, and the *How
+to crack them* panel two inches away says so in its own badges: `FROM BARO`,
+`FROM VARZIA`. Ducats and Aya are both farmed, which is the whole reason they
+are in scope under hard rule 10.
+
+**This is a regression from recent work rather than an old bug.** Before Baro's
+relic entered `relicPlan` (2026-09-04), a Resurgence-only plan reached the first
+branch correctly. A plan mixing **Baro + Varzia** did not exist to be got wrong.
+`every(resurgence)` was the right test for a two-way world and is the wrong one
+now that a relic can be purchasable without being Varzia's.
+
+**The fix is the test, not the message**: the branch wants *"is every wanted
+relic obtainable without trading"* — `resurgence || baro` — and the message
+wants to name whichever of the two applies, or both. The third branch's *"no
+drop, no Baro, no Varzia"* wording at `plan.js:1770` already states the correct
+three-way condition and can be read as the model for it. **Size: small**, and it
+is a wrong sentence on screen rather than a design question, so it does not need
+the decision above to be settled first.
 
 ## Defects found by the documentation sweep of 2026-08-15
 
