@@ -3675,6 +3675,125 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.deepEqual(errors, []);
 });
 
+page_test("a relic on sale is never described as one you have to trade for", async () => {
+  /* Owner-reported 2026-09-06 from the deployed site. `noNodes` tested
+     `every(resurgence)` before `every(vaulted)`, which was the right test while
+     Varzia was the only counter in the game. Baro's relic arrived on 2026-09-04
+     and his relics are `vaulted` and **not** `resurgence`, so one of them failed
+     the first branch and dropped the whole plan into the second — which told a
+     reader holding a Baro relic and a Varzia relic to go and **trade** for two
+     things that were both on sale that afternoon, with `FROM BARO` and
+     `FROM VARZIA` badges rendered two inches away.
+
+     Everything here is staged rather than read live: Baro is on the relay two
+     days a fortnight and his real window expires while this is being written,
+     so a test that waited for him would pass today and hang tomorrow. The
+     subjects are still chosen by a payload property — non-farmable Primes with
+     exactly ONE relic, so the whole plan is that relic and the branch under test
+     is the one that fires.
+
+     `Count Aya drops` is switched off throughout. With it on, a Varzia relic on
+     the list now generates Aya nodes (see the test below), and `noNodes` is not
+     reached at all — which is correct, and not what this test is about. */
+  const { page } = await open("/plan.html");
+  const picked = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const solo = (D.items || []).filter((i) =>
+      (i.relics || []).length === 1 && !(i.flags || {}).farmable);
+    return solo.length >= 2
+      ? { baroItem: solo[0].id, baroRelic: solo[0].relics[0],
+          shelfItem: solo[1].id, shelfRelic: solo[1].relics[0],
+          names: [solo[0].name, solo[1].name] }
+      : null;
+  });
+  assert.ok(picked, "need two non-farmable Primes with a single relic each to stage");
+
+  /* One relic on Baro's counter, one on Varzia's shelf, every other flag of
+     either kind cleared so the real rotation cannot leak into the scenario.
+     Same shape as the two Baro stagings above — a third copy, which is worth
+     folding into a helper the next time one of these is written. */
+  await page.addInitScript(([bRelic, sRelic]) => {
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) {
+        if (next && next.relics) {
+          Object.keys(next.relics).forEach((n) => {
+            next.relics[n].baro = false; next.relics[n].resurgence = false;
+          });
+          if (next.relics[bRelic]) next.relics[bRelic].baro = true;
+          if (next.relics[sRelic]) next.relics[sRelic].resurgence = true;
+        }
+        if (next && next.meta) {
+          /* Read per load rather than baked in, so the "he has left" case needs
+             no second `addInitScript`. Wrapping the property a second time was
+             the first attempt and it corrupted the payload outright — the page
+             fell through to a branch about quest sources, which is a fault in
+             the staging wearing the costume of a fault in the code. */
+          let exp = "2099-01-01T00:00:00.000Z";
+          try { exp = localStorage.getItem("__baroExpiry") || exp; } catch (e) { /* private mode */ }
+          next.meta.baro = { activation: "2000-01-01T00:00:00.000Z", expiry: exp,
+                             node: "EarthHUB", character: "Baro'Ki Teel" };
+        }
+        held = next;
+      },
+    });
+  }, [picked.baroRelic, picked.shelfRelic]);
+
+  const plan = async (ids) => {
+    await page.evaluate((v) =>
+      localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(v)), ids);
+    await page.reload({ waitUntil: "load" });
+    await setCheck(page, "#p-aya", false);
+    assert.equal(await page.locator("#planNodes .spot").count(), 0,
+                 "these relics do not drop, so there must be nothing ranked");
+    return page.locator("#planNodes .nowhere").innerText();
+  };
+
+  // Baro alone: his relic is on the counter now, so it is bought, not traded.
+  const baroOnly = await plan([picked.baroItem]);
+  /* Asserted on `no other route`, which is the trade-only branch's own
+     fingerprint, rather than on the words "traded for" — the new wording says
+     "none of them has to be traded for", which contains the phrase while
+     denying it. The first version of this test matched the denial and failed
+     against a correct message. */
+  assert.ok(!/no other route/i.test(baroOnly),
+            `a relic on Baro's counter is not one you have to trade for: ${baroOnly}`);
+  assert.match(baroOnly, /Baro/, `and he has to be named: ${baroOnly}`);
+  assert.match(baroOnly, /Ducat/i, `with the currency, which is farmed: ${baroOnly}`);
+
+  /* The reported case: one of each. This is the combination that had no branch
+     of its own — `every(resurgence)` failed on Baro's relic and sent it to the
+     trade-only wording. */
+  const both = await plan([picked.baroItem, picked.shelfItem]);
+  assert.ok(!/no other route/i.test(both),
+            `neither of these has to be traded for: ${both}`);
+  assert.match(both, /Baro/, `Baro holds one of them: ${both}`);
+  assert.match(both, /Varzia/, `Varzia holds the other: ${both}`);
+
+  /* And the wording still reverts on its own when he leaves — `isBaro` reads
+     the page's clock, not the build, so this needs no rebuild to become true
+     again. Expire him and the same list is trade-only, correctly. */
+  await page.evaluate(() =>
+    localStorage.setItem("__baroExpiry", "2000-01-02T00:00:00.000Z"));
+  const gone = await plan([picked.baroItem]);
+  assert.ok(!/Baro/.test(gone),
+            `once he has left, nothing may send the reader to look for him: ${gone}`);
+
+  /* **What that message says instead is wrong, and it is a different defect.**
+     This asserted `no other route` first and failed, which is how the third one
+     was found. `wantedIndex` does not mark an item stranded when it carries
+     `flags.baro` — reasonably, since Baro is *a* route — so once he leaves,
+     `relicPlan` drops his relic altogether, `rp` is empty, both buyable
+     branches are skipped and the page falls through to "These relics drop, but
+     nowhere you can reach". They do not drop: `Axi M5` has `sourceCount: 0`.
+
+     Not fixed here, because it is `wantedIndex`'s filter rather than this
+     wording, and it is recorded in `TODO.md`. What is pinned is the half this
+     change is responsible for: the moment he goes, the page stops naming him. */
+});
+
 page_test("a relic on Varzia's shelf makes the Aya somewhere to go, not just a bonus", async () => {
   /* Reported by the owner 2026-09-06 from the deployed site: seven parts still
      needed, two relics that could supply them, and **0 places to run** — while

@@ -242,7 +242,8 @@ observation rather than a precondition.
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | ~~Targeted Aya is worth 100% and still cannot be a reason to go anywhere~~ | **shipped 2026-09-06**, the day it was reported — the guard is conditional on `ayaTargeting` now, and the reported screen went from 0 places to run to 46; `PROJECT.md §7` | done |
-| One Baro relic sends the stranded message to the trade-only branch | **small, and wrong on screen today** — a plan mixing Baro and Varzia relics is told to trade for two relics that are both on sale. A regression from the Baro work of 2026-09-04 |
+| ~~One Baro relic sends the stranded message to the trade-only branch~~ | **fixed 2026-09-06** — the branch asks `resurgence \|\| isBaro` and there are three wordings; `PROJECT.md §7` | done |
+| When Baro leaves, the same list claims its relics drop | **small to change, session to verify** — found 2026-09-06 testing the above. `wantedIndex` reads the static `flags.baro` marker where it wants his live counter, so his relic is filtered out of the crack list and the fall-through message is wrong. Same seam the collection page settled on 2026-09-05 |
 | A priority flag on the farm list | session |
 | The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
 | ~~Kavasa Prime Collar's search rows stutter its name~~ | **finished 2026-09-05** — the search rows already used `partLabel`; the *Still needed* rows did not, and now do |
@@ -1295,13 +1296,48 @@ branch correctly. A plan mixing **Baro + Varzia** did not exist to be got wrong.
 `every(resurgence)` was the right test for a two-way world and is the wrong one
 now that a relic can be purchasable without being Varzia's.
 
-**The fix is the test, not the message**: the branch wants *"is every wanted
-relic obtainable without trading"* — `resurgence || baro` — and the message
-wants to name whichever of the two applies, or both. The third branch's *"no
-drop, no Baro, no Varzia"* wording at `plan.js:1770` already states the correct
-three-way condition and can be read as the model for it. **Size: small**, and it
-is a wrong sentence on screen rather than a design question, so it does not need
-the decision above to be settled first.
+**Fixed 2026-09-06**, reasoning in `PROJECT.md §7` under *A relic on sale is not
+one you have to trade for*. The branch asks `resurgence || isBaro` now and there
+are three wordings rather than one — Varzia's unchanged, one for Baro, one for
+both. Baro is asked through `isBaro`, which reads the page's clock, so it
+reverts on its own when he leaves.
+
+### When Baro leaves, his relic stops being mentioned at all — and the message goes wrong
+
+**Found 2026-09-06 while testing the fix above, and it is a different defect in
+a different function.** The test asserted that once Baro's window closes the
+same list reads as trade-only again. It does not. It reads:
+
+> These relics drop, but nowhere you can reach — every source is a quest or
+> something the model cannot rank yet.
+
+**They do not drop.** `Axi M5` has `sourceCount: 0`.
+
+The cause is in `wantedIndex`, not in the wording. An item is marked *stranded*
+— which is what lets its vaulted relics through the crack-list filter — only
+when it has no route of any kind:
+
+```js
+if (!buyable && !f.baro && !f.special && !f.founder && !f.permanent) {
+  mine.forEach((n) => stranded.add(n));
+}
+```
+
+`flags.baro` is a **static wiki marker** meaning *Baro has sold this at some
+point*, so Akmagnus Prime carries it permanently. While he is on the relay
+`buyable` is true and everything works. The fortnight he is away, `buyable`
+goes false — but `f.baro` is still true, so the item is **not** stranded, its
+relic is filtered out of `relicPlan`, `rp` is empty, both buyable branches are
+skipped, and the fall-through claims the relics drop.
+
+**This is the same static-marker-versus-live-shelf seam as the collection
+page's Baro bucket**, settled 2026-09-05 (`PROJECT.md §7`, *The wiki's Baro
+marker is a badge, and his box is his counter*). The filter here is still
+reading the badge where it wants the counter. The candidate fix is to drop
+`f.baro` from that condition — an item whose only route is a trader who is not
+here is stranded in exactly the sense this Set means — but it changes what the
+crack list shows for eight items for twelve days a fortnight, so it wants
+checking rather than assuming. **Size: small to change, session to verify.**
 
 ## Defects found by the documentation sweep of 2026-08-15
 

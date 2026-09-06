@@ -1398,11 +1398,48 @@
        "nowhere you can reach" names a problem the reader does not have and
        hides the answer, which is sitting in the list beside it. */
     const rp = Array.from((relicPlan || new Map()).keys());
-    if (rp.length && rp.every((n) => (RELICS[n] || {}).resurgence)) {
+    /* **The test is "can I buy this without trading", not "is this Varzia's".**
+       It was `every(resurgence)` until 2026-09-06, which was the right test for
+       as long as Varzia was the only counter in the game. Baro's relic arrived
+       on 2026-09-04 and broke it: his relics are `vaulted` and **not**
+       `resurgence`, so a single one of them failed this branch and dropped the
+       whole plan into the trade-only branch below — which then told a reader
+       holding a Baro relic and a Varzia relic to go and **trade** for two things
+       that were both on sale that afternoon. Reported by the owner from the
+       deployed site, with `FROM BARO` and `FROM VARZIA` badges visible two
+       inches from the sentence denying them.
+
+       Baro is asked through `isBaro`, which gates on the page's own clock as
+       well as the build's manifest, so this reverts to the trade-only wording
+       the moment he leaves the relay and without a rebuild — the same rule the
+       crack list follows. */
+    const onShelf = (n) => !!(RELICS[n] || {}).resurgence;
+    const atBaro = (n) => isBaro(n);
+    if (rp.length && rp.every((n) => onShelf(n) || atBaro(n))) {
+      const varzia = rp.some(onShelf), baro = rp.some(atBaro);
+      /* Three sentences rather than one assembled from parts, because each
+         names a different errand and a reader with nothing of Baro's should not
+         be sent to look for him. The Varzia-only wording is unchanged from
+         before this fix — it was right, it names the programme the reader sees
+         in game, and a test pins it. */
+      if (varzia && !baro) {
+        return `<p class="nowhere">Nothing to run — every relic you still need is
+          <b>Prime Resurgence</b>. Varzia sells them at Maroo's Bazaar for
+          <b>Aya</b>, which is farmed, and <i>How to crack them</i> beside this
+          says what to do with them once you have them.</p>`;
+      }
+      if (baro && !varzia) {
+        return `<p class="nowhere">Nothing to run — every relic you still need is
+          <b>vaulted</b>, but <b>Baro Ki'Teer</b> is on the relay with them now,
+          for <b>Ducats</b>, which are farmed. <i>How to crack them</i> beside
+          this says what to do with them once you have them — and he leaves with
+          his stock, so this is the fortnight to do it.</p>`;
+      }
       return `<p class="nowhere">Nothing to run — every relic you still need is
-        <b>Prime Resurgence</b>. Varzia sells them at Maroo's Bazaar for
-        <b>Aya</b>, which is farmed, and <i>How to crack them</i> beside this
-        says what to do with them once you have them.</p>`;
+        <b>vaulted</b>, and none of them has to be traded for: <b>Varzia</b> has
+        some at Maroo's Bazaar for <b>Aya</b> and <b>Baro Ki'Teer</b> has the
+        rest on the relay for <b>Ducats</b>. Both are farmed, and <i>How to crack
+        them</i> beside this says which relic is on which counter.</p>`;
     }
     /* The other way to have nothing to run: everything left is vaulted and the
        Prime has no other route, so the relics are trade-only. Same shape of

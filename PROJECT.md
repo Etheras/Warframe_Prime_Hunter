@@ -6827,6 +6827,56 @@ state that still genuinely cannot send anyone anywhere, and the message it was
 really protecting is untouched. A new test pins the other half and was verified
 red against the old guard.
 
+### A relic on sale is not one you have to trade for
+
+Owner-reported 2026-09-06 in the same screenshot as the Aya defect above.
+`noNodes` tested its two branches in order:
+
+```js
+if (rp.every((n) => (RELICS[n] || {}).resurgence)) { …Varzia, for Aya… }
+if (rp.every((n) => (RELICS[n] || {}).vaulted))    { …trade-only… }
+```
+
+The reader's plan held **Meso E5** (Varzia's, `resurgence`) and **Axi M5**
+(Baro's, `vaulted` but *not* `resurgence`). Axi M5 failed the first test, so the
+whole plan fell into the second and the page said **"They have to be traded
+for."** Both were on sale that afternoon, and the *How to crack them* panel two
+inches away was rendering `FROM BARO` and `FROM VARZIA` badges saying so.
+
+**A regression rather than an old bug.** `every(resurgence)` was the correct
+question for as long as Varzia was the only counter in the game. Baro's relic
+arrived on 2026-09-04 and made "purchasable" wider than "Varzia's", and this
+branch was not revisited — the combination simply had not existed before.
+
+The branch now asks *"is every wanted relic obtainable without trading"* —
+`resurgence || isBaro` — and there are **three wordings instead of one**: Varzia
+alone (unchanged, and a test pins that it still names *Prime Resurgence*), Baro
+alone, and both. Baro is asked through `isBaro`, which gates on the **page's**
+clock as well as the build's manifest, so the wording reverts on its own when he
+leaves the relay, with no rebuild — the same rule the crack list already
+follows.
+
+**Two things the test found that the fix did not.**
+
+The first was my own assertion. It checked the message did not contain
+*"traded for"*, and the new wording is *"none of them **has to be traded
+for**"* — a denial that contains the phrase it denies. It now asserts on
+`no other route`, which is the trade-only branch's own fingerprint and is the
+claim actually being contradicted. **A negative assertion on prose has to match
+the claim, not the vocabulary.**
+
+The second is a **real defect that is still open**, and the test is what
+surfaced it: once Baro's window closes, the same list does *not* revert to
+trade-only. It falls further, to *"These relics drop, but nowhere you can
+reach"* — and `Axi M5` has `sourceCount: 0`, so that is false. The cause is in
+`wantedIndex`, where an item is only marked *stranded* if `!f.baro`, and
+`flags.baro` is the **static wiki marker** meaning "he has sold this at some
+point" rather than "he has it now". So the item is never stranded, its relic is
+filtered out of `relicPlan`, `rp` is empty and both buyable branches are
+skipped. It is the same static-marker-versus-live-shelf seam the collection
+page's Baro bucket settled the day before, still unfixed one function away, and
+it has its own `TODO.md` entry.
+
 ---
 
 ## 8. Gotchas discovered while building
