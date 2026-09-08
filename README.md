@@ -619,15 +619,20 @@ does not already have, so the usual answer is "nothing new" and no data at all �
 then rebuilds from what is on disk in about a second and a half. A full download
 only happens when Digital Extremes actually publish something.
 
-Ten minutes rather than daily because of the **fissures**: the planner marks which
-of the places it is sending you is a fissure right now, and only ever marks ones
-that have not expired. A fissure runs an hour or two, so those badges are exactly as
-fresh as this task — every ten minutes they are as good as live, daily there are
-never any.
+**Ten minutes was for the fissures, and since 2026-09-08 it no longer has to be.**
+The page asks for the live fissure list itself every two minutes while it is
+open, so the badges are current whatever this task is doing — see *Fissures look
+after themselves* above. What the task still refreshes is everything else: a new
+Prime, a vault rotation, Baro's shelf, Prime Resurgence. Those move a few times a
+year, so **daily is a perfectly reasonable setting now** (`-EveryHours 24`), and
+ten minutes is a cheap habit rather than a requirement.
 
-That is well inside what the source asks for. The fissure list is served with a
-two-minute cache lifetime of its own, so this asks five times *less* often than the
-API is happy to answer, and asks conditionally on top of that.
+It stays the default for one reason: the file the task writes is what the page
+falls back to when it cannot reach WFCD, and a fallback that is ten minutes old
+is worth more than one that is a day old. That is well inside what the source
+asks for either way — the fissure list is served with a two-minute cache lifetime
+of its own, so this asks five times *less* often than the API is happy to answer,
+and asks conditionally on top of that.
 
 The task runs at **two minutes past** each ten-minute mark rather than on it, and
 that is on purpose. The things that change on a schedule in this game change on
@@ -846,13 +851,15 @@ Pages needs a **public** repo on the free plan.
 republishes the site — so it stays up to date whether or not your PC is switched on,
 and the data still never enters the repository.
 
-**And it refreshes the fissures every ten minutes.** That used to be the one thing
-the published copy could not do: fissures turn over every hour or two, so a site
-rebuilt once a day always found them expired and marked nothing. A second, much
-lighter run now takes the slow-moving data straight from the build cache and fetches
-only the fissure list, so the published planner marks tonight's fissures the same
-way a local copy does. Your own scheduled task is now a preference rather than a
-necessity.
+**And the published copy shows live fissures without being rebuilt for them.**
+That used to be the one thing it could not do: fissures turn over every hour or
+two, so a site rebuilt once a day always found them expired and marked nothing.
+**Since 2026-09-08 the page asks for the list itself**, every two minutes, so the
+published planner marks tonight's fissures the same way a local copy does — see
+*Fissures look after themselves*. A second, much lighter workflow run still
+refreshes the published fissure file from the build cache every ten minutes, and
+that is now the fallback rather than the mechanism. Your own scheduled task is a
+preference rather than a necessity.
 
 Worth knowing: GitHub's schedules are best-effort, and in practice that is a
 large gap rather than a small one. Measured on this repository over ten days:

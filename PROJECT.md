@@ -1152,7 +1152,7 @@ Warframe Prime Hunter/
 ├── data/
 │   ├── prime-data.js    ← GENERATED — window.WFPRIME_DATA = {...}
 │   ├── prime-data.json  ← GENERATED — same payload as plain JSON
-│   └── fissures.json    ← GENERATED — just the fissures, re-read every 10 min
+│   └── fissures.json    ← GENERATED — just the fissures; the page's fallback
 ├── .github/workflows/
 │   ├── publish.yml         ← daily full rebuild + a ten-minute fissure refresh
 │   └── wiki.yml            ← regenerates the GitHub wiki from the docs
@@ -1230,7 +1230,7 @@ whole directory it is pointed at, with browsable listings.
 For this folder that meant **`.git`**, pack files included, from which a private
 repository can be reconstructed; plus `.cache/`, `tools/` and `tests/`. So it
 serves an **allowlist** instead: the ten files the two pages ask for — both pages,
-six assets, the dataset, and `data/fissures.json` for the ten-minute re-read —
+six assets, the dataset, and `data/fissures.json` for the page's fallback poll —
 plus flat files under `assets/img/`, and nothing else. An
 allowlist rather than a blocklist
 deliberately — a blocklist has to predict what is worth hiding, and `.git` was
@@ -2400,7 +2400,9 @@ could only ever *lose* badges: it re-reads a list fixed at page load, so it reti
 fissures as they close and never hears about one that opened since. `build_data.py`
 now also writes **`data/fissures.json`** — the same list on its own, four kilobytes
 beside a 1.9 MB payload — and `shared.js` re-reads it every ten minutes, on load, and
-on `visibilitychange`. The array is spliced in place because both pages took a
+on `visibilitychange`. **Since 2026-09-08 that poll is the fallback rather than the
+mechanism**, and it stands down while the live feed is answering; the entry below has
+the precedence rule. The array is spliced in place because both pages took a
 reference to it at load; `shared.js` normalises it to an array first, so a build old
 enough to have no fissure list cannot leave a page holding a private empty one.
 
@@ -7523,16 +7525,26 @@ These cost real debugging time — worth remembering.
 
 ## 9. Current snapshot
 
-As of the build of 2026-08-15:
+As of the build of **2026-09-08**, all measured rather than carried forward:
 
 - **167 Primes** — 51 Warframe, 41 Melee, 34 Primary, 31 Secondary, 7 Companion,
   2 Archgun, 1 Archwing
 - **763 relics** tracked, **34** currently dropping
-- **36 Primes farmable now**, **5** in Prime Resurgence, 135 vaulted
+- **35 Primes farmable now**, **6** in Prime Resurgence, 135 vaulted
 - **0 Primes** in DE's export missing from the wiki — the wiki page is currently complete
-- Resurgence rotation runs **2026-08-06 → 2026-09-03** (Baruuk, Revenant, Phantasma,
-  Afuris, Tatsu)
+- Resurgence rotation runs **2026-09-03 → 2026-10-01** (Akbolto, Banshee, Euphona,
+  Helios, Kogake, Mirage), and Varzia's shelf is six relics: `Axi A12`, `Axi H5`,
+  `Lith K5`, `Lith M7`, `Meso E5`, `Neo B6`
 - 31 mission types carry a relic; a two-Prime list ranks 27 of them
+- **582 parts priced in Platinum** out of 582 that are not whole Primes, and
+  **100% of Prime-part relic reward rows** carry both Ducats and Platinum
+
+**This section is a dated snapshot and is meant to be re-measured, not edited.**
+Every figure above comes from one pass over `data/prime-data.json`; the previous
+version stood from 2026-08-15 and had drifted on three of them — the farmable
+count, the Resurgence count, and a rotation window that had ended five days
+earlier. If you are reading it more than a fortnight after that date, re-measure
+before quoting it.
 
 **The catalogue is relic-only, and that is why it is 167 and not 315.** Five
 categories hold no item any relic can ever drop — verified by exact match against
