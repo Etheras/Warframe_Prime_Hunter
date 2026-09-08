@@ -2693,14 +2693,23 @@ Warframe wiki to see what this name refers to"* — and the three sources say:
 | source | what it has |
 |---|---|
 | **Digital Extremes** | the path only: `/Lotus/Types/Gameplay/Venus/Jobs/VenusHelpingJobResource` |
-| **wiki.warframe.com** | **one** occurrence site-wide, on *World State/Example*, a page quoting a raw worldstate dump. **No mapping to a readable name anywhere.** |
+| **wiki.warframe.com** | **the titles, but never the ids.** `Orb_Vallis/Quotes` lists the Orb Vallis bounties as sections — *Agent Down, Archaeology, Blood Relics, Bury Them, Courier Ambush, Dirt Unit, Distract and Divert* — matching WFCD's values exactly. Searching for the internal id finds **one** hit, on *World State/Example*, a page quoting a raw worldstate dump |
 | **WFCD** | `data/languages.json` (715 KB, MIT) maps the lowercased path to a display value |
 
 **And the name is the bounty's in-game title.** `VenusHelpingJobResource` is
-**"Dirt Unit"**. That is what a player sees on the board in Fortuna, and it says
-nothing about the mission type, the rotation, or what pays a relic — this entry
-previously quoted *"Reclaim What's Ours"*, which is a different job's title and
-was the only example to hand.
+**"Dirt Unit"** — an Orb Vallis bounty, as the owner read straight off the path:
+*"the naming makes me think it's a Bounty from Orb Vallis."* It is, and `Venus`
+is how DE spell Orb Vallis internally. It says nothing about the mission type,
+the rotation, or what pays a relic — this entry previously quoted *"Reclaim
+What's Ours"*, a different job's title and the only example to hand.
+
+**The wiki corroborates the titles independently, which is worth more than the
+title itself.** This entry first recorded that the wiki had no mapping; that was
+a claim about *searching for the id*, and the owner found the page that shows
+the other half. `Orb_Vallis/Quotes` carries the bounty names as sections and they
+match WFCD's values exactly. So if these titles were ever wanted, WFCD's table
+could be **checked** rather than trusted — which is the difference between
+vendoring a fact and vendoring an assertion.
 
 So the recommendation to **leave it** is now evidenced rather than asserted:
 adopting it would be a second rule 9 vendoring, of a 715 KB localisation table,
@@ -2719,9 +2728,23 @@ worth less than it looked.
 
 1. **Leave it.** The recommendation, now with the measurement behind it.
 2. **Derive a kind from DE's identifier ourselves**, by rule rather than by
-   table: `RescueBountyResc` gives *Rescue*. Deterministic and ours. Note this
-   yields the mission *kind*, not the title — `VenusHelpingJobResource` has no
-   kind in it, so it would produce nothing for that one.
+   table. **This entry said `VenusHelpingJobResource` "has no kind in it" and
+   that was wrong** — the kind is the last segment, `Resource`. Corrected
+   2026-09-08 after the owner pointed at the wiki page and the paths were read
+   properly.
+
+   What is actually true is more awkward than either version. **There are two
+   naming conventions**, measured over the 53 job paths:
+
+   | shape | count | example | kind |
+   |---|---:|---|---|
+   | `<landscape><theme>job<kind>` | **26** | `venushelpingjobresource` | `resource`, spelled out |
+   | `<kind>bounty<abbrev>` | **27** | `attritionbountycap` | abbreviated — `cap`, `ext`, `lib`, `sab` |
+
+   So the Orb Vallis and Cambion Drift families give the kind cleanly and the
+   Plains of Eidolon family needs an abbreviation map. Deterministic and ours
+   either way, and no rule 9 question — but it is a small table of our own for
+   half the cases, which is worth knowing before calling it "by rule".
 3. **Vendor WFCD's table**, the same process as `tools/proxima_nodes.py`. 715 KB
    for flavour text, against 42 lines for names nothing else could supply.
 
