@@ -621,18 +621,89 @@
      costs a rounding error and keeps an open tab as current as the schedule
      behind it: ten minutes on both the local task and the published site.
 
-     **Same origin, always.** It is fetched from wherever the page was served
-     and never from api.warframestat.us, so `connect-src 'self'` stands as it is
-     and nobody reading this site appears in a third party's logs. Keeping the
-     data current is the scheduled build's job; this is only how its answer
-     reaches a page that is already open.
+     **That was the whole story until 2026-09-08, and it was not enough.** The
+     published file can never be fresher than the last build, so a page left
+     open all afternoon re-read one snapshot: on 2026-09-02 the deployed list
+     held 31 fissures generated at 13:47Z, every one already ended, while 28
+     were running. Re-reading a stale file more often does not make it younger.
+
+     So the page reads the live feed itself, and the file below is what it falls
+     back to. `PROJECT.md §7` has the provenance change that comes with it -
+     the reader's list now comes from WFCD while the build's comes from DE, and
+     the two can disagree.
 
      Mutated in place rather than reassigned, because both pages took a
      reference to this array at load. Normalised first for the same reason: a
      build old enough to have no fissure list at all would otherwise leave each
      page holding a private empty array that this could never reach. */
   const FISSURE_REFRESH_MS = 10 * 60 * 1000;
+
+  /* WFCD's fissure feed, read by the reader's own browser.
+
+     **Their number, not ours.** Measured 2026-09-05 with an `Origin` header:
+     this endpoint answers `Access-Control-Allow-Origin: *` and
+     `Cache-Control: max-age=120`, so two minutes is the window the server
+     declares and hard rule 11 says to honour it rather than invent one. Do not
+     shorten it to make a badge livelier.
+
+     **Digital Extremes cannot be read here and that is measured, not assumed.**
+     `api.warframe.com/cdn/worldState.php` sends no `Access-Control-Allow-Origin`
+     at all, so a browser refuses it whatever our CSP says. The build's
+     DE -> WFCD -> cache chain has no browser equivalent; this is the second
+     link on its own, which is why the file below stays as a fallback rather
+     than being deleted. */
+  const LIVE_FISSURES = "https://api.warframestat.us/pc/fissures?language=en";
+  const LIVE_FISSURE_REFRESH_MS = 2 * 60 * 1000;
+
   if (!Array.isArray(DATA.fissures)) DATA.fissures = [];
+
+  /* The same allowlist `build_fissures` applies, applied again here because
+     this list no longer comes only from our own build. Requiem is absent on
+     purpose: those relics hold Lich parts and no Prime, so a Requiem fissure is
+     nowhere this app can send anyone. Omnia fits whatever you are holding. */
+  const FISSURE_TIERS = ["Lith", "Meso", "Neo", "Axi", "Omnia"];
+
+  /* Third-party JSON, treated as third-party JSON.
+
+     Five fields survive, each one either matched against a literal or coerced,
+     and nothing else is carried through. `missionType` is dropped for the same
+     reason the build drops it: free-form upstream text in a shipped payload is
+     one template edit away from being a sink, and no badge reads it.
+
+     Emitted in the build's own key order and sorted the build's own way, so the
+     change check downstream compares like with like and a page that switches
+     between the two sources does not repaint for a reason the reader cannot
+     see. Expired rows are dropped here as well as at render, which keeps the
+     list wrong only ever by omission - it can stop marking a live fissure, it
+     cannot invent one. */
+  function normaliseFissures(rows, now) {
+    const out = [];
+    (rows || []).forEach((f) => {
+      if (!f || typeof f !== "object") return;
+      const tier = String(f.tier || "");
+      if (FISSURE_TIERS.indexOf(tier) < 0) return;
+      const node = String(f.node || "").trim();
+      if (!node) return;
+      const ends = Date.parse(f.expiry != null ? f.expiry : f.ends);
+      if (!isFinite(ends) || ends <= now) return;
+      out.push({
+        node: node,
+        tier: tier,
+        // One spelling for both sources: WFCD send milliseconds and a `Z`, the
+        // build writes whole seconds and `+00:00`. Same instant, two strings,
+        // and the change check compares strings.
+        ends: new Date(ends).toISOString().replace(/\.\d{3}Z$/, "+00:00"),
+        hard: !!(f.isHard != null ? f.isHard : f.hard),
+        storm: !!(f.isStorm != null ? f.isStorm : f.storm),
+      });
+    });
+    const bit = (v) => (v ? 1 : 0);
+    out.sort((a, b) =>
+      (FISSURE_TIERS.indexOf(a.tier) - FISSURE_TIERS.indexOf(b.tier)) ||
+      (bit(a.hard) - bit(b.hard)) || (bit(a.storm) - bit(b.storm)) ||
+      (a.ends < b.ends ? -1 : a.ends > b.ends ? 1 : 0));
+    return out;
+  }
 
   /* One poller, every caller's callback. `once` on its own would be wrong here
      and quietly so: it would keep the first caller's callback and drop the
@@ -652,8 +723,46 @@
   function startFissurePoll() {
     const live = DATA.fissures;
     let seen = JSON.stringify(live);
-    const pull = () => {
+    /* When the live feed last answered. The file poll reads this and stands
+       down while it is recent, which is the precedence rule between the two:
+       a build-shaped file is up to ten minutes old by construction and was
+       hours old in the incident that prompted all this, so letting it land on
+       top of a two-minute-old answer would walk the page backwards. Zero, not
+       a flag, so a feed that works and then stops hands the file back within
+       one file-poll interval instead of freezing the list forever. */
+    let liveAt = 0;
+
+    const apply = (rows) => {
+      const now = Date.now();
+      const next = normaliseFissures(rows, now);
+      const text = JSON.stringify(next);
+      if (text === seen) return;          // nothing moved; do not touch the page
+      seen = text;
+      live.splice.apply(live, [0, live.length].concat(next));
+      fissureWatchers.forEach((fn) => fn());
+    };
+
+    /* The live one. Plain GET, no credentials, no headers worth a preflight -
+       so this stays a simple request and never costs WFCD an OPTIONS. */
+    const pullLive = () => {
       if (typeof fetch !== "function") return;
+      fetch(LIVE_FISSURES, { cache: "no-cache", credentials: "omit" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rows) => {
+          if (!Array.isArray(rows)) return;
+          liveAt = Date.now();
+          apply(rows);
+        })
+        /* Blocked by CORS, offline, `file://`, an ad blocker, or WFCD down.
+           Every one of those means "fall back to the file", which is what the
+           next tick does on its own because `liveAt` never moved. */
+        .catch(() => {});
+    };
+
+    const pullFile = () => {
+      if (typeof fetch !== "function") return;
+      // The live feed is answering; its list is younger than this file can be.
+      if (Date.now() - liveAt < FISSURE_REFRESH_MS) return;
       /* `no-cache` revalidates; `no-store` would refuse to cache at all and pay
          for the whole four kilobytes every time. The server answers a
          conditional request with 304 and no body, which is the same trade the
@@ -663,11 +772,8 @@
         .then((r) => (r.ok ? r.json() : null))
         .then((doc) => {
           if (!doc || !Array.isArray(doc.fissures)) return;
-          const now = JSON.stringify(doc.fissures);
-          if (now === seen) return;         // nothing moved; do not touch the page
-          seen = now;
-          live.splice.apply(live, [0, live.length].concat(doc.fissures));
-          fissureWatchers.forEach((fn) => fn());
+          if (Date.now() - liveAt < FISSURE_REFRESH_MS) return;   // raced, and lost
+          apply(doc.fissures);
         })
         /* file://, a bundled single file, a server that does not carry it, or
            no network. Every one of those means "keep what the payload shipped
@@ -675,13 +781,22 @@
            it can go out of date, it cannot invent a fissure. */
         .catch(() => {});
     };
+
     /* Once on load as well, because the browser may have served the 1.9 MB
        payload out of its own cache while this four-kilobyte file is fetched
        fresh - which is exactly the case where the two disagree. */
-    pull();
-    setInterval(pull, FISSURE_REFRESH_MS);
+    pullLive();
+    pullFile();
+    setInterval(pullLive, LIVE_FISSURE_REFRESH_MS);
+    setInterval(pullFile, FISSURE_REFRESH_MS);
+    /* A tab restored after an hour asleep is the case the reader notices, and
+       both timers may be due. `pullFile` stands itself down if `pullLive`
+       already answered, so asking both here is one request in the healthy
+       case, not two. */
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) pull();
+      if (document.hidden) return;
+      pullLive();
+      pullFile();
     });
     return true;
   }
@@ -755,7 +870,12 @@
         ? ["assets/img"] : ["https://cdn.warframestat.us"]);
       const remote = hosts.filter((h) => /^https?:/i.test(h));
       if (!remote.length) {
-        return "Artwork and data are served from this site, so no third party sees your visit. ";
+        /* "so no third party sees your visit" until 2026-09-08, when the live
+           fissure feed made that false on every build including this one. The
+           sentence is about *artwork* and now says only that; the one third
+           party a local-artwork build still contacts is named by
+           `liveFeedNote`, immediately after this. */
+        return "Artwork and data are served from this site rather than hotlinked. ";
       }
       /* Named individually rather than counted: "two third parties" tells a
          reader nothing they can act on, and which one it is happens to be the
@@ -775,7 +895,10 @@
             link("https://raw.githubusercontent.com", "raw.githubusercontent.com") +
             ", which sees it too. "
           : "") +
-        "A copy built with artwork included fetches nothing at all. ";
+        // "fetches nothing at all" until 2026-09-08 — narrowed to artwork for
+        // the same reason as the branch above: the fissure feed is fetched by
+        // every build there is.
+        "A copy built with artwork included fetches no images at all. ";
     }
 
     /* The rate limiter is a property of tools/serve.py, and saying so on a page
@@ -788,6 +911,25 @@
         "purely to stop one client overwhelming it; addresses are keyed-hashed " +
         "with a per-session salt, never written down, and discarded when it stops.";
     }
+    /* The reader's own browser contacts this one, and has done since
+       2026-09-08 — which is a different claim from the artwork note above and
+       has to be made separately. That one is about a host the *build* chose;
+       this is a request the page makes on its own, every two minutes, for as
+       long as the tab is open.
+
+       Unconditional, unlike `artworkNote`. There is no build that turns it off:
+       the poll is in `shared.js`, it ships in the standalone download and on
+       `file://` alike, and a footer that named the host only sometimes would be
+       wrong in exactly the cases nobody checks. If the fetch is blocked the
+       reader has still had it attempted on their behalf, which is the thing
+       worth disclosing. */
+    function liveFeedNote() {
+      return "To show which relic fissures are running right now, this page asks " +
+        link("https://api.warframestat.us", "api.warframestat.us") +
+        " (WFCD) every two minutes while it is open, which tells them your " +
+        "address and that you are using this tool — never what you own, which " +
+        "stays in this browser. ";
+    }
     const html = "<p>" +
       "WARFRAME and all related data, names and artwork are the property of " +
       link("https://www.warframe.com", "Digital Extremes Ltd.") + ", used under their " +
@@ -795,7 +937,8 @@
       " for non-commercial fan works. Warframe Prime Hunter is an unofficial fan " +
       "project, not affiliated with or endorsed by Digital Extremes." + dot +
       "Your collection is stored in this browser and is sent nowhere — there is no " +
-      "account, no cookie and no analytics. " + artworkNote() + rateLimitNote() + dot +
+      "account, no cookie and no analytics. " + artworkNote() + liveFeedNote() +
+      rateLimitNote() + dot +
       "Catalogue data from the " +
       link("https://wiki.warframe.com/w/Prime", "WARFRAME Wiki") +
       " (CC BY-SA); item and worldstate data via " +
@@ -1026,6 +1169,11 @@
     esc, count, $, $$, KEYS, load, save, showTip, staleBanner, staleNotice,
     wireFileBackup, squadOdds,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
+    /* Exported so the suite can drive the allowlist and the ordering against
+       real upstream rows without a browser — this is the one piece of the live
+       feed that is logic rather than plumbing, and `test_assets.mjs` loads it
+       in the same sandbox as the rest. */
+    LIVE_FISSURES, LIVE_FISSURE_REFRESH_MS, FISSURE_TIERS, normaliseFissures,
     masteryLabel, masteryTitle, masteryShown, masteryTyped,
     traceCap, MR_TOP, wireMastery, siteFooter,
     /* One store per page, made here so the `storage` listener is registered

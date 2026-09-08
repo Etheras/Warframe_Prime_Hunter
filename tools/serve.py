@@ -313,7 +313,15 @@ def build_csp() -> str:
             "script-src 'self'; "
             "style-src 'self'; "
             f"img-src {img}; "
-            "connect-src 'self'; "
+            # `api.warframestat.us` because the page reads the live fissure feed
+            # itself, since 2026-09-08. Not an optimisation: the published file
+            # can never be fresher than the last build, and a page left open all
+            # afternoon showed no fissures at all while 28 were running.
+            #
+            # This host and no other. DE's worldstate sends no CORS header, so
+            # the first-party route is closed to a browser however this line is
+            # written -- see the note beside `LIVE_FISSURES` in shared.js.
+            "connect-src 'self' https://api.warframestat.us; "
             "base-uri 'none'; "
             "form-action 'none'; "
             "frame-ancestors 'none'")

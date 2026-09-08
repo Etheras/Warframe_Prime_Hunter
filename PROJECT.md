@@ -2396,19 +2396,85 @@ on `visibilitychange`. The array is spliced in place because both pages took a
 reference to it at load; `shared.js` normalises it to an array first, so a build old
 enough to have no fissure list cannot leave a page holding a private empty one.
 
-**Same origin, and that is the whole design.** It is fetched from wherever the page
-was served and never from `api.warframestat.us`, so `connect-src 'self'` stays a
-true statement about this site and nobody reading it appears in a third party's
-logs. Keeping the data current is the scheduled build's job — locally and in CI,
-both on ten minutes — and this file is only how that answer reaches a page which is
-already open. It fails silently on `file://`, in the bundled single file, and on any
-server that does not carry it, which is the same safe direction the list already
-fails in: it can go out of date, it cannot invent a fissure.
+**Same origin, and that was the whole design — until it was not enough.** The
+file is still written, still served and still read, and it fails silently on
+`file://`, in the bundled single file, and on any server that does not carry it,
+which is the same safe direction the list already fails in: it can go out of
+date, it cannot invent a fissure. What changed on **2026-09-08** is that it
+stopped being the *only* source, because re-reading a stale file more often
+cannot make it younger. See *The page reads its own fissure feed* below.
 
-**Badges only, deliberately.** The fold uses a live fissure to choose which of
-several identical nodes to name. Re-running that on a refresh would rename rows
-under whoever is reading them, for a reason that expires within the hour — the same
-call as never letting a fissure into the score.
+**"Badges only, deliberately" until 2026-09-01, and this sentence outlived it by
+a week.** It said the fold must not re-run on a refresh, because renaming rows
+under a reader for a reason that expires within the hour was the same call as
+never letting a fissure into the score. That was reversed: `tick` in `plan.js`
+calls `render()` whenever `ROT.clockStamp` moves, so a refresh that finds a
+fissure re-ranks, and a page test asserts the ranked figures move rather than
+only the badge. What survived of the original worry is narrower and is still
+enforced — the re-rank is **held while the reader is typing in a form**
+(`typingInForm`), which is the case the objection was really about.
+
+Recorded because of *how* it was found rather than that it was wrong. On
+2026-09-08 three separate notes said this feature did not exist while the code
+had shipped it a week earlier, and this is the fourth. **The backlog and the
+source agreed with each other and both were wrong**, which is the one
+configuration no check catches — a note written from the code is not
+corroboration of the code. Check the code.
+
+### The page reads its own fissure feed
+
+**Chosen by the owner 2026-09-05, built 2026-09-08.** The reader's browser polls
+WFCD for live fissures every two minutes; `data/fissures.json` stays as the
+fallback. Four things here would otherwise be re-derived, and one of them cost a
+day of design space to establish.
+
+**Digital Extremes cannot be read from a browser, and that is measured.**
+`api.warframe.com/cdn/worldState.php` sends **no `Access-Control-Allow-Origin`
+header at all** — read 2026-09-05 with an `Origin` header set. So *"the page
+reads the first-party worldstate"* was never an option, whatever the CSP says.
+The build's `DE → WFCD → cache` chain has no browser equivalent, and this is the
+second link on its own. Do not spend time re-designing around the first.
+
+**The provenance therefore splits, and that is the real cost of this feature.**
+The build's fissures come from DE; the reader's come from WFCD. The two can
+disagree, and when they do the reader is looking at the proxy's answer while
+`meta.feeds.fissures` reports the build's. That is a genuine change in what the
+site *is* — a first-party dataset with a third-party live overlay — and it was
+accepted because the alternative is a list that is routinely expired in full.
+`data/fissures.json` is what makes it degrade rather than break.
+
+**`oracle.browse.wf` was open too, and was declined.** Investigating how
+`browse.wf/live` stays current (2026-09-05) found it has a backend: their page
+reads `oracle.browse.wf/worldState.min.json` — their own server, republishing DE
+at `max-age=10`, CORS-open — and never contacts Digital Extremes. That is our
+build pipeline with a shorter fuse rather than a technique available to a static
+site, so the answer to *"how do they do it"* is **"not applicably"**. Their
+oracle was rejected as a source on its own terms: it is one person's VPS, so
+rule 11's hospitality argument is far sharper against it than against WFCD's
+public API, and it would make our readers' correctness depend on an individual's
+uptime. Reference, not a dependency — nothing was copied.
+
+**Two minutes is WFCD's number.** Their response declares
+`Cache-Control: max-age=120`; hard rule 11 says honour the window the server
+declares rather than invent one. This is the easy case for that rule — compare
+the warframe.market entry below, where the server declares nothing and a rate
+had to be chosen instead.
+
+**The precedence between the two sources is the part that is not obvious.** The
+file is a build artefact: ten minutes old at best, and 2.1 hours old with none
+of its 31 fissures still running in the incident that prompted this. So the file
+poll **stands down while the live feed is answering** — otherwise it lands on
+top of a fresher list on a timer, walking the page backwards for reasons no
+reader could see. It is a timestamp rather than a flag precisely so a feed that
+answers once and then dies hands the file back instead of freezing the list.
+Asserted in both directions in `test_assets.mjs`.
+
+**And no test in `test_pages.mjs` may reach the real internet.** Every page now
+polls WFCD on load, so `open()` routes that host to the build's own list — which
+leaves the page exactly as it was before this existed. Discovered the expensive
+way: the first attempt let the real request through, and roughly two dozen tests
+began passing or failing according to what was running in Warframe at the time,
+reporting it as a five-second locator timeout that mentioned no network at all.
 
 ### Two lists, two questions, never one score
 

@@ -258,14 +258,68 @@ async function closeProfiles() {
   await Promise.all(all.map((c) => c.close().catch(() => {})));
 }
 
+/* Every page in this file polls WFCD for live fissures, since 2026-09-08, and
+   no test in this file may reach the real internet.
+
+   The reason is not tidiness. A test that silently contacts `api.warframestat.us`
+   passes or fails by what is running in Warframe at the moment it runs, which
+   is the definition of a test that cannot be trusted — and the failure it
+   produced when this landed was a five-second locator timeout with no mention
+   of the network anywhere in it. Blocked here rather than in each test so it
+   cannot be forgotten in the one that matters, and so `data/fissures.json`
+   stays the path the existing tests exercise, which is what they were written
+   about. `stageLiveFissures` is how a test opts back in on purpose. */
+const LIVE_FEED_GLOB = "**api.warframestat.us**";
+
+/* The default answer is the build's own list, which is the only neutral one.
+
+   Three were tried before this. `route.abort()` and a CORS-blocked response are
+   both logged by Chromium as console errors, and about half the tests in this
+   file end with `assert.deepEqual(errors, [])`; so is a `503`, which is how
+   that discovery was made — twenty-odd tests failing on one line of console
+   noise that had nothing to do with any of them. An empty `200` is silent but
+   not neutral: it would clear the fissure list every page load, which is a
+   change to what every other test sees.
+
+   Answering with `data/fissures.json` leaves the page exactly as it was before
+   the live feed existed — the feed agrees with the build, `apply` finds nothing
+   moved, and no test that is about something else has to know this exists. It
+   also exercises the live path on every page rather than mocking it away, and
+   the two shapes really do both parse, which is worth having asserted
+   continuously: our normalised rows carry `ends`/`hard`/`storm`, WFCD's carry
+   `expiry`/`isHard`/`isStorm`, and `normaliseFissures` reads either. */
+const buildFissures = () => {
+  try {
+    const raw = fs.readFileSync(path.join(ROOT, "data", "fissures.json"), "utf8");
+    return JSON.parse(raw).fissures || [];
+  } catch { return []; }
+};
+const liveFeedAgrees = (route) => route.fulfill({
+  contentType: "application/json",
+  headers: { "Access-Control-Allow-Origin": "*" },
+  body: JSON.stringify(buildFissures()),
+});
+
 async function open(page_url) {
   const page = await (await newProfile()).newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  await page.route(LIVE_FEED_GLOB, liveFeedAgrees);
   await page.goto(origin + page_url, { waitUntil: "load" });
   return { page, errors };
 }
+
+/* Answer the live feed with a staged list, in WFCD's own shape — a bare array
+   whose rows carry `expiry`, `isHard` and `isStorm`. Deliberately NOT our
+   normalised spelling: the page has to do that translation, and a helper that
+   handed it the finished article would test nothing. */
+const stageLiveFissures = (page, rows) =>
+  page.route(LIVE_FEED_GLOB, (route) => route.fulfill({
+    contentType: "application/json",
+    headers: { "Access-Control-Allow-Origin": "*" },
+    body: JSON.stringify(rows),
+  }));
 
 /* The option is passed only when there is a reason to skip. node:test checks
    whether `skip` is *present*, not whether it is truthy, so `{ skip: null }`
@@ -3120,9 +3174,18 @@ page_test("a fissure changes how far the row says to run, on both pages", async 
 page_test("an open page picks up a fissure that opened after it loaded", async () => {
   /* The badges used to be fixed at load: a one-minute timer re-read a list that
      could only shrink, so a tab left open all evening retired fissures as they
-     closed and never heard about one that opened. `data/fissures.json` is the
-     same list on its own — four kilobytes — re-read every ten minutes from this
-     same origin, never from api.warframestat.us.
+     closed and never heard about one that opened.
+
+     **Staged on the live feed since 2026-09-08, which is the path that now
+     answers.** It used to stage `data/fissures.json`, and that file is still
+     read — but only while WFCD is not answering, so staging it here would have
+     tested the fallback while believing it tested the feature. The fallback has
+     its own test below, and the precedence rule between them is asserted in
+     `test_assets.mjs`.
+
+     Rows are in WFCD's spelling on purpose — `expiry`, `isHard`, `isStorm` —
+     because translating those is `normaliseFissures`'s whole job and handing
+     the page our own spelling would skip it.
 
      The node is read off the row the planner ranked, so this cannot pass by
      marking somewhere nobody is being sent. */
@@ -3135,22 +3198,66 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
   assert.equal(await row.locator(".tag.fissure").count(), 0,
                "nothing is running there yet, so nothing should claim one");
 
-  await page.route("**/data/fissures.json", (route) => route.fulfill({
-    contentType: "application/json",
-    body: JSON.stringify({
-      generated: new Date().toISOString(),
-      fissures: [{ node: key, tier: "Neo", mode: "Survival",
-                   ends: new Date(Date.now() + 55 * 60000).toISOString(),
-                   hard: false, storm: false }],
-    }),
-  }));
-  // the same thing returning to the tab does, without waiting ten minutes
+  await stageLiveFissures(page, [
+    { node: key, tier: "Neo", missionType: "Survival",
+      expiry: new Date(Date.now() + 55 * 60000).toISOString(),
+      isHard: false, isStorm: false },
+  ]);
+  // the same thing returning to the tab does, without waiting two minutes
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
 
   const said = await rowFor(page, key).locator(".tag.fissure").innerText();
   assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
   assert.deepEqual(errors, []);
+});
+
+page_test("with WFCD unreachable the page falls back to the file the build wrote", async () => {
+  /* The other half of the test above, and the reason `data/fissures.json` is
+     still written and still served. WFCD are a third party on someone else's
+     budget: they can be down, blocked by an extension, or unreachable from
+     whatever network the reader is on, and the page has to keep working.
+
+     This is also the only place the fallback is driven in a real browser. The
+     precedence *rule* — a build file must never land on top of a fresher live
+     answer — is asserted in `test_assets.mjs`, where the clock can be moved;
+     what is asserted here is the plainer half, that with nothing coming from
+     WFCD the file still reaches the screen. */
+  const { page, errors } = await open("/plan.html");
+  await wishFarmable(page);
+  assert.ok(await page.locator("#planNodes .spot").count() > 0, "no row to mark");
+  const key = await quietRow(page);
+  assert.equal(await rowFor(page, key).locator(".tag.fissure").count(), 0,
+               "nothing is running there yet, so nothing should claim one");
+
+  /* A real outage, in the shape a real one has: the request fails outright.
+
+     Then a reload, and it is load-bearing rather than tidying. `open()` lets
+     the live feed answer, so by this point the page holds a live list two
+     seconds old — and the precedence rule correctly refuses to put a build file
+     on top of that. Taking WFCD down mid-session therefore proves nothing until
+     the page has been started with it already down, which is the reader whose
+     extension blocks it, or whose network does. The wishlist survives the
+     reload because it is in `localStorage`, which is the same profile. */
+  await page.route(LIVE_FEED_GLOB, (route) => route.abort());
+  await page.route("**/data/fissures.json", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      generated: new Date().toISOString(),
+      // The build's own spelling, which is the other branch of the normaliser.
+      fissures: [{ node: key, tier: "Axi", ends: new Date(Date.now() + 55 * 60000).toISOString(),
+                   hard: false, storm: false }],
+    }),
+  }));
+  await page.reload({ waitUntil: "load" });
+  await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
+  const said = await rowFor(page, key).locator(".tag.fissure").innerText();
+  assert.match(said, /AXI/i, "the fallback carries the tier the same as the live feed does");
+
+  /* An aborted fetch is logged by the browser, and that is correct behaviour
+     rather than a defect — so this test tolerates exactly that line and nothing
+     else. Filtering the whole array would let a real error through. */
+  assert.deepEqual(errors.filter((e) => !/Failed to load resource|net::ERR/.test(e)), []);
 });
 
 page_test("a refresh that finds a fissure re-ranks, and waits if you are typing", async () => {
@@ -3201,15 +3308,12 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
     return null;
   });
   assert.ok(key, "no endless node ranked without a fissure already on it");
-  await page.route("**/data/fissures.json", (route) => route.fulfill({
-    contentType: "application/json",
-    body: JSON.stringify({
-      generated: new Date().toISOString(),
-      fissures: [{ node: key, tier: "Neo", mode: "Survival",
-                   ends: new Date(Date.now() + 55 * 60000).toISOString(),
-                   hard: false, storm: false }],
-    }),
-  }));
+  // Staged on the live feed, for the reason given on the test above it.
+  await stageLiveFissures(page, [
+    { node: key, tier: "Neo", missionType: "Survival",
+      expiry: new Date(Date.now() + 55 * 60000).toISOString(),
+      isHard: false, isStorm: false },
+  ]);
 
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
@@ -3230,10 +3334,7 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
                "the focus has to actually be in the form for this half to mean anything");
 
   const held = await shape();
-  await page.route("**/data/fissures.json", (route) => route.fulfill({
-    contentType: "application/json",
-    body: JSON.stringify({ generated: new Date().toISOString(), fissures: [] }),
-  }));
+  await stageLiveFissures(page, []);
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await page.waitForTimeout(600);
   const while_typing = await shape();
@@ -4386,6 +4487,9 @@ async function openBundle(options) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  // Same rule as `open`: the standalone runs the same `shared.js` and polls the
+  // same live feed, so it must not reach the real internet either.
+  await page.route(LIVE_FEED_GLOB, liveFeedAgrees);
   await page.goto(origin + "/dist/warframe-prime-hunter.html", { waitUntil: "load" });
   return { page, errors };
 }

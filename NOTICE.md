@@ -112,7 +112,22 @@ visitor's address and which items they looked at, and nothing else; the
 collection never leaves the browser either way. The site's own footer names the
 hosts the build it came from actually uses, read from `meta.sources.imageHosts`
 rather than asserted, so the page and this file cannot drift apart again. Build
-with `--with-images` and there are genuinely none.
+with `--with-images` and there are none for artwork.
+
+**One third-party request survives every build, including that one, since
+2026-09-08.** To show which Void Fissures are running now, the page itself asks
+`https://api.warframestat.us/pc/fissures` every two minutes while it is open.
+Void Fissures expire in an hour or two, so a list fixed at build time is
+routinely a list of places that have already closed — the feature does not work
+without a live read, and no first-party route exists for it: Digital Extremes'
+own worldstate sends no `Access-Control-Allow-Origin` header at all, so a browser
+cannot read it whatever this project does.
+
+WFCD therefore see a visitor's address and that they are running this tool, and
+nothing else — the collection is never transmitted. The poll honours the
+`Cache-Control: max-age=120` WFCD's own response declares. The site footer names
+the host on every page and every build, unconditionally, because unlike artwork
+there is no configuration that turns it off.
 
 The one piece of personal data touched is the visitor's IP address, which `serve.py`
 uses transiently for rate limiting. It is keyed-hashed with a salt generated at

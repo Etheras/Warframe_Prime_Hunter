@@ -545,6 +545,32 @@ The data comes from Digital Extremes' official drop tables and item lists, so it
 needs a refresh when the game changes — a new Prime, an unvaulting, or a new Prime
 Resurgence rotation (those change every 28 days).
 
+### Fissures look after themselves
+
+**One thing does not wait for a rebuild.** Void Fissures live an hour or two, and
+a page that only knew what its last build knew was routinely showing a list where
+every fissure had already closed — on one measured afternoon it offered nowhere
+to crack a relic while twenty-eight places were running.
+
+So the page asks for the live list itself, **every two minutes for as long as the
+tab is open**, from [WFCD's public API](https://api.warframestat.us). Nothing to
+configure and nothing to schedule: it works the same on the published site, on a
+local copy, and in the single-file download.
+
+Two things worth knowing:
+
+- **That is a request to somebody else's server.** It tells WFCD your address and
+  that you are using this tool. It never tells them what you own — your
+  collection stays in your browser and is not sent anywhere, ever. The site
+  footer says the same thing on every page.
+- **Two minutes is their number, not ours.** WFCD's own response says
+  `Cache-Control: max-age=120`, and asking faster than a server says its data
+  changes is just taking bandwidth from a free, volunteer-run service.
+
+If that request fails — no network, an extension blocking it, WFCD down — the
+page falls back to the fissure list its own build wrote, which is what it always
+used to do. You lose freshness, not the feature.
+
 ### By hand
 
 On Windows, double-click `refresh-data.cmd`. On any platform:
@@ -626,9 +652,15 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryHours 8
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Remove
 ```
 
-**If you publish this to GitHub Pages, and want the published copy as fresh as
-your local one**, add `-DispatchRemote` (or `--dispatch-remote` on the shell
-script). The task then also asks GitHub to rebuild the site on the same
+**You probably do not need the next one any more.** Since 2026-09-08 the page
+reads the live fissure feed itself, every two minutes, wherever it is opened —
+so the published site shows tonight's fissures without being rebuilt for them.
+What a rebuild still brings is everything else: a new Prime, a vault rotation,
+Baro's shelf. Those move a few times a year, not hourly.
+
+**If you publish this to GitHub Pages and still want the published copy rebuilt
+on your own schedule**, add `-DispatchRemote` (or `--dispatch-remote` on the
+shell script). The task then also asks GitHub to rebuild the site on the same
 schedule:
 
 ```bash
@@ -805,10 +837,16 @@ Worth knowing: GitHub's schedules are best-effort, and in practice that is a
 large gap rather than a small one. Measured on this repository over ten days:
 runs asking for every ten minutes were delivered about **one time in fifteen** —
 a median of 84 minutes between them, and a worst gap of twelve hours. So ten
-minutes is what the published copy aims for, not what it gets. If you want the
-cadence you configured, run the scheduled task on your own machine and add
-`-DispatchRemote` (below), which asks GitHub to rebuild directly instead of
-waiting in that queue.
+minutes is what the published copy aims for, not what it gets.
+
+**That used to decide whether the fissure list was any good, and it no longer
+does.** The page asks WFCD for the live list itself every two minutes, so what
+is on screen is current whatever the build queue is doing. The gap above now
+delays a new Prime or a vault rotation reaching the published site — things that
+move a few times a year — rather than something that expires in an hour. If you
+want the build cadence you configured anyway, run the scheduled task on your own
+machine and add `-DispatchRemote` (below), which asks GitHub to rebuild directly
+instead of waiting in that queue.
 
 > The workflow has **read-only** access to your code and uses no secrets or API
 > keys — every source it touches is public.

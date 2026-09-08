@@ -31,11 +31,20 @@ const source = (name) => fs.readFileSync(path.join(ROOT, "assets", name), "utf8"
 /* A window with just enough in it. `now` freezes the clock: the bounty clock
    is arithmetic on Date.now(), and a test that depended on the real one would
    pass or fail according to the time of day. */
-function sandbox({ data = {}, now = Date.parse("2026-08-11T21:00:00Z"), seed = null,
-                   fetch = null, timers = null } = {}) {
+const FROZEN_NOW = Date.parse("2026-08-11T21:00:00Z");
+
+function sandbox({ data = {}, now = FROZEN_NOW, seed = null,
+                   fetch = null, timers = null, clock = null } = {}) {
+  /* Frozen, but movable when a test asks. The fissure feed's precedence rule
+     is "the build file stands down while the live one is answering", and the
+     only way to observe it coming back is to let that window expire — which is
+     a property of the clock, not of the fetches. Pass `clock: {}` and it gains
+     an `advance(ms)`; pass nothing and this is the fixed clock it always was. */
+  let at = now;
   const FixedDate = class extends Date {
-    static now() { return now; }
+    static now() { return at; }
   };
+  if (clock) clock.advance = (ms) => { at += ms; };
   const el = () => ({
     style: {}, classList: { add() {}, toggle() {} }, dataset: {},
     appendChild() {}, addEventListener() {}, hidden: false, className: "",
@@ -110,8 +119,17 @@ test("the privacy footer names the artwork hosts this build actually uses", () =
   const html = footerHtml({ meta: { sources: { imageHosts: ["https://content.warframe.com"] } } });
   assert.match(html, /artwork loads from/);
   assert.match(html, /content\.warframe\.com/);
-  assert.ok(!/warframestat/.test(html),
-            "a host this build never contacts must not be named");
+  /* Read from the artwork sentence alone, not from the whole footer, since
+     2026-09-08. The footer names `api.warframestat.us` unconditionally now
+     because the page polls it for fissures — a real contact, disclosed on
+     purpose — so a bare search for "warframestat" stopped being able to tell
+     "this build hotlinks WFCD's artwork" from "every build asks WFCD the
+     time". Narrowed rather than deleted: the claim it protects is still one
+     the deployed site got wrong for two days. */
+  const artwork = html.slice(html.indexOf("artwork loads from"));
+  const sentence = artwork.slice(0, artwork.indexOf(". ") + 1);
+  assert.ok(!/warframestat/.test(sentence),
+            "an artwork host this build never contacts must not be named");
 });
 
 test("a build using both artwork hosts says both", () => {
@@ -128,12 +146,46 @@ test("a build using both artwork hosts says both", () => {
                "the WFCD CDN answers 301 to GitHub, which sees the request too");
 });
 
-test("local artwork claims no third party, and nothing else does", () => {
+test("local artwork claims no hotlink, and nothing else does", () => {
+  /* This asserted the footer said "no third party sees your visit" until
+     2026-09-08. That sentence is gone rather than moved: the live fissure feed
+     made it false on **every** build, local artwork included, and a privacy
+     claim that is false in the one configuration a careful reader chooses is
+     the worst place for it to be wrong. What survives is the distinction the
+     field exists to draw — hotlinked or not — which is still a real difference
+     and is still asserted in both directions. */
   const local = footerHtml({ meta: { sources: { imageHosts: ["assets/img"] } } });
-  assert.match(local, /no third party sees your visit/);
+  assert.match(local, /served from this site rather than hotlinked/);
+  assert.ok(!/artwork loads from/.test(local),
+            "a local build must not name an artwork host it does not use");
   const remote = footerHtml({ meta: { sources: { imageHosts: ["https://content.warframe.com"] } } });
-  assert.ok(!/no third party sees your visit/.test(remote),
+  assert.ok(!/rather than hotlinked/.test(remote),
             "the claim this whole field exists to stop being false");
+  for (const html of [local, remote]) {
+    assert.ok(!/no third party sees your visit/.test(html),
+              "the page contacts api.warframestat.us every two minutes; no build may deny it");
+  }
+});
+
+/* The other half of that, and the reason the sentence above could be narrowed
+   rather than simply weakened: the host the READER contacts is named on every
+   build there is. `artworkNote` is conditional because the build chooses its
+   artwork host; this one cannot be, because the poll is in `shared.js` and
+   ships in the standalone download and on `file://` alike. */
+test("the footer names the live feed the reader's own browser contacts", () => {
+  const builds = [
+    { meta: { sources: { imageHosts: ["assets/img"] } } },          // local artwork
+    { meta: { sources: { imageHosts: ["https://content.warframe.com"] } } },
+    { meta: { sources: { images: "https://cdn.warframestat.us/img" } } },  // pre-09-01
+    {},                                                             // no meta at all
+  ];
+  for (const data of builds) {
+    const html = footerHtml(data);
+    assert.match(html, /api\.warframestat\.us/,
+                 "the reader is told which third party their browser asks");
+    assert.match(html, /every two minutes/,
+                 "and how often, which is the part that makes it a disclosure");
+  }
 });
 
 test("a payload built before the hosts were recorded still gets a footer", () => {
@@ -144,7 +196,7 @@ test("a payload built before the hosts were recorded still gets a footer", () =>
   assert.match(old, /cdn\.warframestat\.us/);
   const oldLocal = footerHtml({ meta: { sources: {
     images: "assets/img (local copies; nothing fetched at runtime)" } } });
-  assert.match(oldLocal, /no third party sees your visit/);
+  assert.match(oldLocal, /served from this site rather than hotlinked/);
   const none = footerHtml({});
   assert.match(none, /Content Policy/, "no meta at all still gets the licence");
 });
@@ -1194,12 +1246,22 @@ test("the six storage keys are the ones the pages have always used", () => {
    exists rather than a comment saying "careful here". */
 test("two callers of the fissure watcher share one poller and both are heard", async () => {
   const timers = [];
-  let asked = 0;
-  const fetchStub = () => {
-    asked++;
+  const asked = [];
+  /* An hour out, so the row survives the expiry filter whenever this runs.
+     Rows carried no `expiry` at all until 2026-09-08 and were spliced in
+     regardless; they were then invisible at render, because `fissuresAt` has
+     always dropped anything already ended. Normalising drops them one step
+     earlier instead, so this fixture has to say when its fissure ends — which
+     is the honest shape for a list whose entire purpose is expiry. */
+  const ends = new Date(FROZEN_NOW + 3600e3).toISOString();
+  const fetchStub = (url) => {
+    asked.push(String(url));
+    const row = { node: "Hydron", tier: "Meso", expiry: ends };
     return Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({ fissures: [{ node: "Hydron", tier: "Meso" }] }),
+      // The live feed answers a bare array, the file answers `{fissures: […]}`.
+      json: () => Promise.resolve(
+        String(url).indexOf("data/fissures.json") === 0 ? { fissures: [row] } : [row]),
     });
   };
   const data = { fissures: [] };
@@ -1212,12 +1274,75 @@ test("two callers of the fissure watcher share one poller and both are heard", a
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
 
-  assert.equal(timers.length, 1, "one repeating poll, however many callers there are");
-  assert.equal(asked, 1, "and one request on load, not one per caller");
+  /* **Two** repeating polls since 2026-09-08, and they are two because they
+     are two different sources on two different clocks — WFCD's live feed on the
+     `max-age=120` that server declares, and our own `data/fissures.json` on the
+     build's ten minutes. What this test has always been about is unchanged and
+     is the assertion below it: however many CALLERS register, the count does
+     not move. In the single-file build that is two callers over one document. */
+  assert.equal(timers.length, 2,
+               "one poll per source, however many callers there are");
+  assert.deepEqual(timers.map((t) => t.ms).sort((a, b) => a - b),
+                   [S.LIVE_FISSURE_REFRESH_MS, S.FISSURE_REFRESH_MS].sort((a, b) => a - b),
+                   "each source polls on its own declared interval, not a shared one");
+  assert.deepEqual(asked.map((u) => (u.indexOf("http") === 0 ? "live" : "file")).sort(),
+                   ["file", "live"],
+                   "both sources are asked on load, not one per caller");
   assert.deepEqual(heard, ["planner"],
                    "the callback of a caller that did not start the poller must still run");
   assert.equal(data.fissures.length, 1,
                "and the list is spliced in place, because both pages hold a reference to it");
+});
+
+/* The precedence between those two, which is the whole reason the file poll
+   did not simply stay as it was. `data/fissures.json` is a build artefact: ten
+   minutes old at best, and 2.1 HOURS old with none of its 31 fissures still
+   running in the incident that prompted this. Letting it land on top of a
+   two-minute-old live answer would walk the page backwards, silently, on a
+   timer — so it stands down while the live feed is answering, and comes back
+   on its own if it stops. */
+test("a stale build file never overwrites a live answer, and returns when live stops", async () => {
+  const timers = [];
+  const asked = [];
+  const soon = new Date(FROZEN_NOW + 3600e3).toISOString();
+  let liveUp = true;
+  const fetchStub = (url) => {
+    const isFile = String(url).indexOf("data/fissures.json") === 0;
+    asked.push(isFile ? "file" : "live");
+    if (!isFile && !liveUp) return Promise.reject(new Error("WFCD unreachable"));
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(isFile
+        // What the build published: one node, and it is the wrong one now.
+        ? { fissures: [{ node: "Stale Node", tier: "Lith", expiry: soon }] }
+        : [{ node: "Hydron", tier: "Meso", expiry: soon }]),
+    });
+  };
+  const data = { fissures: [] };
+  const clock = {};
+  const { S } = loadShared({ data, fetch: fetchStub, timers, clock });
+  S.watchFissures();
+  for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+
+  assert.deepEqual(data.fissures.map((f) => f.node), ["Hydron"],
+                   "the live answer wins the load, however the two races resolve");
+
+  // The file's own timer fires while the live feed is healthy: it must not land.
+  const filePoll = timers.find((t) => t.ms === S.FISSURE_REFRESH_MS);
+  filePoll.fn();
+  for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+  assert.deepEqual(data.fissures.map((f) => f.node), ["Hydron"],
+                   "a build file must not overwrite a fresher live list");
+
+  /* And the other direction, which is why this is a timestamp rather than a
+     flag: a feed that answers once and then dies must not freeze the list. */
+  liveUp = false;
+  // Past the guard the only way a real page gets there: let the window expire.
+  clock.advance(S.FISSURE_REFRESH_MS + 1000);
+  filePoll.fn();
+  for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+  assert.deepEqual(data.fissures.map((f) => f.node), ["Stale Node"],
+                   "once the live feed goes quiet the build file is the answer again");
 });
 
 /* The banner's bugs have always been in what it says, never in where it was

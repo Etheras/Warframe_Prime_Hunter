@@ -3367,8 +3367,20 @@ def test_server_serves_only_the_site() -> None:
                loose.get("frame-ancestors") == "'none'")
     check_true("mockup CSP: still default-src 'none'",
                loose.get("default-src") == "'none'")
-    check_true("mockup CSP: a mockup still cannot reach off-site",
-               loose.get("connect-src") == "'self'")
+    # "cannot reach off-site" until 2026-09-08, when the site itself gained one
+    # off-site connection — the live fissure feed. Asserted against the strict
+    # policy rather than against a literal, which is the stronger claim and the
+    # one that was always meant: the carve-out is about inline script and style,
+    # and it must not widen where a page can reach by so much as one host.
+    check("mockup CSP: the carve-out does not widen where a page can reach",
+          loose.get("connect-src"), strict.get("connect-src"))
+    # And the site's own reach, which is what that now inherits. Same-origin
+    # plus exactly one named host: the feed the page polls. DE cannot be added
+    # here — they send no CORS header, so a browser refuses them whatever this
+    # says — and a second host appearing means somebody widened it.
+    check("CSP: the page reaches its own origin and one declared feed",
+          serve.CSP.split("connect-src ")[1].split(";")[0],
+          "'self' https://api.warframestat.us")
     # With artwork local the CDN is not merely unused, it is disallowed - so a
     # visitor's address cannot reach a third party even by accident.
     import artwork as art
