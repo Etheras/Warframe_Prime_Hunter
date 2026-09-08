@@ -426,10 +426,11 @@ is actually running — and the table never says which event it is. There's an
 ### How long a run costs you — *Effort*
 
 A run is not a unit of anything: how far you take an endless mission is your own
-choice, and the setting above changes it. So everything is costed **per
-objective** instead — a Defense round, a Spy vault, a bounty stage — which takes
-2.5 to 6 minutes almost everywhere and is a fact about the mission rather than a
-guess about your play. That is the default and it asks you for nothing.
+choice, and the setting above changes it. So everything is costed **per reward**
+instead — one reward draw, which is a Defense round, a Spy vault or a bounty
+stage depending on where you are, and takes 2.5 to 6 minutes almost everywhere.
+It is a fact about the mission rather than a guess about your play. That is the
+default and it asks you for nothing.
 
 If you would rather rank on real time, open **Effort — optional** in the sidebar
 and put minutes against any mission type. One is enough; the whole list re-sorts,

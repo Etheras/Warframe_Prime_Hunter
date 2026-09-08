@@ -317,10 +317,14 @@ condensed view; it must not be the only route to it.
   in from the top three times. Update the control and its neighbours in place;
   rebuild only sections that genuinely changed and do not hold the focus — for
   that one it is `#dSpots`, the farm-spot ranking, which really does re-rank.
-- **Ask in the unit that holds still.** Effort is collected per *objective* — a
-  Defense round, a Spy vault, a bounty stage — never per run, because how far you
-  take an endless mission is your own choice and the option directly above it
-  changes that. A question whose unit moves cannot be answered once.
+- **Ask in the unit that holds still.** Effort is collected per *reward* — one
+  reward draw, which is a Defense round, a Spy vault or a bounty stage depending
+  on where you are — never per run, because how far you take an endless mission
+  is your own choice and the option directly above it changes that. A question
+  whose unit moves cannot be answered once. (This said *objective* until
+  2026-09-08. The screen has said *reward* since the unit was settled on
+  2026-08-27, and a style guide describing the previous word is how the previous
+  word comes back.)
 - **Only offer a control for something in front of you.** The effort panel lists
   the mission types the current plan actually ranks, not all 31 in the data.
   Those rows stay alphabetical rather than following the ranking they alter: a
