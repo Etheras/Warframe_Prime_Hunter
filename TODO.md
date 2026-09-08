@@ -2553,41 +2553,27 @@ form — held, not dropped: `seen` is left unadvanced, so the next tick does the
 work. Found only because a test was written for the behaviour that already
 existed.
 
-### A vaulted relic on a Prime you *can* farm another way is still hidden **[settled — declined 2026-09-08]**
+### ~~A vaulted relic on a Prime you *can* farm another way is still hidden~~
 
-**Not open. The switch is out of scope.** The owner, asked directly: *"I do not
-want this feature to be included … I do not intend for the client/user to tell
-us what relics he has, but I might change my opinion of this, and it will be a
-major feature."*
+**Shipped 2026-09-08, and it is not the feature that was declined.** The
+*"I have vaulted relics"* switch stays out of scope — the owner's call, recorded
+below. What shipped instead came from the question they asked next: *"isn't
+everything vaulted tradeable as well? why would tradeable exclude relics?"*
 
-**What it would have added**, since the option was put badly the first time and
-this is the answer to it. It is **not** a relic inventory: one boolean, *"I hold
-vaulted relics"*, no list and nothing to maintain. The crack list currently
-drops wanted relics you cannot obtain today; measured 2026-09-08, that hides
-something on **38 of 167 Primes**, median **14** relics each, max **156**. The
-switch would stop that filtering so a long-time player could be told *"you
-already own Meso Y2 — crack that"*.
+It does not, and the code already agreed. `isTrade` is a fact about the
+**relic** — `vaulted && !resurgence && !isBaro` — and never asks which Prime
+wanted it, so the *Trade* checkbox on *How to crack them* was always the right
+control for these rows. They simply never reached it: a filter in `relicPlan`
+threw them away first, and only a count survived. One control now, applied once.
 
-**And the owner's reading of it is the sharper one.** Asked whether this is
-*"basically the Trade checkbox on How to crack them"* — partly, and the part
-that differs is the whole feature:
+Reasoning in `PROJECT.md §7` under *The Trade checkbox was already the right
+control, and the filter never let it near the rows*.
 
-| | what it controls |
-|---|---|
-| the **Trade** checkbox | relics **already in the list**, filtered at `plan.js:1940` |
-| the **switch** | relics that **never enter the list**, dropped at `plan.js:627` |
-
-The split is `stranded`. A vaulted relic on a Prime with no other route reaches
-`relicPlan` and the Trade box shows it; the same relic on a Prime you can farm
-elsewhere is excluded upstream, and only the *"N more relics are vaulted and not
-shown"* count mentions it. So **the Trade checkbox already does this job for
-stranded Primes** and the switch would extend it to the rest — which is why the
-two look alike and why one is a checkbox and the other is a feature.
-
-The blocker underneath is unchanged and is why it stays declined: a boolean
-cannot say *which* relics you hold, so the list it reveals is mostly rows the
+**The switch remains declined** and the reason is unchanged: a boolean cannot
+say *which* relics you hold, so the list it would reveal is mostly rows the
 reader cannot act on. The useful version is relic inventory, **[settled]**
-declined below.
+declined further down. What the merge gives instead is the same rows behind a
+control the reader already understands.
 
 ### The rest of the player facts the header could hold
 

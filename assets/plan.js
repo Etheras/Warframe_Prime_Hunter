@@ -604,29 +604,34 @@
        and knows nothing about where the relic came from — so a relic bought
        with farmed Aya belongs in it on exactly the same terms as a dropped one. */
     const relicPlan = new Map();
-    /* Relics this list declines to show, counted rather than merely dropped.
-       A Prime you can get another way, some of whose relics are vaulted, keeps
-       those relics out of the crack list — which is right, since there is
-       somewhere to go and burying it under relics you cannot farm is what the
-       filter is for. What was wrong is that it happened in **silence**: a
-       reader could not tell a complete list from a filtered one.
+    /* **Every wanted relic gets in, and the controls decide what is shown.**
+       Until 2026-09-08 a vaulted relic was dropped here unless the Prime had no
+       other route (`stranded`), and only a count survived: *"5 more relics are
+       vaulted and not shown"*.
 
-       Saying it costs nothing and decides nothing. The other shape this could
-       take — a planner switch, *"I have vaulted relics"*, that stops filtering
-       — needs the reader to tell us something only they know, and the relic
-       inventory that would answer it properly is declined in `TODO.md`. A count
-       sidesteps that question rather than pre-empting it. */
-    let vaultedOut = 0;
+       The owner asked the question that undid it — *"isn't everything vaulted
+       tradeable as well? why would tradeable exclude relics?"* — and the answer
+       is that it does not. `isTrade` is a fact about the **relic**
+       (`vaulted && !resurgence && !isBaro`) and never asks which Prime wanted
+       it, so the *Trade* checkbox on *How to crack them* was already the right
+       control for these rows; they simply never reached it, because this filter
+       ran first and threw them away. One control, applied once, instead of a
+       filter here and a checkbox there disagreeing about the same relics.
+
+       **Measured before doing it, because the risk was the ranking and the cost
+       is the list.** Of 723 trade-only relics, **none has a live source** — the
+       node walk reads `sources` and finds nothing, so *Where to go* cannot move
+       by a single row. What does move is the length of this list: a wishlist of
+       every farmable Prime wants 670 relics of which 34 drop today, so the
+       crack list grows twentyfold. That is left to the *Trade* checkbox, which
+       is the control for exactly these rows and always was — a cap was tried
+       twice and thrown away both times, once for hiding Varzia's rows behind
+       farmable ones and once for being a second control over rows that already
+       had one (`PROJECT.md §7`). `vaultedOut` and its note are gone with it:
+       nothing is hidden by a filter any more, so nothing has to say so. */
     want.forEach((entries, rname) => {
       const rec = RELICS[rname];
-      if (!rec || (rec.vaulted && !rec.resurgence && !isBaro(rname)
-                   && !stranded.has(rname))) {
-        // Only ones genuinely wanted: a relic held by the Forma bonus alone is
-        // not something the reader is short of, and counting it would overstate
-        // what is being hidden from them.
-        if (rec && entries.some((e) => !e.bonus)) vaultedOut += 1;
-        return;
-      }
+      if (!rec) return;
       // a relic held only by the Forma bonus is not worth running on its own
       if (!entries.some((e) => !e.bonus)) return;
       const { refinement, value, openings, blocker } = bestRefinement(entries);
@@ -1108,7 +1113,7 @@
     });
 
     return { relicPlan, ranked: folded, places: ranked.length,
-             needs, formaShort, ayaValue, ayaRelic, ayaTargeting, vaultedOut,
+             needs, formaShort, ayaValue, ayaRelic, ayaTargeting,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
              blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
   }
@@ -1464,30 +1469,45 @@
        crack list follows. */
     const onShelf = (n) => !!(RELICS[n] || {}).resurgence;
     const atBaro = (n) => isBaro(n);
-    if (rp.length && rp.every((n) => onShelf(n) || atBaro(n))) {
-      const varzia = rp.some(onShelf), baro = rp.some(atBaro);
+    /* **`some`, not `every`, and that changed on 2026-09-08 for a reason worth
+       keeping.** These branches used to ask whether *every* wanted relic was
+       purchasable, which was answerable while the crack list only admitted
+       relics you could obtain. Now that every wanted relic is in the plan, a
+       Resurgence Prime's own vaulted relics are there too, `every` is false for
+       essentially everybody, and the page told a reader to **trade** for relics
+       Varzia was selling that afternoon. Caught by the test that pins the
+       Resurgence wording.
+
+       Asking `some` is also the better question. This paragraph exists to point
+       at the route that *exists*, and if six of your twenty-five relics are on
+       her shelf then Varzia is the answer — the other nineteen do not make it
+       less true, they are simply not the news. */
+    const shelfCount = rp.filter(onShelf).length;
+    const baroCount = rp.filter(atBaro).length;
+    if (rp.length && (shelfCount || baroCount)) {
       /* Three sentences rather than one assembled from parts, because each
          names a different errand and a reader with nothing of Baro's should not
-         be sent to look for him. The Varzia-only wording is unchanged from
-         before this fix — it was right, it names the programme the reader sees
-         in game, and a test pins it. */
-      if (varzia && !baro) {
-        return `<p class="nowhere">Nothing to run — every relic you still need is
-          <b>Prime Resurgence</b>. Varzia sells them at Maroo's Bazaar for
+         be sent to look for him. */
+      if (shelfCount && !baroCount) {
+        return `<p class="nowhere">Nothing to run — none of the relics you need
+          drops today, but ${shelfCount} of them ${shelfCount === 1 ? "is" : "are"}
+          <b>Prime Resurgence</b>. Varzia sells those at Maroo's Bazaar for
           <b>Aya</b>, which is farmed, and <i>How to crack them</i> beside this
           says what to do with them once you have them.</p>`;
       }
-      if (baro && !varzia) {
-        return `<p class="nowhere">Nothing to run — every relic you still need is
-          <b>vaulted</b>, but <b>Baro Ki'Teer</b> is on the relay with them now,
-          for <b>Ducats</b>, which are farmed. <i>How to crack them</i> beside
-          this says what to do with them once you have them — and he leaves with
-          his stock, so this is the fortnight to do it.</p>`;
+      if (baroCount && !shelfCount) {
+        return `<p class="nowhere">Nothing to run — none of the relics you need
+          drops today, but <b>Baro Ki'Teer</b> is on the relay with
+          ${baroCount === 1 ? "one of them" : `${baroCount} of them`}, for
+          <b>Ducats</b>, which are farmed. <i>How to crack them</i> beside this
+          says what to do with ${baroCount === 1 ? "it" : "them"} once you have
+          ${baroCount === 1 ? "it" : "them"} — and he leaves with his stock, so
+          this is the fortnight to do it.</p>`;
       }
-      return `<p class="nowhere">Nothing to run — every relic you still need is
-        <b>vaulted</b>, and none of them has to be traded for: <b>Varzia</b> has
-        some at Maroo's Bazaar for <b>Aya</b> and <b>Baro Ki'Teer</b> has the
-        rest on the relay for <b>Ducats</b>. Both are farmed, and <i>How to crack
+      return `<p class="nowhere">Nothing to run — none of the relics you need
+        drops today, but some can be bought: <b>Varzia</b> has ${shelfCount} at
+        Maroo's Bazaar for <b>Aya</b> and <b>Baro Ki'Teer</b> has ${baroCount} on
+        the relay for <b>Ducats</b>. Both are farmed, and <i>How to crack
         them</i> beside this says which relic is on which counter.</p>`;
     }
     /* The other way to have nothing to run: everything left is vaulted and the
@@ -1634,11 +1654,9 @@
      Held here so the list can be repainted without rebuilding the strip the
      reader is standing in — see `paintRelicList`. */
   let relicRows = [];
-  /* How many wanted relics the vault filter kept out, so the list can say it is
-     filtered rather than look complete. Held beside `relicRows` and set in the
-     same place, for the same reason: `paintRelicList` runs on its own when a
-     control is pressed and must not have to rebuild the plan to find out. */
-  let relicsVaulted = 0;
+  /* `relicsVaulted` stood here and counted what the vault filter kept out of
+     this list. Nothing counts that now: every wanted relic is in it, and the
+     *Trade* checkbox decides what is shown. */
   const tierOf = (rname) => String(rname).split(" ")[0];
   const isVarzia = (rname) => !!(RELICS[rname] || {}).resurgence;
   /* On Baro's manifest when the build ran, **and** he is still on the relay.
@@ -1897,14 +1915,24 @@
             "He leaves after two days and takes it with him — this badge and " +
             "the Baro control both go when he does.")}">from Baro</span>`
       : rec.vaulted
-        /* Only ever reached for a Prime with no way in at all — see
-           `stranded`. The refinement beside it is the point of showing the
-           row: it is the one thing here you can still decide, and it is the
+        /* **This badge is about the relic, not about the Prime**, and until
+           2026-09-08 it was written as though it were about both: the comment
+           said *"only ever reached for a Prime with no way in at all"* and the
+           tooltip said *"this Prime has no other route — no drop, no Baro, no
+           quest."* Both were true while the crack list only admitted vaulted
+           relics for stranded Primes. They stopped being true the moment every
+           wanted relic was let in, because a perfectly farmable Prime has
+           vaulted relics holding its parts too, and they land here.
+
+           The refinement beside it is still the point of showing the row: it is
+           the one thing about this relic you can still decide, and it is the
            same advice it would carry if the relic were dropping. */
         ? `<span class="from-trade" data-tip="${esc(
-            "Vaulted, and this Prime has no other route — no drop, no Baro, " +
-            "no quest.\nSo this relic has to be traded for, and the refinement " +
-            "beside it is what to take it to once you have one.")}">trade for it</span>`
+            "This relic is vaulted and neither Varzia nor Baro is selling it, " +
+            "so it has to be traded for.\nThe refinement beside it is what to " +
+            "take it to once you have one.\n\n" +
+            "This says nothing about the Prime — it may still be farmable " +
+            "through its other relics. Where to go answers that.")}">trade for it</span>`
         : "";
     return `<div class="relic-row ref-row-${esc(p.refinement)}">
       <span class="relic-name">${esc(rname)}${varzia}</span>
@@ -1939,20 +1967,22 @@
       (showVarzia || !isVarzia(rname)) &&
       (showTrade || !isTrade(rname)) &&
       (showBaro || !isBaro(rname)));
-    /* Appended to whatever the list says, empty or not, because the fact it
-       reports is true either way: there are relics you need that this list is
-       not showing. Worded as what it is rather than as an apology — the reader
-       is not being told something is broken, they are being told the list is
-       narrower than their collection. */
-    /* Not when `relicRows` is empty: that case already prints "none of the
-       relics you need can be got right now — they are vaulted", and following
-       it with a count of how many are vaulted says the same thing twice in
-       different words. The note is a qualifier on a list, so it needs a list. */
-    const vaultNote = relicsVaulted && relicRows.length
-      ? `<p class="hint">${relicsVaulted} more relic${relicsVaulted === 1 ? "" : "s"}
-         ${relicsVaulted === 1 ? "is" : "are"} vaulted and not shown — if you are
-         holding any, they are worth cracking too.</p>`
-      : "";
+    /* **Uncapped, and the *Trade* checkbox is the only control.**
+
+       Two shapes were tried and both were worse. A flat cap on the whole list
+       pushed **Varzia's** rows off screen behind twelve farmable ones — a relic
+       you can go and buy today, hidden — so a cap must never be positional
+       here. Collapsing the trade tail behind its own button fixed that and
+       introduced a different fault: two controls for one set of rows, which
+       `STYLE.md §6` exists to prevent, and it showed up immediately as the
+       *Trade* box no longer changing any total because the collapse had already
+       removed those rows.
+
+       So the list shows everything the controls admit, and the reader shortens
+       it by unticking *Trade* — which is what that box is for, and what the
+       owner asked for when they pointed out that `isTrade` already classified
+       these rows correctly. A long list is the honest consequence of wanting
+       many Primes at once, and it has a control on it. */
     $("#planRelics").innerHTML = (rp.length ? rp.map(relicRowHtml).join("")
       /* Two different silences, and saying the wrong one is worse than saying
          nothing. "Nothing can be got right now" is a fact about the vault; an
@@ -1965,13 +1995,12 @@
            relicRows.length === 1 ? "is" : "are"} hidden by the controls
            above.</p>`
         : `<p class="hint">None of the relics you need can be got right now —
-           they are vaulted, and not in this Prime Resurgence rotation either.</p>`)
-      + vaultNote;
+           they are vaulted, and not in this Prime Resurgence rotation either.</p>`);
   }
 
   function render() {
     renderWishlist();
-    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic, ayaTargeting, vaultedOut,
+    const { relicPlan, ranked, needs, formaShort, ayaValue, ayaRelic, ayaTargeting,
             ayaRotationLive, ayaMissing, perMinute, blocked, places } = buildPlan();
     renderEffort(ranked);
 
@@ -2329,7 +2358,6 @@
        repainted on its own when a tab is pressed. Rebuilding the strip on a
        press would destroy the button under the reader's finger. */
     relicRows = rpAll;
-    relicsVaulted = vaultedOut;
     paintRelicFilters();
     paintRelicList();
 

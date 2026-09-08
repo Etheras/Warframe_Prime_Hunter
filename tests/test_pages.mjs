@@ -1144,20 +1144,20 @@ page_test("a tier with nothing in it gets no tab", async () => {
       const relics = [...new Set((it.parts || [])
         .flatMap((p) => (p.relics || []).map((r) => r.relic)))]
         .filter((n) => D.relics[n]);
-      /* Relics that certainly reach the list: still dropping, or on Varzia's
-         shelf. Requiring at least one still dropping also rules out the
-         `stranded` case, where a Prime with no route at all has its vaulted
-         relics let through for the trade list — so this set is exactly what
-         will be rendered, without restating the filter that renders it.
+      /* **Every relic the payload knows for this Prime reaches the list**, and
+         that is simpler than it used to be. This selection carried two
+         work-arounds until 2026-09-08: it required at least one still-dropping
+         relic and then narrowed to live-or-Varzia, because vaulted relics were
+         filtered out unless the Prime was `stranded`, and the set that would be
+         rendered was not the set the payload held. The crack list takes them
+         all now — the *Trade* checkbox decides what is shown — so membership
+         and existence are finally the same question and the filter does not
+         have to be restated here.
 
-         The first draft of this test asked only "does the payload know these
-         relics", picked a Baro-flagged Prime whose relics are all vaulted, and
-         asserted against a list that was empty. Membership is not the same
-         question as existence. */
-      const live = relics.filter((n) => !D.relics[n].vaulted);
-      if (!live.length) continue;
-      const reaching = relics.filter((n) => !D.relics[n].vaulted || D.relics[n].resurgence);
-      const tiers = [...new Set(reaching.map((n) => n.split(" ")[0]))];
+         The teeth are unchanged: a tier with nothing in it must get no tab, in
+         fixed order. It was written after a mutation that showed all four tiers
+         went unnoticed, because a full farm list has all four. */
+      const tiers = [...new Set(relics.map((n) => n.split(" ")[0]))];
       if (tiers.length && tiers.length < TIERS.length) {
         localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
         return { name: it.name, tiers: TIERS.filter((t) => tiers.includes(t)) };
@@ -1165,7 +1165,7 @@ page_test("a tier with nothing in it gets no tab", async () => {
     }
     return null;
   });
-  assert.ok(subject, "no Prime with live relics spans fewer than four tiers — " +
+  assert.ok(subject, "no Prime's relics span fewer than four tiers — " +
                      "pick another property rather than letting this pass vacuously");
   await page.reload({ waitUntil: "load" });
 
@@ -1180,21 +1180,44 @@ page_test("a tier with nothing in it gets no tab", async () => {
 });
 
 page_test("the errand boxes appear only when there is that errand to hide", async () => {
-  /* `STYLE.md §6` — only offer a control for something in front of you. Varzia
-     sells six relics and only sometimes ones you want; the trade-only rows
-     exist only for Primes with no route at all. Measured on the page rather
-     than reasoned about: with every Prime wanted the list is 34 farmable, 6 of
-     Varzia's and 717 trade-only.
+  /* `STYLE.md §6` — only offer a control for something in front of you.
 
-     Both subjects come from the payload. A farm list of Primes that are still
-     dropping has no trade-only relics in it, and that absence is the assertion. */
+     **The first assertion used to be "a farm list of farmable Primes has
+     neither errand".** That stopped being true on 2026-09-08, when every wanted
+     relic started reaching the crack list: a farmable Prime also has vaulted
+     relics holding its parts, so the trade errand is there and its box belongs.
+     Asserting the old absence would now be asserting the old bug.
+
+     So the expectation is **derived from the payload for the list actually
+     wished** rather than written down, which is stronger than what it replaced —
+     it fails if a box appears for a category the list does not hold, *and* if
+     one is missing for a category it does. */
   const { page, errors } = await open("/plan.html");
   const boxes = () => page.evaluate(() =>
     [...document.querySelectorAll("#relicErrands .mini-check input")].map((i) => i.id));
 
   await wishFarmable(page, 3);
-  assert.deepEqual(await boxes(), [],
-    "a farm list of farmable Primes has neither errand, so neither box belongs");
+  const holds = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const ids = JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]");
+    const names = new Set();
+    D.items.filter((i) => ids.includes(i.id)).forEach((i) =>
+      (i.parts || []).forEach((p) => (p.relics || []).forEach((r) => names.add(r.relic))));
+    const rec = (n) => D.relics[n] || {};
+    return {
+      varzia: [...names].some((n) => rec(n).resurgence),
+      // Baro is asked as the page asks it: on his manifest AND on a relay now
+      baro: [...names].some((n) => rec(n).baro),
+      trade: [...names].some((n) => rec(n).vaulted && !rec(n).resurgence && !rec(n).baro),
+    };
+  });
+  const shown = await boxes();
+  assert.equal(shown.includes("p-varzia"), holds.varzia,
+               `the Varzia box has to match whether the list holds one: ${shown.join()}`);
+  assert.equal(shown.includes("p-trade"), holds.trade,
+               `and the trade box likewise: ${shown.join()}`);
+  assert.ok(!shown.includes("p-baro") || holds.baro,
+            "a Baro box may only appear when he is on a relay with one of these");
 
   /* Now a Prime with no way in at all — every relic vaulted, not on Varzia's
      shelf, and no other route. Its whole crack list is trade-only. */
@@ -3722,8 +3745,22 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   const rows = page.locator("#planRelics .relic-row");
   assert.ok(await rows.count() > 0,
             `${subject} is in Resurgence and its relics are buyable, so they must be crackable`);
-  assert.equal(await page.locator("#planRelics .from-varzia").count(), await rows.count(),
-               "every row here comes from Varzia, and a row that does not say so reads as a drop");
+
+  /* **Trade off first, and that is the point rather than a convenience.** Since
+     2026-09-08 every wanted relic reaches this list, so a Resurgence Prime's
+     own vaulted relics are here too and *"every row comes from Varzia"* is no
+     longer true of the default view — it is true of the view this assertion is
+     about. Unticking the box is how a test says which state it means
+     (`CLAUDE.md`, *a page test must set the state it needs*), and it keeps the
+     assertion exact instead of loosening it to "most rows". */
+  await setCheck(page, "#p-trade", false);
+  const varziaOnly = page.locator("#planRelics .relic-row");
+  assert.ok(await varziaOnly.count() > 0, "unticking Trade must not empty her shelf");
+  assert.equal(await page.locator("#planRelics .from-varzia").count(),
+               await varziaOnly.count(),
+               "with trade rows hidden every row comes from Varzia, and a row that " +
+               "does not say so reads as a drop");
+  await setCheck(page, "#p-trade", true);
 
   /* And it must be her shelf, not every relic that holds a part of a Prime she
      is offering. Those are different lists and the second was shipped as the
@@ -4236,16 +4273,20 @@ page_test("the planner's search marks parts collected, and adds no Primes", asyn
   assert.deepEqual(errors, []);
 });
 
-page_test("the crack list says how many relics the vault is keeping from it", async () => {
-  /* A Prime you CAN farm, some of whose relics are vaulted, keeps those relics
-     out of the crack list — which is right: there is somewhere to go, and
-     burying it under relics you cannot farm is what the filter is for. What was
-     wrong until 2026-09-02 is that it happened in silence, so a filtered list
-     and a complete one looked identical.
+page_test("the crack list holds every relic you want, and Trade decides which are shown", async () => {
+  /* **This test has now covered three behaviours, and the last is the owner's
+     question rather than a defect.** A Prime you can farm, some of whose relics
+     are vaulted, used to have those relics dropped from the crack list in
+     silence; 2026-09-02 added a count saying how many; and on 2026-09-08 the
+     owner asked *"isn't everything vaulted tradeable as well? why would
+     tradeable exclude relics?"* — which it does not. `isTrade` is a fact about
+     the relic and never asks which Prime wanted it, so the *Trade* checkbox was
+     always the right control for these rows; a filter upstream simply threw
+     them away before it could see them.
 
-     The subject is chosen from the payload on that exact property rather than
-     named, and the expected count is derived from the payload too — so this
-     asserts the page against the data, not against itself. */
+     So the count is gone and the rows are here. The subject is still chosen
+     from the payload on that exact property, and both counts are derived from
+     it — this asserts the page against the data, not against itself. */
   const { page, errors } = await open("/plan.html");
   const subject = await page.evaluate(() => {
     const D = window.WFPRIME_DATA;
@@ -4271,14 +4312,29 @@ page_test("the crack list says how many relics the vault is keeping from it", as
   assert.ok(subject, "no farmable Prime has a mix of live and vaulted relics");
   await page.reload({ waitUntil: "load" });
 
+  /* **Both states, because the whole change is that there are two.** With
+     *Trade* ticked — the default — every relic holding a part you want is here,
+     live and vaulted alike. Untick it and the list is what it used to be. */
   const rows = await page.locator("#planRelics .relic-row").count();
-  assert.equal(rows, subject.live,
-               `${subject.name} has ${subject.live} live relics, so that is what ranks`);
+  assert.equal(rows, subject.live + subject.vaulted,
+               `${subject.name} wants ${subject.live} live and ${subject.vaulted} ` +
+               `vaulted relics, and all of them belong in the list now`);
+  assert.equal(await page.locator("#planRelics .relic-row .from-trade").count(),
+               subject.vaulted,
+               "and the vaulted ones have to say they are trade rows, or they read as drops");
 
-  const hint = await page.locator("#planRelics .hint").innerText();
-  assert.match(hint, new RegExp(`\\b${subject.vaulted}\\b`),
-               `the list must say how many it is not showing, got: ${hint}`);
-  assert.match(hint, /vaulted/i);
+  await setCheck(page, "#p-trade", false);
+  assert.equal(await page.locator("#planRelics .relic-row").count(), subject.live,
+               "unticking Trade leaves exactly the relics you can obtain — which is " +
+               "the view this list had before the trade rows were let in");
+
+  /* The note that used to stand here — "5 more relics are vaulted and not
+     shown" — is gone, and its absence is asserted rather than assumed. It
+     described a list nobody could reach; the rows are reachable now, so a
+     sentence counting them would be counting what is on screen. */
+  await setCheck(page, "#p-trade", true);
+  assert.equal(await page.locator("#planRelics .hint").count(), 0,
+               "nothing is hidden by a filter any more, so nothing may claim it is");
   assert.deepEqual(errors, []);
 });
 

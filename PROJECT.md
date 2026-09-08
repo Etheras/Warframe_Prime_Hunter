@@ -7056,6 +7056,73 @@ Two things about the test are worth keeping, because both were wrong first:
   test does, because a fissure only moves the arithmetic where the run length is
   a choice.
 
+### The Trade checkbox was already the right control, and the filter never let it near the rows
+
+The owner's question, 2026-09-08: *"isn't everything vaulted tradeable as well?
+why would tradeable exclude relics?"* It does not, and the answer is that the
+exclusion was never the checkbox.
+
+`isTrade` is a fact about the **relic** — `vaulted && !resurgence && !isBaro` —
+and never asks which Prime wanted it. The rows were dropped upstream, in
+`relicPlan`, where a vaulted relic was skipped unless the Prime was `stranded`;
+only a count survived, *"5 more relics are vaulted and not shown"*. So the
+control that should have governed them never saw them.
+
+**Measured before changing anything, because the risk and the cost were
+different things.** Of 723 trade-only relics, **none has a live source** — the
+node walk reads `sources` and finds nothing — so *Where to go* provably cannot
+move. What moves is the list: on a wishlist of every farmable Prime, 34 rows
+become 670, and with the whole catalogue wished, 763.
+
+**Two shapes were built and thrown away before the third, and both failures are
+the useful part.**
+
+- **A flat cap on the list.** Relics sort obtainable-first, so twelve farmable
+  rows filled the cap and pushed **Varzia's off screen** — a relic you can go and
+  buy today, hidden behind a button. Only the browser showed it. *A cap here can
+  never be positional.*
+- **Collapsing the trade tail behind its own control.** That fixed the Varzia
+  regression and introduced a worse fault: two controls for one set of rows,
+  which `STYLE.md §6` exists to prevent. It announced itself immediately — the
+  *Trade* box stopped changing any total, because the collapse had already
+  removed the rows it governed.
+
+So the list is **uncapped** and *Trade* is the only control. A long list is the
+honest consequence of wanting many Primes at once, and it has a control on it.
+Verified on Caliban Prime: 12 rows with Trade on (7 farmable, then 5 badged
+*trade for it*), tier tabs reading All 12 / Lith 3 / Meso 4 / Neo 2 / Axi 3, and
+7 rows with it off.
+
+**Three things the merge broke quietly, each found by a test rather than by
+reading.**
+
+1. **The trade badge's tooltip became false.** It said *"Vaulted, and this Prime
+   has no other route — no drop, no Baro, no quest"*, and its comment said *"only
+   ever reached for a Prime with no way in at all"*. Both were true while the
+   list admitted these relics only for stranded Primes. A farmable Prime has
+   vaulted relics holding its parts, and they land on this badge. It now says
+   what it actually knows — this **relic** must be traded for — and says plainly
+   that it implies nothing about the Prime.
+2. **`noNodes` asked `every` where it had to ask `some`.** Its branches tested
+   whether *every* wanted relic was purchasable. With every relic now in the
+   plan that is false for essentially everybody, so a **Prime Resurgence Prime
+   was told to trade for relics Varzia was selling that afternoon** — the exact
+   defect fixed two days earlier, reintroduced from the other side. Asking `some`
+   is also the better question: if six of twenty-five relics are on her shelf,
+   Varzia is the answer and the other nineteen are not the news.
+3. **Two tests asserted premises that had genuinely changed** — that a tier could
+   be empty, and that a farmable list has no trade errand. Both are now nearly
+   impossible, because every Prime has vaulted relics somewhere. They were
+   rewritten to derive their expectations from the payload rather than loosened,
+   which made both stronger than before: the errand test now fails if a box
+   appears for a category the list lacks *or* is missing for one it holds.
+
+**The general lesson is about where a filter lives.** Two mechanisms governed
+one set of rows — a filter deciding membership and a checkbox deciding display —
+and because the filter ran first, the checkbox's own rule was never wrong and
+never applied. Nothing about `isTrade` needed fixing. The bug was that something
+else had already answered its question.
+
 ---
 
 ## 8. Gotchas discovered while building
