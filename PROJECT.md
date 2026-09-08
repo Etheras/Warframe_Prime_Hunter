@@ -7008,6 +7008,54 @@ nothing, *clear all* is still offered, the number survives in `localStorage`, an
 switching Railjack back on makes it count again. Verified red against the
 unfiltered set.
 
+### The re-rank was already built, and writing its test found the bug in it
+
+The owner decided on 2026-09-08 to have the ranking follow a fissure refresh
+rather than repaint badges only, choosing *re-rank in place* over an affordance
+and over leaving it. **The work was already done and had been since
+2026-09-01.**
+
+`plan.js` has **two** subscribers to the same poller. One repaints badges. The
+other is `tick`, at the foot of the file, which calls `render()` whenever
+`ROT.clockStamp` changes — and a new fissure changes it. Its own comment says
+*"the poller only calls back when the file actually changed, so this is a
+re-rank on real news rather than on a timer"*, and §7 above has a heading for
+it. Nothing needed building.
+
+**What let this get as far as an implementation** is worth more than the entry
+it retired. The comment above the *badges* subscriber read *"Badges only,
+deliberately … re-running that would rename rows under whoever is reading
+them"* — a true description of that one callback, and a false description of the
+page, because the decision it defended had been reversed one scroll away. The
+`TODO.md` row said the same thing and had never been re-read against the code.
+So the backlog and the source agreed with each other and both were wrong, which
+is the one configuration that survives a check.
+
+**And the attempt found a real defect, which is the only reason it was not
+wasted.** `render()` rebuilds the sidebar form as well as the list, through
+`innerHTML`. `STYLE.md §6`: *a control must not rebuild the container it lives
+in* — it destroys the element holding the focus and returns a keyboard user to
+the top of the page. So a fissure arriving while somebody was typing a number
+into *Effort* took the field out from under them, every ten minutes, silently.
+
+`tick` now holds a re-rank while the focus is inside the form. **Held, not
+dropped**: `seen` is left unadvanced, so the next tick — thirty seconds later,
+or the moment the field is left — does the work. Nothing is lost and nothing is
+deferred indefinitely.
+
+Two things about the test are worth keeping, because both were wrong first:
+
+- **It asserted on the row's text**, which contains the fissure badge. A
+  badges-only refresh changes that text without re-ranking anything, so the
+  assertion passed for the wrong reason. It reads the **ranked figures**
+  instead — nothing but a re-render touches those.
+- **It picked its subject with `quietRow`**, which returned a one-run Faceoff
+  node where a fissure changes the badge and nothing else, so the figures were
+  identical afterwards and a working fix looked broken. It selects an **endless**
+  row with no fissure on it, the same way the *"how far the row says to run"*
+  test does, because a fissure only moves the arithmetic where the run length is
+  a choice.
+
 ---
 
 ## 8. Gotchas discovered while building

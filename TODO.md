@@ -226,8 +226,7 @@ observation rather than a precondition.
 |---|---|
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
-| The page tests flake in a full run and pass on their own | watching — a third occurrence 2026-09-04 named `ERR_NO_BUFFER_SPACE`, the first evidence pointing at socket exhaustion rather than timing |
-| A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
+| The page tests flake in a full run and pass on their own | watching — **fourth occurrence 2026-09-08**, `ERR_NO_BUFFER_SPACE` again, on `page.goto`. Two in a row now name it, which is stronger evidence for socket exhaustion than for timing |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
 | A priority flag on the farm list | session |
@@ -760,6 +759,30 @@ Three ways, none started:
 3. **Find the names.** The ids are stable; a static `CrewBattleNode*` map, or
    WFCD's node list read once and cached, would let DE's own rows be named. Most
    work, and the only one that keeps both first-party data and the feature.
+
+**The owner chose 3 — find the names — on 2026-09-08, and it turns out to be a
+rule 9 question rather than a task.** Checked before starting: the ids exist in
+**exactly one** place we hold. Every cached manifest was decompressed and
+searched, and the `CrewBattleNode` ids appear only in `de_worldstate.gz`, twelve
+times. `ExportRegions_en.json` carries none, which `node_names` already says.
+
+So there is no local derivation available, and every route to a name goes
+somewhere that needs the owner's approval first:
+
+- **WFCD's `solNodes` map**, which is what names them for everyone else. That is
+  *"a mapping table lifted verbatim"* — **hard rule 9**: the owner's approval
+  first and its licence read second, in that order. Not started.
+- **Hand-author the map.** Twelve ids today, and it grows whenever DE add a
+  Proxima node, with nothing to tell us when that happened.
+- **Learn it from the two feeds.** DE give id + tier + expiry; the proxy gives
+  name + tier + expiry for the same storms. Joining those on the window would
+  build the map from data we already fetch rather than from anyone's table —
+  but it only learns while the proxy is being asked, which on this machine is
+  almost never, and it is still WFCD's naming reaching our payload by a longer
+  road.
+
+**Blocked on the owner, not on effort.** The choice is which of those three, and
+the first two are rule 9 decisions that a session must not take on its own.
 
 **Size: small for 1 or 2, session for 3.** Nothing about it is urgent — the
 deployed site is on the proxy most of the time, and that is the copy the owner
@@ -1589,30 +1612,38 @@ Related: *A vaulted relic on a Prime you can farm another way is still hidden*,
 which is the same question one level down — when a relic you cannot farm is still
 worth showing.
 
-### What the misses are worth, in Ducats
+### What the misses are worth, in Ducats — **tie-break only, deferred 2026-09-08**
 
-The data is already here and already tested: `ducats` on **582 of 590** parts, all
-in `{15, 25, 45, 65, 100}`, pinned by `test_build.py`. **Nothing in the ranking
-reads it** — this entry said "nothing reads it" until 2026-08-25, but the
-collection drawer has shown a per-part Ducat badge since 2026-08-11
-(`assets/app.js:863`). It is the scoring side that is untouched.
+**Decided and not being built yet.** The owner: *"Ducats are only listed for the
+users'/client's convenience to see. Never intended for them to affect something
+on our sorting. Build the tie-break only."* And, on the plumbing: *"we will need
+the session of plumbing in order to incorporate Ducats and warframe.market
+Platinum prices to each part and/or set … record the decision, but we will not
+be implementing this right now."*
 
-Measured across the 34 currently-dropping relics, the expected Ducats of one Intact
-opening runs **17.3 to 33.4, mean 21.4** — a 1.9× spread. Real, and small. Two notes
-for whoever implements it:
+So the shape is settled: Ducats may order rows that are **already equal** and
+may never move one above another. That is by construction the only use that
+cannot let them reach the ranking.
 
-- the join needs the same `normalise_part` the pipeline already applies. Reward rows
-  are named `Nyx Prime Chassis Blueprint` while the part is `Chassis`; without that
-  step 38 of 180 live reward rows miss and the numbers come out ~20% low.
-- **the tie-break framing is the weak half of the proposal.** Nodes that are the
-  same bet are already folded into one row by `ROT.signature`, so exact ties between
-  *different* relic tables are not the common case. The strong half is the one the
-  review states second: this is the value of the **misses**, and the misses are most
-  of what a run hands you.
+**Two measurements taken before deferring it, because both change the estimate.**
 
-It is not free of the argument that keeps traces out of the score, either: Ducats
-buy from Baro, and what a Ducat is worth depends on whether you want anything he is
-selling.
+- **It is a build change, not a planner change.** A relic's `rewards[]` carry
+  `item` as a display string — `"Akstiletto Prime Blueprint"` — with no link to
+  the part that holds `ducats`. That is the join this entry always warned about:
+  without `normalise_part`, **38 of 180 live reward rows miss and the figure
+  reads ~20% low**. It belongs in `build_data.py`, attaching `ducats` to each
+  reward row — which is the same plumbing the Platinum entry needs, and the
+  reason to do them together rather than twice.
+- **It will fire rarely.** The sort compares at `1e-12`, so a tie means
+  *identical* scores, and `ROT.signature` already folds same-mode nodes with
+  identical relic tables into one row. Measured over 116 ranked rows: **86 share
+  a displayed value** (two decimal places) but differ below it and sort normally.
+
+Neither is an argument against the decision — a rule that rarely fires is the
+safest possible home for a number the owner does not want in the ranking. They
+are an argument about **order**: this is the least valuable and most plumbing of
+the work that is currently approved, and it should ship with the Platinum join
+rather than ahead of it.
 
 ### What the misses are worth in Platinum, from warframe.market
 
@@ -2496,83 +2527,67 @@ thing nobody had before. Both theories above are dead at that point, and the nex
 suspect is the one the original entry named and could not test: timing under
 load, in a group that runs last after half a minute of subprocesses.
 
-### A backend refresh finds new fissures and the ranking does not move
+### ~~A backend refresh finds new fissures and the ranking does not move~~
 
-**Asked for 2026-08-27.** `watchFissures` re-reads `data/fissures.json` every ten
-minutes, on load and on `visibilitychange`, and splices the new list into the
-array both pages hold. The planner repaints its fissure **badges** from that.
-*Where to go* does not re-rank.
+**It already did, and had since 2026-09-01.** Picked up on 2026-09-08 to be
+implemented, on the owner's decision to re-rank in place, and found finished
+before a line was written. `tick` at the foot of `plan.js` is a second
+subscriber to the same poller and calls `render()` whenever `ROT.clockStamp`
+changes, which a new fissure does — its own comment says *"a re-rank on real
+news rather than on a timer"*, and `PROJECT.md §7` has a heading for it: *The
+tick re-ranks for everything on the clock, not just for bounty letters*.
 
-**That is currently deliberate, which is what makes this more than a one-liner.**
-`PROJECT.md §7` — *"Badges only, deliberately"* — the fold uses a live fissure to
-choose which of several identical nodes to name, so re-running the ranking on a
-refresh would rename and reorder rows under whoever is reading them, for a reason
-that expires within the hour. It is the same call as never letting a fissure into
-the score.
+This entry predated that work and nobody re-read it against the code. **A
+backlog entry is not evidence** — the fourth time this file has said so about
+itself, and the first where it nearly cost a re-implementation of a working
+feature. The comment above the *other* subscriber said "badges only,
+deliberately" and was describing a decision that had already been reversed one
+file-scroll away, which is how it survived.
 
-So this is a request to revisit a decision, not to fix an oversight, and it needs
-an answer to the thing that decision was protecting: **what happens to the reader
-mid-read?** Options worth weighing rather than one of them being assumed —
-re-rank in place and accept rows moving; re-rank but hold the order until the
-reader does something; or offer it, a *"3 new fissures — update the list"* affordance
-that re-ranks when pressed, which is the only one that cannot move anything under
-anyone. The last is more work and is probably right.
+**What the attempt did find is real and is fixed.** A re-render replaces the
+sidebar form as well as the list, through `innerHTML`, and `STYLE.md §6` forbids
+a control rebuilding the container it lives in: a re-rank landing while somebody
+is typing a number into *Effort* destroyed the focused input and returned them
+to the top of the page. `tick` now holds the re-rank while the focus is in the
+form — held, not dropped: `seen` is left unadvanced, so the next tick does the
+work. Found only because a test was written for the behaviour that already
+existed.
 
-Whatever is chosen, the collection view's *Still needed* panel reads the same
-list through the same `opts` and would need the same treatment, or the two go
-back to disagreeing about what is reachable — which they did once already.
+### A vaulted relic on a Prime you *can* farm another way is still hidden **[settled — declined 2026-09-08]**
 
-### A vaulted relic on a Prime you *can* farm another way is still hidden
+**Not open. The switch is out of scope.** The owner, asked directly: *"I do not
+want this feature to be included … I do not intend for the client/user to tell
+us what relics he has, but I might change my opinion of this, and it will be a
+major feature."*
 
-**What is left of the owned-relics question after 2026-08-27.** A Prime with no
-way in at all now shows its relics to trade for — `PROJECT.md §7` has that. The
-remaining case is narrower and genuinely undecided: a Prime you *can* get another
-way, some of whose relics are vaulted. Those stay hidden, and for that Prime the
-filter is arguably right — there is somewhere to go, and burying it under relics
-you cannot farm is what *Hide vaulted* exists to prevent.
+**What it would have added**, since the option was put badly the first time and
+this is the answer to it. It is **not** a relic inventory: one boolean, *"I hold
+vaulted relics"*, no list and nothing to maintain. The crack list currently
+drops wanted relics you cannot obtain today; measured 2026-09-08, that hides
+something on **38 of 167 Primes**, median **14** relics each, max **156**. The
+switch would stop that filtering so a long-time player could be told *"you
+already own Meso Y2 — crack that"*.
 
-But it is still true that a player who has been going for years holds a stack of
-vaulted relics, and *"which of these do I crack"* is a fair question the page
-declines to answer.
+**And the owner's reading of it is the sharper one.** Asked whether this is
+*"basically the Trade checkbox on How to crack them"* — partly, and the part
+that differs is the whole feature:
 
-**The blocker is unchanged and is about input, not display.** The app tracks
-Primes and parts, never relic inventory, and *Relic inventory* is **[settled]**
-below as declined — hand-entering a stack is more work than the answer is worth.
-Nothing here is worth building until that is revisited or sidestepped.
+| | what it controls |
+|---|---|
+| the **Trade** checkbox | relics **already in the list**, filtered at `plan.js:1940` |
+| the **switch** | relics that **never enter the list**, dropped at `plan.js:627` |
 
-Two shapes were offered, and **the second shipped on 2026-09-02**:
+The split is `stranded`. A vaulted relic on a Prime with no other route reaches
+`relicPlan` and the Trade box shows it; the same relic on a Prime you can farm
+elsewhere is excluded upstream, and only the *"N more relics are vaulted and not
+shown"* count mentions it. So **the Trade checkbox already does this job for
+stranded Primes** and the switch would extend it to the rest — which is why the
+two look alike and why one is a checkbox and the other is a feature.
 
-- **A planner switch**, mirroring the collection view's *Hide vaulted*: *"I have
-  vaulted relics"*, and the crack list stops filtering on obtainability. No data
-  entry. Note this is exactly the switch the fully-vaulted case deliberately did
-  **not** need — there the answer follows from the data, here it depends on
-  something only the reader knows, which is the honest reason to have one.
-  **Still open, and still undecided.**
-- ~~**Say it rather than show it**~~ — **shipped.** The crack list now counts the
-  wanted relics the vault filter kept out and says so beneath the rows: *"5 more
-  relics are vaulted and not shown — if you are holding any, they are worth
-  cracking too."*
-
-**Why the smaller shape went first.** It sidesteps the blocker rather than
-pre-empting it: a count needs nothing from the reader, decides nothing about
-relic inventory, and does not foreclose the switch. What it fixes is narrow and
-real — the filter was **silent**, so a filtered list and a complete one looked
-identical, and a reader holding a stack of vaulted relics had no way to know the
-page was declining to answer.
-
-Counted only where genuinely wanted: a relic held by the Forma bonus alone is
-not something the reader is short of, and counting it would overstate what is
-being hidden. Suppressed when the list is empty for the fully-vaulted reason,
-which already says so in its own words — two messages saying the same thing
-differently is worse than one.
-
-Verified against `Caliban Prime`, chosen off the payload for having both kinds:
-12 relics, 7 live and ranked, 5 vaulted and reported. The test derives both
-numbers from the payload rather than naming them.
-
-**What is left is the switch, and the blocker under it is unchanged**: the app
-tracks Primes and parts, never relic inventory, and *Relic inventory* is
-**[settled]** below as declined.
+The blocker underneath is unchanged and is why it stays declined: a boolean
+cannot say *which* relics you hold, so the list it reveals is mostly rows the
+reader cannot act on. The useful version is relic inventory, **[settled]**
+declined below.
 
 ### The rest of the player facts the header could hold
 

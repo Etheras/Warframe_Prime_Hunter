@@ -3130,6 +3130,98 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
   assert.deepEqual(errors, []);
 });
 
+page_test("a refresh that finds a fissure re-ranks, and waits if you are typing", async () => {
+  /* Reversed a deliberate decision on 2026-09-08, the owner's call. The refresh
+     used to repaint badges only, so a ranking could sit there ignoring a feed
+     the page had already fetched. It re-ranks now, and the rows moving is the
+     accepted consequence of the answer changing.
+
+     Two halves, and the second is the one that keeps it civil. `render` rebuilds
+     the effort form through `innerHTML`, and `STYLE.md §6` forbids a control
+     rebuilding the container it lives in — so a background refresh that lands
+     while somebody is typing a number would destroy the focused element and
+     return them to the top of the page. It defers instead.
+
+     The subject is read off the row the planner ranked, so this cannot pass by
+     marking somewhere nobody is being sent. */
+  const { page, errors } = await open("/plan.html");
+  await wishFarmable(page);
+  /* Names without badges, and the ranked figures separately. Reading
+     `allInnerTexts()` off the row was the first attempt and it conflates the
+     two: `paintFissures` writes the badge into that same element, so a
+     badges-only refresh changes the text without re-ranking anything, and an
+     assertion on it passes for the wrong reason in one direction and fails for
+     the wrong reason in the other. The figures are the honest signal — nothing
+     but a re-render touches them. */
+  const shape = () => page.evaluate(() => ({
+    nodes: [...document.querySelectorAll("#planNodes .spot-where")]
+      .map((e) => e.childNodes[0].textContent.trim()),
+    figures: [...document.querySelectorAll("#planNodes .spot-score b")]
+      .map((b) => b.textContent.trim()),
+  }));
+  const before = await shape();
+  assert.ok(before.nodes.length > 2, "need a ranking before there is anything to re-rank");
+
+  /* An **endless** row with no fissure on it yet, the same selection the
+     "how far the row says to run" test uses and for the same reason: a fissure
+     only changes the arithmetic where the run length is a choice. `quietRow`
+     was the first attempt and it picked a one-run Faceoff node, where a fissure
+     changes the badge and nothing else — so the figures were identical
+     afterwards and the test failed against a working fix. */
+  const key = await page.evaluate(() => {
+    const live = new Set((window.WFPRIME_DATA.fissures || []).map((f) => f.node));
+    for (const el of document.querySelectorAll("#planNodes .spot")) {
+      if (!/\d+ rounds/.test(el.textContent)) continue;
+      const node = (el.querySelector(".fissure-slot") || {}).dataset?.node;
+      if (node && !live.has(node)) return node;
+    }
+    return null;
+  });
+  assert.ok(key, "no endless node ranked without a fissure already on it");
+  await page.route("**/data/fissures.json", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({
+      generated: new Date().toISOString(),
+      fissures: [{ node: key, tier: "Neo", mode: "Survival",
+                   ends: new Date(Date.now() + 55 * 60000).toISOString(),
+                   hard: false, storm: false }],
+    }),
+  }));
+
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
+  const after = await shape();
+  /* The figures, not the names: a fissure changes how far the row says to run,
+     so the ranked number moves whether or not the row does. Badges-only left
+     these untouched, which is exactly what this reverses. */
+  assert.notDeepEqual(after.figures, before.figures,
+                      "a fissure the page has fetched has to reach the ranking, " +
+                      "not just the badge on one row");
+
+  /* Now the guard. Put the focus in an effort box, change the feed again, and
+     the list must hold still — the reader is mid-number. */
+  await page.locator(".advanced > summary").click();
+  const box = page.locator("#effortRows .effort-row input").first();
+  await box.focus();
+  assert.equal(await page.evaluate(() => document.activeElement.tagName), "INPUT",
+               "the focus has to actually be in the form for this half to mean anything");
+
+  const held = await shape();
+  await page.route("**/data/fissures.json", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ generated: new Date().toISOString(), fissures: [] }),
+  }));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await page.waitForTimeout(600);
+  const while_typing = await shape();
+  assert.deepEqual(while_typing.figures, held.figures,
+                   "a background refresh must not re-rank under someone typing");
+  assert.deepEqual(while_typing.nodes, held.nodes, "and must not reorder the rows either");
+  assert.equal(await page.evaluate(() => document.activeElement.tagName), "INPUT",
+               "and it must not take the focus away either — that is the whole reason");
+  assert.deepEqual(errors, []);
+});
+
 // ── the responsive rules, which only a real browser can answer ─────────────
 
 page_test("the sidebar does not push the grid off screen on a phone", async () => {

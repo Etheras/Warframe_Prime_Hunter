@@ -2451,10 +2451,18 @@
      one that opened since. `watchFissures` re-reads the list itself, every ten
      minutes, from this same origin — see shared.js.
 
-     Badges only, deliberately. The fold uses a fissure to choose which of
-     several identical nodes to name, and re-running that would rename rows
-     under whoever is reading them for a reason that expires within the hour.
-     Same call as never letting a fissure into the score (`PROJECT.md §7`). */
+     **Badges only here, and that is still right** — but not for the reason
+     this comment used to give. It said the ranking deliberately does not move
+     on a refresh. It does, and has since 2026-09-01: `tick` at the foot of this
+     file is a second subscriber to the same poller and calls `render()`
+     whenever `clockStamp` changes, which a new fissure does. This callback is
+     the *badge* half of the same news, and the two are subscribed separately
+     because one is cheap and unconditional and the other is not.
+
+     `TODO.md` carried *"a backend refresh finds new fissures and the ranking
+     does not move"* until 2026-09-08, when it was picked up to be implemented
+     and found already done. The entry predated the tick work and nobody
+     re-read it against the code. **A backlog entry is not evidence.** */
   S.watchFissures(paintFissures);
 
   /* ── catching up after a tab switch ───────────────────────────────
@@ -2907,10 +2915,28 @@
      clock whether or not a bounty is. `clockStamp` is the whole question now, so
      the gate would only ever have answered a part of it. */
   {
+    /* A re-render replaces the sidebar form as well as the list, through
+       `innerHTML` — and `STYLE.md §6` is explicit that a control must not
+       rebuild the container it lives in, because that destroys the element
+       holding the focus and returns a keyboard user to the top of the page.
+       The part counters in the drawer did exactly this once.
+
+       So a re-rank that arrives **while somebody is typing a number into the
+       effort form waits**. It is not dropped: `seen` is left alone, so the next
+       tick — thirty seconds, or the moment the field is left — sees the same
+       change and does the work then. Found 2026-09-08 while writing a test for
+       the re-rank itself, which is the only way this was ever going to show:
+       nothing about the ranking is wrong, the focus simply goes. */
+    const typingInForm = () => {
+      const el = document.activeElement;
+      return !!(el && el.closest && el.closest(".plan-list") &&
+                /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
+    };
     let seen = ROT.clockStamp(FISSURES);
     const tick = () => {
       if (document.hidden) return;
       const now = ROT.clockStamp(FISSURES);
+      if (now !== seen && typingInForm()) return;      // hold it, do not lose it
       if (now !== seen) { seen = now; render(); return; }
       $$("[data-until]").forEach((el) => {
         el.textContent = untilText(Number(el.dataset.until)) + " left";
