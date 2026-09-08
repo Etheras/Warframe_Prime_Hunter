@@ -53,6 +53,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import artwork                                            # noqa: E402
 import catalogue                                          # noqa: E402
 import limits                                             # noqa: E402
+import market                                             # noqa: E402
 import official                                           # noqa: E402
 import relics as relicmod                                 # noqa: E402
 import sources                                            # noqa: E402
@@ -1453,6 +1454,15 @@ def main() -> int:
     log(f"  parts: DE publish a recipe for {len(de_part_specs)} of "
         f"{len(export_primes)} Primes")
 
+    # What another player pays for a spare, joined on DE's own paths. Enrichment
+    # in the strict sense: `{}` here costs a badge and stops a tie-break firing,
+    # and nothing else in the payload changes. Asked once a day - see
+    # `WM_MAX_AGE` in sources.py for why that is our number rather than theirs.
+    wm_prices = market.fetch_prices(args.offline)
+    log(f"  platinum: warframe.market priced {len(wm_prices)} tradeable items"
+        if wm_prices else
+        "  platinum: no warframe.market data - badges and the tie-break are absent")
+
     # Normalised here rather than beside the fetch, because naming a node needs
     # DE's region export and that arrives on the line above. First party first:
     # the worldstate is DE's own, and the proxy is asked only if it gave us
@@ -1778,6 +1788,11 @@ def main() -> int:
                 "itemCount": p["itemCount"],
                 "ducats": p["ducats"],
                 "drops": drops_by_part.get(normalise_part(p["name"]), []),
+                # DE's own paths for this part, carried only as far as the
+                # warframe.market join below and never emitted. `price_for`
+                # tries both, because a Warframe component trades as its
+                # blueprint and the outside world knows it by that path.
+                "plat": market.price_for(wm_prices, p),
             } for p in spec]
 
         parts = []
@@ -1857,7 +1872,7 @@ def main() -> int:
                     r["chances"] = want.get("chances") or {}
                 r["farmable"] = r["relic"] in relic_sources
 
-            parts.append({
+            part = {
                 "name": part_name,
                 "itemCount": as_int(comp.get("itemCount")),
                 # What Baro pays for a spare. A fixed game constant, published
@@ -1866,7 +1881,29 @@ def main() -> int:
                 # exactly why it was trusted to be a number and was not one.
                 "ducats": as_int(comp.get("ducats")),
                 "relics": part_relics,
-            })
+            }
+            # What another player pays for a spare, which is the other half of
+            # the same question and moves weekly rather than never. Absent
+            # whenever warframe.market could not be read or does not list the
+            # part, and every reader of it treats absent as "say nothing" - see
+            # `PROJECT.md §7`. Shown and tie-broken on; never ranked.
+            # Either route to a price, and both are DE's own path rather than a
+            # name. The first is the DE-recipe branch above, which resolved it
+            # already. The second covers the branch that has no DE recipe to
+            # read — one item, Kavasa Prime Collar — where WFCD republish DE's
+            # `uniqueName` per component, and it is byte-identical to the
+            # `gameRef` warframe.market hold. Without this that item is the only
+            # one in the catalogue with no price on any part, for a reason that
+            # has nothing to do with warframe.market: they list it.
+            price = comp.get("plat") or market.price_for(
+                wm_prices, {"path": comp.get("uniqueName")})
+            if price:
+                part["plat"] = price["plat"]
+                if price.get("median") is not None:
+                    part["platMedian"] = price["median"]
+                if price.get("volume") is not None:
+                    part["platVolume"] = price["volume"]
+            parts.append(part)
 
         # Nothing from the item API? Derive the parts from the drop table
         # directly. This is what makes a Prime released hours ago still show
@@ -2015,6 +2052,65 @@ def main() -> int:
             out.append(row)
         return out
 
+    # ---- what each reward row is worth, in Ducats and Platinum -----------
+    #
+    # **A build change, not a planner change, and that is the whole point of
+    # doing it here.** A relic's rewards carry `item` as a display string —
+    # "Akstiletto Prime Blueprint" — with no link to the part that holds
+    # `ducats`. The planner cannot reconstruct that link without re-deriving
+    # this join in JavaScript against the whole catalogue on every render.
+    #
+    # **Two spellings per part, and the second is not optional.** The drop table
+    # says "Ash Prime Neuroptics Blueprint" where DE's component list says
+    # "Neuroptics", because Warframe parts drop as blueprints. Keying on the
+    # bare name alone missed **38 of 180 live reward rows and read ~20% low** —
+    # measured before this was written, and the reason `normalise_part` exists
+    # at all. Emitting both spellings is cheaper and more honest than guessing
+    # which one a source will use.
+    reward_value: dict[str, dict] = {}
+    for it in out_items:
+        for p in it.get("parts") or []:
+            # A component that is itself a whole Prime carries no ducats of its
+            # own and must not be registered: "Lex Prime" as a part of Aklex
+            # Prime would otherwise claim the key that Lex Prime's own rewards
+            # want. Skipped explicitly rather than relying on `worth` coming out
+            # empty, because that is a coincidence and this is a rule.
+            if p.get("builtFrom"):
+                continue
+            worth = {}
+            if p.get("ducats"):
+                worth["ducats"] = p["ducats"]
+            if p.get("plat"):
+                worth["plat"] = p["plat"]
+            if not worth:
+                continue
+            # The item's own name, and the drop table's name for it where those
+            # differ. `NAME_ALIASES` already holds the one case — the catalogue
+            # says "Kavasa Prime Collar" and the drop table pays "Kavasa Prime
+            # Kubrow Collar Blueprint" — so this reads the existing answer
+            # rather than adding a second place to keep the same fact.
+            names = {it["name"], NAME_ALIASES.get(it["name"], it["name"])}
+            spellings = [f"{n} {p['name']}" for n in names]
+            # **And the part name on its own, when it is already a full name.**
+            # Most parts are generic labels — "Chassis", "Blueprint" — which
+            # only mean something after the item's name, and registering those
+            # bare would let one item's Blueprint answer for all 167. A few name
+            # themselves: the drop table pays "Kavasa Prime Band", not "Kavasa
+            # Prime Kubrow Collar Kavasa Prime Band", and those rows were
+            # unpriced until this was measured. Carrying "Prime" as a whole word
+            # is what distinguishes the two, and such names are unique by
+            # construction.
+            #
+            # Split on the raw name, NOT on `norm`, which strips spaces as well
+            # as punctuation — `norm("Kavasa Prime Band").split()` is one token
+            # and the test silently never fired. That cost a rebuild to find.
+            if "prime" in p["name"].lower().split():
+                spellings.append(p["name"])
+            for spelling in list(spellings):
+                spellings.append(f"{spelling} Blueprint")
+            for spelling in spellings:
+                reward_value.setdefault(norm(spelling), worth)
+
     relics_out = {}
     for rname in sorted(used_relics, key=lambda x: (TIER_ORDER.get(x.split()[0], 9), x)):
         content = relic_contents.get(rname, {})
@@ -2028,6 +2124,11 @@ def main() -> int:
                     item=re.sub(r"^\d+\s*X\s+", "", k),
                     qty=int(re.match(r"^(\d+)\s*X\s+", k).group(1)) if re.match(r"^\d+\s*X\s+", k) else 1,
                     rarity=v.get("rarity"), chances=v.get("chances"),
+                    # Absent, not zero, when the row is Forma or a part nobody
+                    # priced. Zero is a claim ("worth nothing"); absent is the
+                    # true one ("not known"), and the tie-break reads it as
+                    # "say nothing" rather than as the bottom of the order.
+                    **(reward_value.get(norm(re.sub(r"^\d+\s*X\s+", "", k))) or {}),
                 )
                 for k, v in sorted((content.get("rewards") or {}).items())
             ],

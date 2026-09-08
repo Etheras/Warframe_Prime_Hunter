@@ -235,6 +235,53 @@ is the one that had to change.
 
 ---
 
+## warframe.market
+
+**A third source tier, and the first that is neither Digital Extremes nor WFCD.**
+Added 2026-09-08. Warframe Prime Hunter reads two public endpoints to show what a
+spare Prime part is worth in Platinum:
+
+- <https://api.warframe.market/v1/tools/ducats> — the price table, carrying
+  `wa_price`, warframe.market's own weighted average
+- <https://api.warframe.market/v2/items> — the item list, used only to map their
+  internal id to `gameRef`, which is Digital Extremes' own path for the item
+
+**Whose numbers these are.** The prices are warframe.market's, computed from
+trades their users post. The *items* are Digital Extremes' and are covered by the
+same Content Policy as everything else here. We compute no price of our own and
+publish no order, no username and no listing — only the aggregate figure they
+already publish, per part.
+
+**Their rules, and what we do about them.** Their
+[published API rules](https://docs.warframe.market/docs/rules/overview/) state a
+limit of **3 requests per second**, require *"a dedicated and descriptive
+`User-Agent`"* with a contact, warn that clients disguising themselves as
+browsers may be blocked, and ask callers to *"use caching, reuse responses, avoid
+tight polling loops"*. Warframe Prime Hunter sends a descriptive User-Agent
+naming this repository, and asks **twice a day at most** — the figure read is
+`previous_day`, a daily aggregate, so polling faster could not produce a
+different answer. Neither endpoint sends a `Cache-Control` header, which makes
+this the one source whose refresh interval this project chose rather than read;
+the reasoning is recorded in `tools/sources.py` beside the constant.
+
+**Licensing is unstated, and that is recorded rather than assumed.** Their
+documentation sets out rules for *using the API* but makes no statement about
+licensing or redistribution of the data, carrying only a
+`Copyright © Warframe.market` footer. So no licence grant is claimed here. What
+is republished is minimal and derived: one rounded number per Prime part, in a
+dataset that is itself never committed and is rebuilt from source on every clone.
+Anyone publishing an instance should satisfy themselves this fits their
+circumstances, as with everything else in this file.
+
+**Nothing here involves real money.** Platinum is tradeable between players and
+these are player-to-player prices — a fact about the game economy, earned by
+playing it. Warframe Prime Hunter reads nothing DE sell for money: no Prime
+Access, no Prime Vault packs, no Regal Aya, no bought Platinum. The figure is
+shown for information and used only to order rows the ranking has already
+declared equal; it never affects what the tool recommends.
+
+---
+
 ## What Warframe Prime Hunter does not redistribute
 
 The generated dataset (`data/prime-data.js`) is deliberately **not committed**

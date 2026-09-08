@@ -1188,9 +1188,15 @@ button.wish-collect{
 
 /* mission type, beside the node name */
 .rounds{color:inherit}
-/* Ducat value of a spare part. Same weight as the rest of the part meta - it
-   is a fact about the part, not a recommendation to sell it. */
-.ducats{
+/* Ducat and Platinum value of a spare part. Same weight as the rest of the part
+   meta - both are facts about the part, not a recommendation to sell it.
+
+   Deliberately identical, and not for want of a spare colour. They answer the
+   same question - what is a duplicate worth - and colour here carries one
+   meaning at a time (STYLE.md section 1). Tinting the Platinum one would mark it
+   as a different KIND of fact, which it is not; the `d` and `p` suffixes already
+   say which is which, and the tooltip says where each number comes from. */
+.ducats,.plat{
   text-decoration:underline dotted;text-underline-offset:3px;
   cursor:help;
 }

@@ -771,7 +771,15 @@
        `n.overlap` is what the row says about it. */
     nodes.forEach((n) => {
       const spent = [];
+      /* What a spare from here is worth, for the tie-break only. Every relic
+         the node drops, across every rotation, because the reader is not
+         choosing a rotation when two rows have scored identically — they are
+         choosing a node. Computed in this pass rather than the walk above for
+         the same reason `creditRelics` is: it is a question about the node as
+         a whole, and the last source has only just landed. */
+      const allRows = [];
       Object.keys(n.rows).forEach((slot) => {
+        (n.rows[slot] || []).forEach((r) => allRows.push(r));
         const c = M.creditRelics(n.rows[slot]);
         n.rot[slot] = c.worth;
         n.cnt[slot] = c.count;      // rolls counted, never valued
@@ -787,6 +795,9 @@
         });
       });
       if (spent.length) n.overlap = spent;
+      const spare = M.nodeSpareValue(allRows, RELICS);
+      n.spareDucats = spare.ducats;
+      n.sparePlat = spare.plat;
     });
 
     /* ── Aya ──────────────────────────────────────────────────────────
@@ -1063,8 +1074,38 @@
     // the same one - so the list is always ordered by the number the row shows
     // largest, which is the rule rather than a coincidence (`STYLE.md §5`).
     const rankKey = sortBy().key;
+    /* ── the tie-break, and the reason it is only ever a tie-break ────
+       **Ducats first, then warframe.market's `wa_price`.** The owner's
+       instruction, and the order is theirs: *"Ducats are only listed for the
+       users'/client's convenience to see. Never intended for them to affect
+       something on our sorting. Build the tie-break only."*
+
+       The `1e-12` above is what makes that safe by construction rather than by
+       care. It fires only when two rows scored **identically** — not close,
+       identical — so this cannot move a row above another however large the
+       ducat gap is. It reorders rows the ranking has already declared equal,
+       which is the only use of a number the owner does not want in the ranking
+       that cannot leak into it.
+
+       Ducats before Platinum because Ducats are a fixed game constant published
+       by Digital Extremes, and `wa_price` is a weighted average of what players
+       asked for something this week. When the two disagree the fixed one should
+       decide; the market figure separates what Ducats could not.
+
+       Both before enemy level, which was the previous first tie-break, because
+       the owner named these as *the* tie-break. Level survives underneath and
+       still decides when neither value figure can — which is every row on a
+       build where warframe.market could not be read, since both are then 0.
+
+       Absent reads as 0 and therefore as "no opinion", never as last place: a
+       node with no priced relics falls through to enemy level exactly as it did
+       before any of this existed. */
     const ranked = Array.from(nodes.values()).sort((a, b) => {
       if (Math.abs(b[rankKey] - a[rankKey]) > 1e-12) return b[rankKey] - a[rankKey];
+      const ad = a.spareDucats || 0, bd = b.spareDucats || 0;
+      if (Math.abs(bd - ad) > 1e-9) return bd - ad;
+      const ap = a.sparePlat || 0, bp = b.sparePlat || 0;
+      if (Math.abs(bp - ap) > 1e-9) return bp - ap;
       const al = a.lvl ? a.lvl[0] : Infinity, bl = b.lvl ? b.lvl[0] : Infinity;
       if (al !== bl) return al - bl;
       return (a.node || "").localeCompare(b.node || "");

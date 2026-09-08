@@ -524,9 +524,30 @@ def prime_part_specs(exports: dict[str, dict]) -> dict[str, list[dict]]:
     `sub` marks an ingredient that is itself a Prime in the catalogue — Aklex
     Prime is built from two Lex Primes, which DE express the same way WFCD do,
     as the same ingredient listed twice at one each.
+
+    **`path` and `altPath` are DE's own internal paths for the part**, added
+    2026-09-08 so a part can be joined to something outside this file without
+    matching on a display name. `path` is what DE call the thing itself — the
+    recipe's `uniqueName` for a set blueprint, the ingredient's `ItemType` for a
+    component. `altPath` is the recipe that BUILDS that component, where one
+    exists, and it is not redundant: a Warframe part is sold and traded as its
+    blueprint, so the outside world frequently knows it by the recipe path while
+    DE's ingredient list knows it by the component path. Measured across the
+    catalogue: 426 parts are found under `path` and 153 only under `altPath`.
+    Emitting one of the two would lose a quarter of them.
+
+    Nothing in this project's own payload keys off these — they exist to be
+    joined on and are not shipped. See `tools/market.py`.
     """
     by_path = {p["uniqueName"]: p["name"]
                for p in collect_prime_items(exports) if p.get("uniqueName")}
+
+    # component path -> the recipe that builds it, for `altPath` above.
+    builds: dict[str, str] = {}
+    for rec in ((exports.get("ExportRecipes_en.json") or {}).get("ExportRecipes") or []):
+        rt, un = rec.get("resultType"), rec.get("uniqueName")
+        if rt and un:
+            builds.setdefault(rt, un)
 
     # ingredient path -> (display name, ducats). Only rows carrying a
     # `primeSellingPrice` are parts; the rest are Orokin Cells and the like,
@@ -545,7 +566,8 @@ def prime_part_specs(exports: dict[str, dict]) -> dict[str, list[dict]]:
         # The blueprint is the recipe itself, and its ducat value is the
         # recipe's own `primeSellingPrice`.
         parts = [{"name": "Blueprint", "itemCount": 1,
-                  "ducats": rec.get("primeSellingPrice"), "sub": False}]
+                  "ducats": rec.get("primeSellingPrice"), "sub": False,
+                  "path": rec.get("uniqueName"), "altPath": None}]
         for ing in (rec.get("ingredients") or []):
             path = ing.get("ItemType")
             count = ing.get("ItemCount") or 1
@@ -566,7 +588,8 @@ def prime_part_specs(exports: dict[str, dict]) -> dict[str, list[dict]]:
                 prev["itemCount"] = (prev["itemCount"] or 1) + count
             else:
                 parts.append({"name": label, "itemCount": count,
-                              "ducats": ducats, "sub": sub})
+                              "ducats": ducats, "sub": sub,
+                              "path": path, "altPath": builds.get(path)})
         out[owner] = parts
     return out
 

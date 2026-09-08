@@ -1471,6 +1471,14 @@ other becomes an automatic fallback.
 | `/pc/vaultTrader`, `/pc/fissures`, `/pc/syndicateMissions`, `/pc/events` on `api.warframestat.us` | **Fallback only** since 2026-08-27, and unused on a healthy build | Kept rather than deleted: they normalise the same document, and they can name the Proxima nodes DE's export omits. All four were 404 from 2026-08-24 |
 | `drops.warframestat.us` | Fallback drop data | Only used if the official page fails or parses thin |
 | `cdn.warframestat.us/img` | Item artwork | The wiki's own images are Cloudflare-protected (§7) |
+| [`api.warframe.market`](https://api.warframe.market) `/v1/tools/ducats` + `/v2/items` | **Platinum only** — what a spare part trades for. A badge, and the second key of the tie-break | A third tier, neither DE nor WFCD, added 2026-09-08. Joined on `gameRef`, DE's own path. Declares **no `Cache-Control`**, so its 24h window is chosen rather than read — the only source where that is true. `NOTICE.md` has their published rules |
+
+**The reader's browser is a source too, and it is the only one not in that
+table.** Since 2026-09-08 the page polls `api.warframestat.us/pc/fissures`
+itself, every two minutes, so the live fissure list is WFCD's rather than DE's
+regardless of what the build used. That splits the provenance and §7 says so
+under *The page reads its own fissure feed*; every other row above describes what
+the **build** contacts.
 
 `meta.dropSource` in the payload records which drop source actually served the
 build, and the sidebar footer shows it.
@@ -2475,6 +2483,82 @@ leaves the page exactly as it was before this existed. Discovered the expensive
 way: the first attempt let the real request through, and roughly two dozen tests
 began passing or failing according to what was running in Warframe at the time,
 reporting it as a five-second locator timeout that mentioned no network at all.
+
+### What a spare is worth: Ducats and Platinum, as a tie-break only
+
+**Decided by the owner, built 2026-09-08.** Both figures ride on the payload per
+part, show in the collection drawer, and order rows the ranking has already
+declared equal. The owner: *"Ducats are only listed for the users'/client's
+convenience to see. Never intended for them to affect something on our sorting.
+Build the tie-break only."*
+
+**Ducats first, then `wa_price`** — the owner's order. Ducats are a fixed game
+constant published by Digital Extremes; Platinum is a weighted average of what
+players asked for something this week. When the two disagree the fixed one
+decides, and the market figure separates what Ducats could not. Measured: they
+disagree on **44% of relic pairs**, so the second key is doing work rather than
+decorating.
+
+**Why it cannot reach the ranking, by construction rather than by care.** The
+comparator's existing epsilon is `1e-12`, so the tie-break is only consulted when
+two rows scored *identically* — not close, identical. Verified by generating
+200,000 pairs where the worse row carries an enormous spare value: **zero were
+lifted**. And it is not inert: on a 116-row list, **16 positions reorder** and
+the set of nodes is unchanged.
+
+**The join is on `gameRef`, Digital Extremes' own path, and never on a name.**
+Names are the join this project keeps getting bitten by — the drop table says
+"Chassis Blueprint", the item API says "Chassis", warframe.market says
+`ash_prime_neuroptics_blueprint` where DE's ingredient list says
+`AshPrimeHelmetComponent`. Three spellings of one part, none derivable from
+another. Both sides already hold DE's path, so the join is an identity.
+
+Three measurements decided it, and the third is the one that makes it
+trustworthy:
+
+- **579 of 581 parts join — 99.7%**, against 417 of 586 for the naive-slug
+  attempt this replaced. The two misses are Galariak Prime and Sagek Prime,
+  which warframe.market do not list **at all**; the join reaches 100% of what
+  they publish and the gap is release lag on their side.
+- **Two DE paths per part, and neither is redundant.** 426 parts are found under
+  the component path and **153 only under the recipe that builds it**, because a
+  Warframe component is traded as its blueprint. Emitting one would lose a
+  quarter of them.
+- **Ducats agree on all 579, zero disagreements.** DE publish a ducat value per
+  part and so does warframe.market, from unrelated pipelines — so comparing them
+  tests the join with a number the join does not use. A mis-join would have to be
+  wrong about the part and right about its ducats to survive it. That is the
+  difference between a match and a *correct* match, and it is the check this
+  project has learnt to demand.
+
+**The reward-row join is a build change, not a planner change.** A relic's
+rewards carry `item` as a display string with no link to the part holding
+`ducats`; the planner cannot reconstruct that without re-deriving the whole
+catalogue on every render. Two spellings per part are registered — with and
+without the `Blueprint` suffix — because the drop table pays "Ash Prime
+Neuroptics Blueprint" where DE's components say "Neuroptics". Keying on the bare
+name missed 38 of 180 rows and read ~20% low. **Now 100% of Prime-part reward
+rows carry both figures**, the only unpriced rows being Forma.
+
+**Absent is not zero, everywhere.** A reward with no price is Forma, or a part
+nobody listed. Counting it as zero would drag a relic's average down by whatever
+Forma happens to occupy — a claim that is false. Missing rows are skipped, and a
+node with nothing priced falls through to the enemy-level tie-break exactly as it
+did before any of this existed.
+
+**`Intact` odds, always.** An expected value has to name a refinement, and
+reading the plan's chosen one would put a *plan* setting inside a *tie-break* —
+the number would move when the reader adjusted something unrelated. Since this
+only ever separates already-equal rows, a consistent reference matters and the
+particular one does not.
+
+**Two traps recorded because both cost a rebuild.** `norm()` strips spaces as
+well as punctuation, so `norm("Kavasa Prime Band").split()` is one token and a
+`"prime" in ...` test silently never fires — split the raw name. And the
+catalogue calls that item "Kavasa Prime Collar" while the drop table pays "Kavasa
+Prime **Kubrow** Collar Blueprint"; `NAME_ALIASES` already held the mapping, so
+the fix was to read the existing answer rather than add a second place to keep
+the same fact.
 
 ### Two lists, two questions, never one score
 

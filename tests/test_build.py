@@ -842,6 +842,122 @@ def test_parts_are_digital_extremes_own_numbers() -> None:
           sorted(uncovered), ["Kavasa Prime Collar"])
 
 
+def test_platinum_joins_on_des_own_paths_not_on_names() -> None:
+    """
+    The warframe.market join, and the two things about it that could rot
+    silently.
+
+    **The join key.** Prices are matched to parts on `gameRef` — Digital
+    Extremes' own internal path, which both sides already hold — and never on a
+    display name. Names are the join this project keeps getting bitten by: the
+    drop table says "Chassis Blueprint", the item API says "Chassis", and
+    warframe.market says `ash_prime_neuroptics_blueprint` where DE's ingredient
+    list says `AshPrimeHelmetComponent`. A name-based fallback creeping in would
+    still produce mostly-right numbers, which is exactly why it needs a test
+    rather than a comment.
+
+    **The reward rows.** A relic's rewards carry `item` as a display string with
+    no link to the part holding `ducats`, so the build joins them. That join
+    missed 38 of 180 rows and read ~20% low before `normalise_part` and the
+    second spelling were applied to it — so this asserts the coverage rather
+    than the mechanism.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import market                                          # noqa: PLC0415
+
+    # ── the pure join, on fixtures, so it runs with no cache and no network ──
+    items = {"data": [
+        {"id": "aaa", "gameRef": "/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetBlueprint"},
+        {"id": "bbb", "gameRef": "/Lotus/Weapons/Tenno/Rifle/PrimeBarrel"},
+        {"id": "ccc"},                       # no gameRef: unjoinable, not a crash
+    ]}
+    prices = {"payload": {"previous_day": [
+        {"item": "aaa", "wa_price": 11.885, "median": 10, "volume": 367},
+        {"item": "bbb", "wa_price": 4, "median": 4, "volume": 12},
+        {"item": "ccc", "wa_price": 99},     # priced but unjoinable
+        {"item": "zzz", "wa_price": 5},      # priced, and not an item we know
+    ]}}
+    joined = market.prices_by_path(items, prices)
+    check("platinum: only rows with a DE path join", sorted(joined),
+          ["/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetBlueprint",
+           "/Lotus/Weapons/Tenno/Rifle/PrimeBarrel"])
+    check("platinum: wa_price is rounded to what the page shows",
+          joined["/Lotus/Weapons/Tenno/Rifle/PrimeBarrel"]["plat"], 4.0)
+    check("platinum: the reader gets the volume behind the average",
+          joined["/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetBlueprint"]["volume"],
+          367)
+
+    # `previous_day`, not `previous_hour`: a daily aggregate is what makes a
+    # once-a-day poll honest. Reading the hourly one would make the chosen
+    # window indefensible without changing a single visible number.
+    both = {"payload": {"previous_hour": [{"item": "aaa", "wa_price": 999}],
+                        "previous_day": [{"item": "aaa", "wa_price": 11.885}]}}
+    # 11.88, not 11.89: `round` is half-to-even and 11.885 is a hair under the
+    # half in binary anyway. Pinned as measured rather than as expected, because
+    # the alternative is a test that encodes a guess about float representation
+    # — and a half-cent on a figure that only ever separates already-equal rows
+    # is not worth a rounding mode of our own.
+    check("platinum: the daily aggregate is the one read",
+          market.prices_by_path(items, both)[
+              "/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetBlueprint"]["plat"],
+          11.88)
+
+    # Both DE paths for a part are tried, and that is not redundancy: a Warframe
+    # component is traded as its blueprint, so 153 of 579 parts are found only
+    # under the recipe path.
+    check("platinum: a component is found under the recipe that builds it",
+          market.price_for(joined, {
+              "path": "/Lotus/Types/Items/MiscItems/AshPrimeHelmetComponent",
+              "altPath": "/Lotus/Types/Recipes/WarframeRecipes/AshPrimeHelmetBlueprint",
+          })["plat"], 11.88)
+    check_true("platinum: a part with neither path priced answers None",
+               market.price_for(joined, {"path": "/nope", "altPath": None}) is None)
+    # An absent source must degrade to "no badge", never to an exception: it is
+    # `optional=True` precisely so a build with every relic in hand still ships.
+    for empty in ({}, None, {"data": []}):
+        check_true("platinum: a missing document yields no prices, not a crash",
+                   market.prices_by_path(empty, prices) == {}
+                   or market.prices_by_path(items, empty) == {})
+
+    # ── and against the payload this build actually produced ──────────────
+    data_js = os.path.join(ROOT, "data", "prime-data.json")
+    if not os.path.exists(data_js):
+        print("  skip platinum payload (run tools/build_data.py first)")
+        return
+    with open(data_js, encoding="utf-8") as fh:
+        payload = json.load(fh)
+
+    parts = [(i["name"], p) for i in payload["items"]
+             for p in (i.get("parts") or []) if not p.get("builtFrom")]
+    unpriced = sorted({n for n, p in parts if not p.get("plat")})
+    if not any(p.get("plat") for _, p in parts):
+        print("  skip platinum payload (built without warframe.market data)")
+        return
+    # Named rather than counted, for the same reason the parts test above names
+    # its one fallback: a threshold passes quietly while a whole category rots.
+    # The only acceptable misses are Primes warframe.market do not list at all,
+    # which is release lag on their side and nothing to fix here.
+    check_true("platinum: every part the market lists carries a price",
+               len(unpriced) <= 4,
+               f"{len(unpriced)} parts have no price: {unpriced[:8]}")
+
+    rows = [r for rel in payload["relics"].values() for r in rel["rewards"]]
+    prime_rows = [r for r in rows if "Forma" not in r["item"]]
+    for field in ("ducats", "plat"):
+        missing = sorted({r["item"] for r in prime_rows if not r.get(field)})
+        check(f"platinum: every Prime-part reward row carries {field}",
+              missing, [],
+              "this is the join that read 20% low before normalise_part")
+    # Forma is the one reward that must NOT carry a value. It is in almost every
+    # relic and is worth no ducats, so pricing it at 0 would drag every relic's
+    # average down by however much Forma happens to occupy - a claim that is not
+    # true. Absent is the honest answer and `spareValue` skips it.
+    check_true("platinum: Forma carries no value at all, rather than zero",
+               all("ducats" not in r and "plat" not in r
+                   for r in rows if "Forma" in r["item"]),
+               "absent means 'not known'; zero would mean 'worthless'")
+
+
 def test_the_scheduled_task_can_actually_be_registered() -> None:
     """
     Register the task for real, read it back, and remove it.
@@ -4598,7 +4714,8 @@ def main() -> int:
         ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
-        ("built payload", [test_built_payload, test_parts_are_digital_extremes_own_numbers]),
+        ("built payload", [test_built_payload, test_parts_are_digital_extremes_own_numbers,
+                           test_platinum_joins_on_des_own_paths_not_on_names]),
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,

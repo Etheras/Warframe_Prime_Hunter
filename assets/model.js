@@ -236,6 +236,65 @@
      Returns the credited count and worth, and `spent` — which relics were
      discounted and what covers them — because the row has to be able to say so.
      A number that quietly halves is the shape this project keeps having to fix. */
+  /* ── what a spare is worth, which is never part of the ranking ────
+     One opening of this relic, in Ducats and in Platinum, as an expected value
+     over its own reward table: `Σ chance × value`. Both figures ride on the
+     payload's reward rows, joined in the build against Digital Extremes' own
+     paths — see `tools/market.py`.
+
+     **`Intact`, always, and that is a decision rather than a default.** The
+     reward odds move with refinement, so an expected value has to name one; the
+     alternative is to read the plan's chosen refinement, which would make this
+     number change when the reader adjusts an unrelated option and would put a
+     *plan* setting inside a *tie-break*. Intact is the unrefined baseline
+     nobody has to opt into, and since this only ever separates rows that are
+     already exactly equal, a consistent reference matters and the particular
+     one does not.
+
+     **Absent is not zero.** A reward row with no `ducats` is Forma, or a part
+     nobody priced; counting it as worth nothing would say the relic is poor
+     when what is true is that we do not know. Missing rows are skipped, and a
+     relic with nothing priced returns zeros that `platTiebreak` reads as "say
+     nothing" rather than as last place.
+
+     The owner's rule, and the reason this lives nowhere near `runValue`:
+     *"Ducats are only listed for the users'/client's convenience to see. Never
+     intended for them to affect something on our sorting."* This may order rows
+     that are already equal. It may never move one above another. */
+  function spareValue(relic) {
+    let ducats = 0, plat = 0;
+    ((relic && relic.rewards) || []).forEach((r) => {
+      const p = (r.chances && r.chances.Intact) || 0;
+      if (!p) return;
+      const qty = r.qty || 1;
+      if (typeof r.ducats === "number") ducats += (p / 100) * r.ducats * qty;
+      if (typeof r.plat === "number") plat += (p / 100) * r.plat * qty;
+    });
+    return { ducats: ducats, plat: plat };
+  }
+
+  /* The mean spare value of one relic dropped at a node, over every relic it
+     drops, weighted by how often each arrives. A property of the node rather
+     than of the plan, so it is comparable between two rows that scored the
+     same — which is the only situation it is ever consulted in.
+
+     Weighted by `chance` rather than a flat mean because a node that drops one
+     valuable relic rarely and three cheap ones constantly is not, in fact, a
+     valuable node. Falls back to zeros when nothing is priced. */
+  function nodeSpareValue(rows, relicsByName) {
+    let weight = 0, ducats = 0, plat = 0;
+    (rows || []).forEach((r) => {
+      const c = r.chance || 0;
+      if (!c) return;
+      const v = spareValue((relicsByName || {})[r.name]);
+      weight += c;
+      ducats += c * v.ducats;
+      plat += c * v.plat;
+    });
+    if (!weight) return { ducats: 0, plat: 0 };
+    return { ducats: ducats / weight, plat: plat / weight };
+  }
+
   function creditRelics(rows, weight) {
     const w = weight == null ? REDUNDANCY_WEIGHT : weight;
     const order = (rows || []).slice().sort((a, b) =>
@@ -610,6 +669,7 @@
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
     REDUNDANCY_WEIGHT, creditRelics, partLabel,
+    spareValue, nodeSpareValue,
     AYA_BANKED_SHARE, FISSURE_REFINED_BONUS,
     FILTER_SHAPE,
   };

@@ -3212,6 +3212,64 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
   assert.deepEqual(errors, []);
 });
 
+page_test("a spare part shows what Baro pays and what a player pays, separately", async () => {
+  /* Two answers to one question — what is a duplicate worth — from two
+     unrelated places, and both are shown because they disagree constantly.
+     Ducats are a fixed game constant published by Digital Extremes; the
+     Platinum figure is warframe.market's weighted average of real trades.
+
+     The subject is asked for by the property under test rather than named: a
+     card the page is SHOWING whose payload entry has a part carrying both
+     figures. A named Prime here would be a claim that this one matters plus an
+     expiry date, and DE vault six a quarter. */
+  const { page, errors } = await open("/index.html");
+  const subject = await page.evaluate(() => {
+    const shown = [...document.querySelectorAll("#grid .card[data-id]")]
+      .map((el) => el.dataset.id);
+    const by = new Map((window.WFPRIME_DATA.items || []).map((i) => [i.id, i]));
+    for (const id of shown) {
+      const it = by.get(id);
+      const p = ((it && it.parts) || []).find((x) => x.ducats && x.plat);
+      if (p) return { id: it.id, name: it.name, part: p.name,
+                      ducats: p.ducats, plat: p.plat };
+    }
+    return null;
+  });
+  if (!subject) {
+    /* Not a silent pass. A build made without warframe.market data is a real
+       and supported state — the source is optional on purpose — but it is not
+       this test passing, so it says so out loud. */
+    assert.ok(await page.evaluate(() => (window.WFPRIME_DATA.items || [])
+      .every((i) => ((i.parts) || []).every((p) => !p.plat))),
+      "some part carries a Platinum price but none of the cards on screen does");
+    console.log("    (no Platinum data in this build — badge test skipped)");
+    return;
+  }
+
+  await page.locator(`[data-id="${subject.id}"]`).click();
+  const meta = page.locator(".part-count").first();
+  await meta.waitFor({ timeout: 5000 });
+
+  const ducat = page.locator(".ducats").first();
+  const plat = page.locator(".plat").first();
+  assert.equal(await ducat.innerText(), `${subject.ducats}d`,
+               "the Ducat badge is the payload's own figure");
+  assert.equal(await plat.innerText(), `${subject.plat}p`,
+               "and the Platinum badge is warframe.market's, not a recomputation");
+
+  /* Both hoverable and both explained, which STYLE.md section 4 requires of
+     anything carrying `cursor:help` — and the Platinum one has to say where
+     the number comes from, because a price with no provenance reads as ours. */
+  const tip = await plat.getAttribute("data-tip");
+  assert.match(tip, /warframe\.market/, "a market price must name the market");
+  assert.match(tip, /never affects the farm ranking/i,
+               "the reader is told this is information, not a recommendation");
+  assert.ok(await ducat.getAttribute("data-tip"),
+            "a badge with cursor:help and no tooltip is the bug STYLE.md names");
+
+  assert.deepEqual(errors, []);
+});
+
 page_test("with WFCD unreachable the page falls back to the file the build wrote", async () => {
   /* The other half of the test above, and the reason `data/fissures.json` is
      still written and still served. WFCD are a third party on someone else's
@@ -3258,6 +3316,62 @@ page_test("with WFCD unreachable the page falls back to the file the build wrote
      rather than a defect — so this test tolerates exactly that line and nothing
      else. Filtering the whole array would let a real error through. */
   assert.deepEqual(errors.filter((e) => !/Failed to load resource|net::ERR/.test(e)), []);
+});
+
+page_test("Ducats break a tie between equal nodes, and can never break anything else", async () => {
+  /* The owner's rule, and the half that matters is the second one: *"Ducats are
+     only listed for the users'/client's convenience to see. Never intended for
+     them to affect something on our sorting. Build the tie-break only."*
+
+     So there are two claims here and they pull in opposite directions — the
+     tie-break has to actually fire, and it has to be incapable of moving a row
+     that is not tied. Testing only the first would pass on a build where Ducats
+     had quietly become the ranking.
+
+     Driven through the page's own comparator rather than a copy of it: the
+     rows are read off the rendered list, and the ordering claim is checked
+     against the ranked figure the row displays. A reimplementation here would
+     be a test of the test. */
+  const { page, errors } = await open("/plan.html");
+  await wishFarmable(page, 6);
+  const more = page.locator("#planNodes").locator("..").getByText(/show all/i).first();
+  if (await more.count()) await more.click().catch(() => {});
+
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll("#planNodes .spot")].map((el) => {
+      const slot = el.querySelector(".fissure-slot");
+      // The ranked figure the row leads with, as the reader sees it.
+      const fig = (el.textContent.match(/([\d.]+)\s*relics?\s*\//) || [])[1];
+      return { node: slot ? slot.dataset.node : null, figure: fig ? Number(fig) : null };
+    }));
+  assert.ok(rows.length > 2, `too few ranked rows to say anything: ${rows.length}`);
+
+  /* **The safety property.** The list must be non-increasing on the number it
+     is ranked by, from top to bottom, with no exceptions. A tie-break that had
+     leaked into the ranking shows up here and nowhere else: it would lift a row
+     with a smaller figure above one with a larger, which is precisely what
+     "never move one above another" forbids.
+
+     Compared with a tolerance, because these are rendered to two decimals and
+     the comparator's own idea of a tie is 1e-12 — a strict `>=` on the printed
+     figure would fail on rounding rather than on order. */
+  const figured = rows.filter((r) => r.figure !== null);
+  const wrong = figured.filter((r, i) =>
+    i > 0 && r.figure > figured[i - 1].figure + 0.005);
+  assert.deepEqual(wrong, [],
+    "a row ranked below one with a smaller figure means a tie-break reached the ranking");
+
+  /* And that it is doing something at all. Ties are common here by
+     construction — DE write one relic table per tier and rotation shape, so
+     many nodes are the same bet — and a build where no two rows share a figure
+     would make the assertion above vacuous rather than reassuring. */
+  const shared = figured.filter((r, i) =>
+    i > 0 && Math.abs(r.figure - figured[i - 1].figure) < 1e-9).length;
+  assert.ok(shared > 0,
+    `no two ranked rows share a figure, so the tie-break was never exercised ` +
+    `(${figured.length} rows) — this test proves nothing on this data`);
+
+  assert.deepEqual(errors, []);
 });
 
 page_test("a refresh that finds a fissure re-ranks, and waits if you are typing", async () => {

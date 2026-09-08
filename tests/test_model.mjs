@@ -741,3 +741,79 @@ test("a part is named beside its Prime without saying the Prime twice", () => {
   assert.equal(M.partLabel("Ash Prime", ""), "");
   assert.equal(M.partLabel(undefined, undefined), "");
 });
+
+// ── what a spare is worth, which must never be part of the ranking ─────────
+
+test("a spare's worth is an expected value over the relic's own reward table", () => {
+  const M = load();
+  /* Hand-built rather than taken from the payload, because the arithmetic is
+     the claim: 20% of 100 ducats plus 80% of 15 is 32, and nothing about the
+     real data makes that easier to check. */
+  const relic = { rewards: [
+    { item: "Rich Prime Blueprint", chances: { Intact: 20, Radiant: 50 }, ducats: 100, plat: 30 },
+    { item: "Cheap Prime Systems", chances: { Intact: 80, Radiant: 50 }, ducats: 15, plat: 4 },
+  ] };
+  const v = M.spareValue(relic);
+  assert.equal(Math.round(v.ducats * 100) / 100, 32);       // .2*100 + .8*15
+  assert.equal(Math.round(v.plat * 100) / 100, 9.2);        // .2*30  + .8*4
+
+  /* `Intact` and not the reader's chosen refinement, which is the decision this
+     pins. Radiant odds on this relic are 50/50 and would give 57.5 ducats — so
+     if this ever starts reading the plan's refinement, the number moves and
+     this test says so rather than the ranking quietly shifting under a setting
+     that has nothing to do with it. */
+    assert.notEqual(Math.round(v.ducats * 100) / 100, 57.5);
+});
+
+test("a reward nobody priced is absent, and absent is not worth nothing", () => {
+  const M = load();
+  /* The distinction the whole thing rests on. Forma is in almost every relic
+     and has no ducat value at all; counting it as 0 would drag every relic's
+     average down by however much Forma happens to occupy, which is a claim
+     about the relic that is not true. Skipping it says "of what we can price,
+     this is the answer". */
+  const withForma = { rewards: [
+    { item: "Forma Blueprint", chances: { Intact: 75 } },
+    { item: "Real Prime Barrel", chances: { Intact: 25 }, ducats: 40, plat: 10 },
+  ] };
+  assert.equal(M.spareValue(withForma).ducats, 10);     // .25 * 40, Forma skipped
+  assert.equal(M.spareValue(withForma).plat, 2.5);
+
+  // Nothing priced at all answers zero rather than throwing or returning null.
+  assert.deepEqual(plain(M.spareValue({ rewards: [{ chances: { Intact: 100 } }] })),
+                   { ducats: 0, plat: 0 });
+  assert.deepEqual(plain(M.spareValue(null)), { ducats: 0, plat: 0 });
+  assert.deepEqual(plain(M.spareValue({})), { ducats: 0, plat: 0 });
+
+  // A quantity multiplies: "2 X Forma" pays twice, and so would a priced row.
+  const two = { rewards: [{ chances: { Intact: 100 }, qty: 2, ducats: 15, plat: 3 }] };
+  assert.equal(M.spareValue(two).ducats, 30);
+});
+
+test("a node's spare value is weighted by how often each relic arrives", () => {
+  const M = load();
+  /* A flat mean would call this node rich; it is not. The valuable relic turns
+     up a twentieth as often as the cheap one, and a reader choosing between two
+     equally-ranked nodes is choosing what they will actually be handed. */
+  const relics = {
+    "Axi RICH": { rewards: [{ chances: { Intact: 100 }, ducats: 100, plat: 50 }] },
+    "Lith POOR": { rewards: [{ chances: { Intact: 100 }, ducats: 10, plat: 1 }] },
+  };
+  const rows = [{ name: "Axi RICH", chance: 0.05 }, { name: "Lith POOR", chance: 0.95 }];
+  const v = M.nodeSpareValue(rows, relics);
+  assert.equal(Math.round(v.ducats * 100) / 100, 14.5);    // not 55, the flat mean
+  assert.ok(v.ducats < 55, "a flat mean would misreport this node as rich");
+
+  // A relic the payload does not carry contributes nothing but does not throw,
+  // which is the shape of a build where one source was unreachable.
+  const partial = M.nodeSpareValue(
+    [{ name: "Axi RICH", chance: 1 }, { name: "Axi MISSING", chance: 1 }], relics);
+  assert.equal(partial.ducats, 50);            // (1*100 + 1*0) / 2
+
+  // No rows, no chances, no relics: zero rather than NaN. `n.spareDucats` is
+  // read by a comparator, and NaN in a comparator is a silently unstable sort.
+  for (const empty of [M.nodeSpareValue([], relics), M.nodeSpareValue(null, null),
+                       M.nodeSpareValue([{ name: "Axi RICH", chance: 0 }], relics)]) {
+    assert.deepEqual(plain(empty), { ducats: 0, plat: 0 });
+  }
+});

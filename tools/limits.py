@@ -94,6 +94,14 @@ class Malformed(Refused):
 # never the wrong way round: a body that already exceeds the expanded limit
 # while still compressed cannot possibly expand to less.
 MAX_EXPANDED = {
+    # warframe.market, both measured 2026-09-08 against the live endpoints.
+    # Catalogue-shaped rather than live-feed-shaped: the item list grows when DE
+    # release something and the price table has one row per tradeable item, so
+    # neither moves with what is running in the game. Doubled, like the rest of
+    # this half of the table, rather than given the extra room the live feeds
+    # get for the reason written above them.
+    "wm_items":                        3_200 * KB,   #  1,614,035 (3,840 items)
+    "wm_ducats":                       1_100 * KB,   #    520,195 (742 rows)
     "api_items":                      21_000 * KB,   # 10,443,694
     "official_droptables":             9_000 * KB,   #  4,419,528
     "export_ExportManifest.json":      7_600 * KB,   #  3,780,187

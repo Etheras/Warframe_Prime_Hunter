@@ -1117,7 +1117,29 @@
               p.ducats ? ` · <span class="ducats" data-tip="${esc(
                 "Baro Ki'Teer pays " + p.ducats + " ducats for a spare " + p.name +
                 "." + "\n" + "A fixed game value, not a market price.")
-              }">${esc(p.ducats)}d</span>` : ""}</span>
+              }">${esc(p.ducats)}d</span>` : ""}${
+              /* What another player pays, beside what Baro pays — the same
+                 question with a different answer, and the reason both are
+                 shown rather than one. Ducats are a fixed constant; this is a
+                 weighted average of real trades and moves weekly.
+
+                 `platVolume` is in the tooltip because a weighted average over
+                 four trades and one over eight hundred are not the same claim,
+                 and the reader is the one deciding whether to believe it.
+                 Absent whenever warframe.market could not be read or does not
+                 list the part, and absent means the badge is simply not there
+                 — never a zero, which would read as "worthless". */
+              p.plat ? ` · <span class="plat" data-tip="${esc(
+                "warframe.market's weighted average for a spare " + p.name +
+                ": " + p.plat + " Platinum." +
+                (p.platMedian != null ? "\nMedian " + p.platMedian + "p." : "") +
+                (p.platVolume != null
+                  ? " Over " + p.platVolume + " trade" + (p.platVolume === 1 ? "" : "s")
+                    + " in the last day."
+                  : "") +
+                "\nPlayer-to-player trade price, not a shop price. Shown for " +
+                "information; it never affects the farm ranking.")
+              }">${esc(p.plat)}p</span>` : ""}</span>
           </div>`;
 
         /* A whole weapon, not a part of one: an akimbo Prime is built from two

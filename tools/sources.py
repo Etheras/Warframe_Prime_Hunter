@@ -36,7 +36,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
 CACHE_DIR = os.path.join(ROOT, ".cache")
 
-UA = "WarframePrimeHunter/1.0 (personal Prime collection tracker; contact: local user)"
+# Descriptive, and it names somewhere to complain to.
+#
+# warframe.market's published rules require this of every caller — "a dedicated
+# and descriptive `User-Agent`", with an example carrying a contact URL, and an
+# explicit warning that clients disguising themselves as browsers may be
+# blocked. The repository is the honest contact for a tool with no server and no
+# operator; "contact: local user", which this said until 2026-09-08, told a
+# reader being asked for bandwidth nothing they could act on.
+UA = ("WarframePrimeHunter/1.0 (personal Prime collection tracker; "
+      "+https://github.com/Etheras/Warframe_Prime_Hunter)")
 
 WIKI_RAW = "https://wiki.warframe.com/index.php?title={title}&action=raw"
 DROPS = "https://drops.warframestat.us/data/{name}"
@@ -64,6 +73,47 @@ WORLD_EVENTS = "https://api.warframestat.us/pc/events?language=en"
 # understates the fissure map but can never overstate it.
 FISSURES = "https://api.warframestat.us/pc/fissures?language=en"
 IMG_CDN = "https://cdn.warframestat.us/img/"
+
+# ── warframe.market: what a spare part is worth in Platinum ────────────────
+#
+# A third source tier, and the first that is neither Digital Extremes nor WFCD.
+# Player-to-player trade prices, which are a fact about the game economy earned
+# by playing it — hard rule 10 is satisfied because nothing here is bought with
+# real money, and the figure is shown and used as a TIE-BREAK ONLY. It never
+# moves a row above another. See `PROJECT.md §7`.
+#
+# `wa_price` is warframe.market's own weighted average. We do not compute a
+# percentile or decide which orders count: they have already made those choices
+# inside this number, which is the whole reason to prefer it.
+#
+# **v1 for the prices — v2 of this path is 404, measured.** 742 rows, 520 KB.
+WM_DUCATS = "https://api.warframe.market/v1/tools/ducats"
+# **v2 for the join, and it is the better key.** The price rows identify an item
+# by an internal id (`54a73e65e779893a797fff22`) and nothing else. This maps
+# that id to `gameRef` — Digital Extremes' OWN internal path — which is the same
+# discipline as the `/StoreItems` rule this project already trusts, and far
+# better than matching on a display name. 3,840 items, 1.6 MB.
+WM_ITEMS = "https://api.warframe.market/v2/items"
+
+# How often we may ask, and it is our number rather than theirs.
+#
+# **Neither endpoint sends `Cache-Control`** — measured 2026-09-08, the only
+# headers of note are a `Set-Cookie` and Cloudflare's `cf-cache-status: DYNAMIC`.
+# So hard rule 11 has no input here, which makes this the first source where the
+# window has to be chosen. Their published rules say what to do instead: a limit
+# of 3 requests/second, and "use caching, reuse responses, avoid tight polling
+# loops".
+#
+# Twenty-four hours, for a reason rather than as a round number: the figure we
+# read is `previous_day`, a daily aggregate. Polling faster **cannot produce a
+# different answer** — it would spend 350 KB of somebody's bandwidth to re-read
+# a number that has not moved. Two requests a day against a 3/second allowance
+# is taking a great deal less than is offered, which is the point of the rule.
+#
+# There is also nothing to revalidate with: neither endpoint sends an `ETag`, so
+# a conditional request is not available and every refresh costs the full body.
+# That is the other half of the argument for a long window.
+WM_MAX_AGE = 24 * 3600
 
 # Digital Extremes, first party
 OFFICIAL_DROPTABLES = "https://www.warframe.com/droptables"
@@ -223,19 +273,35 @@ def read_maxage(path: str) -> float | None:
         return None
 
 
-def write_maxage(path: str, header: str | None) -> None:
+def write_maxage(path: str, header: str | None, chosen: float | None = None) -> None:
     """Record `max-age` from a `Cache-Control`, or forget any we held.
 
     `no-cache` and `no-store` are not a `max-age` of zero to us: they mean
     *revalidate*, which the conditional request already does in a header
     exchange with no body. So they leave nothing behind and the ETag path
     handles them.
+
+    `chosen` is the one case where this project picks the number instead of
+    reading it, and it is deliberately awkward to reach. Hard rule 11 says to
+    honour the window the server declares **because they are the only party who
+    knows it** — so a source that declares nothing is not an invitation to poll
+    freely, it is a source where the rule has no input. warframe.market is the
+    first: no `Cache-Control` on either endpoint, and their published rules ask
+    callers to "use caching, reuse responses, avoid tight polling loops"
+    instead. `chosen` is how that instruction gets obeyed in the same mechanism
+    as everybody else's header, so one code path enforces both.
+
+    A declared window always wins. If they ever start sending one, theirs is
+    what gets written and this argument stops applying — which is the property
+    that made storing it here, rather than in a table of our own, worth doing.
     """
     seconds = None
     if header and "no-store" not in header and "no-cache" not in header:
         found = re.search(r"max-age\s*=\s*(\d+)", header)
         if found:
             seconds = int(found.group(1))
+    if seconds is None and chosen:
+        seconds = int(chosen)
     try:
         if seconds:
             with open(maxage_path(path), "w", encoding="utf-8") as fh:
@@ -306,7 +372,7 @@ def stale_if_older(key: str, path: str, max_age: float | None) -> None:
 
 def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
           optional: bool = False, max_age: float | None = None,
-          readonly: bool = False):
+          readonly: bool = False, chosen_maxage: float | None = None):
     """
     GET with a small on-disk cache so reruns and --offline are cheap.
 
@@ -402,7 +468,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 with gzip.open(path, "wb") as fh:
                     fh.write(raw)
                 write_etag(path, tag)
-                write_maxage(path, freshness)
+                write_maxage(path, freshness, chosen_maxage)
                 return raw
             except limits.Refused as exc:
                 # Both refusals, and both the same answer. Too large is not an
@@ -479,8 +545,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
 def fetch_json(url: str, key: str, offline: bool = False, critical: bool = True,
                optional: bool = False, max_age: float | None = None,
-               readonly: bool = False):
-    raw = fetch(url, key, offline, critical, optional, max_age, readonly)
+               readonly: bool = False, chosen_maxage: float | None = None):
+    raw = fetch(url, key, offline, critical, optional, max_age, readonly,
+                chosen_maxage)
     if raw is None:
         return None
     try:

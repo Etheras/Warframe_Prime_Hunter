@@ -474,15 +474,36 @@ detail line — hover for the rate. Two things worth knowing:
   not drop while no rotation is on, so it is a safety net for a stale dataset rather
   than a situation you will meet in game.
 
-### Ducat values
+### What a spare is worth — Ducats and Platinum
 
-Each part shows what Baro Ki'Teer pays for a spare — `15d`, `65d` and so on. It is a
-fixed game value published per component, not a market price, so it is exact rather
-than an estimate. Useful for deciding which duplicates to keep.
+Each part shows two figures, because there are two answers and they disagree
+constantly:
 
-It is **information only**. Nothing in the planner reads it: no ranking, no scoring,
-no suggestion to sell anything. In particular it has nothing to do with how Aya is
-valued — Aya is measured by the relics it buys, never by ducats.
+- **`65d`** — what **Baro Ki'Teer** pays for a spare. A fixed game value published
+  per component by Digital Extremes, so it is exact rather than an estimate.
+- **`25.28p`** — what **another player** pays, from
+  [warframe.market](https://warframe.market)'s own weighted average of recent
+  trades. Hover it for the median and how many trades that average is over —
+  an average across four trades and one across eight hundred are not the same
+  claim, and you are the one deciding whether to believe it.
+
+Both are Platinum you can earn by trading, and Ducats you earn by playing. Nothing
+here reads anything you would buy with real money — no Prime Access, no Prime Vault
+packs, no Regal Aya.
+
+**They are information, with one narrow exception.** No ranking, no scoring, no
+suggestion to sell anything, and nothing to do with how Aya is valued — Aya is
+measured by the relics it buys, never by ducats.
+
+The exception: when two places in the farm list score **exactly** the same, the
+one whose relics are worth more is listed first — Ducats deciding, and the market
+price separating what Ducats cannot. It can only ever reorder places the ranking
+has already called equal; it can never move one above another. If warframe.market
+cannot be reached, the badge is simply absent and the list falls back to the
+tie-break it always used.
+
+A Platinum figure may be missing for a very new Prime that warframe.market has not
+listed yet. That is release lag on their side, and it corrects itself.
 
 ### The rest of the sidebar
 
