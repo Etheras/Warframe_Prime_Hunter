@@ -1598,65 +1598,62 @@ are an argument about **order**: this is the least valuable and most plumbing of
 the work that is currently approved, and it should ship with the Platinum join
 rather than ahead of it.
 
-### What the misses are worth in Platinum, from warframe.market
+### What the misses are worth in Platinum, from warframe.market — **spec settled 2026-09-08, not started**
 
-**Asked for by the owner 2026-08-27. Not started — recorded so it is not
-re-derived.**
+**Decided, waiting on the owner's go.** Three answers, and the first replaced the
+question rather than picking from it.
 
-Fetch [warframe.market](https://warframe.market)'s API for the Platinum value of
-each part, and **carry it exactly as `ducats` is carried**: per part, on the
-payload, beside the Ducat figure the drawer already shows. The owner's spec for
-the number is *"the 95th percentile of quantity"*.
+**The number is warframe.market's own weighted average.** The owner, seeing
+<https://warframe.market/tools/ducats>: *"that shows 'WA Price — Weighted Average
+price'. We should use that value if it's available."* It is. Measured
+2026-09-08 — this is research, nothing is wired up:
 
-**This is not a real-money violation, and the entry has to say so or it will be
-closed as one.** `PROJECT.md §2` lists *"Platinum bought from Digital Extremes"*
-as out of scope, and that is still right. The test that section actually states
-is **"can this be earned by playing, or must it be purchased?"** — and Platinum
-from **trading parts with other players** is earned: you farm the relic, you crack
-it, you sell the part. It is the same shape as Ducats, which are in scope for
-exactly that reason, and it is the other half of what a spare part is worth. What
-stays out is buying Platinum from DE with a card, which this would neither
-recommend nor price.
+| | |
+|---|---|
+| endpoint | `api.warframe.market/v1/tools/ducats` (**v2 is 404**) |
+| shape | `previous_hour` and `previous_day`, **742 rows** each |
+| fields | `wa_price`, `median`, `volume`, `ducats`, `ducats_per_platinum`, `ducats_per_platinum_wa`, `plat_worth`, `item` |
+| size | 520 KB |
 
-Add that distinction to §2's table when this lands, because the current row reads
-as though all Platinum were out.
+So the percentile question this entry carried for twelve days is **withdrawn** —
+we do not compute a percentile, we read their published figure. The
+*"which orders count"* question goes with it: online-versus-offline and platform
+are decisions warframe.market have already made inside `wa_price`, and the owner
+expressed no preference precisely because there is nothing left to prefer.
 
-**Three things to settle before writing any of it.**
+**What it is for: a badge, and the Ducat tie-break.** Same rule as Ducats — it
+may order rows that are *already equal* and may never move one above another.
+Both figures land on the payload per part and show in the drawer.
 
-1. **What "95th percentile of quantity" means**, which has more than one reading
-   and the readings differ by a lot. The orders endpoint gives a list of live
-   sell orders, each with a price and a quantity. Candidates: take orders sorted
-   by price ascending, accumulate quantity, and read the price at 95% of the
-   total — which lands near the *top* of the range and is close to a robust
-   maximum; or discard the top 5% of quantity as outliers and take the highest
-   price that survives; or use the `/statistics` endpoint's closed-order history
-   instead of live orders, which is what actually sold rather than what is being
-   asked. **Ask the owner rather than picking** — the figure means different
-   things to a seller and to a valuer, and this one is going on screen.
-2. **Which orders count.** Live sell orders from online users is the usual answer;
-   including offline sellers inflates the price with orders nobody can fill.
-   Platform matters too — the API is per-platform and this project is PC.
-3. **What it is for.** Ducats have the same open question in the entry above:
-   the data is on the payload and *nothing in the ranking reads it*. If Platinum
-   is only ever a badge beside the Ducat badge, that is a small and honest
-   feature. If it is meant to reach the ranking, it inherits the whole argument
-   in *What the misses are worth, in Ducats* — what a Platinum is worth depends
-   on what you want to buy with it, exactly as a Ducat's does.
+**Three things measured that decide how it gets built.**
 
-**A new source tier, and the first one that is neither DE nor WFCD.** So it needs
-what the others got: read its `Cache-Control` before the first fetch and honour
-the window (`PROJECT.md §2`, *"Ask no more often than the source says to"*); check
-its terms and rate limits, since warframe.market **does** publish a rate limit
-where DE and WFCD publish none; and record it in the source table with what it
-supplies and what happens when it is unreachable. It is an API rather than a
-library, so it is ordinary work under rule 9 — but the licence question is
-sharper here than for a first-party feed, and the answer belongs in `NOTICE.md`.
+1. **The join needs a second fetch, and there is a good one.** The ducats tool
+   identifies items by an internal id (`54a73e65e779893a797fff22`), not a name.
+   `api.warframe.market/v2/items` — 3,840 items, 1.6 MB — maps id to slug **and
+   carries `gameRef`, Digital Extremes' own internal path**. That is a far better
+   key than any name, and it is the same discipline as the `/StoreItems` rule
+   this project already trusts. Whether our parts can reach a `gameRef` is the
+   open question: the payload's `parts[]` carry no `uniqueName`, though the build
+   reads `ExportRecipes` and may be able to supply one.
+2. **Coverage is at least 71% and the misses name their own fix.** Naive slugs
+   matched **417 of 586** parts, and **every one of those 417 carries a
+   `wa_price`**. The misses are Warframe components — `ash_prime_neuroptics`
+   against the market's `ash_prime_neuroptics_blueprint` — because those sell as
+   blueprints. So the real ceiling is higher, and the third spelling this entry
+   always warned about is exactly that suffix.
+3. **Neither endpoint sends `Cache-Control`, and that is a rule 11 problem.**
+   Hard rule 11 says to honour the window the server declares and never invent
+   one. warframe.market declare nothing on either response — the only headers of
+   note are a `Set-Cookie`. **This is the first source where the rule cannot be
+   applied as written**, so a poll rate has to be chosen rather than read, and
+   that is the owner's call before any fetch ships. Their published API rate
+   limit — believed to be 3 requests/second — must be confirmed from their own
+   documentation first, not from memory.
 
-The join is the same one the Ducat entry warns about: reward rows are named
-`Nyx Prime Chassis Blueprint` where the part is `Chassis`, so it goes through
-`normalise_part` like everything else. Their item keys are slugs
-(`nyx_prime_chassis`), which is a third spelling and needs the same funnel rather
-than a route around it.
+**A new source tier**, and the first that is neither DE nor WFCD, so it needs
+what the others got: a row in the source table, a `NOTICE.md` entry, a ceiling in
+`limits.py` sized against the 520 KB and 1.6 MB measured above, and the licence
+and terms read.
 
 ### Expected openings for everything, not for the worst one — measured, and it costs traces
 
@@ -2689,21 +2686,44 @@ holds and already joins itself, which is how the rotation letter is read. So the
 WFCD's join of DE. It confirms nothing that a disagreement could not equally
 blame on the third party. `official.py` sets `rewardPool: []` and says so.
 
-**`type` is blocked on a rule-9 decision, not on effort.** DE publish an
-identifier, not a name: `VenusHelpingJobResource`, `RescueBountyResc`,
-`AssassinateBountyCap`. The readable *"Reclaim What's Ours"* this row used to
-quote is **WFCD's own mapping table** on top of that identifier — and a mapping
-table lifted verbatim needs the owner's approval first and its licence read
-second (`PROJECT.md §2`). Three ways forward, and only the owner can pick:
+**`type`: the deep dive is done, 2026-09-08, and the answer is that it is
+flavour.** The owner asked for it directly — *"deep dive between DE, WFCD and the
+Warframe wiki to see what this name refers to"* — and the three sources say:
 
-1. **Leave it.** The job on the board turns over every window — all 22 jobs share
-   one expiry — and the flavour name says nothing about what pays a relic. This
-   is the recommendation.
+| source | what it has |
+|---|---|
+| **Digital Extremes** | the path only: `/Lotus/Types/Gameplay/Venus/Jobs/VenusHelpingJobResource` |
+| **wiki.warframe.com** | **one** occurrence site-wide, on *World State/Example*, a page quoting a raw worldstate dump. **No mapping to a readable name anywhere.** |
+| **WFCD** | `data/languages.json` (715 KB, MIT) maps the lowercased path to a display value |
+
+**And the name is the bounty's in-game title.** `VenusHelpingJobResource` is
+**"Dirt Unit"**. That is what a player sees on the board in Fortuna, and it says
+nothing about the mission type, the rotation, or what pays a relic — this entry
+previously quoted *"Reclaim What's Ours"*, which is a different job's title and
+was the only example to hand.
+
+So the recommendation to **leave it** is now evidenced rather than asserted:
+adopting it would be a second rule 9 vendoring, of a 715 KB localisation table,
+to put a flavour name beside a node — where the node name is already the join key
+between DE's drop table, the worldstate, `ROT.signature` and `nodeKey`, and the
+flavour name would be an annotation nothing reads.
+
+**Two things worth keeping from the dive.** `languages.json` also maps the reward
+*table* paths (`venustieratablearewards` to a list of reward names), which is
+WFCD's join of DE's drop tables — the same `rewardPoolDrops` cross-check this
+file already declined, and seeing it confirms why: it would check our join of DE
+against theirs. And the readable-name option below stays available; it is simply
+worth less than it looked.
+
+**The three ways forward are unchanged**, and only the owner can pick:
+
+1. **Leave it.** The recommendation, now with the measurement behind it.
 2. **Derive a kind from DE's identifier ourselves**, by rule rather than by
-   table: `RescueBountyResc` → *Rescue*, `VenusCullJobAssassinate` → *Assassinate*.
-   Deterministic and ours, and still a fact about the current window rather than
-   about the tier.
-3. **Ask about WFCD's table** — approval, then licence.
+   table: `RescueBountyResc` gives *Rescue*. Deterministic and ours. Note this
+   yields the mission *kind*, not the title — `VenusHelpingJobResource` has no
+   kind in it, so it would produce nothing for that one.
+3. **Vendor WFCD's table**, the same process as `tools/proxima_nodes.py`. 715 KB
+   for flavour text, against 42 lines for names nothing else could supply.
 
 **One thing in `jobType` is worth having whatever is decided about names.**
 Isolation Vault bounties arrive with **no `jobType` at all**, which is DE's own
