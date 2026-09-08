@@ -1387,10 +1387,18 @@ page_test("a row names the rotations that pay a relic, and prices the free one a
         held = next;
       },
     });
-    /* `watchFissures` polls `data/fissures.json` on load and splices the answer
-       over the array in place, so staging the payload alone lasts about a
-       second. The poll is answered with the same staged list instead — which
-       also means the test exercises the refresh path rather than dodging it. */
+    /* `watchFissures` polls on load and splices the answer over the array in
+       place, so staging the payload alone lasts about a second. The poll is
+       answered with the same staged list instead — which also means the test
+       exercises the refresh path rather than dodging it.
+
+       **Both polls, since 2026-09-08.** There are two now: `data/fissures.json`
+       here, and WFCD's live feed, which `stageLiveFissures` answers just below.
+       Matching on `fissures.json` alone let the live one through to the default
+       route — which serves the build's REAL fissure list — and it quietly
+       overwrote this planted fissure a second after load. The test then failed
+       on a subject that no longer had a fissure at all, saying so as a missing
+       "free Neo" and naming nothing about the network. */
     const realFetch = window.fetch;
     window.fetch = (url, ...rest) =>
       (String(url).includes("fissures.json")
@@ -1398,6 +1406,14 @@ page_test("a row names the rotations that pay a relic, and prices the free one a
         : realFetch.call(window, url, ...rest));
     localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([id]));
   }, [subject.node, subject.fissureTier, subject.item]);
+  /* The other half of the same staging, in WFCD's own spelling. Whichever poll
+     answers first, the page sees one fissure on the subject's node — which is
+     what "everything here is staged" has to mean now that there are two
+     sources. */
+  await stageLiveFissures(page, [{
+    node: subject.node, tier: subject.fissureTier, isHard: false, isStorm: false,
+    expiry: new Date(Date.now() + 3600e3).toISOString(),
+  }]);
   await page.reload({ waitUntil: "load" });
 
   /* The list shows the top eight and hides the rest behind *Show all N places*.
