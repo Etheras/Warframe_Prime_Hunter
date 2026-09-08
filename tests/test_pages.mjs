@@ -3781,17 +3781,27 @@ page_test("a relic on sale is never described as one you have to trade for", asy
   assert.ok(!/Baro/.test(gone),
             `once he has left, nothing may send the reader to look for him: ${gone}`);
 
-  /* **What that message says instead is wrong, and it is a different defect.**
-     This asserted `no other route` first and failed, which is how the third one
-     was found. `wantedIndex` does not mark an item stranded when it carries
-     `flags.baro` — reasonably, since Baro is *a* route — so once he leaves,
-     `relicPlan` drops his relic altogether, `rp` is empty, both buyable
-     branches are skipped and the page falls through to "These relics drop, but
-     nowhere you can reach". They do not drop: `Axi M5` has `sourceCount: 0`.
+  /* **And what it says instead has to be true, which took a second fix.**
+     This asserted `no other route` when it was first written, failed, and that
+     failure is how a third defect was found: `wantedIndex` counted
+     `flags.baro` — the wiki's *"he sometimes sells this Prime"* marker — as a
+     route, so once he left, the item was not stranded, its relics were filtered
+     out of `relicPlan` entirely, `rp` was empty, both buyable branches were
+     skipped, and the page fell through to "These relics drop, but nowhere you
+     can reach" about a relic with `sourceCount: 0`.
 
-     Not fixed here, because it is `wantedIndex`'s filter rather than this
-     wording, and it is recorded in `TODO.md`. What is pinned is the half this
-     change is responsible for: the moment he goes, the page stops naming him. */
+     `flags.baro` came out of that condition on 2026-09-08 — `buyable` already
+     asks the live question through `isBaro` — so the assertion this test wanted
+     in the first place is the one it makes now. */
+  assert.match(gone, /no other route/i,
+               `once he has left, his relic really is trade-only: ${gone}`);
+  assert.ok(!/relics drop/i.test(gone),
+            `and it must not claim they drop — this one has no sources at all: ${gone}`);
+
+  /* The crack list is the half the reader actually uses, and it was empty for
+     the whole fortnight he is away. It has to have the relic back. */
+  assert.ok(await page.locator("#planRelics .relic-row").count() > 0,
+            "a stranded Prime's relics are shown to trade for, not filtered to nothing");
 });
 
 page_test("a relic on Varzia's shelf makes the Aya somewhere to go, not just a bonus", async () => {

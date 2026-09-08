@@ -365,17 +365,40 @@
         });
       });
 
-      /* Is there any way in at all? A relic that still drops or that Varzia is
-         selling counts; so does a route that is not a relic — Baro, a quest, an
-         event, the Founder pack. If none of that is true, the only honest
-         answer is the trade list, so its relics are let through the filter that
-         would otherwise drop every one of them. */
+      /* Is there any way in **right now**? A relic that still drops or that
+         Varzia is selling counts, and so does one on Baro's counter today; so
+         does a route that is not a relic at all — a quest, an event, the
+         Founder pack. If none of that is true, the only honest answer is the
+         trade list, so its relics are let through the filter that would
+         otherwise drop every one of them.
+
+         **`f.baro` was in this list until 2026-09-08 and had to come out**, and
+         the reason is the seam the collection page settled three days earlier:
+         `flags.baro` is the wiki's `[[Baro Ki'Teer|B]]` marker and means *"he
+         sometimes sells this Prime"*. It is a historical record on nine items
+         and says nothing about today. Treating it as a route meant that for the
+         twelve days a fortnight he is away, seven Primes were held to have a way
+         in that they did not have — so their relics were filtered out of the
+         crack list, `relicPlan` came back empty, and *Where to go* fell through
+         to **"These relics drop, but nowhere you can reach"** about relics with
+         `sourceCount: 0`. Found on 2026-09-06 by a test asserting the opposite,
+         and live from the moment he left the relay.
+
+         **Nothing is lost by removing it, because `buyable` already asks the
+         live question**: `isBaro(n)` is "this relic is on his counter and he is
+         on a relay", the same test `baroSellingNow` uses on the collection view.
+         While he is here with something for this Prime, the item is buyable and
+         is not stranded — unchanged. While he is away it is stranded, which is
+         what the word means. The static marker was adding nothing but the bug.
+
+         The other three stay: `special`, `founder` and `permanent` describe
+         routes that do not come and go. */
       const f = it.flags || {};
       const buyable = mine.some((n) => {
         const rec = RELICS[n];
         return rec && (!rec.vaulted || rec.resurgence || isBaro(n));
       });
-      if (!buyable && !f.baro && !f.special && !f.founder && !f.permanent) {
+      if (!buyable && !f.special && !f.founder && !f.permanent) {
         mine.forEach((n) => stranded.add(n));
       }
     });

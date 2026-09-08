@@ -6877,6 +6877,87 @@ skipped. It is the same static-marker-versus-live-shelf seam the collection
 page's Baro bucket settled the day before, still unfixed one function away, and
 it has its own `TODO.md` entry.
 
+### The planner counted a wiki marker as a route, for the twelve days a fortnight it is not one
+
+Found on 2026-09-06 by a test asserting the opposite of what happened, fixed on
+2026-09-08 once Baro had actually left and it was live rather than theoretical.
+
+`wantedIndex` decides whether a Prime is *stranded* — has no way in at all —
+because that is what lets its vaulted relics through the crack-list filter and
+gives the reader a trade list instead of an empty panel. The condition read:
+
+```js
+if (!buyable && !f.baro && !f.special && !f.founder && !f.permanent) {
+```
+
+**`flags.baro` is the wiki's `[[Baro Ki'Teer|B]]` marker.** It means *"he
+sometimes sells this Prime"*, it sits on nine items, and it says nothing about
+today — the collection page had already learned exactly this on 2026-09-04, when
+the owner asked why five vaulted secondaries were badged `BARO` while he was
+selling a relic for one of them. That fix shipped on the 5th. This one, one
+function away in the other file, was not looked at.
+
+So for the twelve days a fortnight he is away, seven Primes were held to have a
+way in that they did not have. Their relics were filtered out of `relicPlan`
+entirely, `rp` came back empty, both of `noNodes`' buyable branches were skipped,
+and *Where to go* fell through to **"These relics drop, but nowhere you can
+reach"** — about relics with `sourceCount: 0`, which is the one thing they
+certainly do not do. The crack list beside it was empty at the same time, so the
+reader was told the wrong thing and shown nothing to act on.
+
+**Removing the flag loses nothing, and that is the part worth checking rather
+than assuming.** `buyable` already asks the live question one line above:
+
+```js
+const buyable = mine.some((n) => {
+  const rec = RELICS[n];
+  return rec && (!rec.vaulted || rec.resurgence || isBaro(n));
+});
+```
+
+`isBaro(n)` is *"this relic is on his counter **and** he is on a relay"* — the
+same test `baroSellingNow` uses on the collection view. So while he is here with
+something for this Prime the item is buyable and is not stranded, exactly as
+before; while he is away it is stranded, which is what the word means. The
+static marker was contributing nothing but the bug.
+
+Measured before changing it — who moves, and who does not:
+
+| | |
+|---|---|
+| items carrying `flags.baro` | **9** |
+| unaffected | **Lex Prime** (farmable and permanent, so `buyable`), **Gotva Prime** (`special`) |
+| **stranded-ness changes** | **7** — Volt, Aklex, Akmagnus, Akvasto, Magnus, Vasto, Odonata Prime |
+
+Verified on the real payload with no staging at all, because he had genuinely
+left: his next window is 2026-09-18 to 09-20 at MercuryHUB, so `isBaro` is false
+everywhere today. A list of Akmagnus, Magnus and Vasto Prime now returns **47
+relics in the crack list**, every one badged `TRADE FOR IT` — `Axi M5` among
+them, correctly a trade row now rather than a Baro row — under the honest
+message *"every relic you still need is vaulted, and this Prime has no other
+route."* Before the fix that panel was empty and the message was the false one.
+
+**The general shape, since this is the third time it has been found in five
+days.** A static wiki marker and a live shelf answer different questions, and
+every place that treats the first as the second is a separate bug with the same
+cause. The collection page's badge, its availability bucket, and now the
+planner's reachability filter — three sites, found one at a time, each by
+someone looking at something else.
+
+**So the fourth was looked for deliberately rather than waited for, and there
+is not one.** Every remaining read of `flags.baro` in `assets/` was checked on
+2026-09-08 and all three are correct:
+
+| site | what it does | why it is right |
+|---|---|---|
+| `app.js:397` | `f.special && !f.baro` chooses a badge | a classification, not an availability claim — Gotva Prime carries `(S)` on the wiki but is really a Baro item, so *other source* steps aside |
+| `app.js:1023` | `f.baro && baroSellingNow(it)` | gated on the live shelf and the page's clock |
+| `app.js:1029` | `f.baro` alone → *"Baro Ki'Teer — sometimes"* | describes the marker **as** a marker: *"the wiki marks this Prime as one he has sold before, not one he is selling now"* |
+
+The distinction that makes all three fine and made the fourth a bug: reading the
+marker to say *"he sometimes sells this"* is what it is for. Reading it to
+answer *"can I get this today"* is what it cannot do.
+
 ---
 
 ## 8. Gotchas discovered while building
