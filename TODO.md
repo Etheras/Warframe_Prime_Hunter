@@ -287,16 +287,56 @@ looked. So the preparation is the part with a deadline:
   because `EVENT_TAGS` is empty until something is seen. Both are tested now,
   and the entry below records a third finding that is **not** fixed: the
   syndicate half of the detector cannot fire when DE answer.
-- **Capture the tag itself when it appears.** The build already logs
-  `bounties: ! <event> is running and DE tag it '<tag>'`; put that tag into
-  `EVENT_TAGS` as a fact. Nothing else in the window is cheaper or more durable.
-- **Capture the whole entry, not the answer.** Save the raw `/pc/events` and
-  `/pc/syndicateMissions` rows for Plague Star verbatim into `PROJECT.md` — `tag`,
-  `node`, `maximumScore`, `interimSteps`, `rewards[]`, `activation`, `expiry`. A
-  future question about the shape is then answerable without waiting for 2027.
-- **Check the detection actually fires**, on the deployed site and locally: does
-  `eventRunning` see it, does the Plague Star bounty leave the *include event
-  nodes* gate, and does the Hemocyte row stop being unreachable.
+- ~~**Capture the tag itself when it appears.**~~ **Nothing to do — it captures
+  itself.** Checked 2026-09-08 by putting a synthetic live entry through the
+  real `find_live_events` and `build_bounty_meta`: the row that reaches the
+  payload is `{event, activation, expiry, tag, node}`, spread into
+  `meta.bounties.events[<bounty node>]` at `build_data.py:1075`. So the tag is
+  **published**, not merely logged, and the first build after the event opens
+  carries it. That matters because the build log this entry planned to read goes
+  to `conhost --headless` 144 times a day and nobody sees it. One command gets
+  it, and it works against the deployed site rather than needing a local build:
+
+  ```bash
+  curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.json | python -c "import json,sys;print(json.dumps(json.load(sys.stdin)['meta']['bounties']['events'],indent=2))"
+  ```
+
+  Then put the real tag into `EVENT_TAGS` as a fact. **Do not guess it now** — a
+  wrong tag matches nothing and reads as "not running", which is the exact
+  failure the empty map exists to avoid.
+- **Capture the whole entry, not the answer. — the one thing still to do, and
+  it is not automatic.** `maximumScore`, `interimSteps` and `rewards[]` are read
+  and dropped; nothing keeps them. Run both of these while the event is live and
+  paste the output into `PROJECT.md`:
+
+  ```bash
+  curl -s https://api.warframe.com/cdn/worldState.php | python -c "import json,sys;d=json.load(sys.stdin);print(json.dumps([g for g in d.get('Goals',[]) if 'plague' in json.dumps(g).lower()],indent=2))"
+  ```
+  ```bash
+  curl -s https://api.warframestat.us/pc/events | python -c "import json,sys;print(json.dumps([e for e in json.load(sys.stdin) if 'plague' in json.dumps(e).lower()],indent=2))"
+  ```
+
+  Both, not one: DE's `Goals` is the source `from_chain` asks first and its
+  `Desc` is an internal path, while WFCD's is prose — the two shapes are the
+  thing worth having side by side, and the first is the one no test has ever
+  seen for this event.
+- ~~**Check the detection actually fires.**~~ **Our half is verified, 2026-09-08,
+  a day early and by staging.** A live window planted on `meta.bounties.events`
+  put **both** gated rows into the ranking with *Include event nodes* still
+  **off** — `Level 15 - 25 Plague Star` (Bounty, Cetus) and `Hemocyte` (Enemy) —
+  and reverting the window removed exactly those two and nothing else: 234
+  places to run became 232, 115 genuinely different became 113. The two rows are
+  gated by different mechanisms and both were exercised: the bounty through
+  `bountyEvent(s)`, the Hemocyte through `access: "event:Plague Star"` →
+  `eventWindow("Plague Star")`, which resolves by scanning for `e.event === name`
+  because the payload is keyed by bounty node rather than by event name. Neither
+  carries an `Event:` planet prefix, which would have gated them permanently
+  through `isEventNode`'s first clause whatever the event was doing.
+
+  **What that does not prove is the half only DE can answer**: the shape of the
+  real entry. The staged tag was invented. If the detection does *not* fire
+  tomorrow, capture the raw entry with the commands above — that is the fixture
+  this could never be written against.
 
 **The second date on this page was Baro, 2026-09-04 to 09-06, and it has been
 kept.** His manifest was read at 13:24Z on the 04th, 24 minutes into the window:
