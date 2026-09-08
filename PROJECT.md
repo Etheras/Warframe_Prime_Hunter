@@ -2484,6 +2484,38 @@ way: the first attempt let the real request through, and roughly two dozen tests
 began passing or failing according to what was running in Warframe at the time,
 reporting it as a five-second locator timeout that mentioned no network at all.
 
+### The catalogue against the wiki's Mastery Rank Checklist
+
+**Checked 2026-09-08, and the answer is that nothing is missing.** The checklist
+is the closest thing to an exhaustive, human-maintained list of every Prime, and
+it is derived differently from ours — so it is the right thing to audit against
+and the audit is worth not repeating from scratch.
+
+**174 Primes there, 166 of them here, and all eight differences are deliberate.**
+Each was verified rather than assumed: **not one of the eight is dropped by any
+relic, and none has a single component to track.**
+
+| Missing from ours | Why | Where the rule lives |
+|---|---|---|
+| 6 sentinel weapons — Burst Laser, Deconstructor, Deth Machine Rifle, Prime Laser Rifle, Sweeper, Verglas | Come with their Prime sentinel; nothing to farm separately | `Robotic Weapon` in `NON_RELIC_CATEGORIES` |
+| Venari Prime | **The wiki itself files it as Exalted** — intrinsic to Khora Prime, `tradable=false`, no components | `Exalted` in `NON_RELIC_CATEGORIES` |
+| Excalibur Umbra Prime | WARFRAME (China) Founders Pack — real money only, and absent from DE's item API entirely | Hard rule 10 |
+
+**And one the other way, which is also correct:** we carry Kavasa Prime Collar
+and the checklist does not. A Kubrow collar earns no Mastery, so a *Mastery* list
+omits it correctly while a *relic* list carries it correctly. Two lists, two
+questions — do not "fix" either to match the other.
+
+**What the audit actually changed was the guard, not the data.** `test_built_payload`
+already checked that no cut category leaks *into* the payload; nothing checked
+that the 148 entries removed were removed on purpose. So a wiki restructure
+renaming `Robotic Weapon` to `Companion Weapon` would have dropped six Primes and
+passed every test in the suite — the payload would still look clean, and the
+catalogue total is deliberately written down nowhere. The new test asserts on the
+**category vocabulary**: an unrecognised category name fails loudly and names
+itself, rather than however many items were inside it vanishing. Verified by
+performing exactly that rename and watching it fail.
+
 ### What a spare is worth: Ducats and Platinum, as a tie-break only
 
 **Decided by the owner, built 2026-09-08.** Both figures ride on the payload per

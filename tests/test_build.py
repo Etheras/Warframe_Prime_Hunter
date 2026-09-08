@@ -842,6 +842,76 @@ def test_parts_are_digital_extremes_own_numbers() -> None:
           sorted(uncovered), ["Kavasa Prime Collar"])
 
 
+def test_every_prime_the_wiki_lists_is_kept_or_cut_on_purpose() -> None:
+    """
+    Every Prime the wiki page carries is either in the catalogue or in a
+    category we cut deliberately — and nothing falls between the two.
+
+    **The guard that was missing.** `test_built_payload` already checks that no
+    cut category leaks *into* the payload. Nothing checked the other direction:
+    that the 148 entries removed were removed **on purpose**. A wiki restructure
+    renaming "Robotic Weapon" to "Companion Weapon" would drop six Primes and
+    pass every test in this file, because the payload would still look clean and
+    the count is deliberately written down nowhere.
+
+    So this asserts on the *category vocabulary* rather than on a total. An
+    unrecognised category name is the failure — loudly, naming it — instead of
+    however many items happened to be inside it disappearing quietly.
+
+    Checked 2026-09-08 against the wiki's own **Mastery Rank Checklist**, which
+    is the closest thing to an exhaustive human-maintained list and is derived
+    differently from ours. 174 Primes there, 166 of them here, and all eight
+    differences explained and verified: six Robotic Weapons that come with their
+    Prime sentinel, Venari Prime which the wiki itself files as Exalted
+    (intrinsic to Khora Prime), and Excalibur Umbra Prime, a China Founders Pack
+    exclusive that is real-money-only and is therefore out of scope by rule 10.
+    Not one of the eight is dropped by any relic, and none has a single
+    component to track. The one item we carry that the checklist does not is
+    Kavasa Prime Collar — a Kubrow collar earns no Mastery, so it is absent from
+    a Mastery list correctly and present in ours correctly.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import catalogue                                       # noqa: PLC0415
+    import gzip                                            # noqa: PLC0415
+
+    cache = os.path.join(ROOT, ".cache", "wiki_prime.gz")
+    if not os.path.exists(cache):
+        print("  skip wiki coverage (no warm wiki cache)")
+        return
+    with gzip.open(cache) as fh:
+        entries = catalogue.parse_prime_page(fh.read().decode("utf-8-sig"))
+    check_true("wiki coverage: the Prime page parsed at all", len(entries) > 250,
+               f"only {len(entries)} entries — the page shape may have changed")
+
+    known = set(catalogue.CATEGORY_ORDER) | catalogue.NON_RELIC_CATEGORIES
+    seen = {e["category"] for e in entries}
+    # The whole point. A category the wiki grew, or renamed, that neither list
+    # names is an item silently leaving the catalogue.
+    check("wiki coverage: every category is either kept or cut on purpose",
+          sorted(seen - known), [],
+          "an unrecognised category drops its items with nothing to notice")
+
+    data_js = os.path.join(ROOT, "data", "prime-data.json")
+    if not os.path.exists(data_js):
+        print("  skip wiki coverage payload (run tools/build_data.py first)")
+        return
+    with open(data_js, encoding="utf-8") as fh:
+        payload = json.load(fh)
+    ours = {re.sub(r"[^a-z0-9]", "", i["name"].lower()) for i in payload["items"]}
+
+    # An entry in a KEPT category must have reached the payload. This is the
+    # half that catches an item lost to a parse quirk rather than to a policy —
+    # a name the join could not match, say — which no category check can see.
+    lost = sorted(e["name"] for e in entries
+                  if e["category"] in catalogue.CATEGORY_ORDER
+                  and re.sub(r"[^a-z0-9]", "", e["name"].lower()) not in ours
+                  and re.sub(r"[^a-z0-9]",
+                             "", catalogue.NAME_ALIASES.get(e["name"], "").lower())
+                  not in ours)
+    check("wiki coverage: nothing in a kept category is missing from the payload",
+          lost, [])
+
+
 def test_platinum_joins_on_des_own_paths_not_on_names() -> None:
     """
     The warframe.market join, and the two things about it that could rot
@@ -4715,6 +4785,7 @@ def main() -> int:
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
         ("built payload", [test_built_payload, test_parts_are_digital_extremes_own_numbers,
+                           test_every_prime_the_wiki_lists_is_kept_or_cut_on_purpose,
                            test_platinum_joins_on_des_own_paths_not_on_names]),
         ("integration", [test_offline_build,
                          test_the_scheduled_task_can_actually_be_registered,
