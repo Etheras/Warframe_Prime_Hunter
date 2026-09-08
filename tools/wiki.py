@@ -76,21 +76,28 @@ PAGES = [
         ("PROJECT.md", "Effort is the player's to give, and blank until they do"),
         ("PROJECT.md", "One deliberate thumb on the scale, and only one"),
     ]),
+    # This published `TODO.md`'s "What is open, at a glance" until 2026-09-08,
+    # when that section was deleted: it was a summary table above each family
+    # and it could not be kept true, because closing an entry and closing its
+    # row are two acts and only one is where anybody looks. So the wiki has no
+    # index to mirror any more, and this page carries the orientation instead —
+    # what the backlog is, how it is organised, and where to read it.
     ("Status.md", "Status", [
-        ("TODO.md", "What is open, at a glance"),
+        ("TODO.md", "How to read this file"),
     ]),
 ]
 
 
 # A closing note for pages whose source text points somewhere the wiki does not
-# go. The status overview says "each one is a ### heading further down", and
-# further down is TODO.md, not this page - a promise the wiki cannot keep unless
-# it says where the rest is.
+# go. The orientation above talks about headings "below" and about greping for
+# them, and below is TODO.md rather than this page - a promise the wiki cannot
+# keep unless it says where the rest is.
 TAILS = {
     "Status.md":
-        "\n\n---\n\nEach row above is a heading in "
+        "\n\n---\n\nThe open items themselves are the headings of "
         f"[`TODO.md`]({BLOB}TODO.md), where the reasoning, the measurements and "
-        "the arguments against live. This page carries the index only.\n",
+        "the arguments against live. This page carries the orientation only — "
+        "there is deliberately no summary list, here or there.\n",
 }
 
 

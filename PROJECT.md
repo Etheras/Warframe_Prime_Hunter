@@ -105,6 +105,27 @@ has drifted is worse than no doc, because it will be trusted.
 If you notice a stale line while doing something else, fix it then. Do not leave
 it for a tidy-up pass that will not happen.
 
+**Three files, three jobs, and the boundary is the part that keeps slipping.**
+Stated 2026-09-08 at the owner's direction, after `PROJECT.md §7` grew to 79% of
+this file by absorbing the reasoning behind every finished item:
+
+| | goes in |
+|---|---|
+| still to do, still to decide | `TODO.md` — once, as a `###` heading |
+| must not be re-derived or re-argued | `PROJECT.md §7` |
+| what changed and when | `git log`, which is better at it than prose |
+
+The test for §7 is *"would a future session, lacking this, redo the work or
+re-litigate the decision?"* A dated note that something shipped is not that.
+
+**And never index the backlog.** `TODO.md` carried a summary table above each
+family, one row per entry, and it was deleted on 2026-09-08 because it could not
+be kept true: closing an entry and closing its row are two acts, and the row is
+not where the reader is looking. Rows outlived their fixes by a week; a sweep
+removed twenty and a fresh stale one appeared the same afternoon. **A backlog
+with two places to say "done" will disagree with itself.** The headings are the
+index.
+
 ### Never put a language model in the data pipeline
 
 Every source is JSON or a machine-generated HTML table with a regular structure,
@@ -1486,7 +1507,41 @@ run rather than trusting the shape of the four outcomes to have kept the old num
 
 ---
 
-## 7. Data model
+## 7. Data model, and the decisions not to re-derive
+
+**What belongs here, and what does not.** This section is two things: the shape of
+the payload, immediately below, and then the record of decisions — why the model
+is the way it is, what was tried and rejected, and which traps have already been
+fallen into.
+
+The test for an entry is one question: **would a future session, lacking this,
+redo the work or re-litigate the decision?** If yes it belongs here. If it is
+merely a note of what changed on a date, it does not — that is what `git log`
+is, and it is better at it.
+
+**This is the contract, stated 2026-09-08 at the owner's direction, and the
+section does not yet meet it.** It holds 99 entries over 5,700 lines — 79% of
+this file — and 87 of them carry a date, which is the shape of a changelog rather
+than of a rulebook. The split it is being held to:
+
+| | belongs in |
+|---|---|
+| still to do, still to decide | `TODO.md`, once, as a `###` heading |
+| must not be re-derived or re-argued | here |
+| what changed and when | `git log` |
+
+**It is numbered 7 and stays numbered 7.** Ninety-five references across the code,
+tests and docs point at `PROJECT.md §7`, so renumbering would be ninety-five
+chances to break a pointer for no reader's benefit. The title changed instead,
+because *"Data model"* stopped describing nine-tenths of the contents some time
+ago.
+
+**The entry-by-entry pass is outstanding**, and deliberately not done in the same
+sitting as the contract: pruning 99 entries quickly is how reasoning gets lost,
+and this project has already had one hour today where four lessons existed in no
+file at all because a preamble was deleted around them. `TODO.md` carries it.
+
+---
 
 `window.WFPRIME_DATA` holds:
 
@@ -7185,6 +7240,54 @@ Proxima node before we do, it lands there rather than on a card. `node_names`
 also seeds the vendored table *first*, so DE's own export wins any collision —
 the day they start publishing these rows, the borrowed copy stops being consulted
 without anyone editing anything.
+
+### What the security reviews taught that the findings did not say
+
+Two independent security reviews, 2026-08-24 and 2026-08-28, and sixteen of their
+findings shipped. The findings themselves are closed and their fixes are recorded
+above; this is the residue — what doing the work taught, which none of the reports
+contained.
+
+**Kept here rather than in `TODO.md` because none of it is outstanding work.** It
+sat in that file's preamble until 2026-09-08 and went missing for an hour when the
+preamble was deleted, which is the argument for the split the owner asked for:
+what is still to do belongs there, what must not be re-derived belongs here.
+
+Five, and none of them was in the findings — they came out of doing the work:
+
+- **The footer could not have been fixed by correcting the footer.** The payload
+  field it read was a single string chosen by whether artwork is local, and a
+  build can use both hosts. The field had to be able to say so first.
+- **The `filters` gap was narrower than filed.** The collection page already
+  validated every one of those keys where it read them, `sort` included. What
+  shipped is consistency inside `parseBackup` and defence in depth, not a hole
+  being closed — see the note in `PROJECT.md §7`, which says so rather than
+  claiming the larger win.
+- **Removing a feature was on the table and nobody had offered it.** Both
+  reviews and the backlog framed LAN mode as a documentation-or-encryption choice.
+  It was neither: the mode bought a convenience and cost a paragraph the reader
+  had to weigh correctly at the wrong moment, so it went. Worth remembering the
+  next time a finding arrives with two options in it.
+- **The wiki fix was not the fix that was asked for.** Both the review and the backlog said "confine `contents: write` to the step that pushes", and GitHub has
+  no per-step permissions — the scope is per job and per workflow, nothing
+  finer. The available fix was a second job, which is a bigger edit than the
+  wording implied and buys the same thing. A finding phrased as a small change
+  is not evidence that a small change exists.
+- **The ceilings are tight because refusing is cheap, not because the numbers
+  are confident.** The owner chose twice each measured figure where three times had been proposed. That is only safe because an oversized response
+  takes the path a failed fetch already takes — next host, then the cached copy,
+  then `meta.stale` — so a ceiling set too low costs a stale build and a named
+  log line rather than a broken one. **Read a "source over its ceiling" line as
+  "raise the number", not as an attack.** `de_worldstate` is the one most likely
+  to say it, because it carries whatever events are running.
+
+**And a sixth, from 2026-09-08, which is the same shape.** `api_events` was
+refused by its ceiling once — `Content-Length: 131,072` against 32,768 — and the
+build correctly reused a 0-minute-old cache. It did not reproduce, and the
+endpoint measures 1,482 bytes with one event. The rule above is what to apply if
+it recurs: **raise the number**. `TODO.md` carries it as a watch item because the
+timing matters — that is the events feed and Operation Plague Star opens the next
+day.
 
 ---
 

@@ -39,198 +39,43 @@ which is what the rule at the top of this file asks for.
 
 ---
 
-## What is open, at a glance
+## How to read this file
 
-**Swept against the code on 2026-08-26.** Every row below was checked to still be
-true; the cadence row changed shape and the Mastery Rank row shipped.
-Titles are given verbatim so they can be grepped — each one is a `###` heading
-further down, where the reasoning lives.
+**Every open item is a `###` heading.** Grep for one, or scan the headings — that
+is the index, and it is the only one.
 
-**Five rows were added 2026-09-04**, under *Findings of 2026-09-04*, three of
-them from the owner watching the thing run for two days — which found what no
-local suite was ever going to. **Four have since shipped and been deleted**
-rather than ticked, per the rule at the top of this file. One is left, and it is
-not code:
+**There used to be a summary table above each family**, one row per entry with a
+size and a status. It was deleted on 2026-09-08 at the owner's direction, and the
+reason is worth keeping because it took three separate incidents to see:
 
-| Entry | What it is | Size |
-|---|---|---|
-| Does a missed daily task really run on the next boot? | the `-StartWhenAvailable` fallback is documented and set, not measured — one field to read the first morning the machine was off at 18:07 | nil |
+> A backlog with two places to say "done" will disagree with itself.
 
-**A row was added on 2026-08-26 and deleted on 2026-08-27**, in the same two days
-that produced it: *The standalone runs both pages' wiring twice, and it shows*
-came from the first session that ever drove the built single file in a browser
-rather than reading it as text, and it named seven defects confined to `dist/`.
-All seven shipped, the reasoning is in `PROJECT.md §7`, and the page tests now
-open `dist/warframe-prime-hunter.html` and press its buttons — which is the part
-worth keeping, because the gap was never any one of the seven.
+It did, repeatedly. Rows outlived their own entries by days — the wiki-permissions
+test, the 404 page and `gunzip_capped` all sat "open" in a table for a week after
+being fixed in the prose below. A sweep on the morning of 2026-09-08 removed
+twenty such rows; **by that afternoon a fresh one had already appeared**, saying
+the vault-filter switch was undecided after it had been declined and its entry
+closed. The index was not failing to keep up — it was structurally unable to,
+because closing an entry and closing its row are two acts and only one of them
+is where the reader is looking.
 
-**A row added in its place lasted a few hours**: the two pages restored a
-self-contradictory backup differently from each other, found while proving that
-fix. It is settled and gone too — neither page corrects such a file now, both
-report it in the same words, and `PROJECT.md §7` has why the reasoning behind the
-old behaviour was wrong about its own cause.
+So there is no index. The reasoning for anything shipped lives in `PROJECT.md §7`;
+what is still open lives here, once.
 
-**Neither is what those two days left behind.** That is a cadence rather than a
-backlog row: a security audit and a feature-usability audit, monthly, both
-baselined 2026-08-27 and both next due 2026-09-27, postponed a month whenever no
-commits have landed. It lives in `PROJECT.md §2` and has no entry here, because a
-recurring obligation is not outstanding work — it is due on a date, and that date
-is written where the rule is.
+**Two standing cautions, kept from that section because they are about this file
+rather than about any entry.**
 
-*Size* is honest rather than optimistic: **small** is a few lines and one file,
-**session** is an afternoon including the test, **large** touches the pipeline, the
-payload and both pages.
-
-**This file no longer claims that nothing is wrong on screen.** It said so on
-2026-08-24 and a sweep the next day found two things that were; it said so again on
-2026-08-25 and the cadence sweep of 2026-08-26 found six mission types costed at a
-third to a fifth of what the wiki says they cost, two of them the largest modes in
-the dataset. The claim has now been wrong twice running, which is enough. **What is
-true is narrower and worth stating instead:** every defect anyone has actually
-identified is either fixed or has an entry below. Whether the ranking is *right*
-turns on the open question in *A round is not a universal unit of effort*, and
-until that is settled nobody should write the reassuring sentence again.
-
-Four defects shipped that day and their entries are gone, with the reasoning in
-`PROJECT.md §7`: both Onslaught nodes ranked at twice their true rate; 38 live
-nodes costed as endless when they are not; the *Still needed* panel counting
-relics the reader's own switches had turned off; and an opt-in gate standing in
-front of the only route six Primes have.
-
-That family is closed. The last of it was not a wrong number but an unreachable
-one: **Spy nodes and the eleven pre-refined nodes never appeared in the rows
-either page rendered**. The planner's ranking can now be expanded in place, which
-puts all 92 places on screen — Elite Sanctuary Onslaught at #38, and Pago and Bode
-the first Spy nodes either page has ever shown.
-
-**Both lists can now be seen whole** — the drawer got the same treatment the same
-day, so Spy nodes and the pre-refined eleven are reachable on either page.
-
-### Security
-
-Nine findings from the re-review of 2026-08-28. **No Critical and no High** —
-both Highs from the previous review were re-tested and are fixed. These come
-first in this file because they are security work, not because any of them is on
-fire.
-
-**Two of the nine were already asked and answered**, by the owner on 2026-08-26,
-and are marked below rather than re-opened — the second review re-filed them
-without knowing they had been declined. **A tenth entry was here that neither
-review filed**, found while checking one of those two against the code, which is
-the same way four of the first review's twelve outcomes arrived.
-
-**Seven shipped on 2026-09-01** and their entries are gone, with the reasoning
-in `PROJECT.md §7`: the mutable action tags, the non-atomic feed-log write, the
-privacy footer naming a host the site never contacts, the unvalidated `filters`
-section of a backup, **the wiki job's repo-writing token, now held by a job that
-runs no build**, **the unbounded downloads and decompression, now a ceiling per
-source at twice what it measures**, and **LAN mode, which was removed rather
-than documented** — the review offered "say so" or "add HTTPS" and the owner
-took neither, so `serve.py` is loopback-only and refuses to bind anything else.
-
-**An eighth shipped in half.** The freshness stampede is gone —
-serve-then-refresh, one background check, the page polling until it settles —
-and what the fix *guards rather than removes* keeps the entry: page serving
-still writes the builder's cache. The entry was renarrowed rather than deleted,
-which is the honest shape when a finding had two bullets and one of them
-shipped.
-
-Five things worth carrying forward, because none was in the findings:
-
-- **The footer could not have been fixed by correcting the footer.** The payload
-  field it read was a single string chosen by whether artwork is local, and a
-  build can use both hosts. The field had to be able to say so first.
-- **The `filters` gap was narrower than filed.** The collection page already
-  validated every one of those keys where it read them, `sort` included. What
-  shipped is consistency inside `parseBackup` and defence in depth, not a hole
-  being closed — see the note in `PROJECT.md §7`, which says so rather than
-  claiming the larger win.
-- **Removing a feature was on the table and nobody had offered it.** Both
-  reviews and this file framed LAN mode as a documentation-or-encryption choice.
-  It was neither: the mode bought a convenience and cost a paragraph the reader
-  had to weigh correctly at the wrong moment, so it went. Worth remembering the
-  next time a finding arrives with two options in it.
-- **The wiki fix was not the fix that was asked for.** Both the review and this
-  file said "confine `contents: write` to the step that pushes", and GitHub has
-  no per-step permissions — the scope is per job and per workflow, nothing
-  finer. The available fix was a second job, which is a bigger edit than the
-  wording implied and buys the same thing. A finding phrased as a small change
-  is not evidence that a small change exists.
-- **The ceilings are tight because refusing is cheap, not because the numbers
-  are confident.** The owner chose twice each measured figure where this file
-  had proposed three times. That is only safe because an oversized response
-  takes the path a failed fetch already takes — next host, then the cached copy,
-  then `meta.stale` — so a ceiling set too low costs a stale build and a named
-  log line rather than a broken one. **Read a "source over its ceiling" line as
-  "raise the number", not as an attack.** `de_worldstate` is the one most likely
-  to say it, because it carries whatever events are running.
-
-| Entry | Size |
-|---|---|
-| A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
-
-### The worldstate is already cached, and barely read
-
-**Mostly read now.** The sweep of 2026-08-24 took the rotation letter per tier, the
-stage counts and the bounty levels; `PROJECT.md §7` records what that corrected.
-What is left of the entry is two fields and a warning about one of them.
-
-| Entry | What is left | Size |
-|---|---|---|
-| The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| Baro's actual stock is published, and never read | **read 2026-09-04: 41 rows, one relic — `Axi M5`, resolved first-party.** No longer blocked on a window; what is left is whether to build it | session |
-
-### Model and ranking
-
-| Entry | Size |
-|---|---|
-| Seven rotation-bearing mission types are still unverified | **five now** — `Legacyte Harvest` verified AABC, `Skirmish` undocumented, `The Circuit` disputed; checked 2026-09-02 |
-| `The Circuit` may be two different modes wearing one name | **the owner's, to settle in game** — the wiki and DE's tables describe different things |
-| `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
-| `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
-| Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
-| What the misses are worth, in Ducats | session |
-| What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
-| A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
-
-**Two of this table's rows shipped on 2026-08-27** and their reasoning is in
-`PROJECT.md §7`: the unit question — *an objective is one reward draw* — and the
-fixed cost of a run, which was gated by it. What is left is no longer gated by
-anything.
-
-**The one live defect in this table shipped on 2026-09-01** — *Two relics that pay
-the same part are counted as two*, the double-count that put Apollo (Lua) at the
-top of a farm list where one of its two relics paid nothing the other did not.
-`PROJECT.md §7` has the reasoning, the two claims that entry had wrong, and why
-the union fix it named first would have made the ranking worse rather than
-better. **Everything left in this table adds something rather than correcting
-something**, which is a different kind of choice. That is not the reassuring
-sentence: this file has twice claimed nothing was wrong on screen and been wrong
-both times, and the entry that just shipped was found by the owner reading the
-app rather than by anything written here.
-
-*Seven rotation-bearing mission types* is what remains of the entry that gated the
-unit question — tedious rather than hard, and blocking nothing.
-
-**One measurement in this family stopped reproducing** and was **settled
-2026-09-05** — reasoning in `PROJECT.md §7`. Short version: the four-round column
-has read 43/49 on every re-run since 2026-09-02, across a Resurgence rotation
-flip, so the missing row was one event rather than drift. The useful finding was
-elsewhere — the table's real omission was not the build stamp but the **state of
-the fissure feed**, which changes every figure in it and was recorded as an
-observation rather than a precondition.
-
-### Interface
-
-| Entry | Size |
-|---|---|
-| Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
-| One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
-| `api_events` was refused by its ceiling once, the day before Plague Star | **watching, 2026-09-08** — the fetcher saw `Content-Length: 131,072` against a 32,768 ceiling and reused the cache (0 min old, nothing lost). Did not reproduce on the next build, and the endpoint measures 1,482 bytes with 1 event and answers chunked when gzip is asked for, so it was not the body. Read a ceiling line as *raise the number*, but there is nothing to raise it against yet |
-| The page tests flake in a full run and pass on their own | watching — **fourth occurrence 2026-09-08**, `ERR_NO_BUFFER_SPACE` again, on `page.goto`. Two in a row now name it, which is stronger evidence for socket exhaustion than for timing |
-| The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
-| A priority flag on the farm list | session |
-| The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
+- **A `TODO.md` entry is not evidence.** Check it against the code before
+  planning around it. Three entries have described work that had already
+  shipped, and on 2026-09-08 one nearly cost a re-implementation of a working
+  feature — the ranking already re-ranked on a fissure refresh, and both this
+  file and the comment beside the code said it did not.
+- **This file no longer claims that nothing is wrong on screen.** It said so on
+  2026-08-24 and a sweep the next day found two things that were; it said so
+  again on 2026-08-25 and the cadence sweep found six mission types costed at a
+  third to a fifth of what the wiki says. Twice wrong is enough. What is true is
+  narrower: every defect anyone has actually identified is either fixed or has an
+  entry below.
 
 ### One refactor
 
@@ -243,11 +88,6 @@ of a worklist, not of the click, and worth deciding on its own merits.
 
 ### Cannot be finished today — and why
 
-| Entry | Waiting on |
-|---|---|
-| Plague Star and Profit-Taker are the same shape, modelled two ways | **Plague Star, and it has a date: 2026-09-09 to 2026-09-23** |
-| The Ghoul and Plague Star detection has never seen a live event | **2026-09-09 to 09-23.** The `tag` half is **done, 2026-09-04** — it was coverage rather than code, and it found that DE's path form was untested and the tag branch untested. What is left needs the event |
-| Expected openings for everything, not for the worst one — measured, and it costs traces | nothing — *are you trace-limited?* has an answer on screen, and since 2026-09-05 it is the reader's own Mastery Rank cap rather than a flat 500; this is ordinary work |
 
 **Two of those three now have a date, given by the owner on 2026-09-02 from DE's
 own announcement: Operation Plague Star runs 2026-09-09 to 2026-09-23, all
@@ -2392,6 +2232,54 @@ and falling back to the family only where a group has none, would remove the
 approximation without deriving anything new. What needs deciding is what the
 *countdown* means once tiers can disagree, since `walkFrom` advances one letter
 for a whole family.
+
+### `PROJECT.md` section 7 needs an entry-by-entry pass against its own contract
+
+**The contract was written on 2026-09-08 and the section does not yet meet it.**
+It says what belongs there — *would a future session, lacking this, redo the work
+or re-litigate the decision?* — and it currently holds **99 entries over 5,700
+lines, 79% of `PROJECT.md`**, of which **87 carry a date**. That is the shape of
+a changelog, and `git log` is better at being one.
+
+**Deliberately not done in the same sitting as the contract.** Pruning 99 entries
+quickly is how reasoning gets lost, and this file has the evidence: during the
+same session's `TODO.md` sweep, four review lessons — including *read a "source
+over its ceiling" line as "raise the number"* — existed in **no file at all** for
+about an hour, because the preamble holding them was deleted around them. They
+were recovered from `git show`. A faster pass over ten times as much text would
+not have noticed.
+
+**How to do it**, when it is done: entry by entry, keeping anything that names a
+rejected option and why, a trap already fallen into, or a number nobody should
+re-measure; compressing anything that is only *"this changed on this date"* down
+to the rule it taught, or deleting it where it taught nothing. **Not in one
+commit** — a batch at a time, so a bad call is one revert rather than a
+reconstruction.
+
+Two candidates to start from, because they are the largest and their size is not
+obviously earned: *Three derived ideas worth knowing* (328 lines) and *Two
+security findings examined and declined* (279 lines).
+
+**Size: session, and it is the kind that must not be rushed.**
+
+### `api_events` was refused by its ceiling once, the day before Plague Star
+
+**Watching, 2026-09-08.** The fetcher saw `Content-Length: 131,072` against a
+32,768 ceiling, refused the refresh and reused the cached copy — 0 minutes old,
+so nothing was lost and the build was correct throughout.
+
+**It did not reproduce**, and the endpoint does not explain it: measured the same
+hour, `api.warframestat.us/pc/events` returns **1,482 bytes with one event**, and
+answers *chunked* with no `Content-Length` at all when gzip is requested. So
+whatever declared 128 KiB was not the body.
+
+`PROJECT.md §7` — *What the security reviews taught that the findings did not
+say* — says to read a "source over its ceiling" line as **raise the number**,
+not as an attack. There is nothing to raise it against yet — the
+measured body is 5% of the current ceiling. Left here because the timing is worth
+watching: this is the events feed, it is the fallback for event detection, and
+Operation Plague Star opens 2026-09-09. If it recurs while the event runs,
+raising `api_events` is the first move, not the last.
 
 ### The page tests flake in a full run and pass on their own
 
