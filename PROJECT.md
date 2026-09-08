@@ -6958,6 +6958,56 @@ The distinction that makes all three fine and made the fourth a bug: reading the
 marker to say *"he sometimes sells this"* is what it is for. Reading it to
 answer *"can I get this today"* is what it cannot do.
 
+### A minute you cannot see must not decide what the list is costed in
+
+The owner's rule for the effort panel, given 2026-09-05, is that **the row
+disappearing must not discard the number**: `opts.minutes` is keyed by mission
+type and survives whatever the panel happens to be rendering. That was already
+true and no code was written for it.
+
+What was *not* true is the half nobody had stated: a number that is kept must
+also stop **counting** while it is invisible. `effort()` read every key of
+`opts.minutes` regardless of whether that mission type was anywhere near the
+plan. Measured on the served page with `minutes: {Skirmish: 9}` saved and
+*Include Railjack* switched off, which is Skirmish's only home:
+
+| | |
+|---|---|
+| effort rows shown | **27** |
+| rows carrying a number | **none** |
+| Skirmish's row | absent |
+| the state line | *"**1 set.** Every other type is costed at their average, **9 min**"* |
+| the ranking | flipped to **per minute**, all 27 visible types costed at 9 |
+
+So one invisible number decided the basis of the entire ranking, under a note
+saying "1 set" above a form where nothing was set, with *clear all* the only way
+out and it clears everything.
+
+**The fix is a filter, and the reason it is the right one is that it needs
+nothing else.** The alternative the backlog had been holding — render a row for
+the absent type — required a unit to print, and `objectivesOf` derives the unit
+from a **node**, so a mission type with nothing ranked genuinely has none. The
+owner chose the filter, which retires that question rather than answering it.
+
+Three details that decide whether it is done properly:
+
+- **Where the set comes from.** `effort(liveModes)` is called at the one moment
+  it can be: after the node walk, the `creditRelics` pass and the Aya block have
+  all run, so `nodes` is complete, and before anything is costed. Any earlier
+  and the answer does not exist; any later and the ranking has already used it.
+- **The note has to move with it**, or the panel goes on saying "1 set" about a
+  row it is not drawing. `renderEffort` filters by the modes it just rendered.
+- **`clear all` must NOT move with it.** It is filtered on the *unfiltered* set,
+  because an inert invisible value is still in the reader's saved options and
+  something on screen has to be able to remove it. Filtering that too would have
+  made the value unreachable — a tidier bug than the one being fixed, and worse.
+
+Pinned by a page test that gives Skirmish a number, switches Railjack off, and
+asserts the heading stays *per reward*, no row carries a value, the note counts
+nothing, *clear all* is still offered, the number survives in `localStorage`, and
+switching Railjack back on makes it count again. Verified red against the
+unfiltered set.
+
 ---
 
 ## 8. Gotchas discovered while building

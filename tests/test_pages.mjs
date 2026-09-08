@@ -3675,6 +3675,78 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.deepEqual(errors, []);
 });
 
+page_test("a minute saved for a mission type off the list stops costing the list", async () => {
+  /* Measured on the served page 2026-09-05 and fixed 2026-09-08. `opts.minutes`
+     is keyed by mission type and survives whatever the panel renders, which is
+     the owner's rule — *the row disappearing shouldn't discard the number*. What
+     was wrong is that it went on being **used** while invisible: `effort()` read
+     every saved key, so one value for a type with nothing ranked flipped the
+     whole list to per-minute and became the assumed cost of every visible type.
+
+     `Skirmish` is the subject because Railjack is its only home and the switch
+     that removes it is a control the reader owns — so the "not on the list"
+     state is reachable without inventing a mission type. Asserted off the
+     payload rather than assumed: if Skirmish ever ranks with Railjack off, this
+     test says so instead of quietly passing. */
+  const { page, errors } = await open("/plan.html");
+  await wishFarmable(page);
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
+    p.railjack = true; p.minutes = {};
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify(p));
+  });
+  await page.reload({ waitUntil: "load" });
+
+  const modeRows = () => page.evaluate(() =>
+    [...document.querySelectorAll("#effortRows .effort-row .em-name")].map((e) => e.textContent));
+  const state = () => page.evaluate(() => ({
+    heading: document.querySelector("#p-sort").selectedOptions[0].textContent.trim(),
+    note: (document.querySelector("#effortState") || {}).textContent || "",
+    clearOffered: !(document.querySelector("#effortClear") || {}).hidden,
+    rowsWithValue: [...document.querySelectorAll("#effortRows .effort-row input")]
+      .filter((i) => i.value !== "").length,
+  }));
+
+  await page.locator(".advanced > summary").click();
+  assert.ok((await modeRows()).includes("Skirmish"),
+            "with Railjack on, Skirmish has to be one of the rows — otherwise there is " +
+            "no way to reach the state this test is about");
+
+  // give it a number, then take away the switch that puts it on the list
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
+    p.minutes = { Skirmish: 9 }; p.railjack = false;
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify(p));
+  });
+  await page.reload({ waitUntil: "load" });
+  await page.locator(".advanced > summary").click();
+
+  const rows = await modeRows();
+  assert.ok(rows.length > 2, "there still has to be a form to look at");
+  assert.ok(!rows.includes("Skirmish"), "Railjack off takes Skirmish off the list");
+
+  const after = await state();
+  assert.equal(after.rowsWithValue, 0, "nothing on screen carries a number");
+  assert.match(after.heading, /per reward/,
+               "so the ranking must stay on reward count — a value nobody can see " +
+               "must not decide the basis of the whole list");
+  assert.doesNotMatch(after.note, /\d+ set/,
+                      `and the note must not count it: ${after.note}`);
+  /* The escape hatch is deliberately NOT filtered: the value is inert now, but
+     it is still in the reader's saved options and something has to be able to
+     remove it. */
+  assert.ok(after.clearOffered, "clear all still has to reach a value the rows cannot");
+
+  // and it is kept, not discarded — the owner's rule — so it counts again
+  assert.deepEqual(await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.plan.v1")).minutes), { Skirmish: 9 },
+    "the number survives; it is only stopped from counting while it is off the list");
+  await setCheck(page, "#p-railjack", true);
+  const back = await state();
+  assert.match(back.heading, /per minute/, "and it counts again the moment Skirmish returns");
+  assert.deepEqual(errors, []);
+});
+
 page_test("a relic on sale is never described as one you have to trade for", async () => {
   /* Owner-reported 2026-09-06 from the deployed site. `noNodes` tested
      `every(resurgence)` before `every(vaulted)`, which was the right test while

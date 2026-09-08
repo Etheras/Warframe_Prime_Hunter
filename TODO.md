@@ -46,20 +46,15 @@ true; the cadence row changed shape and the Mastery Rank row shipped.
 Titles are given verbatim so they can be grepped — each one is a `###` heading
 further down, where the reasoning lives.
 
-**Five rows added 2026-09-04**, under *Findings of 2026-09-04*. Three came from
-the owner watching the thing run for two days, which found what no local suite
-was ever going to:
+**Five rows were added 2026-09-04**, under *Findings of 2026-09-04*, three of
+them from the owner watching the thing run for two days — which found what no
+local suite was ever going to. **Four have since shipped and been deleted**
+rather than ticked, per the rule at the top of this file. One is left, and it is
+not code:
 
 | Entry | What it is | Size |
 |---|---|---|
-| ~~The freshness fingerprint asks DE directly~~ | **fixed 2026-09-04**, same day it was reported; reasoning in `PROJECT.md §7` | done |
-| ~~The scheduled task steals focus every ten minutes~~ | **fixed 2026-09-04** with `conhost --headless`; reasoning in `PROJECT.md §6` | done |
-| ~~An anchor for the ten-minute refresh, from the data rather than a grid~~ | **decided and shipped 2026-09-05**: no derived schedule, but the grid moved two minutes off the hour; reasoning in `PROJECT.md §7` | done |
-| ~~The daily FULL build's anchor is not being delivered~~ | found and **fixed 2026-09-05** on the owner's direction: `-DispatchRemote` installs a second daily job for it; reasoning in `PROJECT.md §7` | done |
 | Does a missed daily task really run on the next boot? | the `-StartWhenAvailable` fallback is documented and set, not measured — one field to read the first morning the machine was off at 18:07 | nil |
-| Two battery defaults were never examined | `DisallowStartIfOnBatteries`/`StopIfGoingOnBatteries` shipped True since the script was written; **overridden 2026-09-05**. Invisible here — this machine is a desktop | done |
-| Baro's relic should live only while he is on the relay | **decided and shipped 2026-09-04**; reasoning moved to `PROJECT.md §7` | done |
-| Vendor `ItemType` paths have a general rule, and we found one case of it | reference read from two MIT repos; nothing copied, pending approval | note |
 
 **A row was added on 2026-08-26 and deleted on 2026-08-27**, in the same two days
 that produced it: *The standalone runs both pages' wiring twice, and it shows*
@@ -173,9 +168,6 @@ Five things worth carrying forward, because none was in the findings:
 | Entry | Size |
 |---|---|
 | A backup import will read a file of any size **[settled — declined 2026-08-26]** | not open — re-filed unchanged by the second review; the answer is in `PROJECT.md §7` |
-| ~~`gunzip_capped` turns a refused download into a short one~~ | **code fixed 2026-09-02, pinned 2026-09-05** — it was repaired the day it was found and nothing asserted it; four cases now do |
-| ~~The wiki-permissions test matches spellings, not the property it names~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
-| ~~The pin count in `dependabot.yml` was stale the day it was written~~ | **fixed 2026-09-05** — eleven lines, all pinned, seven distinct actions |
 
 ### The worldstate is already cached, and barely read
 
@@ -186,8 +178,6 @@ What is left of the entry is two fields and a warning about one of them.
 | Entry | What is left | Size |
 |---|---|---|
 | The worldstate publishes far more than the two fields we read | `type` (with a trap in it) and `rewardPoolDrops` as a cross-check | session |
-| ~~Varzia's shelf is published outright, and we infer it instead~~ | **found and shipped 2026-09-05** — the rows are read first, the convention is the fallback; `PROJECT.md §7` | done |
-| ~~`flags.resurgence` misses a Prime whose path is a codename~~ | **found and shipped 2026-09-05** — resolving the manifest recovers Euphona Prime, live now, and Cobra & Crane on the previous rotation | done |
 | Baro's actual stock is published, and never read | **read 2026-09-04: 41 rows, one relic — `Axi M5`, resolved first-party.** No longer blocked on a window; what is left is whether to build it | session |
 
 ### Model and ranking
@@ -199,7 +189,6 @@ What is left of the entry is two fields and a warning about one of them.
 | `The Perita Rebellion` is a time box, and the model has no clock for it | **tried and reverted** — the obvious fix halves the default case; left as it is on purpose |
 | `RUN_OVERHEAD` is two *rewards* on a node where a reward is two zones | small — no effect today, left open on purpose |
 | Our four invented "mission types" leak into the ranking | **checked 2026-09-02** — every consequence is already handled and now guarded by a test; what is left is the architecture, not a defect |
-| ~~Baro's item-level marker still over-claims, and now there is a number for it~~ | **settled and shipped 2026-09-05** — the marker is a badge, the bucket is his live shelf, and the seven he is not selling are vaulted; `PROJECT.md §7` |
 | What the misses are worth, in Ducats | session |
 | What the misses are worth in Platinum, from warframe.market | session — the owner's, 2026-08-27; a new source tier, and the percentile needs settling |
 | A concentrated farm finishes a relic sooner than a diluted one | session — needs a size chosen by hand |
@@ -241,17 +230,8 @@ observation rather than a precondition.
 | A backend refresh finds new fissures and the ranking does not move | session — the deliberate half of this is the hard half |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
-| ~~Targeted Aya is worth 100% and still cannot be a reason to go anywhere~~ | **shipped 2026-09-06**, the day it was reported — the guard is conditional on `ayaTargeting` now, and the reported screen went from 0 places to run to 46; `PROJECT.md §7` | done |
-| ~~One Baro relic sends the stranded message to the trade-only branch~~ | **fixed 2026-09-06** — the branch asks `resurgence \|\| isBaro` and there are three wordings; `PROJECT.md §7` | done |
-| ~~When Baro leaves, the same list claims its relics drop~~ | **fixed 2026-09-08** — `flags.baro` is out of the `stranded` condition; `buyable` already asked the live question. Seven Primes get their crack list back for the twelve days a fortnight he is away; `PROJECT.md §7` | done |
 | A priority flag on the farm list | session |
 | The deployed site shows no fissures for hours at a time | **decided 2026-09-05 — the page reads a live feed.** The owner is opting out of the dispatch as an architecture, though it measured well. WFCD is CORS-open at `max-age=120` and DE is not open to a browser at all, so the source and the poll rate are both settled. Size: session; the dispatch stays until the feed runs |
-| ~~Kavasa Prime Collar's search rows stutter its name~~ | **finished 2026-09-05** — the search rows already used `partLabel`; the *Still needed* rows did not, and now do |
-| ~~The server's own 404 page violates the CSP it sends~~ | **fixed 2026-09-04**, recorded below the same day; this row outlived it |
-| ~~*Short on Void Traces?* becomes *Capped Void Traces*, and the logic with it~~ | **shipped 2026-09-05** — on means capped, default off, bonus lives on the off side; `PROJECT.md §7` |
-| ~~The two Baro badges should filter differently from each other~~ | **shipped 2026-09-05** — the Baro box answers for what he holds now, the rest need *Vaulted* too; `PROJECT.md §7` |
-| The forms are too wordy, and *Effort (optional)* changes its rows | **wording done 2026-09-05**, visible prose down 89%. What is left is **decided and unbuilt**: a saved value for an unranked type must stop counting — measured to flip the whole list to per-minute ranking from a row nobody can see. Size: small |
-| ~~The *Vaulted* count includes eight Primes it cannot reveal on its own~~ | **withdrawn 2026-09-05 — it never did.** `vaulted` is a fallback bucket, not a flag-driven one, so those eight carry `["baro"]` alone; `PROJECT.md §7` |
 
 ### One refactor
 
@@ -728,22 +708,62 @@ A third option worth naming only to reject it: publishing an emptier list is not
 better, because the page already renders the empty case correctly and the reader
 still learns nothing.
 
-### The local build published no Void Storms and the deployed build published six
+### ~~The local build published no Void Storms and the deployed build published six~~
 
-Found 2026-09-05 while measuring the above, and **not investigated** — recorded
-so it is not lost. Both files were generated in the same minute:
+**Diagnosed 2026-09-08, and it is not a defect.** Filed on the 05th as "cause
+unknown"; the cause is documented behaviour that is counted and logged, and the
+entry is kept only because the *consequence* is a real choice.
 
-| | generated | rows | ordinary | Steel Path | **Void Storm** |
+Re-measured, both payloads 22 seconds apart:
+
+| build | feed answering | rows | ordinary | Steel Path | **storm** |
 |---|---|---:|---:|---:|---:|
-| local `data/fissures.json` | 14:02:03Z | 20 | 10 | 10 | **0** |
-| deployed | 14:02:26Z | 26 | 11 | 9 | **6** |
+| local | **worldstate** (DE) | 18 | 9 | 9 | **0** |
+| deployed | **proxy** (WFCD) | 30 | 9 | 9 | **12** |
 
-Twenty-three seconds apart, so this is not staleness: the entire difference is
-the six Void Storms, which the local build does not have and the deployed one
-does. Void Storms are the Railjack fissures, so this is reachable from the
-planner whenever *Include Railjack* is on. Cause unknown — a different feed
-source between the two builds is the first thing to check (`meta.feeds` on each
-payload says who answered). Size: small to diagnose, unknown to fix.
+Ordinary and Steel Path match **exactly**. The whole difference is Void Storms,
+and the reason is in `fissures_from_worldstate`'s own docstring: DE publish
+`VoidStorms` in the worldstate but **no `CrewBattleNode*` row in their region
+export**, so there is no name to resolve the id against. Emitting
+`CrewBattleNode522` on a card would be worse than dropping it, so the rows come
+back with `node: None` and `build_fissures` drops them. The WFCD proxy
+normalises the same document and *can* name Proxima nodes, so a proxy build has
+them.
+
+**And it says so out loud.** Verified by running a build on 2026-09-08:
+
+```
+worldstate: 22 fissures from Digital Extremes, 12 Railjack storm(s) unnamed and dropped
+```
+
+So nothing is silent and nothing is broken. **A first check looked at
+`build_fissures`, saw a bare `if not node: continue`, and concluded the promise
+in the docstring was not kept** — it is kept, one function up at the fetch site.
+Checking the drop rather than the count is the mistake worth recording.
+
+**What is left is a real choice, and it is the owner's.** Which feed answers
+decides whether Railjack fissures exist for the reader at all: DE answering
+gives none, the proxy gives twelve. `from_chain` asks DE first everywhere by
+policy, so the *better* first-party answer is the one that loses this feature —
+and on this machine DE almost always answer, which is why the local build looked
+wrong when it was merely first-party.
+
+Three ways, none started:
+
+1. **Leave it.** Documented, counted, logged. The cost is that *Include
+   Railjack* shows nothing on a DE build and twelve nodes on a proxy build, with
+   no way for the reader to tell which they are looking at.
+2. **Ask the proxy for fissures specifically**, reversing the DE-first rule for
+   one feed. Cheap and it makes the feature consistent — but it deliberately
+   prefers a third party for a feed DE publish, which is the opposite of every
+   other decision here.
+3. **Find the names.** The ids are stable; a static `CrewBattleNode*` map, or
+   WFCD's node list read once and cached, would let DE's own rows be named. Most
+   work, and the only one that keeps both first-party data and the feature.
+
+**Size: small for 1 or 2, session for 3.** Nothing about it is urgent — the
+deployed site is on the proxy most of the time, and that is the copy the owner
+reads.
 
 ---
 
@@ -1256,36 +1276,11 @@ returns non-null on `Object.keys(opts.minutes).length` alone, and `mean` average
 every saved key whether or not its mission type is ranked. The only escape is
 *clear all*, which clears everything.
 
-**Decided by the owner, 2026-09-05: count only ranked modes.** `minutesSet()`
-filters to the mission types on the current list. The saved number is left
-untouched and counts again when its type returns; nothing invisible ever weighs
-anything; *"1 set"* stops lying. **This needs no unit and adds no row, so the
-`min / reward` question is not answered — it is retired**, along with the
-declared-vocabulary option and the "show the row but keep counting it" option.
-
-Two things to get right when it is built. `renderEffort` reads `minutesSet()`
-too, for the *"N set"* line and for `#effortClear`'s hidden state, so both have
-to move to the filtered set or the note goes on miscounting. And `effort()`'s
-`if (!set.length) return null` is what returns the list to reward-count ranking,
-which is the assertion a test should pin: **a value saved for an unranked type
-must leave the heading reading *per reward***. **Size: small.**
-
-**The wording half is done, 2026-09-05.** The *Capped Void Traces* tooltip went
-from 683 characters to 361 when that switch shipped, and the *Effort (optional)*
-panel followed: **907 characters of visible prose down to 98**, a single line
-naming the unit, with the reasoning moved into the `<summary>` tooltip where
-`STYLE.md §6` says it belongs. Counting the tooltip, all the panel's text
-together is down 43%. `PROJECT.md §7` has what was cut and why none of it was
-lost. What is left of this entry is the hidden-value half above.
-
-**One thing found while cutting and recorded rather than fixed.** `README.md`'s
-*How long a run costs you — Effort* still says everything is costed **per
-objective**, three paragraphs above saying the row reads *per reward*. The word
-was settled on 2026-08-27 — an objective is whatever pays a reward, and the
-screen was changed to say *reward* then — so the README is carrying the older
-half of a decision it also states correctly further down. One sentence, and it
-is the reader-facing document, so it is worth doing deliberately rather than in
-passing.
+**Decided by the owner 2026-09-05 and shipped 2026-09-08**, closing this entry
+entirely. `effort()` takes the set of mission types the plan actually ranks and
+filters `opts.minutes` to it, so a saved number for a type that is not on the
+list is kept and does not count. Reasoning in `PROJECT.md §7` under *A minute
+you cannot see must not decide what the list is costed in*.
 
 ## Reported by the owner, 2026-09-06 — one shipped, one open
 

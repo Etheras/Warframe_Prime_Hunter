@@ -301,8 +301,29 @@
      differently: `per` multiplies by the objective count, this is added once.
      Folding it into `per` would charge it per round, which is the opposite of
      the point. */
-  function effort() {
-    const set = minutesSet();
+  /* `liveModes` is the set of mission types the current plan actually ranks, and
+     it is required rather than optional because the whole correction is that
+     this function used to ignore it.
+
+     **A saved minute for a mission type with nothing on the list must not
+     count.** `opts.minutes` is keyed by mission type and survives whatever the
+     panel is rendering — which is right, and is the owner's rule: *the row
+     disappearing shouldn't discard the number*. What was wrong is that it went
+     on being **used** while invisible. Measured 2026-09-05 on the served page
+     with `minutes: {Skirmish: 9}` saved and *Include Railjack* switched off,
+     which is Skirmish's only home: 27 rows shown, **none with a value in it**,
+     Skirmish's row absent, the state line reading *"1 set"*, and the entire
+     ranking flipped to **per minute** with all 27 visible types costed at the
+     9 minutes of a row nobody could see or edit. One invisible number decided
+     the basis of the whole list.
+
+     Filtering here fixes it at the root and needs no new row and no new unit —
+     which is why the owner chose it over printing `min / reward` for absent
+     types: `objectivesOf` derives the unit from a *node*, so a type with
+     nothing ranked genuinely has none to print. The number waits, intact, and
+     counts again the moment its mission type is back on the list. */
+  function effort(liveModes) {
+    const set = minutesSet().filter((m) => liveModes.has(m));
     const overhead = opts.runStart + opts.runEnd;
     /* No per-mode minutes means no per-minute ranking, even with an overhead
        given. 35 seconds has no meaning in objective *count* — a round is
@@ -916,8 +937,13 @@
         (r) => (n.rot[r] || 0) > 0 && !((n.rotRelic[r] || 0) > 0));
     });
 
-    // value each node as a whole run, which is what you actually commit to
-    const mins = effort();
+    /* Value each node as a whole run, which is what you actually commit to.
+
+       `nodes` is complete by here — the walk, the `creditRelics` pass and the
+       Aya block have all run — so this is the first moment the set of mission
+       types on the list is known, and the last before anything is costed. That
+       ordering is why `effort` can be asked the question at all. */
+    const mins = effort(new Set(Array.from(nodes.values()).map((n) => n.mode)));
     /* Worked out once for the whole plan because the *arithmetic* is the same
        everywhere — the mean worth of a random Exceptional over a tier's live
        relics does not depend on where you are standing. **Which tier does**,
@@ -1561,7 +1587,16 @@
         </label>`).join("");
     }
 
-    const set = minutesSet();
+    /* The same filter `effort` applies, for the same reason and so the note
+       cannot contradict the ranking it is describing. `modes` is exactly the
+       set of rows above, so counting outside it is how the panel came to read
+       *"1 set"* over a form where nothing was set. `saved` is deliberately NOT
+       filtered: it decides only whether *clear all* is offered, and a value
+       that is inert and invisible still has to be removable, or it is stuck in
+       the reader's options with nothing on screen able to reach it. */
+    const shown = new Set(modes);
+    const saved = minutesSet();
+    const set = saved.filter((m) => shown.has(m));
     const mean = set.length
       ? set.reduce((s, m) => s + opts.minutes[m], 0) / set.length : 0;
     const note = $("#effortState");
@@ -1590,7 +1625,8 @@
               : "");
     }
     const clear = $("#effortClear");
-    if (clear) clear.hidden = !set.length && !(opts.runStart + opts.runEnd);
+    // `saved`, not `set` — the escape hatch has to reach values the rows cannot
+    if (clear) clear.hidden = !saved.length && !(opts.runStart + opts.runEnd);
   }
 
   /* ── How to crack them, and the two controls above it ─────────────
