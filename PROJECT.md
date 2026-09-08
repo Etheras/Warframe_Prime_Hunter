@@ -7123,6 +7123,69 @@ and because the filter ran first, the checkbox's own rule was never wrong and
 never applied. Nothing about `isTrade` needed fixing. The bug was that something
 else had already answered its question.
 
+### The Railjack names had to be borrowed, because nobody first-party has them
+
+Digital Extremes publish the Railjack fissures as
+`{"Node": "CrewBattleNode522", "ActiveMissionTier": "VoidT1", …}` — an id, a
+tier, a window, and nothing else. No region, no system, no name. So the storms
+came back unnamed and `build_fissures` dropped them rather than putting
+`CrewBattleNode522` on a card, which was the right call and was counted out loud
+in the build log.
+
+**The owner asked for the names to come from DE, with the proxy as a fallback
+rather than a prerequisite. That turned out to be impossible, and proving it was
+the work.**
+
+| where | has the ids | has the names |
+|---|---|---|
+| DE's manifests | **only** `worldState.php` — every cached export was decompressed and searched | no, none, anywhere |
+| `wiki.warframe.com` | **zero** occurrences site-wide | yes, in prose |
+| WFCD `solNodes.json` | yes | yes — **because a person typed them** |
+
+There is no generator in WFCD's `tools/`; `data/solNodes.json` is curated. So the
+mapping is not derivable from any first-party source and never was, and the
+choice was never "DE or WFCD" — it was "borrow a hand-made table, make our own,
+or do without".
+
+**Hard rule 9 ran exactly as written**, which is worth recording because it is
+the first time it has been exercised: *the owner's approval first and its licence
+read second, in that order*. The owner approved after being shown that no
+first-party route exists; the MIT licence was then read in full before anything
+was copied, and its condition — that the copyright and permission notice ship
+with any copy — is met in `tools/proxima_nodes.py`, `NOTICE.md` and `README.md`.
+`NOTICE.md` had a sentence reading *"No WFCD code is vendored, copied or depended
+on"* that **named this exception in advance**; the rule worked and the sentence
+was the thing that had to change.
+
+Taken narrowly: 42 of their 452 nodes, and only the name of each — `enemy` and
+`type` are neither used nor reproduced.
+
+**Two reconciliations, and the first one is a defect nobody had noticed.** Their
+names are `Calabash (Veil)`; ours are `Calabash (Veil Proxima)`, because
+`nodeKey` builds `"<node> (<planet>)"` and the drop tables give the planet as
+`Veil Proxima`. Measured before changing anything: of the twelve storms the
+deployed site was already publishing with WFCD's names, **zero matched a node the
+planner ranks**. So the proxy path had been naming them in a shape nothing could
+match, and the badge had never once appeared. The vendored table is written in
+our shape instead.
+
+The second is spelling. Where the two disagree, DE's drop tables win — `Lu-yan` →
+`Lu-Yan`, and `Sambir Cloud` → `Sabmir Cloud` — because a fissure only reaches a
+reader if it matches the node the planner is rendering, and the planner's names
+come from DE. No judgement is offered about which is correct in the abstract.
+
+**What it buys, measured.** Storms run two per region across six regions, and
+every relic-bearing Proxima node this project tracks is in Veil — so two of
+twelve land somewhere the planner sends you. Small, and it was nothing before.
+The first build after: `H-2 Cloud (Veil Proxima)`, a live storm on a ranked node.
+
+**And the guard that made the old behaviour correct is kept and still tested**: a
+row with no name is still dropped rather than shipped as an id. If DE add a
+Proxima node before we do, it lands there rather than on a card. `node_names`
+also seeds the vendored table *first*, so DE's own export wins any collision —
+the day they start publishing these rows, the borrowed copy stops being consulted
+without anyone editing anything.
+
 ---
 
 ## 8. Gotchas discovered while building

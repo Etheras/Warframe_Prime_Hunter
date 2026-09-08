@@ -186,11 +186,37 @@ served, complete, the entire time.
 - **`cdn.warframestat.us`** — serves the item artwork shown on the cards. The
   images themselves remain Digital Extremes' property.
 
-Both projects are used unmodified over their public HTTP endpoints; their
-copyright notices are preserved by this file. **No WFCD code is vendored, copied
-or depended on** — see `PROJECT.md §2`, which requires the owner's approval and a
-licence reading before any of that changes, including for a mapping table taken
-verbatim.
+- **[warframe-worldstate-data](https://github.com/WFCD/warframe-worldstate-data)**
+  — **MIT** licensed, © 2016 Matej Voboril. **The one thing vendored rather than
+  fetched**, and the only WFCD material copied into this repository.
+
+  `tools/proxima_nodes.py` carries 42 Railjack node names derived from their
+  `data/solNodes.json`, with the full MIT notice reproduced in that file as the
+  licence requires. Digital Extremes publish the Railjack fissures as bare ids —
+  `CrewBattleNode522` — and publish no name for them anywhere: every DE manifest
+  this project caches was decompressed and searched on 2026-09-08 and the ids
+  occur in one file only, the worldstate. The wiki names the nodes and has zero
+  occurrences of `CrewBattleNode` site-wide, so it cannot supply the join either.
+  The mapping is not derivable from any first-party source; it exists because
+  people wrote it down.
+
+  Taken narrowly: their Railjack subset only, 42 of 452 nodes, and only the name
+  of each — the `enemy` and `type` fields beside it are neither used nor
+  reproduced. Two names are reconciled to Digital Extremes' own drop tables
+  (`Lu-yan` → `Lu-Yan`, `Sambir Cloud` → `Sabmir Cloud`) because a fissure only
+  reaches a reader if it matches the node the planner ranks, and the planner's
+  names come from DE. `tools/proxima_nodes.py` records both.
+
+Everything else from WFCD is used unmodified over their public HTTP endpoints,
+and every copyright notice above is preserved by this file.
+
+**This paragraph used to read "No WFCD code is vendored, copied or depended on",
+and it named the exception in advance**: `PROJECT.md §2` requires the owner's
+approval first and a licence reading second before a mapping table is taken
+verbatim. Both happened on 2026-09-08, in that order — the owner approved after
+being shown that no first-party route exists, and the MIT terms were read in full
+before anything was copied. The rule worked as written; the sentence it protected
+is the one that had to change.
 
 ---
 

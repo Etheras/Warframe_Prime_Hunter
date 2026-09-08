@@ -226,6 +226,7 @@ observation rather than a precondition.
 |---|---|
 | Digital Extremes 403 the GitHub runner | **watching** — the defect is fixed and verified on CI; the 403 is frequent, so the deployed site's live feeds now lean on WFCD |
 | One Cambion Drift tier labels a different letter from the rest of its family | **checked 2026-09-02** — not a misfile; the letter is per tier and the family split is an approximation. Costs nothing today: that tier carries no relic |
+| `api_events` was refused by its ceiling once, the day before Plague Star | **watching, 2026-09-08** — the fetcher saw `Content-Length: 131,072` against a 32,768 ceiling and reused the cache (0 min old, nothing lost). Did not reproduce on the next build, and the endpoint measures 1,482 bytes with 1 event and answers chunked when gzip is asked for, so it was not the body. Read a ceiling line as *raise the number*, but there is nothing to raise it against yet |
 | The page tests flake in a full run and pass on their own | watching — **fourth occurrence 2026-09-08**, `ERR_NO_BUFFER_SPACE` again, on `page.goto`. Two in a row now name it, which is stronger evidence for socket exhaustion than for timing |
 | A vaulted relic on a Prime you *can* farm another way is still hidden | **half shipped 2026-09-02** — the list now says how many it is hiding; the *"I have vaulted relics"* switch is still undecided |
 | The rest of the player facts the header could hold | session — the rank itself shipped 2026-08-26 |
@@ -709,84 +710,37 @@ still learns nothing.
 
 ### ~~The local build published no Void Storms and the deployed build published six~~
 
-**Diagnosed 2026-09-08, and it is not a defect.** Filed on the 05th as "cause
-unknown"; the cause is documented behaviour that is counted and logged, and the
-entry is kept only because the *consequence* is a real choice.
+**Diagnosed 2026-09-08 and fixed the same day.** The difference was never a bug:
+DE publish `VoidStorms` with a bare `CrewBattleNode` id and no name, DE's region
+export carries no such row, so the storms came back unnamed and `build_fissures`
+dropped them — documented, counted and logged (*"12 Railjack storm(s) unnamed and
+dropped"*). A proxy build had them because WFCD can name Proxima nodes.
 
-Re-measured, both payloads 22 seconds apart:
+**The owner's decision was to find the names, and there were none to find.**
+Every cached DE manifest was decompressed and searched: the ids occur in exactly
+one file, the worldstate. `wiki.warframe.com` names the nodes and has **zero**
+occurrences of `CrewBattleNode` site-wide. WFCD's `data/solNodes.json` has both,
+and has them because a person typed them — there is no generator in their
+`tools/`. So the mapping is not first-party data anywhere and never was.
 
-| build | feed answering | rows | ordinary | Steel Path | **storm** |
-|---|---|---:|---:|---:|---:|
-| local | **worldstate** (DE) | 18 | 9 | 9 | **0** |
-| deployed | **proxy** (WFCD) | 30 | 9 | 9 | **12** |
+Owner's call, given that: take WFCD's table and attribute it. Hard rule 9 was
+followed in its stated order — approval first, licence second — and the MIT terms
+were read in full before anything was copied. `tools/proxima_nodes.py` holds 42
+names with the notice; `NOTICE.md` and `README.md` carry the attribution.
+Reasoning in `PROJECT.md §7`.
 
-Ordinary and Steel Path match **exactly**. The whole difference is Void Storms,
-and the reason is in `fissures_from_worldstate`'s own docstring: DE publish
-`VoidStorms` in the worldstate but **no `CrewBattleNode*` row in their region
-export**, so there is no name to resolve the id against. Emitting
-`CrewBattleNode522` on a card would be worse than dropping it, so the rows come
-back with `node: None` and `build_fissures` drops them. The WFCD proxy
-normalises the same document and *can* name Proxima nodes, so a proxy build has
-them.
+**What it is worth, and this was measured rather than assumed.** Storms run two
+per region across six regions; every relic-bearing Proxima node this project
+tracks is in Veil. So **two of twelve live storms land on a node the planner
+ranks** — and before this they could not, because the rows were discarded. First
+build after: `H-2 Cloud (Veil Proxima)` badged as a live storm on a ranked node.
 
-**And it says so out loud.** Verified by running a build on 2026-09-08:
-
-```
-worldstate: 22 fissures from Digital Extremes, 12 Railjack storm(s) unnamed and dropped
-```
-
-So nothing is silent and nothing is broken. **A first check looked at
-`build_fissures`, saw a bare `if not node: continue`, and concluded the promise
-in the docstring was not kept** — it is kept, one function up at the fetch site.
-Checking the drop rather than the count is the mistake worth recording.
-
-**What is left is a real choice, and it is the owner's.** Which feed answers
-decides whether Railjack fissures exist for the reader at all: DE answering
-gives none, the proxy gives twelve. `from_chain` asks DE first everywhere by
-policy, so the *better* first-party answer is the one that loses this feature —
-and on this machine DE almost always answer, which is why the local build looked
-wrong when it was merely first-party.
-
-Three ways, none started:
-
-1. **Leave it.** Documented, counted, logged. The cost is that *Include
-   Railjack* shows nothing on a DE build and twelve nodes on a proxy build, with
-   no way for the reader to tell which they are looking at.
-2. **Ask the proxy for fissures specifically**, reversing the DE-first rule for
-   one feed. Cheap and it makes the feature consistent — but it deliberately
-   prefers a third party for a feed DE publish, which is the opposite of every
-   other decision here.
-3. **Find the names.** The ids are stable; a static `CrewBattleNode*` map, or
-   WFCD's node list read once and cached, would let DE's own rows be named. Most
-   work, and the only one that keeps both first-party data and the feature.
-
-**The owner chose 3 — find the names — on 2026-09-08, and it turns out to be a
-rule 9 question rather than a task.** Checked before starting: the ids exist in
-**exactly one** place we hold. Every cached manifest was decompressed and
-searched, and the `CrewBattleNode` ids appear only in `de_worldstate.gz`, twelve
-times. `ExportRegions_en.json` carries none, which `node_names` already says.
-
-So there is no local derivation available, and every route to a name goes
-somewhere that needs the owner's approval first:
-
-- **WFCD's `solNodes` map**, which is what names them for everyone else. That is
-  *"a mapping table lifted verbatim"* — **hard rule 9**: the owner's approval
-  first and its licence read second, in that order. Not started.
-- **Hand-author the map.** Twelve ids today, and it grows whenever DE add a
-  Proxima node, with nothing to tell us when that happened.
-- **Learn it from the two feeds.** DE give id + tier + expiry; the proxy gives
-  name + tier + expiry for the same storms. Joining those on the window would
-  build the map from data we already fetch rather than from anyone's table —
-  but it only learns while the proxy is being asked, which on this machine is
-  almost never, and it is still WFCD's naming reaching our payload by a longer
-  road.
-
-**Blocked on the owner, not on effort.** The choice is which of those three, and
-the first two are rule 9 decisions that a session must not take on its own.
-
-**Size: small for 1 or 2, session for 3.** Nothing about it is urgent — the
-deployed site is on the proxy most of the time, and that is the copy the owner
-reads.
+**Two things the fix had to reconcile**, both recorded in the file: the names are
+rewritten into our `(<Region> Proxima)` key shape, because a bare `(Veil)` would
+never match `nodeKey`; and where WFCD and DE's drop tables disagree, DE wins —
+`Lu-yan` → `Lu-Yan`, `Sambir Cloud` → `Sabmir Cloud`. Verified beforehand that
+the deployed site's proxy-named storms matched **0** ranked nodes for exactly
+this reason, so the format half was a silent defect of its own.
 
 ---
 

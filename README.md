@@ -859,7 +859,15 @@ Warframe Prime Hunter satisfies all three, and the site footer says so on every 
 Data sources and their licences (catalogue from the WARFRAME Wiki under CC BY-SA,
 item and worldstate data from WFCD under MIT) are listed in
 [NOTICE.md](NOTICE.md). The dataset itself is never committed — it's downloaded
-fresh on every build, so nothing is redistributed from here.
+fresh on every build.
+
+**One thing is redistributed from here, and only one**: `tools/proxima_nodes.py`
+carries 42 Railjack node names derived from WFCD's `warframe-worldstate-data`
+under MIT, with their notice reproduced in that file. Digital Extremes publish
+those nodes as bare ids and publish no name for them anywhere — not in any
+manifest, and the wiki does not carry the ids at all — so without it the
+Railjack fissures cannot be named and are discarded. `NOTICE.md` has the full
+entry and what was taken.
 
 **Inspired by, not taken from.** One structural fact about Digital Extremes' data
 was learned by reading two other open-source projects —

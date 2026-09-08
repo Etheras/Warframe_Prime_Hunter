@@ -1696,9 +1696,27 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           names.get("SolNode196"), "Charybdis (Sedna)")
     check("worldstate: no system means no empty brackets",
           names.get("SolNodeNoSystem"), "Somewhere")
-    check("worldstate: Proxima is absent and stays absent",
-          names.get("CrewBattleNode522"), None,
-          "DE ship no CrewBattleNode rows; inventing one would be worse than none")
+    # DE ship no CrewBattleNode rows and never have; since 2026-09-08 these
+    # names come from the small vendored table instead (NOTICE.md, hard rule 9).
+    check("worldstate: Proxima is named from the vendored table",
+          names.get("CrewBattleNode522"), "Bendar Cluster (Earth Proxima)")
+    check("worldstate: and in OUR node-key shape, not the source's",
+          names.get("CrewBattleNode538"), "Calabash (Veil Proxima)",
+          "a bare '(Veil)' would name a node `nodeKey` could never match")
+    # The two reconciliations, pinned because they are the whole reason the
+    # table is not a straight copy — see tools/proxima_nodes.py.
+    check("worldstate: Lu-Yan keeps DE's capitalisation",
+          names.get("CrewBattleNode542"), "Lu-Yan (Veil Proxima)")
+    check("worldstate: Sabmir Cloud keeps DE's spelling, not the source's",
+          names.get("CrewBattleNode543"), "Sabmir Cloud (Veil Proxima)")
+    # DE's own export outranks the vendored copy, so this decays on its own if
+    # they ever start publishing the rows.
+    seeded = official.node_names({"ExportRegions_en.json": {"ExportRegions": [
+        {"uniqueName": "CrewBattleNode522", "name": "Bendar Cluster",
+         "systemName": "Earth Proxima"},
+    ]}})
+    check("worldstate: DE's export wins a collision with the vendored table",
+          seeded.get("CrewBattleNode522"), "Bendar Cluster (Earth Proxima)")
 
     # 2026-08-27T07:30:25.511Z — checked three ways rather than eyeballed, after
     # a first draft of this test asserted a time four hours out and the parser
@@ -1729,14 +1747,26 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
                    "isHard": True, "isStorm": False})
     check("worldstate: Hard is a flag by absence, not a false",
           got[1]["isHard"], False)
-    check("worldstate: a storm is a storm, and unnamed",
-          (got[2]["isStorm"], got[2]["node"], got[2]["tier"]), (True, None, "Lith"))
+    check("worldstate: a storm is a storm, and now it has a name",
+          (got[2]["isStorm"], got[2]["node"], got[2]["tier"]),
+          (True, "Bendar Cluster (Earth Proxima)", "Lith"))
 
-    # ...and the build drops the unnamed one rather than shipping an id.
+    # ...and it reaches the payload, which is the whole point of naming it. This
+    # asserted the opposite until 2026-09-08 — `build_fissures` drops a row with
+    # no node, and every storm had none, so twelve a build were discarded.
     live = build_data.build_fissures(
         got, datetime.datetime(2026, 8, 27, 6, 0, tzinfo=datetime.timezone.utc))
-    check("worldstate: only named fissures reach the payload",
-          sorted(f["node"] for f in live), ["Charybdis (Sedna)", "Galatea (Neptune)"])
+    check("worldstate: a named storm reaches the payload with the rest",
+          sorted(f["node"] for f in live),
+          ["Bendar Cluster (Earth Proxima)", "Charybdis (Sedna)", "Galatea (Neptune)"])
+    # The guard that made the old behaviour correct is still there and still
+    # needed: a row with no name is dropped rather than shipped as an id.
+    unnamed = build_data.build_fissures(
+        [{"node": None, "tier": "Lith", "expiry": "2026-08-27T07:30:25.511Z",
+          "isHard": False, "isStorm": True}],
+        datetime.datetime(2026, 8, 27, 6, 0, tzinfo=datetime.timezone.utc))
+    check("worldstate: a node we still cannot name is dropped, not shipped raw",
+          unnamed, [], "a new Proxima node DE add before we do would land here")
 
 
 def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> None:

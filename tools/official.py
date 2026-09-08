@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import limits  # noqa: E402  (local module, sits beside this file)
+from proxima_nodes import PROXIMA_NODES  # noqa: E402  (likewise; see NOTICE.md)
 
 # ── drop table ────────────────────────────────────────────────────────────
 
@@ -602,12 +603,16 @@ def node_names(exports: dict[str, dict]) -> dict[str, str]:
     pages already speak it, and a second spelling would be a second thing to keep
     in step.
 
-    Proxima is **not** in here and cannot be: `ExportRegions_en.json` carries no
-    `CrewBattleNode*` rows at all, which is the same gap that leaves Railjack
-    enemy levels unknown. Callers get nothing for a storm node rather than a
-    guess.
+    Proxima is **not in DE's export and cannot be**: `ExportRegions_en.json`
+    carries no `CrewBattleNode*` rows at all, which is the same gap that leaves
+    Railjack enemy levels unknown. Since 2026-09-08 those names are supplied
+    from `proxima_nodes.PROXIMA_NODES` instead — a small vendored table, the
+    owner's decision under hard rule 9 and used under its licence; that file
+    says where it came from and what was reconciled. It is seeded first so DE's
+    own export always wins a collision: if they ever start publishing these
+    rows, the vendored copy stops being consulted without anyone editing it.
     """
-    out: dict[str, str] = {}
+    out: dict[str, str] = dict(PROXIMA_NODES)
     payload = exports.get("ExportRegions_en.json") or {}
     for rows in payload.values():
         if not isinstance(rows, list):
