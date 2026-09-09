@@ -666,9 +666,10 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 08:02
 ```
 
 `-Time` sets the phase the repeating checks land on, not a one-off start time —
-so pick a minute that is **not** a multiple of your interval, for the reason
-above. `08:00` with the default ten-minute cadence would put every check exactly
-on the hour, which is the one phase worth avoiding.
+so it decides where in the rotation every later check falls, for the reason
+above. With the default 150-minute cadence the phase is kept forever, so a start
+a few minutes after a real bounty boundary keeps every subsequent check just
+after one too. Landing exactly *on* a turnover is the one phase worth avoiding.
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -EveryMinutes 30
@@ -699,13 +700,17 @@ powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -DispatchRemote
 
 > **Why this exists.** A published site is only ever as fresh as its last build,
 > and GitHub's own scheduler is best effort — it queues and drops runs under
-> load. Re-measured over ten days: a workflow asking for a run every ten minutes
+> load. Re-measured over ten days, when it asked for every ten minutes: a run
 > was delivered about **one time in fifteen**, a median of 84 minutes apart with
 > a worst gap of twelve hours. Void Fissures live an hour or two, so the
 > published list had often expired in full before the next build. A request sent
 > from your machine is not in that queue.
 >
-> It runs the **light** build — the same one the ten-minute schedule uses, which
+> Since 2026-09-08 the page reads the live fissure list itself, so that
+> particular problem is solved without a dispatch — which is why this is a
+> convenience now rather than a fix.
+>
+> It runs the **light** build — the same one the recurring schedule uses, which
 > refreshes the worldstate and rebuilds everything else from cache. The wiki and
 > the drop tables are not re-downloaded.
 >
@@ -861,15 +866,22 @@ two, so a site rebuilt once a day always found them expired and marked nothing.
 **Since 2026-09-08 the page asks for the list itself**, every two minutes, so the
 published planner marks tonight's fissures the same way a local copy does — see
 *Fissures look after themselves*. A second, much lighter workflow run still
-refreshes the published fissure file from the build cache every ten minutes, and
-that is now the fallback rather than the mechanism. Your own scheduled task is a
-preference rather than a necessity.
+refreshes the published fissure file from the build cache **every three hours**,
+and that is now the fallback rather than the mechanism. Your own scheduled task
+is a preference rather than a necessity.
+
+**That run was every ten minutes until 2026-09-09**, and the paragraph above is
+why it no longer needs to be. It is now a backstop for the hours a local machine
+is off — three hours rather than two and a half so it cannot fire twice inside
+one bounty window, since the real cadence belongs to the scheduled task, which
+can sit on the rotation boundary in a way a cron cannot.
 
 Worth knowing: GitHub's schedules are best-effort, and in practice that is a
-large gap rather than a small one. Measured on this repository over ten days:
-runs asking for every ten minutes were delivered about **one time in fifteen** —
-a median of 84 minutes between them, and a worst gap of twelve hours. So ten
-minutes is what the published copy aims for, not what it gets.
+large gap rather than a small one. Measured on this repository over ten days,
+back when it asked for every ten minutes: runs were delivered about **one time
+in fifteen** — a median of 84 minutes between them, and a worst gap of twelve
+hours. That measurement is one more argument for the slower cadence: the
+published copy was never getting ten minutes anyway.
 
 **That used to decide whether the fissure list was any good, and it no longer
 does.** The page asks WFCD for the live list itself every two minutes, so what
