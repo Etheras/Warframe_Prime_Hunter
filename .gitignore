@@ -64,6 +64,10 @@ __pycache__/
 # untracked means it can go stale without becoming the kind of published, trusted,
 # wrong document PROJECT.md §2 warns about.
 CLAUDE.md
+# A local, per-machine hint file - see CLAUDE.md hard rule 2. Deliberately not
+# shared: a handoff note that reached a fresh clone would arrive carrying the
+# authority of the repository, which is the opposite of what it is for.
+UNVERIFIED.md
 
 # OS noise
 Thumbs.db
