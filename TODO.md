@@ -1794,6 +1794,55 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
+### The feed log's `de` field counts a build that never asked Digital Extremes
+
+**Found by the audit of 2026-09-09, after `d3ca157`.** `data/feed-log.json`
+exists to answer one question the owner asked — *how often do DE actually
+reply* — and since the light CI build stopped asking them it answers a
+different one, in the direction that hides the problem.
+
+`de_outcome` (`build_data.py:1613`) is `offline` / `stale` / `refused` / `ok`,
+and `ok` is the fall-through: not offline, worldstate not too old, and
+`de_worldstate` not in `STALE`. A build run with `--no-first-party` skips the
+worldstate step outright, so **nothing enters `STALE`, nothing is too old, and
+the build records `ok` having sent DE no request at all.** The light CI path
+passes exactly that flag (`publish.yml:287`).
+
+**Measured from the deployed log, 173 builds, 2026-09-08T13:12Z to
+2026-09-09T13:12Z**, split at the commit:
+
+| | builds | `de: ok` | of those, DE really answered |
+|---|---|---|---|
+| before `d3ca157` | 137 | 10 | **10** |
+| after | 36 | 26 | **1** |
+
+So the field read `ok` ⇔ *DE answered* for as long as it existed, and now does
+not: after the change the log shows a **72.2%** apparent reply rate against a
+**2.8%** real one. The inversion is total — 26 of the 27 light builds report
+`ok` and asked nothing, while all 9 full builds, the only ones that did ask,
+report a refusal.
+
+Two things break, and the second is the expensive one:
+
+- The measurement that justified the change — *11 of 181, 6.1%* — can no longer
+  be reproduced from the log it was taken from. `ok / total` now overstates it
+  by an order of magnitude, and the next reader to run it would conclude the
+  Akamai block had lifted.
+- **The canary is unfindable.** `d3ca157`'s reasoning is that the daily full
+  build still asks once and that request tells us whether the block has lifted.
+  Its answer is now one row in twenty-seven wearing the same `de` value as
+  twenty-six builds that never made a request.
+
+The comment directly above `de_outcome` already argues this exact case for
+`--offline`: *"An `--offline` build never asks DE, so counting it as a reply
+would inflate the very number this log exists to answer."* `--no-first-party` is
+the second never-asked path and did not get the same treatment — the fix is
+plainly a fifth outcome beside `offline`, but naming it and deciding whether
+older rows are re-read is the owner's call.
+
+**Size: small.** One expression, plus whatever the reader of the log should do
+about the 26 rows already published.
+
 ### Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale
 
 **Measured 2026-09-01, at the owner's question — "has DE succeeded at some point
@@ -2043,25 +2092,6 @@ security findings examined and declined* (279 lines).
 
 **Size: session, and it is the kind that must not be rushed.**
 
-### `api_events` was refused by its ceiling once, the day before Plague Star
-
-**Watching, 2026-09-08.** The fetcher saw `Content-Length: 131,072` against a
-32,768 ceiling, refused the refresh and reused the cached copy — 0 minutes old,
-so nothing was lost and the build was correct throughout.
-
-**It did not reproduce**, and the endpoint does not explain it: measured the same
-hour, `api.warframestat.us/pc/events` returns **1,482 bytes with one event**, and
-answers *chunked* with no `Content-Length` at all when gzip is requested. So
-whatever declared 128 KiB was not the body.
-
-`PROJECT.md §7` — *What the security reviews taught that the findings did not
-say* — says to read a "source over its ceiling" line as **raise the number**,
-not as an attack. There is nothing to raise it against yet — the
-measured body is 5% of the current ceiling. Left here because the timing is worth
-watching: this is the events feed, it is the fallback for event detection, and
-Operation Plague Star opens 2026-09-09. If it recurs while the event runs,
-raising `api_events` is the first move, not the last.
-
 ### The page tests flake in a full run and pass on their own
 
 **Observed twice on 2026-08-27, in consecutive full runs, on two different
@@ -2229,12 +2259,55 @@ the two fields we read*). A node could say **"asks MR5"** the same way it says
 **"Railjack"**, shown only when the player's rank is below it. The rank is now on
 hand to do it; nothing reads it yet.
 
-### The Ghoul and Plague Star detection has never seen a live event
+### The Plague Star half of the event detection has still never seen a live event
 
-**It gets its chance on 2026-09-09.** The owner brought DE's announcement on
-2026-09-02: Operation Plague Star runs **2026-09-09 to 2026-09-23**, all
-platforms. Everything below was written not knowing when, or whether, that would
-happen — read it as a plan with a start date now rather than as a wait.
+**The Ghoul half has, and it worked — 2026-09-09.** This entry was titled *"The
+Ghoul and Plague Star detection has never seen a live event"* until the audit
+that afternoon, which is a sentence that had stopped being true. A Ghoul Purge
+was live (`GhoulEmergence`, 2026-09-08T17:49Z → 2026-09-29T17:49Z) and the whole
+chain was walked against it rather than reasoned about: DE's `Goals` →
+`events_from_worldstate` → `find_live_events` caught it on the scan and recorded
+the tag → `meta.bounties.events` carried the window → the shipped `rotation.js`
+answered `eventRunning = true` and `reachableSource = true` for both tiers → the
+planner rendered both rows, at ranks 83 and 84 of 116, each with the tooltip line
+**"Ghoul Purge is running until 2026-09-29."** That is the design working
+end to end, on a real event, for the first time since it shipped on 2026-08-12.
+
+**Plague Star had not opened as of 2026-09-09T13:10Z**, its announced day — no
+`Goals` entry, no `InfestedPlains` or `Hemocyte` string anywhere in the
+worldstate, and the Cetus board carrying only the ordinary Ostron and Narmer
+jobs. The only mention is the news item in `Events[]`, dated 2026-09-02 with an
+`EventEndDate` of 2026-09-23 and **no start date**, which is precisely the trap
+`CLAUDE.md` names — `Events` is the news feed and `Goals` is the game. Both live
+Goals that day activated between 16:00Z and 17:49Z, so the announced day was not
+yet the announced hour when this was checked.
+
+**What the audit could settle without the event, and it is the tag worry.** The
+instruction below is *do not guess the tag* — right, and unchanged. But the
+scan has to survive until the tag is known, and whether it does turns entirely
+on how DE spell it. That is measurable today from DE's own manifests, and was:
+**`PlagueStar` appears in four cached first-party sources** —
+`/Lotus/Types/StoreItems/AvatarImages/Events/PlagueStarGlyph`,
+`/Lotus/Upgrades/Skins/Clan/PlagueStarBadgeItem`,
+`/Lotus/Interface/Icons/Player/PlagueStar.png` in `ExportManifest`, and the same
+paths through `api_items` — while **`InfestedPlains` appears in none of them.**
+So DE's own internal spelling for this event is the one `plague\s*star` matches
+with `\s*` taking zero characters, which is the piece of luck this entry already
+flags. Confirmed by running the real `find_live_events` over the real live
+worldstate with a synthetic Goal appended in DE's own `Goals` shape: with
+`Tag: "PlagueStar"` the window reaches `meta.bounties.events` intact; with
+`Tag: "InfestedPlains"` and no "plague" anywhere it is silently not detected.
+
+**What a miss would cost, now quantified.** `Level 15 - 25 Plague Star` gates
+**26 distinct relics** — more than any other bounty, and the largest of the three
+event groups by a factor of 26. The mitigation below is real and was re-checked:
+`opts.event` defaults to `false` (`plan.js:130`) and ticking *include event
+nodes* forces them back in, with the page warning to check the event is actually
+running. So a missed detection hides 26 relics behind a checkbox for the one
+fortnight a year they are farmable, rather than making them unreachable.
+
+**Everything below was written not knowing when, or whether, Plague Star would
+run** — read it as a plan whose Ghoul half is now closed.
 
 **The `tag` half was done on 2026-09-04, before the window.** What it turned out
 to be is not what this entry expected, because the matching it asks for was
@@ -2285,9 +2358,10 @@ tables carry `Level 15 - 25 Plague Star` and both Ghoul tiers with no event
 running, which is precisely why the gating exists.
 
 The bounty clock and the event gating both shipped on 2026-08-12
-(`PROJECT.md §7`). One part of it is unverified and cannot be verified on demand:
-**neither the Ghoul Purge nor Plague Star was running when it was written**, so the
-shape the worldstate gives those events was never observed.
+(`PROJECT.md §7`). Neither the Ghoul Purge nor Plague Star was running when they
+were written, so the shape the worldstate gives those events could not be
+observed — **the Ghoul shape has since been observed and pinned (2026-09-09,
+above); Plague Star's has not.**
 
 The detection is deliberately loose because of that — a keyword scan across both
 `/pc/events` and `/pc/syndicateMissions`, matching on several fields, so an
