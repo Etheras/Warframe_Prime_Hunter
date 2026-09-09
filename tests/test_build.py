@@ -1656,13 +1656,38 @@ def test_the_feed_log_keeps_a_day_and_survives_a_runner() -> None:
                isinstance(build_data.read_feed_log("http://127.0.0.1:9/none.json"), list),
                "a build must not fail because it could not read its own statistics")
 
-    # The vocabulary. `offline` is separate from `ok` on purpose: an --offline
-    # build never asks DE, so counting it as a reply would inflate the exact
-    # number this log exists to answer.
-    src = read_text(os.path.join(ROOT, "tools", "build_data.py"))
-    for word in ('"offline" if args.offline', '"refused" if "de_worldstate" in STALE'):
-        check_true(f"feed log: outcome {word.split()[0]} is recorded", word in src,
-                   "an outcome that collapses into another cannot be counted apart")
+    # The vocabulary. Every outcome in which DE were not asked is separate from
+    # `ok`, because counting one as a reply inflates the exact number this log
+    # exists to answer.
+    #
+    # **This used to grep `build_data.py` for the source of the expression**, and
+    # a test that reads the code under test cannot fail for the reason it was
+    # written: the `unasked` gap below sat in the deployed log for a day with
+    # both greps passing, because both strings were still present and correct.
+    # It asks the function now.
+    outcome = build_data.de_outcome
+    check("feed log: a build with no network is not a reply",
+          outcome(offline=True, asked=True, too_old=False, refused=False), "offline")
+    check("feed log: a build that chose not to ask is not a reply either",
+          outcome(offline=False, asked=False, too_old=False, refused=False), "unasked",
+          "--no-first-party skips the worldstate step, so nothing else here fires")
+    check("feed log: a refusal is a refusal",
+          outcome(offline=False, asked=True, too_old=False, refused=True), "refused")
+    check("feed log: a document DE stamped too long ago is stale",
+          outcome(offline=False, asked=True, too_old=True, refused=False), "stale")
+    check("feed log: and an answer is the only thing that counts as one",
+          outcome(offline=False, asked=True, too_old=False, refused=False), "ok")
+    # Offline outranks unasked: both sent nothing, but one could not have.
+    check("feed log: offline outranks the host we declined to ask",
+          outcome(offline=True, asked=False, too_old=False, refused=False), "offline")
+    # The property the whole vocabulary exists for, stated once as a property
+    # rather than as five cases: `ok` requires a request to have been made.
+    every = [(o, a, t, r) for o in (0, 1) for a in (0, 1)
+             for t in (0, 1) for r in (0, 1)]
+    liars = [c for c in every
+             if outcome(*map(bool, c)) == "ok" and (c[0] or not c[1])]
+    check("feed log: nothing that skipped the request can report a reply",
+          liars, [], "this is the whole point of the field")
 
 
 def test_the_worldstate_is_judged_on_its_own_timestamp() -> None:

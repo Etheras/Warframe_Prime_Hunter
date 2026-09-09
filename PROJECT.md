@@ -7692,6 +7692,43 @@ reader may see few fissures or none. It can only ever under-report — every ent
 carries its own expiry and the page drops the expired — so the failure is a
 thinner list, never a wrong one.
 
+**And what it cost that was not stated, found by the audit a day later.** The
+paragraph above says the canary's answer is recorded in `data/feed-log.json`,
+and *"losing it would mean never finding out"*. For one day it was lost, by this
+very change. `de_outcome` was a four-way expression whose last branch was `ok`,
+and every test in it — offline, `ws_too_old`, `de_worldstate` in `STALE` — is
+false for a build that never made the request, because skipping the worldstate
+step is what makes them false. So the light build recorded `ok` for asking
+nothing.
+
+Measured over the 173 deployed builds in the log, split at `d3ca157`: before it,
+`de: ok` meant DE answered, ten times out of ten; after it, 26 rows said `ok`
+and one of them had asked. **72.2% apparent reply rate against 2.8% real**, and
+the inversion is total — every one of the nine full builds, the only ones that
+did ask, recorded a refusal. The 6.1% measurement this whole section rests on
+could no longer be reproduced from the log it was taken from, and the canary was
+one row in twenty-seven wearing the same value as twenty-six that never made a
+request.
+
+Fixed 2026-09-09 by giving the never-asked case its own outcome, `unasked`, and
+by moving the decision out of `main()` into `de_outcome`, which is where the
+vocabulary is now written down. `offline` outranks it: both sent nothing, but
+`--offline` could not have asked and `--no-first-party` chose not to. No repair
+of the published rows was attempted or is needed — `trim_feed_log` keeps 24
+hours, so the 26 bad rows age out on their own, and the log is self-healing by
+construction.
+
+**The lesson is about the test, not the expression.** There was a test on this
+vocabulary and it passed throughout, because it grepped `build_data.py` for the
+substrings `'"offline" if args.offline'` and `'"refused" if "de_worldstate" in
+STALE'` — both still present, both still correct, and neither able to notice a
+fifth case that had never been enumerated. A test that reads the code under test
+can only confirm the code says what it says. It now calls `de_outcome` and
+asserts the property the field exists for: **nothing that skipped the request
+may report a reply**, checked across all sixteen combinations rather than as a
+list of cases someone remembered. Verified the only way that means anything —
+by deleting the `unasked` branch and watching it go red, then restoring it.
+
 ### The Ghoul Purge entry, in both shapes, captured 2026-09-09
 
 `maximumScore`, `interimSteps` and `rewards[]` are read and dropped; nothing in

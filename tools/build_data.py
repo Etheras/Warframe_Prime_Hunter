@@ -1229,6 +1229,53 @@ def trim_feed_log(rows: list, now: datetime) -> list:
     return sorted(out, key=lambda r: r["at"])
 
 
+def de_outcome(offline: bool, asked: bool, too_old: bool, refused: bool) -> str:
+    """
+    What Digital Extremes did on this build, for `data/feed-log.json`.
+
+    `de` is what DE did, separately from what the site ended up using: a 403 the
+    proxy covered leaves the payload current and is still a refusal, and
+    conflating those is how the first "intermittent" reading went wrong.
+
+    **Every outcome in which no request was made is its own**, and that is the
+    whole design of this vocabulary rather than a detail of it. The log exists to
+    answer one question — *how often do DE actually reply* — and any never-asked
+    build that reads as `ok` inflates precisely that number. `offline` had this
+    treatment from the start. `unasked` did not, and the gap was live between
+    `d3ca157` and 2026-09-09:
+
+      `--no-first-party` skips the worldstate step outright, so nothing enters
+      `STALE`, `ws_age` is `None` and `too_old` is `False` — every test the old
+      expression had fell through to `ok` for a build that sent DE nothing. The
+      light CI path passes that flag, so 26 of the 27 light builds in the
+      deployed log claimed a reply and one had asked. 72.2% apparent against
+      2.8% real, in the direction that hides the problem.
+
+    Two things rode on it, and the second is why this is not bookkeeping. The
+    measurement that justified `--no-first-party` — 11 of 181, 6.1% — could no
+    longer be reproduced from the log it came from. And the canary could not be
+    found: the daily full build still asks once, deliberately, to learn whether
+    Akamai has lifted the block, and its answer was one row among twenty-six
+    wearing the same value.
+
+    `offline` outranks `unasked` because they are different news. Neither sent a
+    request, but `--offline` could not have, and `--no-first-party` chose not to
+    against a host that answers from the owner's own machine every time.
+
+    Both are kept in the record rather than dropped, because "no request was
+    made" is different news from "no build ran".
+    """
+    if offline:
+        return "offline"
+    if not asked:
+        return "unasked"
+    if too_old:
+        return "stale"
+    if refused:
+        return "refused"
+    return "ok"
+
+
 def from_chain(what, de_fresh, proxy, de_cached):
     """
     One live feed, from the best source that answers.
@@ -1601,24 +1648,17 @@ def main() -> int:
     # last 24 hours are kept.
     #
     # `de` is what Digital Extremes did, separately from what the site ended up
-    # using: a 403 that the proxy covered leaves the payload current and is still
-    # a refusal, and conflating those is how the first "intermittent" reading
-    # went wrong.
-    #
-    # `offline` is its own outcome and not `ok`. An `--offline` build never asks
-    # DE, so counting it as a reply would inflate the very number this log exists
-    # to answer — and locally that is most builds. It stays in the record rather
-    # than being dropped, because "no request was made" is different news from
-    # "no build ran".
-    de_outcome = ("offline" if args.offline
-                  else "stale" if ws_too_old
-                  else "refused" if "de_worldstate" in STALE
-                  else "ok")
+    # using. The vocabulary, and why every never-asked build gets an outcome of
+    # its own, are in `de_outcome` above.
+    outcome = de_outcome(offline=args.offline,
+                         asked=sources.ASK_FIRST_PARTY,
+                         too_old=ws_too_old,
+                         refused="de_worldstate" in STALE)
     built_at = datetime.now(timezone.utc)
     feed_log = trim_feed_log(read_feed_log(PUBLISHED_FEED_LOG), built_at)
     feed_log.append({
         "at": built_at.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "de": de_outcome,
+        "de": outcome,
         "used": dict(sorted(feed_source.items())),
         "full": not args.if_changed,
     })

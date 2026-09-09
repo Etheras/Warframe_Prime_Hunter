@@ -1794,55 +1794,6 @@ through one multiplier, `n.adj`, which reaches `score`, `rate` and a new
 and is what the tooltip quotes, so the row's figures are adjusted and say which
 thumbs are on them, while the fact underneath is not.
 
-### The feed log's `de` field counts a build that never asked Digital Extremes
-
-**Found by the audit of 2026-09-09, after `d3ca157`.** `data/feed-log.json`
-exists to answer one question the owner asked — *how often do DE actually
-reply* — and since the light CI build stopped asking them it answers a
-different one, in the direction that hides the problem.
-
-`de_outcome` (`build_data.py:1613`) is `offline` / `stale` / `refused` / `ok`,
-and `ok` is the fall-through: not offline, worldstate not too old, and
-`de_worldstate` not in `STALE`. A build run with `--no-first-party` skips the
-worldstate step outright, so **nothing enters `STALE`, nothing is too old, and
-the build records `ok` having sent DE no request at all.** The light CI path
-passes exactly that flag (`publish.yml:287`).
-
-**Measured from the deployed log, 173 builds, 2026-09-08T13:12Z to
-2026-09-09T13:12Z**, split at the commit:
-
-| | builds | `de: ok` | of those, DE really answered |
-|---|---|---|---|
-| before `d3ca157` | 137 | 10 | **10** |
-| after | 36 | 26 | **1** |
-
-So the field read `ok` ⇔ *DE answered* for as long as it existed, and now does
-not: after the change the log shows a **72.2%** apparent reply rate against a
-**2.8%** real one. The inversion is total — 26 of the 27 light builds report
-`ok` and asked nothing, while all 9 full builds, the only ones that did ask,
-report a refusal.
-
-Two things break, and the second is the expensive one:
-
-- The measurement that justified the change — *11 of 181, 6.1%* — can no longer
-  be reproduced from the log it was taken from. `ok / total` now overstates it
-  by an order of magnitude, and the next reader to run it would conclude the
-  Akamai block had lifted.
-- **The canary is unfindable.** `d3ca157`'s reasoning is that the daily full
-  build still asks once and that request tells us whether the block has lifted.
-  Its answer is now one row in twenty-seven wearing the same `de` value as
-  twenty-six builds that never made a request.
-
-The comment directly above `de_outcome` already argues this exact case for
-`--offline`: *"An `--offline` build never asks DE, so counting it as a reply
-would inflate the very number this log exists to answer."* `--no-first-party` is
-the second never-asked path and did not get the same treatment — the fix is
-plainly a fifth outcome beside `offline`, but naming it and deciding whether
-older rows are re-read is the owner's call.
-
-**Size: small.** One expression, plus whatever the reader of the log should do
-about the 26 rows already published.
-
 ### Digital Extremes 403 the GitHub runner, so the deployed worldstate goes stale
 
 **Measured 2026-09-01, at the owner's question — "has DE succeeded at some point
