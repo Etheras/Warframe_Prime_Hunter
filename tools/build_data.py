@@ -636,18 +636,36 @@ EVENT_PATTERNS = {
 #
 #     bounties: ! Ghoul Purge is running and DE tag it 'GhoulEmergence'
 #
-# So the line below is an observation, not a guess - the first of the two ever
-# made. **Plague Star's is still unknown and must stay that way**: it was due to
-# open the same day and had not, and `meta.bounties.events` carries its entry
-# with no activation, expiry or tag, which is what "matched from a drop table,
-# not from the worldstate" looks like. Add it the same way, from a build log,
-# when it runs.
+# So the lines below are observations, not guesses.
+#
+# **Plague Star opened at 15:00Z the same day and taught the harder half.** Its
+# tag is `InfestedPlains` - DE name the event after what happens to the Plains,
+# exactly as Dog Days is `WaterFight` and Thermia Fractures is `HeatFissure`,
+# and never after the marketing name. The description agrees with the tag and
+# not with the poster:
+# `/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName`.
+#
+# **So the scan that was supposed to be the way in did not find it.** Nothing
+# `events_from_worldstate` carried held the string "plague star", and the event
+# was detected only through WFCD, whose `description` is the prose `Plague
+# Star`. That means it was found on exactly the builds where Digital Extremes
+# had **refused** us and missed on the ones where they answered - the first
+# party going blind where the fallback sees, which is the reverse of every other
+# failure here. `_goal_marks` in `official.py` closes it: DE do print
+# `PlagueStar` on the badge, the store package and the reward tables, and those
+# are scanned now.
+#
+# A note here said Plague Star's tag "must stay unknown" until observed. That
+# was right, and it is why the entry below could be written from the worldstate
+# rather than from a guess - a guess would have been `PlagueStar`, which is what
+# DE call the *cosmetics*, and it would have matched nothing.
 #
 # What a known tag buys, beyond being sturdier than prose: `consider` rejects a
 # row whose tag names a *different* event, so a Ghoul bounty can no longer be
 # read as a Plague Star one by a keyword. The scan remains for anything untagged.
 EVENT_TAGS: dict[str, str] = {
     "GhoulEmergence": "Ghoul Purge",
+    "InfestedPlains": "Plague Star",
 }
 
 CYCLE_MINUTES = 150       # one full day/night of the landscape
@@ -933,7 +951,7 @@ def find_live_events(events: list, syndicate_missions: list) -> dict:
 
     for ev in events or []:
         blob = " ".join(str(ev.get(k) or "") for k in
-                        ("description", "tooltip", "node", "tag", "name"))
+                        ("description", "tooltip", "node", "tag", "name", "marks"))
         for name in EVENT_PATTERNS:
             consider(name, blob, ev.get("activation"), ev.get("expiry"),
                      ev.get("tag"), ev.get("node"))

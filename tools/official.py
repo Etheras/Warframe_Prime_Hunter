@@ -744,8 +744,48 @@ def events_from_worldstate(doc: dict) -> list[dict]:
             "name": str(goal.get("Tag") or ""),
             "activation": _worldstate_instant(goal.get("Activation")),
             "expiry": _worldstate_instant(goal.get("Expiry")),
+            "marks": _goal_marks(goal),
         })
     return out
+
+
+def _goal_marks(goal: dict) -> str:
+    """Every other string on a `Goal` that names which event it is.
+
+    **Added 2026-09-09, from the failure it would have prevented.** Plague Star
+    opened and the first-party route did not see it. DE tag the event
+    `InfestedPlains` and describe it
+    `/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName`, so the
+    fields this adapter carried held no string a reader would call Plague Star,
+    and `plague\\s*star` matched none of them. WFCD's copy says `Plague Star` in
+    prose, so the proxy caught it — meaning the event was detected only on the
+    builds where Digital Extremes had refused us, and missed on every build
+    where they answered. First-party going blind where the fallback sees is the
+    inversion of every other failure in this pipeline, and no test could have
+    caught it, because every fixture was written from a guess.
+
+    DE **do** name it, three times over, on fields nobody was reading:
+
+        Icon              /Lotus/Materials/Emblems/PlagueStarEventBadge_e.png
+        InstructionalItem /Lotus/Types/StoreItems/Packages/PlagueStarEventStoreItem
+        Jobs[].rewards    …/EidolonJobMissionRewards/PlagueStarTableRewards
+
+    So the marketing name does reach the worldstate — on the artwork and the
+    reward tables, never on the tag or the description. Any one of the three
+    would have been enough.
+
+    These are scanned, never displayed, and they cannot widen a match wrongly:
+    `find_live_events` prefers a known tag over any text, so a `Goal` DE have
+    already identified is decided before this string is read.
+    """
+    marks = [str(goal.get("Icon") or ""),
+             str(goal.get("InstructionalItem") or ""),
+             str(goal.get("JobAffiliationTag") or "")]
+    for job in (goal.get("Jobs") or []) + (goal.get("PreviousJobs") or []):
+        if isinstance(job, dict):
+            marks.append(str(job.get("rewards") or ""))
+            marks.append(str(job.get("jobType") or ""))
+    return " ".join(m for m in marks if m)
 
 
 def void_trader_from_worldstate(doc: dict) -> dict | None:

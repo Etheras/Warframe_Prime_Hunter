@@ -2204,6 +2204,110 @@ def test_a_real_ghoul_purge_as_digital_extremes_actually_published_it() -> None:
           "EVENT_BOUNTIES keys 'Level 15 - 25' and 'Level 40 - 50' name these")
 
 
+def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> None:
+    """Operation Plague Star, live 2026-09-09T15:00Z, pinned from the worldstate.
+
+    **The event that broke the way in, and the most useful fixture here.** Every
+    Plague Star test before this one was written against an invented shape whose
+    tag was `PlagueStar` — a reasonable guess, supported by DE's own manifests,
+    where the badge, the glyph and the player icon all spell it that way. The
+    guess was wrong on the field that mattered. DE tag the **event**
+    `InfestedPlains` and describe it
+    `/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName`, naming it
+    after what happens to the Plains exactly as Dog Days is `WaterFight` and
+    Thermia Fractures is `HeatFissure`. The marketing name is on the artwork.
+
+    So the keyword scan — the mechanism whose whole job is to catch an event
+    nobody has seen before — did not catch this one, and the failure was
+    invisible in the worst way: WFCD's `description` is the prose `Plague Star`,
+    so the proxy found it. The event was detected on precisely the builds where
+    Digital Extremes had **refused** us, and missed on the builds where they
+    answered.
+
+    Two things are asserted below and the second is the general one. The tag is
+    now a recorded fact. And with `EVENT_TAGS` emptied — the state every genuinely
+    new event starts in — the scan finds it anyway, because `_goal_marks` carries
+    the fields DE *do* print the name on.
+    """
+    doc = {"Goals": [{
+        "Tag": "InfestedPlains",
+        "Desc": "/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName",
+        "ToolTip": "/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyDesc",
+        "Icon": "/Lotus/Materials/Emblems/PlagueStarEventBadge_e.png",
+        "InstructionalItem": "/Lotus/Types/StoreItems/Packages/PlagueStarEventStoreItem",
+        "JobAffiliationTag": "EventSyndicate",
+        "Faction": "FC_INFESTATION",
+        "RegionIdx": 2,
+        "Activation": {"$date": {"$numberLong": "1788966000000"}},
+        "Expiry": {"$date": {"$numberLong": "1790172000000"}},
+        "Jobs": [
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/InfestedPlainsBounty",
+             "rewards": "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards"
+                        "/PlagueStarTableRewards",
+             "minEnemyLevel": 15, "maxEnemyLevel": 25},
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events"
+                        "/InfestedPlainsBountyAdvanced",
+             "rewards": "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards"
+                        "/PlagueStarTableRewards",
+             "minEnemyLevel": 55, "maxEnemyLevel": 65},
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events"
+                        "/InfestedPlainsBountySteelPath",
+             "rewards": "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards"
+                        "/PlagueStarTableSteelPathRewards",
+             "minEnemyLevel": 100, "maxEnemyLevel": 110, "masteryReq": 10},
+        ],
+    }]}
+
+    events = official.events_from_worldstate(doc)
+    check("plague star: DE name the event after the Plains, not after the poster",
+          (events[0]["tag"], events[0]["description"]),
+          ("InfestedPlains",
+           "/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName"),
+          "guessing 'PlagueStar' from the cosmetics is what went wrong")
+
+    check_true("plague star: the tag is a recorded fact, observed while it ran",
+               build_data.EVENT_TAGS.get("InfestedPlains") == "Plague Star",
+               "observed 2026-09-09T15:00Z; the second of the two ever seen")
+
+    found = build_data.find_live_events(events, [])
+    check("plague star: the window reaches the payload",
+          (found.get("Plague Star", {}).get("activation"),
+           found.get("Plague Star", {}).get("expiry")),
+          ("2026-09-09T15:00:00.000Z", "2026-09-23T14:00:00.000Z"))
+
+    # The general fix, and the only assertion here that would still matter for an
+    # event nobody has ever seen: with no tag known, the scan must still find it.
+    saved = dict(build_data.EVENT_TAGS)
+    try:
+        build_data.EVENT_TAGS.clear()
+        blind = build_data.find_live_events(events, [])
+        check("plague star: an UNKNOWN tag is still found, on the fields DE do "
+              "print the name on", blind.get("Plague Star", {}).get("tag"),
+              "InfestedPlains",
+              "the badge, the store package and the reward tables all say it")
+
+        # And the counterfactual, so this cannot pass for the wrong reason: strip
+        # those fields and it goes dark again, which is exactly what shipped.
+        bare = [{k: v for k, v in events[0].items() if k != "marks"}]
+        check("plague star: without them the first-party route is blind",
+              "Plague Star" in build_data.find_live_events(bare, []), False,
+              "this is the bug, reproduced - the proxy's prose was covering it")
+    finally:
+        build_data.EVENT_TAGS.clear()
+        build_data.EVENT_TAGS.update(saved)
+
+    # `marks` is scanned, never shown. A reader must never see a /Lotus/ path.
+    check_true("plague star: marks are for matching, not for display",
+               "marks" not in build_data.find_live_events(events, [])["Plague Star"],
+               "only activation, expiry, tag and node reach meta.bounties.events")
+
+    bands = [(j["minEnemyLevel"], j["maxEnemyLevel"]) for j in doc["Goals"][0]["Jobs"]]
+    check("plague star: DE publish three bands and the drop tables only one",
+          (bands, sorted(g for g in build_data.EVENT_BOUNTIES if "Plague" in g)),
+          ([(15, 25), (55, 65), (100, 110)], ["Level 15 - 25 Plague Star"]),
+          "the Advanced and Steel Path tiers carry no relics of their own")
+
+
 def test_the_rotation_letter_is_read_then_cross_checked() -> None:
     """
     The letter Digital Extremes print on each bounty is the primary reading, and
@@ -4947,6 +5051,7 @@ def main() -> int:
                          test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_event_is_recognised_by_tag_first_and_in_either_source_shape,
                          test_a_real_ghoul_purge_as_digital_extremes_actually_published_it,
+                         test_plague_star_is_named_after_the_plains_and_not_after_the_poster,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,

@@ -1718,10 +1718,25 @@ one, and it is now a guarded risk rather than an unguarded one.
 
 ### Plague Star and Profit-Taker are the same shape, modelled two ways
 
-**Unblocked with a date, 2026-09-02.** DE's announcement, brought by the owner:
-Operation Plague Star runs **2026-09-09 to 2026-09-23**, all platforms. This entry
-has been waiting on "Plague Star to run" since 2026-08-14 and now has a fortnight
-to be answered in.
+**No longer a prediction — observed 2026-09-09.** Plague Star opened at 15:00Z
+(to 2026-09-23T14:00Z), so the "when Plague Star next runs" this entry has waited
+on since 2026-08-14 is **now**, and the fortnight to answer it in is running.
+
+**What the two rows actually look like, on a wishlist of four Primes with the
+event live**, read off the rendered planner rather than reasoned about:
+
+| rank of 118 | row |
+|---|---|
+| **2** | `Hemocyte (Enemy) — Enemy drops` |
+| **113** | `Level 15 - 25 Plague Star (Bounty) — Cetus (Plains of Eidolon)` |
+
+So the phantom destination is not merely present, it is **near the top of the
+list while the real node it rides on is near the bottom** — 111 places apart,
+for one trip. That is worse than the entry predicted, and it is the shape a
+reader acts on first. The `Enemy` badge and the "four spawn in the Plague Star
+final stage" note are doing the only work stopping it from being a straight lie.
+
+Everything below was written before either row could be seen.
 
 **Raised by the owner 2026-08-14, and they are right that something is off.**
 Both are gated multi-stage activities that end in a boss dropping relics. Four of
@@ -2210,7 +2225,36 @@ the two fields we read*). A node could say **"asks MR5"** the same way it says
 **"Railjack"**, shown only when the player's rank is below it. The rank is now on
 hand to do it; nothing reads it yet.
 
-### The Plague Star half of the event detection has still never seen a live event
+### The event detection: both events now seen, and one part still open
+
+**The observation this entry existed for is done, and the entry should probably
+go.** Rule at the top of this file says delete a shipped entry rather than tick
+it, and most of what is below has shipped — but it is ~10 KB of reasoning with
+one genuinely open finding buried in it (the syndicate half, marked below), so
+the deletion is left to the owner rather than taken. **Read the two capture
+sections in `PROJECT.md §7` first; they supersede most of what follows.**
+
+**Both relic-bearing events have now been seen running.** Ghoul Purge on
+2026-09-09 morning, Plague Star the same afternoon — it opened at **15:00:00Z**,
+six hours after the morning's audit checked and correctly found it absent.
+
+**What Plague Star cost, and it was not nothing.** Its tag is `InfestedPlains`,
+not the `PlagueStar` every fixture had guessed from DE's cosmetics. So the
+keyword scan — the mechanism whose whole job is catching an event nobody has
+seen — returned "not running" on the first-party route, and the event was found
+only through WFCD's prose `description`. **It was detected on exactly the builds
+where DE had refused us, and missed on the ones where they answered**, which is
+why the deployed site looked correct all afternoon. Fixed two ways: the observed
+tag is now in `EVENT_TAGS`, and `_goal_marks` scans the `Icon`,
+`InstructionalItem` and job `rewards` paths, where DE do print `PlagueStar`.
+`PROJECT.md §7` has the whole entry in both shapes and the verification.
+
+**Still open, and it is the sub-finding below rather than this heading:** the
+syndicate half of `find_live_events` cannot fire when DE answer, because the
+field it scans holds the mapped faction name. It is a behaviour change, so it is
+the owner's call. It also matters less than it looks — Plague Star's bounty
+comes from Ostrons on the ordinary Cetus board, and `Goals` is the whole
+detector for it, which the capture above confirms.
 
 **The Ghoul half has, and it worked — 2026-09-09.** This entry was titled *"The
 Ghoul and Plague Star detection has never seen a live event"* until the audit

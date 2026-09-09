@@ -7788,6 +7788,89 @@ whose `rewardPool` carries **33 resolved reward rows each**.
    WFCD's copy is 14,897 bytes against DE's 1,706 — see the `api_events` ceiling
    entry above. One job-bearing event costs ~15 KB in that feed.
 
+### Operation Plague Star, captured 2026-09-09, and the way in that it broke
+
+**The second of the two relic-bearing events ever seen running**, and the one
+that cost something. It opened at **15:00:00Z** — its announced day, six hours
+after the morning's audit had checked and found it absent — and runs to
+**2026-09-23T14:00Z**. Digital Extremes' own `Goal`, trimmed to the fields that
+matter and otherwise verbatim:
+
+```json
+{
+  "Tag": "InfestedPlains",
+  "Desc": "/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyName",
+  "ToolTip": "/Lotus/Language/InfestedPlainsEvent/InfestedPlainsBountyDesc",
+  "Icon": "/Lotus/Materials/Emblems/PlagueStarEventBadge_e.png",
+  "InstructionalItem": "/Lotus/Types/StoreItems/Packages/PlagueStarEventStoreItem",
+  "JobAffiliationTag": "EventSyndicate",
+  "Faction": "FC_INFESTATION",
+  "RegionIdx": 2,
+  "Activation": {"$date": {"$numberLong": "1788966000000"}},
+  "Expiry":     {"$date": {"$numberLong": "1790172000000"}},
+  "Jobs": [
+    {"jobType": ".../Jobs/Events/InfestedPlainsBounty",
+     "rewards": ".../EidolonJobMissionRewards/PlagueStarTableRewards",
+     "minEnemyLevel": 15,  "maxEnemyLevel": 25},
+    {"jobType": ".../Jobs/Events/InfestedPlainsBountyAdvanced",
+     "rewards": ".../EidolonJobMissionRewards/PlagueStarTableRewards",
+     "minEnemyLevel": 55,  "maxEnemyLevel": 65},
+    {"jobType": ".../Jobs/Events/InfestedPlainsBountySteelPath",
+     "rewards": ".../EidolonJobMissionRewards/PlagueStarTableSteelPathRewards",
+     "minEnemyLevel": 100, "maxEnemyLevel": 110, "masteryReq": 10}
+  ]
+}
+```
+
+and WFCD's, which is the same event in prose:
+
+```json
+{"id": "6aa174700000000000000000", "tag": "InfestedPlains",
+ "description": "Plague Star",
+ "tooltip": "Steal Vay Hek's Thrax Toxin, mix it, and poison the Infested Boil…",
+ "node": null, "name": null,
+ "activation": "2026-09-09T15:00:00.000Z", "expiry": "2026-09-23T14:00:00.000Z"}
+```
+
+**The tag is `InfestedPlains`, and that is the finding.** DE name an event after
+what happens in the world, never after the poster — Dog Days is `WaterFight`,
+Thermia Fractures is `HeatFissure`, and Plague Star is the Plains going
+infested. The `Desc` agrees with the tag. **The marketing name appears nowhere a
+reader would look for it**, and the instruction not to guess the tag earned its
+keep here: the guess would have been `PlagueStar`, which is what DE call the
+*cosmetics* — the badge, the glyph, the player icon, all four of them in
+`ExportManifest` — and it would have matched nothing.
+
+**So the keyword scan did not find it, and the way the failure hid is the part
+worth keeping.** The scan is the mechanism whose entire job is to catch an event
+nobody has seen before, and on the biggest one of the year it returned "not
+running" from the first-party route. Nothing broke visibly, because WFCD's
+`description` is the prose `Plague Star`: **the event was detected on exactly the
+builds where DE had refused us, and missed on the builds where they answered.**
+The deployed site was correct all afternoon for the wrong reason — Akamai was
+blocking the runner — while a build from the owner's own machine, the one that
+gets first-party data, went blind. First party failing where the fallback
+succeeds is the inversion of every other failure in this pipeline, and no test
+could have caught it: every fixture had been written from a guess.
+
+**Both halves are fixed, and they are different fixes.** `EVENT_TAGS` gains
+`InfestedPlains` → `Plague Star` as an observed fact, which settles this event
+forever. And `_goal_marks` (`official.py`) closes the general hole: DE **do**
+print the name, three times, on fields nobody was reading — the `Icon`, the
+`InstructionalItem` and each job's `rewards` table all say `PlagueStar`. Those
+are scanned now and never displayed, and a known tag still wins over any text,
+so the wider net cannot mis-identify a `Goal` DE have already named. Verified by
+emptying `EVENT_TAGS` — the state every genuinely new event starts in — and
+watching the scan still find it, then removing `marks` and watching it go dark.
+
+**What it gates, measured:** `Level 15 - 25 Plague Star` is the only tier the
+drop tables carry, and it holds **26 distinct relics**, more than any other
+bounty. DE publish three job bands; the other two are Advanced (55–65) and Steel
+Path (100–110), and neither has relics of its own, so `EVENT_BOUNTIES` needs no
+new key. With the fix, a fully first-party build reports *"limited-time events
+running — Ghoul Purge, Plague Star"*, all 26 relics become reachable, and the
+row carries **"Plague Star is running until 2026-09-23."**
+
 ---
 
 ## 8. Gotchas discovered while building
