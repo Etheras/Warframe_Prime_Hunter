@@ -262,12 +262,26 @@ already publish, per part.
 limit of **3 requests per second**, require *"a dedicated and descriptive
 `User-Agent`"* with a contact, warn that clients disguising themselves as
 browsers may be blocked, and ask callers to *"use caching, reuse responses, avoid
-tight polling loops"*. Warframe Prime Hunter sends a descriptive User-Agent
-naming this repository, and asks **twice a day at most** — the figure read is
+tight polling loops, and prefer incremental updates or WebSocket subscriptions
+when appropriate"*. Warframe Prime Hunter sends a descriptive User-Agent naming
+this repository, and asks **twice a day at most** — the figure read is
 `previous_day`, a daily aggregate, so polling faster could not produce a
-different answer. Neither endpoint sends a `Cache-Control` header, which makes
-this the one source whose refresh interval this project chose rather than read;
-the reasoning is recorded in `tools/sources.py` beside the constant.
+different answer. Two requests a day against an allowance of 3 per second is
+about **0.0008%** of what is offered.
+
+**On the WebSocket clause, since it says "when appropriate".** It is not
+appropriate here, and that is a decision rather than an oversight: a
+subscription is for a client that wants changes as they happen, and this reads a
+figure that is recomputed once a day. Holding a socket open to be told about a
+number that moves daily would cost them more than the two requests does, not
+less. Re-read 2026-09-09 to check the rules had not moved; they had not.
+
+Neither endpoint sends a `Cache-Control`, `ETag`, `Expires` or any
+`X-RateLimit-*` header — re-measured the same day — which makes this the one
+source whose refresh interval this project chose rather than read; the reasoning
+is recorded in `tools/sources.py` beside the constant. Nor is any cookie they
+set ever sent back: the build keeps no cookie jar, so each request is anonymous
+and carries no session.
 
 **Licensing is unstated, and that is recorded rather than assumed.** Their
 documentation sets out rules for *using the API* but makes no statement about
