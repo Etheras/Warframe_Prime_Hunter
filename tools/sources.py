@@ -63,8 +63,22 @@ VAULT_TRADER = "https://api.warframestat.us/pc/vaultTrader?language=en"
 # `Cache-Control: max-age=120`, measured, so a ten-minute build is well inside it.
 VOID_TRADER = "https://api.warframestat.us/pc/voidTrader?language=en"
 # The bounties on offer right now, and the world events that add temporary
-# ones. Both proxy the game worldstate, the same route Prime Resurgence takes
-# and for the same reason: DE's own worldState.php is 404 (PROJECT.md §6).
+# ones. Both proxy the game worldstate, and both are the **fallback** on that
+# route rather than the way in: `from_chain` asks DE's own `WORLDSTATE` below
+# first and reaches these when a datacentre address is refused.
+#
+# This said "DE's own worldState.php is 404 (PROJECT.md §6)" until 2026-09-09,
+# which stopped being true on 2026-08-27 and was contradicted by the comment on
+# `WORLDSTATE` eighty lines below it in this same file. The 404 belongs to two
+# *other* hosts - `/dynamic/worldState.php` on content. and origin.warframe.com
+# - and `api.warframe.com/cdn/worldState.php` answers 200. Worth knowing as a
+# shape: the usual drift is a note outliving the code, but here the
+# documentation was right and the comment beside the constant was the stale one,
+# so "check the code, not the note about the code" would have sent a reader to
+# the wrong authority.
+#
+# `api_events` is also the feed whose ceiling this project got wrong; see
+# `tools/limits.py`, where WFCD's 8.7x expansion of DE's raw goals is measured.
 SYNDICATE_MISSIONS = "https://api.warframestat.us/pc/syndicateMissions?language=en"
 WORLD_EVENTS = "https://api.warframestat.us/pc/events?language=en"
 # Where relics can be cracked right now. Every entry carries its own expiry,
@@ -431,11 +445,27 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     last_err = None
     prior = read_etag(path)
     ceiling = limits.cap_for(key)
-    # A host that answered with more than this key is allowed does not get
-    # asked again: it will send the same oversized body, and requesting it
-    # three times over is exactly what "ask no more often than the source says
-    # to" exists to prevent. Other hosts publishing the same document are still
-    # tried, which is the case this loop was built for.
+    # Hosts that have given a definitive answer, and so are not asked again on
+    # this call. Two things land here and they are the same judgement:
+    #
+    #   * a body larger than this key is allowed - it will send the same
+    #     oversized body next time, so asking three times over is exactly what
+    #     "ask no more often than the source says to" exists to prevent; and
+    #   * a 4xx, which is a decision rather than a hiccup. Digital Extremes sit
+    #     behind Akamai and 403 whole datacentre address ranges, so a CI runner
+    #     is refused on every attempt by design - measured from the deployed
+    #     feed log, DE answered 10 of 131 builds in 24 hours, and the other 121
+    #     each asked three times from two call sites. That is of the order of
+    #     360-720 requests a day to an endpoint answering none of them.
+    #     `CLAUDE.md` has said not to retry a refusal since the block was found;
+    #     the generic loop was doing it anyway.
+    #
+    # 429 is included on purpose and is the clearest case: being told we are
+    # asking too often is not a reason to ask again. 408 is excluded because a
+    # timeout genuinely is transient, and 5xx keep all three attempts.
+    #
+    # Other hosts publishing the same document are still tried, which is the
+    # case this loop was built for.
     refused = set()
     for attempt in range(3):
         for one in urls:
@@ -494,6 +524,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     with gzip.open(path, "rb") as fh:
                         return fh.read()
                 last_err = exc
+                # A decision, not a hiccup - see `refused` above.
+                if 400 <= exc.code < 500 and exc.code != 408:
+                    refused.add(one)
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 last_err = exc
         if len(refused) == len(urls):

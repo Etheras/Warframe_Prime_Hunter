@@ -23,17 +23,25 @@ discipline as the `/StoreItems` rule this project already trusts.
 **Measured before it was wired in, and cross-checked rather than spot-checked.**
 Against the live endpoints on 2026-09-08:
 
-  * **579 of 581 parts joined — 99.7%**, and every one of them carries a price.
-    The naive-slug attempt this replaced managed 417 of 586.
+  * **583 of 585 part specs joined — 99.7%**, and every one of them carries a
+    price. The naive-slug attempt this replaced managed 417 of 586.
   * The two misses are Galariak Prime and Sagek Prime, which warframe.market do
     not list **at all** — no slug, no id. So the join reaches 100% of what they
     publish, and the gap is release lag rather than a spelling we failed to
     handle. Nothing to fix here when they appear.
-  * **Ducats agree on all 579, with zero disagreements.** That is the part worth
+  * **Ducats agree on 579, with zero disagreements.** That is the part worth
     having: DE publish a ducat value per part and so does warframe.market, from
     different pipelines, so comparing them tests the join with a number the join
     itself does not use. A mis-join would have to be wrong about the part and
     right about its ducats to survive it.
+
+**Two different counts, which is what made this look wrong.** The join total and
+the ducat cross-check are different subsets and were both written as "579" until
+2026-09-09: 583 specs join, and 579 of those carry a ducat value on *both*
+sides, which is what can be compared. Re-measured on 2026-09-09 — 583/585 and
+579 agreeing, zero disagreeing — so what moved was the catalogue, not the
+method. Keep them spelled differently; one number doing two jobs is what sent an
+audit looking for a defect that was not there.
 
 **It is a tie-break and a badge, never the ranking.** The owner: *"Ducats are
 only listed for the users'/client's convenience to see. Never intended for them
@@ -84,7 +92,15 @@ def _rows(doc) -> list:
 
 
 def prices_by_path(items_doc, ducats_doc) -> dict[str, dict]:
-    """`{DE path: {plat, median, volume, ducats}}`, keyed on `gameRef`.
+    """`{DE path: {plat, median, volume}}`, keyed on `gameRef`.
+
+    **No `ducats`, deliberately**, and this line claimed one until 2026-09-09.
+    warframe.market publish a ducat value per row and it is read here — but only
+    to be *compared* with DE's, in the cross-check above, never to be carried.
+    A part's ducat value in the payload is Digital Extremes' own, from
+    `ExportRecipes_en.json`. Emitting a second one beside it would put two
+    sources for one number into the same record, which is a drift generator
+    rather than a redundancy: the day they disagree, nothing decides.
 
     Both documents are optional and either being absent yields `{}` — the badge
     disappears and the tie-break stops firing, which is the whole of the damage.

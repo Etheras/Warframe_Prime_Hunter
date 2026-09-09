@@ -125,9 +125,14 @@ cannot read it whatever this project does.
 
 WFCD therefore see a visitor's address and that they are running this tool, and
 nothing else — the collection is never transmitted. The poll honours the
-`Cache-Control: max-age=120` WFCD's own response declares. The site footer names
-the host on every page and every build, unconditionally, because unlike artwork
-there is no configuration that turns it off.
+`Cache-Control: max-age=120` WFCD's own response declares, **on every path that
+can reach it**: the two-minute timer, and the check made when a reader returns
+to the tab. That second one is stated because it was the gap — until 2026-09-09
+returning to the tab asked immediately, so alt-tabbing between the game and the
+planner could produce many requests inside one declared window. It is now
+refused in the same place the timer is. The site footer names the host on every
+page and every build, unconditionally, because unlike artwork there is no
+configuration that turns it off.
 
 The one piece of personal data touched is the visitor's IP address, which `serve.py`
 uses transiently for rate limiting. It is keyed-hashed with a salt generated at

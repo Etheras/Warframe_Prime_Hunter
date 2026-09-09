@@ -2550,10 +2550,14 @@ another. Both sides already hold DE's path, so the join is an identity.
 Three measurements decided it, and the third is the one that makes it
 trustworthy:
 
-- **579 of 581 parts join — 99.7%**, against 417 of 586 for the naive-slug
+- **583 of 585 part specs join — 99.7%**, against 417 of 586 for the naive-slug
   attempt this replaced. The two misses are Galariak Prime and Sagek Prime,
   which warframe.market do not list **at all**; the join reaches 100% of what
-  they publish and the gap is release lag on their side.
+  they publish and the gap is release lag on their side. Re-measured 2026-09-09
+  and it was **579 of 581** when written on 2026-09-08 — the ratio, the
+  percentage and the two named misses all held, and what moved was the
+  catalogue. Do not read a changed count here as a broken join; read the third
+  measurement below, which is the one that can actually fail.
 - **Two DE paths per part, and neither is redundant.** 426 parts are found under
   the component path and **153 only under the recipe that builds it**, because a
   Warframe component is traded as its blueprint. Emitting one would lose a
@@ -7465,13 +7469,161 @@ Five, and none of them was in the findings — they came out of doing the work:
   "raise the number", not as an attack.** `de_worldstate` is the one most likely
   to say it, because it carries whatever events are running.
 
-**And a sixth, from 2026-09-08, which is the same shape.** `api_events` was
-refused by its ceiling once — `Content-Length: 131,072` against 32,768 — and the
-build correctly reused a 0-minute-old cache. It did not reproduce, and the
-endpoint measures 1,482 bytes with one event. The rule above is what to apply if
-it recurs: **raise the number**. `TODO.md` carries it as a watch item because the
-timing matters — that is the events feed and Operation Plague Star opens the next
-day.
+**And a sixth, from 2026-09-08, which is the same shape and was the worst of
+them.** `api_events` was refused by its ceiling — `Content-Length: 131,072`
+against 32,768 — the build reused a 0-minute-old cache, and it was filed as
+"did not reproduce" beside a measurement of 1,482 bytes. Both halves of that
+were wrong, and the entry read as reassurance for a day.
+
+Re-measured 2026-09-09, the day Operation Plague Star was due to open: **16,564
+bytes, 50.5% of the ceiling**, with three events live and Plague Star not yet
+among them. The figure nobody had is why:
+
+| Ghoul Purge, same instant | bytes |
+|---|---|
+| DE's raw worldstate goal | 1,706 |
+| WFCD's `/pc/events` | **14,897** |
+
+**8.7x, because `api_events` is a feed of bounty tables and not of events.**
+WFCD expand each goal's `Jobs` into whole bounty objects with their reward
+tables, so the feed's size tracks how many *job-bearing* events overlap, not how
+many events exist. One costs ~15 KB. Plague Star is job-bearing, which projected
+to ~31.5 KB — **96%** — and that is what the 131,072 refusal had been: not a
+fluke, but what happens when enough of them overlap.
+
+Raised to **192 KB**, set from the largest figure the server ever *declared*
+rather than the largest body seen — the same correction `api_syndicatemissions`
+needed — and still below `de_worldstate`, which carries every one of these goals
+raw and is strictly the larger document.
+
+**The lesson is about the failure mode, not the number.** `limits.Refused` falls
+through to the cached copy and logs nothing anyone reads, so this would have
+presented as the events feed quietly not moving, during the only two-week window
+there was anything to capture. A ceiling set from one sample of a live feed is
+the recurring bug in this file; a ceiling on a feed that *expands* an upstream
+is the same bug with a multiplier on it. **Measure the endpoint you cap, not the
+one it derives from.**
+
+### Hard rule 11 is about how often we ask, not how many bytes come back
+
+Three things were found on 2026-09-08 by asking what this project actually sends,
+rather than what it says it sends. They are one lesson.
+
+**The fissure poll re-asked WFCD on every tab focus.** `pullFile` had always
+stood itself down while the live feed was answering; `pullLive` had no such
+guard, and `visibilitychange` called it unconditionally. Measured on the running
+page: **ten focus events, ten requests, same millisecond**, against a feed whose
+own response declares `max-age=120`. For a farm planner, alt-tabbing between the
+game and the planner is not an edge case — it is the intended use, so the
+ordinary reader was the one generating it.
+
+Fixed by the guard `pullFile` already had, keyed on the last *attempt* rather
+than the last success, so a failing feed is not hammered either. It carries a
+one-second slack purely so `setInterval` firing a hair early cannot be
+suppressed by its own boundary — trading a politeness bug for a staleness one
+would be no better. `test_pages.mjs` asserts **both** halves: refused inside the
+window, and allowed once past it. A guard that never let go would satisfy the
+first and make the tool wrong.
+
+**A 403 was asked three times.** `fetch`'s retry loop treated an `HTTPError`
+like any other failure, so a refusal got all three attempts and both sleeps.
+Digital Extremes sit behind Akamai and refuse whole datacentre address ranges:
+from the deployed feed log, **DE answered 10 of 131 builds in 24 hours (7.6%)**,
+and each of the other 121 asked three times from two call sites — of the order
+of **360–720 requests a day to an endpoint answering none of them**. Measured
+with a stubbed 403 so the check itself cost DE nothing; `de_worldstate` now
+makes 1 request instead of 3, and `export_index` 2 instead of 6, still trying
+both hosts.
+
+A 4xx now joins the same `refused` set an oversized body already did, which is
+the right home for it: both are decisions rather than hiccups. **429 is included
+deliberately** — being told we are asking too often is not a reason to ask
+again. 408 is excluded because a timeout genuinely is transient, and 5xx keep
+all three attempts.
+
+**What ties them together.** Both were invisible to every existing check,
+because both are about *frequency*, and nothing in the suite counted requests —
+the fissure poll was correct on the timer path and the retry loop was correct
+for a transient failure. Neither is a licence breach and neither cost a user
+anything; they were simply us taking more than we say we take, in the file that
+says it. `NOTICE.md` told WFCD the poll honours their window, which was true of
+one path and not the other. **When a politeness claim is made to a third party,
+the test for it has to count requests, not check behaviour.**
+
+### The documentation audit of 2026-09-08, and what it found correct
+
+Recorded so the next one does not repeat it, and because several of these are
+claims made to third parties rather than to ourselves. The `.md` files were
+checked against the code, and the licensing against the sources.
+
+**Licensing came back clean, with nothing to change.** `LICENSE`'s scope clause;
+`NOTICE.md`'s three Content Policy conditions (non-commercial, no DE or Warframe
+logo as branding, "unofficial" stated on every page — verified in the bundled
+single file too); CC BY-SA attribution for the wiki; and every MIT notice.
+`tools/proxima_nodes.py` carries 42 nodes, the full MIT text, the correct holder
+(© 2016 Matej Voboril) and both documented reconciliations — **the one vendored
+table in the repository is compliant**, and the approval-then-licence order that
+`§2` requires was followed.
+
+**warframe.market politeness holds.** A descriptive `User-Agent` naming the
+repository; `WM_MAX_AGE` of 86400 confirmed by the sidecars on disk; two
+endpoints once a day against an allowance of 3/second. The risk flagged as
+unverified — whether CI preserves the chosen window — is mechanically sound:
+`actions/cache` restores `.cache` with `tar`, which preserves mtimes, and
+`still_fresh` reads the body's mtime.
+
+**The stated concept holds.** Every `tools/*.py` import is stdlib or a local
+module and `package.json` is test-only, so dependency-free is true rather than
+aspirational. No LLM anywhere in the pipeline — no key, no client, no model
+call. CSP is identical in `serve.py` and both pages, with no `unsafe-inline` and
+no inline handler or `style=` attribute. Six `wfprimes.*` keys, one store, both
+pages.
+
+**And the payload matches what is written down**: 7 categories, 167 items, 763
+relics, 87 Aya. `§7` is 78.6% of this file, confirming the 79% recorded when the
+contract was set.
+
+**One open worry was closed by measurement rather than argument.** `CLAUDE.md`
+feared warframe.market would refuse the GitHub runner the way Akamai do, leaving
+the deployed site silently unpriced. It does not: the deployed payload carries
+Platinum for **582 of 586 parts**, and the four without it are the whole-weapon
+components of the Ak- duals — Aklex Prime is built from two Lex Primes, and a
+whole weapon is not a part warframe.market price. Cloudflare are not Akamai, and
+the analogy that produced the fear was doing the reasoning.
+
+### `EVENT_TAGS` has its first real entry, and it was captured rather than guessed
+
+`EVENT_TAGS` was deliberately empty from the day it was written: neither of the
+two relic-bearing events had run since this project existed, and a guessed tag
+is worse than no tag, because it matches nothing and reads as *"the event is not
+running"* — indistinguishable from the truth. So the prose scan stayed as the
+way in, and the build was made to **record** the tag of whatever it matched.
+
+On **2026-09-09** that paid off, and it is worth keeping as an example of the
+pattern rather than only as a fact. A Ghoul Purge was live —
+**2026-09-08T17:49Z to 2026-09-29T17:49Z** — the scan caught it on prose, and
+the build printed:
+
+    bounties: ! Ghoul Purge is running and DE tag it 'GhoulEmergence'
+
+`GhoulEmergence` is now in `EVENT_TAGS` as an **observation**, the first of the
+two ever made. Two gated rows reached the ranking with it (`Level 15 - 25 Ghoul
+Bounty`, `Level 40 - 50 Ghoul Bounty`), which is also the first time the event
+path has been exercised against DE's real shape rather than a staged window.
+
+**Plague Star's tag is still unknown and must stay unknown until it runs.** It
+was documented as opening 2026-09-09 and had not by 05:30Z that day — DE's
+`Goals` and WFCD's `/pc/events` both carried the same three events, and neither
+was it. Its entry *does* appear in `meta.bounties.events`, which is the trap
+worth naming: that row has **no activation, no expiry and no tag**, because it
+was matched against a static drop-table row rather than the worldstate. **An
+entry in that map is not evidence an event is running; a window on the entry
+is.**
+
+What the known tag buys beyond durability against DE rewording prose: `consider`
+now rejects a row whose tag names a *different* event, so a Ghoul bounty can no
+longer be read as a Plague Star one by keyword. The scan stays for anything
+untagged, which is how the next one gets captured.
 
 ---
 

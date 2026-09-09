@@ -321,6 +321,31 @@ const stageLiveFissures = (page, rows) =>
     body: JSON.stringify(rows),
   }));
 
+/* Come back to the tab after the live feed's own window has elapsed.
+
+   A bare `visibilitychange` no longer forces a fetch, and that is deliberate:
+   since 2026-09-09 `pullLive` refuses to ask WFCD again inside the
+   `max-age=120` their own response declares, because alt-tabbing between the
+   game and the planner is what this tool is *for* and each return used to cost
+   a request. So a test that wants the refresh has to be a reader who has been
+   away longer than that, which is what this is.
+
+   The window is read from the page rather than written here, so shortening it
+   cannot leave this quietly asserting against a number the app stopped using.
+
+   The shift is left in place on purpose. `Date.now` is read afterwards only by
+   expiry arithmetic, which is comparing against fissures an hour out, and
+   repeated calls compound correctly because each one re-wraps whatever it
+   finds. `visibilitychange` is also the suite's ordinary repaint trigger —
+   that half is untouched and still needs no clock. */
+const returnAfterWindow = (page) => page.evaluate(() => {
+  const shared = window.WFPrimeShared || {};
+  const shift = (shared.LIVE_FISSURE_REFRESH_MS || 120000) + 5000;
+  const real = Date.now;
+  Date.now = () => real() + shift;
+  document.dispatchEvent(new Event("visibilitychange"));
+});
+
 /* The option is passed only when there is a reason to skip. node:test checks
    whether `skip` is *present*, not whether it is truthy, so `{ skip: null }`
    silently skips the lot - which it duly did, reporting eight passes as eight
@@ -3219,12 +3244,55 @@ page_test("an open page picks up a fissure that opened after it loaded", async (
       expiry: new Date(Date.now() + 55 * 60000).toISOString(),
       isHard: false, isStorm: false },
   ]);
-  // the same thing returning to the tab does, without waiting two minutes
-  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  // what returning to the tab does, for a reader who has been away long enough
+  // that WFCD's own window has expired — see `returnAfterWindow`
+  await returnAfterWindow(page);
   await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
 
   const said = await rowFor(page, key).locator(".tag.fissure").innerText();
   assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
+  assert.deepEqual(errors, []);
+});
+
+page_test("returning to the tab does not re-ask WFCD inside their own window", async () => {
+  /* Hard rule 11: never ask again inside the freshness window the source
+     declared. WFCD answer `Cache-Control: max-age=120` on the fissure feed, so
+     two minutes is their number rather than one we picked.
+
+     Measured on 2026-09-08, before the guard existed: ten `visibilitychange`
+     events produced ten requests to WFCD in the same millisecond. Alt-tabbing
+     between the game and the planner is the ordinary use of a farm planner, so
+     that is the shape of a real session and not an edge case.
+
+     Counted at the route, because that is the only place that can tell an
+     intention apart from a request. Both halves are asserted deliberately: a
+     guard that never lets go would pass the first assertion and make the tool
+     wrong, which is the failure this could otherwise trade for. */
+  const { page, errors } = await open("/plan.html");
+
+  let asked = 0;
+  await page.route(LIVE_FEED_GLOB, (route) => {
+    asked += 1;
+    return route.fulfill({
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: "[]",
+    });
+  });
+
+  for (let i = 0; i < 10; i += 1) {
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  }
+  await page.waitForTimeout(400);
+  assert.equal(asked, 0,
+               `ten returns inside the declared window asked WFCD ${asked} times`);
+
+  await returnAfterWindow(page);
+  await page.waitForTimeout(400);
+  assert.equal(asked, 1,
+               "a reader back after the window expired must get a fresh list — " +
+               "the guard is a window, not a mute");
+
   assert.deepEqual(errors, []);
 });
 
@@ -3445,7 +3513,7 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
       isHard: false, isStorm: false },
   ]);
 
-  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await returnAfterWindow(page);
   await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
   const after = await shape();
   /* The figures, not the names: a fissure changes how far the row says to run,
@@ -3465,7 +3533,11 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
 
   const held = await shape();
   await stageLiveFissures(page, []);
-  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  /* Past the window again, so the feed really is re-read. A bare
+     `visibilitychange` would be refused by the politeness guard, and this half
+     would then hold still because nothing was fetched — passing for the
+     opposite of the reason it is asserting. */
+  await returnAfterWindow(page);
   await page.waitForTimeout(600);
   const while_typing = await shape();
   assert.deepEqual(while_typing.figures, held.figures,

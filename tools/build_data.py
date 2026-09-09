@@ -623,17 +623,32 @@ EVENT_PATTERNS = {
 # Thermia Fractures, `WaterFight` is Dog Days - and a tag is a far better key
 # than a keyword scan over prose DE can reword at any time.
 #
-# **Empty on purpose, and it is not an oversight.** Neither of the two events
-# that carry relics has run since this project existed, so their tags have never
-# been seen. Guessing one would be worse than scanning: a wrong tag matches
-# nothing and looks like the event is not running, which is exactly the failure
-# the scan was written loosely to avoid.
+# **This was empty on purpose until 2026-09-09, and the mechanism that filled it
+# is the point.** Neither of the two events that carry relics had run since this
+# project existed, so their tags had never been seen, and guessing one would
+# have been worse than scanning: a wrong tag matches nothing and reads as "the
+# event is not running", which is the exact failure the loose scan avoids.
 #
-# So the scan stays as the way in, and the build *records* the tag of whatever
-# it matched - see `find_live_events`. The first time a Ghoul Purge runs, its
-# tag lands in the payload and in the build log, and it can be added here as a
-# fact rather than a guess.
-EVENT_TAGS: dict[str, str] = {}
+# So the scan stayed as the way in and the build *recorded* the tag of whatever
+# it matched - see `find_live_events`. On 2026-09-09 that paid off. A Ghoul
+# Purge was running (window 2026-09-08T17:49Z to 2026-09-29T17:49Z), the scan
+# caught it on prose, and the build printed its tag and put it in the payload:
+#
+#     bounties: ! Ghoul Purge is running and DE tag it 'GhoulEmergence'
+#
+# So the line below is an observation, not a guess - the first of the two ever
+# made. **Plague Star's is still unknown and must stay that way**: it was due to
+# open the same day and had not, and `meta.bounties.events` carries its entry
+# with no activation, expiry or tag, which is what "matched from a drop table,
+# not from the worldstate" looks like. Add it the same way, from a build log,
+# when it runs.
+#
+# What a known tag buys, beyond being sturdier than prose: `consider` rejects a
+# row whose tag names a *different* event, so a Ghoul bounty can no longer be
+# read as a Plague Star one by a keyword. The scan remains for anything untagged.
+EVENT_TAGS: dict[str, str] = {
+    "GhoulEmergence": "Ghoul Purge",
+}
 
 CYCLE_MINUTES = 150       # one full day/night of the landscape
 SEQUENCE = "ABC"

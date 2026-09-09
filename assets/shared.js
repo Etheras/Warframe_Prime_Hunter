@@ -731,6 +731,9 @@
        a flag, so a feed that works and then stops hands the file back within
        one file-poll interval instead of freezing the list forever. */
     let liveAt = 0;
+    /* When the live feed was last *asked*, which is a different question from
+       when it last answered, and the one hard rule 11 is about. See `pullLive`. */
+    let liveAsked = 0;
 
     const apply = (rows) => {
       const now = Date.now();
@@ -743,9 +746,31 @@
     };
 
     /* The live one. Plain GET, no credentials, no headers worth a preflight -
-       so this stays a simple request and never costs WFCD an OPTIONS. */
+       so this stays a simple request and never costs WFCD an OPTIONS.
+
+       **Never inside the window WFCD's own response declares.** `pullFile` has
+       always stood itself down; this did not, and `visibilitychange` below
+       calls it on every return to the tab. Measured 2026-09-08 on the running
+       page: ten focus events produced ten requests to WFCD in the same
+       millisecond, against a feed whose response says `max-age=120`. Alt-
+       tabbing between the game and the planner is what this tool is *for*, so
+       that is the ordinary case and not an edge one - and hard rule 11 is
+       about how often we ask, not about how many bytes come back.
+
+       Keyed on the last attempt rather than the last success, deliberately: a
+       feed that is failing would otherwise still be asked once per focus,
+       which is the case where restraint matters most.
+
+       The slack keeps the 120s timer from being suppressed by its own
+       boundary. `setInterval` may fire a hair early, and a guard of exactly
+       the window would drop that tick and halve the refresh rate - which would
+       trade a politeness bug for a staleness one. */
+    const LIVE_ASK_SLACK_MS = 1000;
     const pullLive = () => {
       if (typeof fetch !== "function") return;
+      const asking = Date.now();
+      if (asking - liveAsked < LIVE_FISSURE_REFRESH_MS - LIVE_ASK_SLACK_MS) return;
+      liveAsked = asking;
       fetch(LIVE_FISSURES, { cache: "no-cache", credentials: "omit" })
         .then((r) => (r.ok ? r.json() : null))
         .then((rows) => {

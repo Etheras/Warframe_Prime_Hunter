@@ -134,7 +134,33 @@ MAX_EXPANDED = {
     # the busy case and not the usual one — which is the opposite of `api_events`
     # below and the reason both get room well past double.
     "api_voidtrader":                     32 * KB,   #   6,219 with 41 rows (2026-09-04)
-    "api_events":                         32 * KB,   #   2,994 with NO event running
+    # `api_events` is not a feed of events; it is a feed of *bounty tables*, and
+    # that is what the 32 KB below missed for a week.
+    #
+    # WFCD expand each goal's `Jobs` into whole bounty objects with their reward
+    # tables. Measured 2026-09-09 on the same instant of the same event: Ghoul
+    # Purge is **1,706 bytes** in DE's raw worldstate and **14,897** in WFCD's
+    # `/pc/events` — **8.7x**. So one job-bearing event costs ~15 KB on its own,
+    # and the feed's size tracks how many of those are live, not how many events
+    # there are.
+    #
+    # Three events were running that day at 16,564 bytes total — already 50.5%
+    # of the old 32,768 ceiling, with Operation Plague Star (a fourth, and
+    # job-bearing) due to open the same day. That projects to ~31.5 KB, or 96%,
+    # which is not a margin. It also explains the `Content-Length: 131,072`
+    # refusal recorded on 2026-09-08 and filed as "did not reproduce": it
+    # reproduces whenever enough job-bearing events overlap, and the fallback is
+    # silent, so the events feed would simply have stopped moving during the one
+    # two-week window there was anything to capture.
+    #
+    # 192 KB is set from the largest figure ever *declared* by the server
+    # (131,072) with room past it, not from the largest body seen — the same
+    # correction `api_syndicatemissions` needed. It stays below `de_worldstate`
+    # above, which carries every one of these goals raw and so is strictly the
+    # larger document.
+    "api_events":                        192 * KB,   #  16,564 with 3 events, one
+                                                     #  of them 14,897 (2026-09-09);
+                                                     #  131,072 declared once
     # ── and the rest, whose size tracks the catalogue ──
     "wiki_prime":                        128 * KB,   #     56,157
     "export_ExportRegions_en.json":      100 * KB,   #     49,501
