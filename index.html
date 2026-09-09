@@ -110,11 +110,11 @@
 
     <section class="filter-block">
       <div class="filter-head"><h2>Sort</h2></div>
+      <label class="check" data-tip="Keep each category together and sort inside it. Untick to sort the whole catalogue as one list."><input type="checkbox" id="f-group" checked="checked" />
+        <span class="box"></span><span class="lbl">Group by category</span></label>
       <select id="sort" class="select">
-        <option value="cat">Category, then release date</option>
-        <option value="name">Name (A–Z)</option>
-        <option value="status">Availability</option>
-        <option value="release">Newest release</option>
+        <option value="release">Release date</option>
+        <option value="parts">Parts remaining</option>
       </select>
     </section>
 
@@ -164,7 +164,8 @@
       </div>
       <div class="bulk">
         <button class="btn ghost sm" id="markAllBtn">Mark shown as collected</button>
-        <button class="btn ghost sm" id="clearAllBtn">Unmark shown</button>
+        <button class="btn ghost sm" id="wantAllBtn" data-tip="Add every Prime shown to the farm list, so the planner ranks places to get them">Mark shown as wanted</button>
+        <button class="btn ghost sm" id="clearAllBtn" data-tip="Clears collected, every part, and the farm list, for everything shown">Unmark shown</button>
       </div>
     </div>
     <div id="grid" class="grid"></div>

@@ -226,7 +226,11 @@
     showCollected: false,
     showMissing: true,
     cats: new Set(CATEGORIES),
-    sort: "cat",
+    sort: "release",
+    /* Grouping is its own switch since 2026-09-09; on by default because that
+       is what the old `cat` default did and nothing about the split was meant
+       to move the opening view. */
+    group: true,
     q: "",
     /* On by default since 2026-08-27, at the owner's direction. The drawer's
        question is "where do I farm this part", and a vaulted relic cannot be
@@ -291,7 +295,23 @@
       if (Array.isArray(saved.cats) && saved.cats.length) {
         state.cats = new Set(saved.cats.filter((c) => CATEGORIES.includes(c)));
       }
-      if (saved.sort) state.sort = saved.sort;
+      /* The sort was one key naming both the grouping and the ordering until
+         2026-09-09, and is now two. A saved value from before the split is
+         translated rather than dropped, because dropping it silently moves a
+         reader's list on them and they would have no way to tell why.
+
+           cat     -> group + release, which is exactly what it meant
+           release -> release, ungrouped, likewise
+           name    -> gone, and there is no honest translation
+           status  -> gone, likewise
+
+         The two with no equivalent fall through to the normaliser below, which
+         puts them on the default. `saved.group` is read after, so a value
+         written since the split always wins over this translation. */
+      if (saved.sort === "cat") { state.sort = "release"; state.group = true; }
+      else if (saved.sort === "release") { state.sort = "release"; state.group = false; }
+      else if (saved.sort) state.sort = saved.sort;
+      if (typeof saved.group === "boolean") state.group = saved.group;
       if (typeof saved.hideVaultedRelics === "boolean")
         state.hideVaultedRelics = saved.hideVaultedRelics;
       if (typeof saved.hideOwnedParts === "boolean")
@@ -305,6 +325,7 @@
     showMissing: state.showMissing,
     cats: Array.from(state.cats),
     sort: state.sort,
+    group: state.group,
     hideVaultedRelics: state.hideVaultedRelics,
     hideOwnedParts: state.hideOwnedParts,
   });
@@ -335,23 +356,41 @@
     return rb.localeCompare(ra);
   };
 
+  /* How many parts of this Prime are still to find. `partsDone` counts the ones
+     whose quantity is met, so this is the complement and not a second count -
+     the card already shows `partsDone/parts.length` and the two must agree.
+     An item with no parts at all (Excalibur Prime, and the other three with no
+     relic route) has nothing remaining, which is true rather than convenient. */
+  const partsLeft = (it) => it.parts.length - partsDone(it);
+
+  /* Ascending: what is closest to finished comes first, because that is the
+     question this sort is asked. Fully complete items therefore lead - a Prime
+     at 0 remaining is either claimed or one button from it - and by default
+     they are not on screen at all, since `showCollected` opens off. */
+  const byPartsLeft = (a, b) => partsLeft(a) - partsLeft(b);
+
+  /* Two orderings, and the category grouping is a separate switch rather than
+     four combinations spelled out. Owner's choice, 2026-09-09: a third ordering
+     would otherwise mean two more dropdown lines, and every one of them would
+     have to be worded to say whether it grouped.
+
+     Both fall through to release and then to name, so the order is total and a
+     redraw cannot shuffle equal rows. Release before name for the same reason
+     the old default did it: "what came out lately that I do not have" is a
+     question an alphabet cannot answer. */
   const SORTS = {
-    name: (a, b) => a.name.localeCompare(b.name),
-    /* Category, then newest first inside it. This orders on release rather than
-       on name because the question the default is answering is "what has come
-       out lately that I do not have", and an alphabet answers nothing - it put
-       Ash Prime above Styanax Prime for no reason a reader could use. Name is
-       still the tie-break, and still its own option for looking one thing up. */
-    cat: (a, b) =>
-      CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) ||
-      byRelease(a, b) ||
-      a.name.localeCompare(b.name),
-    status: (a, b) => {
-      const order = ["farmable", "railjack", "resurgence", "baro", "special",
-                     "vaulted", "founder"];
-      return order.indexOf(a._status) - order.indexOf(b._status) || a.name.localeCompare(b.name);
-    },
     release: (a, b) => byRelease(a, b) || a.name.localeCompare(b.name),
+    parts: (a, b) => byPartsLeft(a, b) || byRelease(a, b) || a.name.localeCompare(b.name),
+  };
+
+  /* Category first, then whichever ordering is chosen. Composed rather than
+     written out so the two halves cannot drift - the grouped and ungrouped
+     versions of a sort are the same comparator with one term in front. */
+  const ordering = () => {
+    const within = SORTS[state.sort] || SORTS.release;
+    if (!state.group) return within;
+    return (a, b) =>
+      CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || within(a, b);
   };
 
   /* A restored `sort` was taken on bare truthiness, and could not be checked
@@ -361,7 +400,7 @@
      visibly broken — the value simply persisted, and the select showed no
      selection because assigning an unknown value to a <select> selects
      nothing. This makes the stored value one of the real ones. */
-  if (!Object.prototype.hasOwnProperty.call(SORTS, state.sort)) state.sort = "cat";
+  if (!Object.prototype.hasOwnProperty.call(SORTS, state.sort)) state.sort = "release";
 
   /* ── badges ───────────────────────────────────────────────── */
   const BADGE = {
@@ -560,10 +599,10 @@
 
   function render() {
     shown = ITEMS.filter((it) => matches(it));
-    shown.sort(SORTS[state.sort] || SORTS.cat);
+    shown.sort(ordering());
 
     let html = "";
-    if (state.sort === "cat") {
+    if (state.group) {
       let cur = null;
       shown.forEach((it) => {
         if (it.category !== cur) {
@@ -1387,19 +1426,33 @@
   }
 
   /* One card and the numbers around it, without rebuilding the grid. Falls back
-     to a full render exactly when the change moves the card in or out of the
-     list, which is the case a targeted update cannot express. Nothing a part
-     tick changes affects the sort, so a card that stays never moves. */
+     to a full render in the two cases a targeted update cannot express: the
+     change moves the card in or out of the list, or it moves the card *within*
+     it.
+
+     This said "nothing a part tick changes affects the sort, so a card that
+     stays never moves", and that was true of every ordering there had ever
+     been — until *Parts remaining* arrived on 2026-09-09, which is precisely an
+     ordering a part tick changes. Left as it was, ticking under that sort put
+     the grid quietly out of order and it stayed wrong until the next filter
+     change or reload: a sort is a promise about the whole list, not a label on
+     the control that set it.
+
+     Only that one ordering pays for the rebuild, and in the shipped default it
+     costs nothing visible — `showCollected` opens off, so claiming a Prime
+     removes it from the grid anyway and the card was never going to stay. */
+  const sortReadsProgress = () => state.sort === "parts";
+
   function refreshCard(it) {
     const card = it && matches(it)
       ? grid.querySelector(`.card[data-id="${CSS.escape(it.id)}"]`) : null;
-    if (!card) { render(); return; }
+    if (!card || sortReadsProgress()) { render(); return; }
     card.outerHTML = cardHTML(it);
     updateProgress(); updateCounts(); refreshHeadings();
   }
 
   function refreshHeadings() {
-    if (state.sort !== "cat") return;
+    if (!state.group) return;
     $$(".cat-heading").forEach((h) => {
       const cat = h.childNodes[0].textContent.trim();
       const inCat = shown.filter((x) => x.category === cat);
@@ -1448,6 +1501,10 @@
     state.showMissing = e.target.checked; saveFilters(); render();
   });
 
+  $("#f-group").checked = state.group;
+  $("#f-group").addEventListener("change", (e) => {
+    state.group = e.target.checked; saveFilters(); render();
+  });
   $("#sort").value = state.sort;
   $("#sort").addEventListener("change", (e) => {
     state.sort = e.target.value; saveFilters(); render();
@@ -1528,8 +1585,29 @@
     shown.forEach((it) => { ST.setAllParts(it, true); ST.setCollected(it.id, true); });
     render();
   });
+  /* The farm list is the planner's input, so this is the collection page
+     reaching across to it — the same thing the per-card cross does, done to a
+     screenful. Items with no parts are skipped because they have no cross
+     either: there is nothing to farm, and putting one on the list would give
+     the planner a Prime it can rank no places for. */
+  $("#wantAllBtn").addEventListener("click", () => {
+    shown.forEach((it) => { if (it.parts.length) ST.addWish(it.id); });
+    updateFarmCount();
+    render();
+  });
+
+  /* Unmark clears the farm list too, at the owner's direction 2026-09-09. It
+     is the undo for both of the buttons beside it, and a reader who has just
+     wanted a screenful and changed their mind has no other way back — the
+     alternative was clicking 40 crosses. Three slices, one press: the parts,
+     the claim, and the want. */
   $("#clearAllBtn").addEventListener("click", () => {
-    shown.forEach((it) => { ST.setAllParts(it, false); ST.setCollected(it.id, false); });
+    shown.forEach((it) => {
+      ST.setAllParts(it, false);
+      ST.setCollected(it.id, false);
+      ST.removeWish(it.id);
+    });
+    updateFarmCount();
     render();
   });
 

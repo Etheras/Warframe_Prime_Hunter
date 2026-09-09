@@ -1045,6 +1045,171 @@ page_test("the materials checklist keeps what you type in it", async () => {
   assert.equal(await page.locator("#matList input").first().inputValue(), "7");
 });
 
+/* The sort was one dropdown naming both the grouping and the ordering until
+   2026-09-09, and is now a checkbox and a two-entry list — the same four
+   combinations the owner asked for, spelled as 2x2 rather than as four lines. */
+
+/* What the grid is showing, in render order, with how many parts each card
+   still wants. Read off the DOM rather than recomputed from the payload,
+   because the card's own `x/y` is what a reader sees and the sort has to agree
+   with it. A card with no `.card-prog` is one of the seven Primes with no parts
+   at all, and wants nothing. */
+const shownProgress = (page) => page.evaluate(() =>
+  [...document.querySelectorAll("#grid .card[data-id]")].map((el) => {
+    const p = el.querySelector(".card-prog");
+    if (!p) return { id: el.dataset.id, left: 0 };
+    const [got, all] = p.textContent.trim().split("/").map(Number);
+    return { id: el.dataset.id, left: all - got };
+  }));
+
+page_test("the sort offers the four combinations, and grouping is what makes headings",
+          async () => {
+  const { page, errors } = await open("/index.html");
+
+  const options = await page.locator("#sort option").evaluateAll(
+    (els) => els.map((e) => e.value));
+  assert.deepEqual(options, ["release", "parts"],
+                   "the orderings are the two the owner named");
+
+  /* Four combinations, and the only thing the checkbox may change is whether
+     the grid is broken into categories. Asserted both ways round for each
+     ordering, so a heading that survived unticking would fail here rather than
+     in whichever test happened to look next. */
+  for (const sort of options) {
+    await page.selectOption("#sort", sort);
+
+    await setCheck(page, "#f-group", true);
+    const grouped = await page.locator("#grid .cat-heading").count();
+    assert.ok(grouped > 1,
+              `grouped by ${sort} rendered ${grouped} category headings`);
+
+    await setCheck(page, "#f-group", false);
+    assert.equal(await page.locator("#grid .cat-heading").count(), 0,
+                 `unticked, ${sort} still broke the grid into categories`);
+  }
+  assert.deepEqual(errors, []);
+});
+
+page_test("parts remaining orders on what is left, not on how many parts exist",
+          async () => {
+  /* The distinction matters and is easy to get wrong: 96 of the 167 Primes have
+     four parts and 59 have three, so a sort that read `parts.length` would look
+     right on a cold profile and never move again as the reader collected. */
+  const { page } = await open("/index.html");
+  await setCheck(page, "#f-group", false);
+  await page.selectOption("#sort", "parts");
+
+  const before = await shownProgress(page);
+  assert.ok(before.length > 5, `only ${before.length} cards on screen to order`);
+  const lefts = before.map((r) => r.left);
+  assert.deepEqual([...lefts].sort((a, b) => a - b), lefts,
+                   `the grid is not in ascending order of parts left: ${lefts.join(",")}`);
+
+  /* Now move one, and the subject has to be one the sort is currently putting
+     LAST — the card with the most left to find. `pickCard` is wrong here and
+     was tried: it returns the first card on screen, which under an ascending
+     sort is already at index 0 and cannot move up, so the assertion below
+     failed on a working sort. The subject is still chosen on a property rather
+     than named, it is just the far end of the property this test is about. */
+  const worst = before.reduce((a, b) => (b.left > a.left ? b : a), before[0]);
+  const wasAt = before.findIndex((r) => r.id === worst.id);
+  assert.ok(worst.left > 0 && wasAt > 0,
+            "every card on screen wants the same number of parts, so this test " +
+            "cannot tell an ordering from a coincidence");
+
+  await setCheck(page, "#f-collected", true);      // this test is about a claimed item
+  await page.locator(`[data-tick="${worst.id}"]`).click();
+
+  const after = await shownProgress(page);
+  const nowAt = after.findIndex((r) => r.id === worst.id);
+  assert.equal(after[nowAt].left, 0,
+               `${worst.id} was claimed and still reports parts outstanding`);
+  assert.ok(nowAt < wasAt,
+            `${worst.id} went from ${wasAt} to ${nowAt} after being claimed — ` +
+            "collecting it did not move it up the parts-remaining sort");
+  const after_lefts = after.map((r) => r.left);
+  assert.deepEqual([...after_lefts].sort((a, b) => a - b), after_lefts,
+                   "the order stopped ascending once one item changed");
+});
+
+page_test("a sort saved before the grouping switch existed still opens grouped",
+          async () => {
+  /* `cat` meant "category, then release date" and no longer names anything. A
+     reader carrying one has their list silently reordered unless it is
+     translated, and they have no way to tell why — so it is translated. */
+  const { page } = await open("/index.html");
+  await page.evaluate(() => localStorage.setItem("wfprimes.filters.v1",
+    JSON.stringify({ sort: "cat" })));
+  await page.reload({ waitUntil: "load" });
+
+  assert.equal(await page.locator("#sort").inputValue(), "release");
+  assert.equal(await page.locator("#f-group").isChecked(), true);
+  assert.ok(await page.locator("#grid .cat-heading").count() > 1,
+            "a restored `cat` sort did not come back grouped");
+
+  /* And the other survivor: `release` meant the flat list, so it must not come
+     back grouped. Both directions, because a translation that grouped
+     everything would pass the assertion above. */
+  await page.evaluate(() => localStorage.setItem("wfprimes.filters.v1",
+    JSON.stringify({ sort: "release" })));
+  await page.reload({ waitUntil: "load" });
+  assert.equal(await page.locator("#f-group").isChecked(), false,
+               "a restored flat `release` sort came back grouped");
+});
+
+page_test("marking a screenful as wanted puts exactly that screenful on the farm list",
+          async () => {
+  const { page } = await open("/index.html");
+  const shown = await shownIds(page);
+  assert.ok(shown.length, "nothing on screen to want");
+
+  await page.locator("#wantAllBtn").click();
+  const wished = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]"));
+
+  /* Only the ones with parts: a Prime with nothing to farm has no cross on its
+     card either, and putting it on the list would hand the planner something it
+     can rank no places for. */
+  const wantable = await page.evaluate((ids) => {
+    const by = new Map(window.WFPRIME_DATA.items.map((i) => [i.id, i]));
+    return ids.filter((id) => ((by.get(id) || {}).parts || []).length);
+  }, shown);
+  assert.deepEqual([...wished].sort(), [...wantable].sort(),
+                   "the farm list is not the screenful that was showing");
+  assert.equal(await page.locator("#planCount").textContent(), String(wished.length),
+               "the planner tab's count did not follow");
+});
+
+page_test("unmarking a screenful clears the claim, the parts and the want together",
+          async () => {
+  /* Owner's requirement, 2026-09-09: Unmark is the undo for both buttons beside
+     it. Three slices, and this asserts all three, because clearing two of them
+     leaves a reader with a farm list they cannot see any way to empty. */
+  const { page } = await open("/index.html");
+  await page.locator("#wantAllBtn").click();
+  await page.locator("#markAllBtn").click();
+  await setCheck(page, "#f-collected", true);   // the claim hides them otherwise
+
+  const filled = await page.evaluate(() => ({
+    wish: JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]").length,
+    collected: JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]").length,
+    parts: Object.keys(JSON.parse(localStorage.getItem("wfprimes.parts.v1") || "{}")).length,
+  }));
+  assert.ok(filled.wish && filled.collected && filled.parts,
+            `nothing was set to clear: ${JSON.stringify(filled)}`);
+
+  await page.locator("#clearAllBtn").click();
+  const cleared = await page.evaluate(() => ({
+    wish: JSON.parse(localStorage.getItem("wfprimes.wishlist.v1") || "[]").length,
+    collected: JSON.parse(localStorage.getItem("wfprimes.collected.v1") || "[]").length,
+    parts: Object.keys(JSON.parse(localStorage.getItem("wfprimes.parts.v1") || "{}")).length,
+  }));
+  assert.deepEqual(cleared, { wish: 0, collected: 0, parts: 0 },
+                   "Unmark shown left one of the three slices behind");
+  assert.equal(await page.locator("#planCount").isVisible(), false,
+               "the planner tab still shows a count with an empty farm list");
+});
+
 // ── the planner ────────────────────────────────────────────────────────────
 
 page_test("the planner ranks somewhere to go for a wanted Prime", async () => {

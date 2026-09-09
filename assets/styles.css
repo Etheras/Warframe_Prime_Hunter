@@ -353,6 +353,13 @@ button,input,select,textarea{font:inherit;color:inherit}
   width:100%;padding:8px 10px;border-radius:8px;
   background:var(--panel);border:1px solid var(--line);cursor:pointer;
 }
+/* Only where a checkbox sits directly above one, which is the Sort block since
+   the grouping switch was split out of the sort list. `.select` carried no top
+   margin because it had never had a sibling; against the checkbox's own padding
+   that left a 1px gap and the two read as one control. Scoped to the adjacency
+   rather than added to `.select`, so the standalone's other selects are
+   untouched. */
+.check + .select{margin-top:8px}
 .src-note{
   margin-top:26px;padding-top:14px;border-top:1px solid var(--line-soft);
   font-size:11px;line-height:1.55;color:var(--txt-faint);

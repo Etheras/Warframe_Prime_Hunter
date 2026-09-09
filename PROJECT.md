@@ -4453,7 +4453,12 @@ nobody who already uses the site — including the owner. Redefining `"cat"` rea
 every saved store without a migration to write, and the stored value stays valid.
 The cost is real and was accepted: **category-then-name is no longer offered.**
 *Name (A–Z)* still exists for looking one thing up, which is the job that ordering
-actually had.
+actually had. **Superseded 2026-09-09**: *Name (A–Z)* was itself dropped when the
+sort split into a grouping switch and an ordering, on the same reasoning taken one
+step further — the search box does that job better, because it matches parts and
+relic names too. See *The sort splits into a grouping switch and an ordering*
+below, which also records how a stored `"cat"` is translated now that redefining
+it is no longer enough.
 
 Both sorts that read a date now go through one `byRelease`, because there are two
 of them and they must not drift apart on the awkward case. **`releaseDate` is
@@ -7881,6 +7886,61 @@ Path (100–110), and neither has relics of its own, so `EVENT_BOUNTIES` needs n
 new key. With the fix, a fully first-party build reports *"limited-time events
 running — Ghoul Purge, Plague Star"*, all 26 relics become reachable, and the
 row carries **"Plague Star is running until 2026-09-23."**
+
+### The sort splits into a grouping switch and an ordering, and gains a third bulk button
+
+**Owner's request, 2026-09-09.** The collection page's Sort was one `<select>`
+naming both the grouping and the ordering — *Category then release date*, *Name
+(A–Z)*, *Availability*, *Newest release*. It is now a **Group by category**
+checkbox above a two-entry list, *Release date* and *Parts remaining*, which is
+the same four arrangements the owner asked for written as 2×2.
+
+**Why the checkbox rather than four lines**, since the owner offered both: every
+ordering added to a flat list costs *two* entries, and each one has to be worded
+to say whether it groups. The four they listed were already two of those pairs.
+Composed rather than enumerated in the code too — `ordering()` puts the category
+term in front of whichever comparator is chosen, so the grouped and ungrouped
+forms of a sort cannot drift apart.
+
+**Name and Availability were dropped**, on the owner's decision when asked.
+Name's job is looking one Prime up and the search box does that better, matching
+parts and relic names as well. Availability is still visible as badges and as
+the sidebar's own filters.
+
+**`Parts remaining` is ascending — closest to finished first** — because that is
+the question it is asked. Fully complete items therefore lead, which sounds
+wrong and is not: in the shipped default `showCollected` is off, so they are not
+on screen at all, and the ones that *are* at zero are one button from being
+claimed. It reads `partsDone`, the same count the card prints, so the sort and
+the `3/4` on the card cannot disagree.
+
+**It also broke an invariant that had held since the grid existed, and the
+comment that stated it.** `refreshCard` patched a single card in place and said
+*"nothing a part tick changes affects the sort, so a card that stays never
+moves"* — true of every ordering there had ever been, and false the moment an
+ordering read progress. Ticking under *Parts remaining* left the grid silently
+out of order until the next filter change or reload. **A sort is a promise about
+the whole list, not a label on the control that set it**, so that ordering now
+falls back to a full render. It was the new page test that caught this, not
+review: the assertion was that a claimed item moves up, and it did not move at
+all.
+
+**A saved sort from before the split is translated, not dropped.** `cat` becomes
+grouped + release and `release` becomes ungrouped + release, which is exactly
+what each meant; `name` and `status` have no honest equivalent and fall to the
+default. Dropping them silently would reorder a reader's list with nothing to
+explain why.
+
+**The third bulk button is *Mark shown as wanted***, the farm list's counterpart
+to *Mark shown as collected* — the collection page reaching across to the
+planner, which is what the per-card crosshair already does one at a time. It
+skips items with no parts, because those have no crosshair either: there is
+nothing to farm, and the planner could rank no places for them.
+
+**And *Unmark shown* now clears the want as well as the claim and the parts**,
+at the owner's direction. It is the undo for both buttons beside it, and without
+the third slice a reader who wanted a screenful and changed their mind had no
+way back but forty clicks.
 
 ---
 

@@ -238,14 +238,21 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 
 - **Search box** at the top — type a Prime, a part, or a relic name. Press `/` to jump to it.
 - **Category** in the sidebar — Warframe, Primary, Secondary, Melee, and so on.
-- **Sort** in the sidebar — four orders, and the page remembers which one you picked:
+- **Sort** in the sidebar — a **Group by category** tick and two orders, giving
+  four arrangements between them. The page remembers both:
 
 | | Order |
 |---|---|
-| **Category, then release date** | The default. Grouped by Warframe, Primary and so on, newest Prime first inside each group — so what has come out lately is at the top of every section |
-| **Name (A–Z)** | One flat alphabetical list, for looking a particular Prime up |
-| **Availability** | Farmable now first, Founder exclusive last — the same order the badges use |
-| **Newest release** | One flat list, newest first, ignoring category |
+| **Release date** | Newest Prime first, so what has come out lately is at the top |
+| **Parts remaining** | Fewest parts still to find first — what you are closest to finishing |
+
+  Leave **Group by category** ticked and each of those runs inside Warframe,
+  Primary, Secondary and so on, with a progress count on every heading. Untick
+  it and the whole catalogue is one list. Ticked, on release date, is the
+  default.
+
+  To look one Prime up, use the search box rather than the sort — it matches
+  parts and relic names too.
 
 - **Availability** in the sidebar — six groups you can switch on and off:
 
@@ -283,8 +290,14 @@ each category heading shows its own count.
 (Unticking **Show not collected** does the opposite — handy for reviewing your
 collection.)
 
-The **Mark shown as collected** button applies to everything currently on screen,
-so you can filter to a category first and tick it off in one go.
+Three buttons apply to **everything currently on screen**, so you can filter to a
+category first and act on the lot in one go:
+
+| Button | What it does |
+|---|---|
+| **Mark shown as collected** | Claims every Prime shown, and fills in all their parts |
+| **Mark shown as wanted** | Puts every Prime shown on the farm list, so the planner starts ranking places to get them |
+| **Unmark shown** | The undo for both — clears the claim, the parts, and the farm list |
 
 ### Finding where to farm something
 
