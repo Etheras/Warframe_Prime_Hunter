@@ -7625,6 +7625,73 @@ now rejects a row whose tag names a *different* event, so a Ghoul bounty can no
 longer be read as a Plague Star one by keyword. The scan stays for anything
 untagged, which is how the next one gets captured.
 
+### The cadence is the bounty rotation, and CI stops asking a host that refuses it
+
+Two changes on 2026-09-09, from one measurement pass. Both are hard rule 11 —
+*ask no more often than the source says to* — applied to ourselves rather than
+to a header.
+
+**Digital Extremes are not refusing us at random times; they are refusing the
+address.** Across 181 deployed builds in 24 hours DE answered **11, or 6.1%**.
+The successes landed in **ten separate hours**, against 9.0 expected from pure
+scatter, and **no run was longer than one** — never twice in a row, not once.
+That is the signature of a per-run IP lottery: GitHub hands each run an address
+from a large pool and a little of it is outside Akamai's blocked ranges. **There
+is no window that works**, so a schedule built on "ask in the good window" would
+have been a 6% coin flip dressed as a strategy. Recorded because it is exactly
+the kind of thing that gets assumed and never measured.
+
+So the light CI build passes `--no-first-party` and does not ask at all: it
+starts at the WFCD proxy, which answers a datacentre. That is ~166 requests a day
+no longer spent on an endpoint that refuses nearly all of them. **The daily full
+build still asks, once** — that single request is the canary for whether the
+block has lifted, and `data/feed-log.json` records the answer. Losing it would
+mean never finding out.
+
+Two details that matter more than the flag. It reads **no cached copy** when it
+declines to ask: letting DE's last answer flow on would have `meta.feeds` report
+`worldstate` for a document nobody requested, which is a false provenance claim,
+and in `upstream_signature` it is worse — a reused worldstate's `Expiry` cannot
+have moved, so the fingerprint would match its own previous value and the rebuild
+that was due would not happen. That is the 2026-09-04 bug exactly. And the
+politeness is real rather than notional: **a light build from the owner's machine
+is two requests, both first party, both 200**; the same build with
+`--no-first-party` is three, none of them to a host that has said no.
+
+**The refresh cadence went from ten minutes to 150, and 150 is not a round
+number — it is the bounty rotation.** All three boards share one clock: measured
+2026-09-09, Cetus, Solaris and Entrati carried *identical* activation and expiry,
+`05:50:17 → 08:20:16 → 10:50:15`. What the landscapes differ in is their
+environmental cycle, not their bounty board.
+
+Ten minutes had one stated reason and it expired the day before: fissures. Since
+2026-09-08 the page polls WFCD for them itself, so **nothing in the payload needs
+ten-minute granularity any more** — the rotation letter advances on the reader's
+own clock in `walkFrom`, DE publish this window *and the next*, and Baro, Varzia
+and Resurgence all ship as windows compared against the reader's clock.
+
+**Alignment is possible in one place and impossible in the other, and that split
+decides which scheduler leads.** A day is 1440 minutes and `1440 mod 150 = 90`,
+so the boundary slides 90 minutes daily and repeats only every fifth day: **no
+hour:minute pair in cron can name it.** A Windows repeating task started once on
+a boundary can, and never drifts. So `tools/schedule.{ps1,sh}` default to 150 and
+are the aligned runner; the CI cron becomes a **backstop** at `25 */3 * * *`,
+three hours rather than two so it cannot fire twice inside one window, at :25
+because boundaries fall on :20 and :50.
+
+**The banner needed no adjustment, and that was checked rather than assumed.**
+None of `staleNotice`'s five conditions is tied to the build interval; the "old
+copy" threshold is 14 days, which is 134 times the new cadence; and
+`de_worldstate` no longer enters `meta.stale` at all, because it is *not asked*
+rather than asked-and-reused. Verified on a `--no-first-party` build: `stale` and
+`degraded` both `[]`, `feeds` all `proxy`.
+
+**What it costs, stated plainly:** the fallback fissure list in
+`data/fissures.json` is now up to 150 minutes old, so if WFCD are unreachable a
+reader may see few fissures or none. It can only ever under-report — every entry
+carries its own expiry and the page drops the expired — so the failure is a
+thinner list, never a wrong one.
+
 ### The Ghoul Purge entry, in both shapes, captured 2026-09-09
 
 `maximumScore`, `interimSteps` and `rewards[]` are read and dropped; nothing in

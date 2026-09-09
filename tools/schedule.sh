@@ -38,7 +38,12 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd -P)
 
 EVERY=0            # hours; 0 means "not given", so the minute cadence stands
-EVERY_MIN=10
+# 150 — the bounty rotation itself. All three boards share one clock and turn
+# over together every 150 minutes, so a repeating job started on a boundary
+# stays on it. Was 10 until 2026-09-09, for a fissure-freshness reason that
+# expired the day before when the page began polling WFCD live. schedule.ps1
+# carries the full argument beside its own default; keep the two the same.
+EVERY_MIN=150
 # :32, not :30, so the ten-minute grid lands at 2-59/10 rather than on the hour.
 # The offset is load-bearing and the reasoning is in schedule.ps1's .DESCRIPTION:
 # every boundary this dataset names falls on a UTC hour, DE regenerate the

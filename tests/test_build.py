@@ -1094,9 +1094,20 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
         check("schedule: registering the task exits 0", made.returncode, 0,
               (made.stderr or made.stdout)[-400:])
         interval, _, duration = read().partition("|")
-        check("schedule: it repeats every ten minutes, as the default says",
-              interval, "PT10M",
-              "the fissure list is the reason for the cadence; it lasts an hour or two")
+        # Read from the script rather than restated here. This asserted the
+        # literal `PT10M` until 2026-09-09 and so failed the moment the default
+        # moved, which tests the number instead of the property — the property
+        # is that what the script *says* its default is, is what Task Scheduler
+        # actually stored. A second copy of a default is how the two drift.
+        want = re.search(r"\$EveryMinutes\s*=\s*(\d+)",
+                         read_text(os.path.join(ROOT, "tools", "schedule.ps1")))
+        check_true("schedule: the script's default interval is findable", bool(want))
+        every = int(want.group(1)) if want else -1
+        iso = (f"PT{every}M" if every < 60 else
+               f"PT{every // 60}H" + (f"{every % 60}M" if every % 60 else ""))
+        check("schedule: it repeats on the interval the default declares",
+              interval, iso,
+              f"the script says {every} minutes; Task Scheduler stored {interval!r}")
         check("schedule: with no duration, which is how it means indefinitely",
               duration, "",
               "a bounded duration registers fine and then stops refreshing")
@@ -3984,13 +3995,23 @@ def test_the_full_build_matches_a_schedule_that_exists() -> None:
           f"comparing against a schedule that does not exist silently becomes a "
           f"light build")
 
-    # And the converse is deliberately NOT asserted: the ten-minute cron is a
+    # And the converse is deliberately NOT asserted: the light cron is a
     # schedule the expression must *not* name, so "every schedule is named" would
     # be exactly backwards.
-    check_true("FULL: the light schedule is left unnamed, on purpose",
-               "*/10 * * * *" in scheduled and "*/10 * * * *" not in named,
-               "naming it would give the ten-minute run the full fetch, which is "
-               "what hard rule 11 forbids")
+    #
+    # Found by shape rather than by literal. This pinned the string
+    # `*/10 * * * *` until 2026-09-09 and so failed the moment the cadence
+    # changed — which is a test about a number, not about the property. The
+    # property is that a recurring cron exists and the FULL expression does not
+    # claim it.
+    light = {c for c in scheduled if re.fullmatch(r"\d+ \*/\d+ \* \* \*", c)
+             or c.startswith("*/")}
+    check_true("FULL: there is a light schedule to leave unnamed",
+               bool(light), f"crons found: {sorted(scheduled)}")
+    check("FULL: the light schedule is left unnamed, on purpose",
+          sorted(light & named), [],
+          "naming it would give the frequent run the full fetch, which is "
+          "what hard rule 11 forbids")
 
 
 def test_no_workflow_expression_is_pasted_into_a_shell() -> None:
@@ -4422,35 +4443,58 @@ def test_the_schedulers_outpace_the_banner_they_prevent() -> None:
                0 < polled <= DISCOVERY_CEILING_MIN,
                f"polling every {polled} min against a {DISCOVERY_CEILING_MIN} min "
                f"ceiling means the page is the slow part")
-    check_true("schedule: the local job is well inside a fissure's life",
-               0 < mins <= DISCOVERY_CEILING_MIN,
-               "a fissure runs an hour or two; refreshing slower than that shows none")
+    # **The build no longer gates fissure discovery, and this test used to
+    # assume it did.** Since 2026-09-08 the page reads WFCD's fissure feed
+    # itself, every two minutes, in the reader's own browser — so what a reader
+    # waits for is the poll above, not the build. The build's list is the
+    # fallback for when that feed cannot be reached.
+    #
+    # So the cadence is judged against what it still gates, below, and the
+    # ceiling is applied to the poll. Asserting it against the build interval
+    # would fail a 150-minute cadence for a latency the reader does not have.
+    check_true("schedule: the build's list is a fallback, not the live path",
+               "LIVE_FISSURES" in shared and "watchFissures" in shared,
+               "if the page stops polling for itself, the build interval is "
+               "back on the critical path and this ceiling applies to it again")
 
     # The third scheduler, and the one that reaches anybody who is not running
     # this locally. Same job, same reason, and it drifts the same way if nobody
     # checks: the published site rebuilt once a day always shows no fissures.
     flow = read_text(os.path.join(ROOT, ".github", "workflows", "publish.yml"))
     crons = re.findall(r'- cron: "(.+?)"', flow)
-    step = re.search(r"(?m)^\s*- cron: \"\*/(\d+) \* \* \* \*\"", flow)
-    check_true("schedule: the published site has a short-interval refresh too",
-               bool(step), f"crons found: {crons}")
-    ci = int(step.group(1)) if step else -1
+    check_true("schedule: the published site has a recurring refresh too",
+               len(crons) >= 2, f"crons found: {crons}")
 
-    # The sum, which is the thing a reader actually experiences. Two of them,
-    # because there are two audiences: the deployed site and somebody running
-    # this locally, and each has its own build interval feeding the same poll.
-    check_true("schedule: a change upstream reaches a deployed reader in time",
-               0 < ci + polled <= DISCOVERY_CEILING_MIN,
-               f"CI every {ci} min plus a {polled} min page poll is "
-               f"{ci + polled} min worst case, against a ceiling of "
-               f"{DISCOVERY_CEILING_MIN} — half the shortest fissure life")
-    check_true("schedule: and reaches a local reader in time too",
-               0 < mins + polled <= DISCOVERY_CEILING_MIN,
-               f"local job every {mins} min plus a {polled} min poll is "
-               f"{mins + polled} min worst case")
+    # **The local job is the aligned one; CI is the backstop.** All three bounty
+    # boards share one 150-minute clock (measured 2026-09-09: 05:50:17 ->
+    # 08:20:16 -> 10:50:15), and 1440 mod 150 is 90 — so the boundary slides 90
+    # minutes a day and repeats only every fifth day. No hour:minute pair in
+    # cron can name it; a repeating task started on a boundary can, and stays
+    # aligned forever. That is why the two schedulers are allowed to differ
+    # here, where every earlier version of this test insisted they match.
+    check("schedule: the local cadence is the bounty window itself", mins, 150,
+          "all three boards rotate together every 150 minutes; a local task "
+          "started on a boundary at that interval never drifts off it")
+    hourly = [c for c in crons if re.fullmatch(r"\d+ \*/(\d+) \* \* \*", c)]
+    check_true("schedule: CI carries a recurring light build as the backstop",
+               bool(hourly), f"crons found: {crons}")
+    ci = int(re.fullmatch(r"\d+ \*/(\d+) \* \* \*", hourly[0]).group(1)) * 60 \
+        if hourly else -1
+    check_true("schedule: the backstop cannot fire twice inside one window",
+               0 < ci >= 150,
+               f"a {ci}-minute backstop inside a 150-minute rotation would "
+               "publish the same window twice for no reader benefit")
+    # Its start minute, for the same reason the local one has a phase: the
+    # boundaries land on :20 and :50, and DE regenerate the worldstate every
+    # 60 seconds, so a read ON a boundary usually carries the stamp before it.
+    start = int(hourly[0].split()[0]) if hourly else -1
+    check_true("schedule: the backstop does not read on a boundary minute",
+               start % 30 >= 2,
+               f"starting at :{start:02d} reads within a minute of a :20/:50 "
+               "rotation boundary, which is when the worldstate is least settled")
     check_true("schedule: the daily full build is still there",
-               any(not c.startswith("*/") for c in crons),
-               "the ten-minute run takes its heavy sources from the cache, so "
+               any(not re.fullmatch(r"\d+ \*/\d+ \* \* \*", c) for c in crons),
+               "the light run takes its heavy sources from the cache, so "
                "something has to fill that cache")
     # The whole point of the short run is that it does NOT re-download the wiki,
     # the drop tables and DE's export 144 times a day.

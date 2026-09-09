@@ -77,8 +77,25 @@ param(
     # the endpoint would survive it, but nothing in the data changes that fast -
     # a fissure lasts an hour or two - so anything under five is cost with no
     # answer attached.
+    # 150, because that is the bounty rotation itself. All three boards -
+    # Cetus, Solaris and Entrati - share one clock and turn over together every
+    # 150 minutes; measured 2026-09-09, DE published 05:50:17 -> 08:20:16 ->
+    # 10:50:15 with identical activation and expiry on all three.
+    #
+    # A repeating task at this interval, started once on a boundary, stays on
+    # the boundary forever. That is the whole reason the local task rather than
+    # CI is the aligned runner: a day is 1440 minutes and 1440 mod 150 is 90, so
+    # the boundary slides 90 minutes a day and repeats only every fifth day -
+    # there is no hour:minute pair a cron could name.
+    #
+    # It was 10 until 2026-09-09, for a reason that expired a day earlier: the
+    # Void Fissures, which the page has read live from WFCD every two minutes
+    # since 2026-09-08. Nothing left in the payload needs ten-minute
+    # granularity - the rotation letter advances on the reader's own clock in
+    # `walkFrom`, DE publish this window AND the next, and Baro, Varzia and
+    # Resurgence all ship as windows the page compares against its own clock.
     [ValidateRange(5, 1440)]
-    [int]$EveryMinutes = 10,
+    [int]$EveryMinutes = 150,
     # Kept for anyone who set it before, and for anyone who wants the old
     # cadence back. Zero means "not given", since PowerShell has no way to ask
     # whether an int parameter was bound without inspecting $PSBoundParameters.

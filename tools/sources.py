@@ -221,6 +221,29 @@ STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 # a threshold that must agree is a drift generator. `build_data` imports it.
 WORLDSTATE_MAX_AGE = 15 * 60
 
+# Whether this build may ask Digital Extremes for the worldstate at all.
+#
+# **Not a performance switch — a politeness one, and it is address-shaped.**
+# DE sit behind Akamai, which refuses whole datacentre ranges. Measured from the
+# deployed feed log over 181 builds on 2026-09-09: DE answered **11, or 6.1%**,
+# and the successes were scattered across ten separate hours with no run longer
+# than one. That is a per-run IP lottery — GitHub hands each run an address from
+# a large pool and a little of it is unblocked — and emphatically **not** a time
+# of day that works. A schedule built on "ask in the good window" would be a 6%
+# coin flip wearing a strategy's clothes.
+#
+# So a runner that has been refused 94% of the time should stop asking 144 times
+# a day. `--no-first-party` sets this False and the worldstate step is skipped
+# outright, going straight to the WFCD proxy that answers from a datacentre.
+#
+# **The daily full build still asks**, once, and that single request is the
+# point: it is a canary for whether the block has lifted, and `data/feed-log.json`
+# records the answer. Losing that would mean never finding out.
+#
+# Left True everywhere else, because from the owner's own machine DE answer
+# every time — a light build there is two requests, both first party, both 200.
+ASK_FIRST_PARTY = True
+
 
 
 # --------------------------------------------------------------------------
@@ -696,9 +719,18 @@ def upstream_signature(offline: bool = False, readonly: bool = False) -> dict:
     # a copy. Fissures were unaffected and that is the tell — the light build
     # fetches them live either way, so only the trader data lagged.
     expiry, whence = None, None
+    doc = None
     try:
-        doc = fetch_json(WORLDSTATE, "de_worldstate", offline,
-                         critical=False, optional=True, readonly=readonly)
+        # Skipped outright when this address is refused, rather than falling
+        # back to the cached copy — and here that matters more than it does for
+        # the feeds. A reused worldstate's `Expiry` **cannot have moved**, so
+        # the fingerprint would match its own previous value, `--if-changed`
+        # would conclude nothing had changed, and the rebuild that was due would
+        # not happen. That is the 2026-09-04 bug exactly, and reading a cache we
+        # chose not to refresh would walk straight back into it.
+        if ASK_FIRST_PARTY:
+            doc = fetch_json(WORLDSTATE, "de_worldstate", offline,
+                             critical=False, optional=True, readonly=readonly)
         # Judged on the **content**, not on the transport, exactly as the build
         # judges it: `de_worldstate` in STALE means the refresh failed, and a
         # `Time` older than the ceiling means an edge cache served us an old

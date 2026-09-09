@@ -56,19 +56,44 @@ on:
     # over the hours after a patch - a daily cadence suits that, and the hour
     # does not change it.
     - cron: "5 18 * * *"
-    # Every ten minutes — the LIGHT build, for the one source with an hour to
-    # live. Void Fissures move every hour or two and the pages only ever show
-    # ones that have not expired, so a site rebuilt once a day always shows
-    # none. This run takes the heavy sources from the restored cache and fetches
-    # only what has actually moved (see `--if-changed` below), so it does not
-    # re-download the wiki, the drop tables or DE's export every ten minutes.
+    # The LIGHT build, and since 2026-09-09 a **backstop** rather than the
+    # rhythm. It was `*/10` for one stated reason — "the one source with an hour
+    # to live", the Void Fissures — and that reason expired on 2026-09-08 when
+    # the page started reading the fissure feed itself, every two minutes, in
+    # the reader's own browser. The comment outlived the design by a day.
     #
-    # Two things worth knowing before changing this number. GitHub schedules are
-    # best effort — five minutes is the documented floor, runs are queued and
-    # can be delayed or dropped entirely under load, so ten minutes is a target
-    # rather than a guarantee. And Pages allows on the order of ten deployments
-    # an hour; six is comfortably inside that, three-minute polling would not be.
-    - cron: "*/10 * * * *"
+    # **Nothing left in the payload needs ten-minute granularity**, and that is
+    # measured rather than assumed:
+    #
+    #   * the bounty rotation LETTER advances on the reader's own clock —
+    #     `walkFrom` in rotation.js steps the sequence forward from the last
+    #     published window, indefinitely, so its correctness does not decay;
+    #   * DE publish **this window and the next**, so even without that a build
+    #     names the right rotation for 2.5 hours after it is made;
+    #   * Baro, Varzia and Prime Resurgence all ship as *windows* the page
+    #     compares against its own clock, and all three turn over fortnightly;
+    #   * fissures are read live, per above.
+    #
+    # **The real rhythm is 150 minutes and it cannot be written here.** All three
+    # bounty boards — Cetus, Solaris and Entrati — share one clock and rotate at
+    # the same instant, measured 2026-09-09: 05:50:17 -> 08:20:16 -> 10:50:15.
+    # A day is 1440 minutes and 1440 mod 150 is 90, so the boundary slides 90
+    # minutes later every day and repeats only every fifth day. No hour:minute
+    # pair in cron can name it. `tools/schedule.ps1` can, because a repeating
+    # task started on a boundary at a 150-minute interval stays aligned forever
+    # — so the aligned runner is the local one, and this is what covers the
+    # hours the owner's machine is off.
+    #
+    # Every three hours, at :25. Three rather than two so a run cannot land
+    # twice inside one 150-minute window, and :25 because boundaries fall on :20
+    # and :50 — five minutes past keeps the read clear of DE's own 60-second
+    # regeneration, the same 2x margin the daily build uses.
+    #
+    # GitHub schedules are best effort — five minutes is the documented floor,
+    # runs are queued and can be delayed or dropped entirely under load — which
+    # is another argument for the local task owning the cadence and this owning
+    # the floor.
+    - cron: "25 */3 * * *"
   workflow_dispatch:        # run it by hand from the Actions tab
     inputs:
       full:
@@ -248,9 +273,18 @@ jobs:
       #
       # A cold cache falls through to a full build, which is the right failure:
       # slower, never thinner.
+      #
+      # `--no-first-party` since 2026-09-09. Digital Extremes sit behind Akamai,
+      # which refuses whole datacentre ranges: measured across 181 deployed
+      # builds, DE answered **11 of them, 6.1%**, scattered over ten separate
+      # hours with no two in a row. That is a per-run IP lottery, not a window
+      # that works, so asking on every light run spent ~166 requests a day on an
+      # endpoint that refuses nearly all of them. The daily FULL build above
+      # still asks, once, and that one request is the canary for whether the
+      # block has lifted — `data/feed-log.json` records the answer.
       - name: Refresh the fissure list and rebuild from cache
         if: env.FULL != 'true'
-        run: python tools/build_data.py --if-changed
+        run: python tools/build_data.py --if-changed --no-first-party
 
       - name: Sanity-check the result
         run: |

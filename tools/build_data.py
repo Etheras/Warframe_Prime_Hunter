@@ -1295,8 +1295,17 @@ def main() -> int:
     ap.add_argument("--allow-degraded", action="store_true",
                     help="publish even if a source was unreachable with nothing cached "
                          "(default: refuse, so a cold failure never silently thins the site)")
+    ap.add_argument("--no-first-party", action="store_true",
+                    help="do not ask Digital Extremes for the worldstate; go "
+                         "straight to the WFCD proxy. For addresses DE refuse "
+                         "(their edge blocks datacentre ranges) - see "
+                         "ASK_FIRST_PARTY in tools/sources.py")
     args = ap.parse_args()
     off = args.offline
+    # One flag, two readers: the feed fetch below and `upstream_signature`,
+    # which asks the same question about the same document. A second copy of
+    # this decision is how the fingerprint and the feeds disagreed once before.
+    sources.ASK_FIRST_PARTY = not args.no_first_party
 
     print("Warframe Prime Hunter data build")
     print("-" * 60)
@@ -1343,9 +1352,24 @@ def main() -> int:
     # One document, several feeds. DE publish the whole worldstate in one place
     # and regenerate it every 60 seconds, so it is fetched once here and read by
     # everything below that used to have its own endpoint on the proxy.
-    log("worldstate: Digital Extremes' live worldstate")
-    worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
-                            critical=False, optional=True, max_age=3 * 3600)
+    # `--no-first-party` reads the cached copy and sends nothing. Not an
+    # optimisation: this address has been refused 94% of the time, and asking
+    # anyway 144 times a day is what hard rule 11 exists to stop. `sources.py`
+    # has the measurement beside `ASK_FIRST_PARTY`. The chain below then starts
+    # at WFCD, which answers a datacentre.
+    if sources.ASK_FIRST_PARTY:
+        log("worldstate: Digital Extremes' live worldstate")
+        worldstate = fetch_json(WORLDSTATE, "de_worldstate", args.offline,
+                                critical=False, optional=True, max_age=3 * 3600)
+    else:
+        # `None`, not the cached copy. Reading DE's last answer here and letting
+        # it flow on would have `meta.feeds` report `worldstate` for a document
+        # nobody asked for this build — presenting a reused copy as a
+        # first-party one, which is the exact trap `from_chain` was written to
+        # close. The content check on `Time` would usually catch it; "usually"
+        # is not the standard for a provenance claim. Start at WFCD instead.
+        log("worldstate: not asked - this address is refused; starting at WFCD")
+        worldstate = None
 
     # ── the source chain, and it is the same for every live feed ──────
     #

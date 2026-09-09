@@ -611,40 +611,44 @@ Right-click `tools\schedule.ps1` → **Run with PowerShell**, or run this in a t
 powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
 ```
 
-That sets up a Windows scheduled task that checks **every ten minutes**, and it
+That sets up a Windows scheduled task that checks **every 150 minutes**, and it
 runs with **no window** — it is hosted by `conhost --headless`, so nothing
 appears or takes focus while you are working. When
-nothing has changed it sends four small requests — each one asking only for what it
+nothing has changed it sends two small requests — each one asking only for what it
 does not already have, so the usual answer is "nothing new" and no data at all —
 then rebuilds from what is on disk in about a second and a half. A full download
 only happens when Digital Extremes actually publish something.
 
-**Ten minutes was for the fissures, and since 2026-09-08 it no longer has to be.**
-The page asks for the live fissure list itself every two minutes while it is
+**Why 150 minutes, and not a round number.** It is the bounty rotation itself.
+All three bounty boards — Cetus, Orb Vallis and Deimos — share one clock and turn
+over together every two and a half hours; measured on 2026-09-09, Digital
+Extremes published `05:50:17 → 08:20:16 → 10:50:15` with identical windows on all
+three. A repeating task on that interval, started once on a boundary, stays on
+the boundary indefinitely. So the refresh lands just after each rotation instead
+of somewhere random inside it.
+
+**It used to be ten minutes, and that was for the fissures.** Since 2026-09-08
+the page asks for the live fissure list itself every two minutes while it is
 open, so the badges are current whatever this task is doing — see *Fissures look
-after themselves* above. What the task still refreshes is everything else: a new
-Prime, a vault rotation, Baro's shelf, Prime Resurgence. Those move a few times a
-year, so **daily is a perfectly reasonable setting now** (`-EveryHours 24`), and
-ten minutes is a cheap habit rather than a requirement.
+after themselves* above. That removed the only thing that needed ten-minute
+granularity. Nothing else comes close: the bounty rotation *letter* advances on
+your own computer's clock, Digital Extremes publish this window **and the next**,
+and Baro, Varzia and Prime Resurgence all arrive as date ranges the page compares
+against the clock. So a slower task cannot make any of them wrong.
 
-It stays the default for one reason: the file the task writes is what the page
-falls back to when it cannot reach WFCD, and a fallback that is ten minutes old
-is worth more than one that is a day old. That is well inside what the source
-asks for either way — the fissure list is served with a two-minute cache lifetime
-of its own, so this asks five times *less* often than the API is happy to answer,
-and asks conditionally on top of that.
+**Daily is still a perfectly reasonable setting** (`-EveryHours 24`) if you would
+rather ask even less. The only thing you lose is the freshness of the fallback
+fissure list — the file the page uses when it cannot reach WFCD — and that
+fallback can only ever *under*-report, never show a fissure that is not running.
 
-The task runs at **two minutes past** each ten-minute mark rather than on it, and
-that is on purpose. The things that change on a schedule in this game change on
-the hour — Prime Resurgence rotations turn over at 18:00 UTC, Baro arrives and
-leaves at 13:00 UTC — while Digital Extremes rebuild the live world state once a
-minute. A check that ran exactly on the hour would usually be reading the state
-from *just before* the turnover, and would then show the old one for another ten
-minutes. Two minutes past clears that with room to spare, and costs nothing.
+The task runs a few minutes **past** the boundary rather than on it, and that is
+on purpose. Digital Extremes rebuild the live world state once a minute, so a
+check that ran exactly on a turnover would usually be reading the state from just
+before it. A few minutes past clears that with room to spare, and costs nothing.
 
-While the page is open it re-reads the fissure list on the same ten minutes, from
-this site and nowhere else, so a tab you left open in the morning is still right
-after lunch without a reload.
+While the page is open it re-reads the fissure list every two minutes, from this
+site and nowhere else, so a tab you left open in the morning is still right after
+lunch without a reload.
 
 **On a laptop it now runs on battery too.** Windows' own default for a scheduled
 task is to skip it whenever the machine is unplugged, and to kill it if the
