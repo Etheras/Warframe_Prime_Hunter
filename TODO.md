@@ -2225,40 +2225,35 @@ the two fields we read*). A node could say **"asks MR5"** the same way it says
 **"Railjack"**, shown only when the player's rank is below it. The rank is now on
 hand to do it; nothing reads it yet.
 
-### The event detection: both events now seen, and one part still open
+### The syndicate half of the event detector cannot fire when DE answer
 
-**The observation this entry existed for is done, and the entry should probably
-go.** Rule at the top of this file says delete a shipped entry rather than tick
-it, and most of what is below has shipped — but it is ~10 KB of reasoning with
-one genuinely open finding buried in it (the syndicate half, marked below), so
-the deletion is left to the owner rather than taken. **Read the two capture
-sections in `PROJECT.md §7` first; they supersede most of what follows.**
+**Kept because it is not finished.** Both relic-bearing events have now been
+seen running and the `Goals` half is done — Ghoul Purge on the morning of
+2026-09-09, Plague Star at **15:00:00Z** the same afternoon, six hours after the
+morning's audit checked and correctly found it absent. Both captures are in
+`PROJECT.md §7` and supersede most of the history below. **What is still open is
+the second half of `find_live_events`, described under its own bold heading
+further down.**
 
-**Both relic-bearing events have now been seen running.** Ghoul Purge on
-2026-09-09 morning, Plague Star the same afternoon — it opened at **15:00:00Z**,
-six hours after the morning's audit checked and correctly found it absent.
+**What Plague Star cost on the way, since it changed the shape of the risk.**
+Its tag is `InfestedPlains`, not the `PlagueStar` every fixture had guessed from
+DE's cosmetics. So the keyword scan — the mechanism whose whole job is catching
+an event nobody has seen — returned "not running" on the first-party route, and
+the event was found only through WFCD's prose `description`. **It was detected
+on exactly the builds where DE had refused us, and missed on the ones where they
+answered.** Fixed two ways: the observed tag is in `EVENT_TAGS`, and
+`_goal_marks` scans the `Icon`, `InstructionalItem` and job `rewards` paths,
+where DE do print `PlagueStar`.
 
-**What Plague Star cost, and it was not nothing.** Its tag is `InfestedPlains`,
-not the `PlagueStar` every fixture had guessed from DE's cosmetics. So the
-keyword scan — the mechanism whose whole job is catching an event nobody has
-seen — returned "not running" on the first-party route, and the event was found
-only through WFCD's prose `description`. **It was detected on exactly the builds
-where DE had refused us, and missed on the ones where they answered**, which is
-why the deployed site looked correct all afternoon. Fixed two ways: the observed
-tag is now in `EVENT_TAGS`, and `_goal_marks` scans the `Icon`,
-`InstructionalItem` and job `rewards` paths, where DE do print `PlagueStar`.
-`PROJECT.md §7` has the whole entry in both shapes and the verification.
+That is the part that is done. It is written here rather than only in
+`PROJECT.md` because it is the reason to distrust the remaining half: **the scan
+has now been observed failing on a real event**, so "the syndicate path is a
+harmless second net" is no longer an assumption anyone should carry into the
+decision below.
 
-**Still open, and it is the sub-finding below rather than this heading:** the
-syndicate half of `find_live_events` cannot fire when DE answer, because the
-field it scans holds the mapped faction name. It is a behaviour change, so it is
-the owner's call. It also matters less than it looks — Plague Star's bounty
-comes from Ostrons on the ordinary Cetus board, and `Goals` is the whole
-detector for it, which the capture above confirms.
-
-**The Ghoul half has, and it worked — 2026-09-09.** This entry was titled *"The
+**The Ghoul Purge, walked end to end — 2026-09-09.** This entry was titled *"The
 Ghoul and Plague Star detection has never seen a live event"* until the audit
-that afternoon, which is a sentence that had stopped being true. A Ghoul Purge
+that morning, which is a sentence that had stopped being true. A Ghoul Purge
 was live (`GhoulEmergence`, 2026-09-08T17:49Z → 2026-09-29T17:49Z) and the whole
 chain was walked against it rather than reasoned about: DE's `Goals` →
 `events_from_worldstate` → `find_live_events` caught it on the scan and recorded
@@ -2268,41 +2263,32 @@ planner rendered both rows, at ranks 83 and 84 of 116, each with the tooltip lin
 **"Ghoul Purge is running until 2026-09-29."** That is the design working
 end to end, on a real event, for the first time since it shipped on 2026-08-12.
 
-**Plague Star had not opened as of 2026-09-09T13:10Z**, its announced day — no
-`Goals` entry, no `InfestedPlains` or `Hemocyte` string anywhere in the
-worldstate, and the Cetus board carrying only the ordinary Ostron and Narmer
-jobs. The only mention is the news item in `Events[]`, dated 2026-09-02 with an
-`EventEndDate` of 2026-09-23 and **no start date**, which is precisely the trap
-`CLAUDE.md` names — `Events` is the news feed and `Goals` is the game. Both live
-Goals that day activated between 16:00Z and 17:49Z, so the announced day was not
-yet the announced hour when this was checked.
+**A prediction made here that morning was wrong, and it is left in as the
+warning it turned out to be.** The audit argued the scan would survive an
+unobserved Plague Star, because `PlagueStar` appears in four cached first-party
+sources — the glyph, the clan badge and the player icon in `ExportManifest`, and
+the same paths through `api_items` — while `InfestedPlains` appeared in none of
+them. The inference was that DE's own spelling was the one `plague\s*star`
+matches. **Six hours later the event opened and the tag was `InfestedPlains`.**
 
-**What the audit could settle without the event, and it is the tag worry.** The
-instruction below is *do not guess the tag* — right, and unchanged. But the
-scan has to survive until the tag is known, and whether it does turns entirely
-on how DE spell it. That is measurable today from DE's own manifests, and was:
-**`PlagueStar` appears in four cached first-party sources** —
-`/Lotus/Types/StoreItems/AvatarImages/Events/PlagueStarGlyph`,
-`/Lotus/Upgrades/Skins/Clan/PlagueStarBadgeItem`,
-`/Lotus/Interface/Icons/Player/PlagueStar.png` in `ExportManifest`, and the same
-paths through `api_items` — while **`InfestedPlains` appears in none of them.**
-So DE's own internal spelling for this event is the one `plague\s*star` matches
-with `\s*` taking zero characters, which is the piece of luck this entry already
-flags. Confirmed by running the real `find_live_events` over the real live
-worldstate with a synthetic Goal appended in DE's own `Goals` shape: with
-`Tag: "PlagueStar"` the window reaches `meta.bounties.events` intact; with
-`Tag: "InfestedPlains"` and no "plague" anywhere it is silently not detected.
+The manifests were not wrong; they were the wrong evidence. `PlagueStar` is what
+DE call the **cosmetics**, and the reasoning silently assumed one internal name
+per event. There is no such rule — the badge and the goal are named by different
+teams for different purposes, and only the goal is what the detector reads.
+**A measurement of a nearby thing is not a measurement of the thing**, and the
+tell was available: every prior guess about DE's shapes in this entry had also
+been wrong, twice over.
 
-**What a miss would cost, now quantified.** `Level 15 - 25 Plague Star` gates
-**26 distinct relics** — more than any other bounty, and the largest of the three
-event groups by a factor of 26. The mitigation below is real and was re-checked:
-`opts.event` defaults to `false` (`plan.js:130`) and ticking *include event
-nodes* forces them back in, with the page warning to check the event is actually
-running. So a missed detection hides 26 relics behind a checkbox for the one
-fortnight a year they are farmable, rather than making them unreachable.
+**What a miss cost, which is no longer hypothetical.** `Level 15 - 25 Plague
+Star` gates **26 distinct relics**, more than any other bounty. The mitigation
+is real and was re-checked — `opts.event` defaults to `false` (`plan.js:130`)
+and ticking *include event nodes* forces them back in — so a missed detection
+hides 26 relics behind a checkbox for the one fortnight a year they are
+farmable, rather than making them unreachable. That is what would have happened
+on every first-party build for a fortnight had the fix not landed the same day.
 
 **Everything below was written not knowing when, or whether, Plague Star would
-run** — read it as a plan whose Ghoul half is now closed.
+run** — read it as a plan whose `Goals` half is now closed.
 
 **The `tag` half was done on 2026-09-04, before the window.** What it turned out
 to be is not what this entry expected, because the matching it asks for was
@@ -2393,14 +2379,22 @@ payload:
 | `Level 40 - 50 Ghoul Bounty` | yes | **yes** | yes |
 | `Level 15 - 25 Plague Star` | no | **no** | yes |
 
-That last row is the control and it is the one worth keeping: a *listed* event
+That last row was the control and it is the one worth keeping: a *listed* event
 that is not running stays out, which is what `eventRunning` returning false on
 an entry with no expiry is supposed to buy.
 
-**Still open for Plague Star**, which carries 26 relics, more than any other
-bounty. Nothing needs building for it — the path is the same one the Ghoul
-Purge just exercised end to end — only DE's tag, which cannot be had until it
-runs. Do not guess it.
+**The control has since flipped, which is the other half of the same proof.**
+Re-measured the same afternoon with Plague Star live: `Level 15 - 25 Plague
+Star` is now `eventRunning = true` and `reachable = true` with the switch off,
+and all **26** relics behind it are reachable. So the gate has now been observed
+holding a row out *and* letting the same row in, on real data, in one day —
+which is the only evidence that it gates on the event rather than on something
+correlated with it.
+
+**Done for Plague Star, 2026-09-09.** The tag was captured while it ran and is
+in `EVENT_TAGS` as a fact, not a guess — `InfestedPlains`. The path was not
+quite "the same one the Ghoul Purge exercised", and that is the finding this
+entry nearly missed: see the wrong prediction above.
 
 ### The worldstate publishes far more than the two fields we read
 

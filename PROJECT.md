@@ -7863,6 +7863,17 @@ so the wider net cannot mis-identify a `Goal` DE have already named. Verified by
 emptying `EVENT_TAGS` — the state every genuinely new event starts in — and
 watching the scan still find it, then removing `marks` and watching it go dark.
 
+**The `api_events` ceiling, settled by the same event.** That raise from 32 KB
+to 192 KB was made on a projection — three events live at 16,564 bytes, with
+Plague Star not yet among them, extrapolating to ~31.5 KB or 96% of the old
+ceiling. Measured with Plague Star actually running: the feed is **36,857
+bytes** across four events, of which Plague Star alone is 22,357 with three job
+bands and Ghoul Purge 14,893 with two. That is **18.8% of the new ceiling and
+112% of the old one** — so the projection was not merely prudent, it was low,
+and the pre-2026-09-09 ceiling would be refusing this feed right now, silently,
+for the entire fortnight. The `Content-Length` was honest and the response was
+not chunked, so the refusal would have been at the header.
+
 **What it gates, measured:** `Level 15 - 25 Plague Star` is the only tier the
 drop tables carry, and it holds **26 distinct relics**, more than any other
 bounty. DE publish three job bands; the other two are Advanced (55–65) and Steel
