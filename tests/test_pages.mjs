@@ -3513,15 +3513,37 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
       isHard: false, isStorm: false },
   ]);
 
+  /* The figure on the row we planted on, not the ranking's top eight.
+
+     **The top eight is the wrong instrument and it took a second sighting to
+     see it.** This test already records one round of exactly this mistake —
+     `quietRow` picked a one-run node where a fissure moves the badge and
+     nothing else — and the node selection was fixed while the measurement was
+     left alone. It is invariant under a real re-rank: the list is sorted, so a
+     row rising to the top can leave the *multiset* of visible values untouched.
+     Measured 2026-09-09 on a live dataset, this row went 0.31 to 0.35, four
+     rounds to five, and from third place to first, while the eight figures
+     compared byte-identical and the assertion called that "no re-rank".
+
+     One row's own number cannot do that, and needs no assumption about which
+     rows are on screen or how many fissures the build happened to ship. */
+  const figureOf = () => rowFor(page, key).locator(".spot-score b").first().innerText();
+  const roundsOf = () => rowFor(page, key).innerText();
+  const figureBefore = await figureOf();
+  const roundsBefore = (await roundsOf()).match(/\d+ rounds/)?.[0];
+
   await returnAfterWindow(page);
   await rowFor(page, key).locator(".tag.fissure").waitFor({ timeout: 5000 });
   const after = await shape();
-  /* The figures, not the names: a fissure changes how far the row says to run,
-     so the ranked number moves whether or not the row does. Badges-only left
-     these untouched, which is exactly what this reverses. */
-  assert.notDeepEqual(after.figures, before.figures,
-                      "a fissure the page has fetched has to reach the ranking, " +
-                      "not just the badge on one row");
+  assert.ok(after.nodes.length > 2, "the ranking has to still be there afterwards");
+
+  const figureAfter = await figureOf();
+  const roundsAfter = (await roundsOf()).match(/\d+ rounds/)?.[0];
+  assert.notEqual(
+    `${figureBefore}|${roundsBefore}`, `${figureAfter}|${roundsAfter}`,
+    `a fissure the page has fetched has to reach the ranking, not just the ` +
+    `badge: ${key} read ${figureBefore} over ${roundsBefore} before and ` +
+    `${figureAfter} over ${roundsAfter} after`);
 
   /* Now the guard. Put the focus in an effort box, change the feed again, and
      the list must hold still — the reader is mid-number. */
@@ -3543,6 +3565,12 @@ page_test("a refresh that finds a fissure re-ranks, and waits if you are typing"
   assert.deepEqual(while_typing.figures, held.figures,
                    "a background refresh must not re-rank under someone typing");
   assert.deepEqual(while_typing.nodes, held.nodes, "and must not reorder the rows either");
+  /* And the same row-level figure the first half moved, for the same reason it
+     was needed there: the eight sorted values can sit still through a re-rank,
+     so on its own the check above can hold while the row it is really about
+     has quietly gone back to what it was before the fissure landed. */
+  assert.equal(await figureOf(), figureAfter,
+               `${key} must still read the fissure-aware figure while typing`);
   assert.equal(await page.evaluate(() => document.activeElement.tagName), "INPUT",
                "and it must not take the focus away either — that is the whole reason");
   assert.deepEqual(errors, []);

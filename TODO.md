@@ -123,10 +123,19 @@ looked. So the preparation is the part with a deadline:
   Then put the real tag into `EVENT_TAGS` as a fact. **Do not guess it now** — a
   wrong tag matches nothing and reads as "not running", which is the exact
   failure the empty map exists to avoid.
-- **Capture the whole entry, not the answer. — the one thing still to do, and
-  it is not automatic.** `maximumScore`, `interimSteps` and `rewards[]` are read
-  and dropped; nothing keeps them. Run both of these while the event is live and
-  paste the output into `PROJECT.md`:
+- **Capture the whole entry, not the answer — done for a Ghoul Purge on
+  2026-09-09, still open for Plague Star.** A Ghoul Purge was live and both
+  shapes are pasted into `PROJECT.md §7`, along with what they settled: there
+  are **two** event shapes rather than one (`maximumScore` is `null` and
+  `interimSteps` is `[]` on a recurring alert — those belong to the scored
+  *Operation* shape), and DE's real `Desc` path is
+  `/Lotus/Language/GameModes/RecurringGhoulAlert`, which is **not** what the
+  invented fixture guessed. That value is now pinned in `test_build.py`.
+
+  Plague Star is the one still to take, and it is likely to be the shape that
+  carries *both* — a scored operation delivered through bounties — so it is not
+  a duplicate of the capture already made. Run both while it is live and paste
+  into `PROJECT.md`:
 
   ```bash
   curl -s https://api.warframe.com/cdn/worldState.php | python -c "import json,sys;d=json.load(sys.stdin);print(json.dumps([g for g in d.get('Goals',[]) if 'plague' in json.dumps(g).lower()],indent=2))"
@@ -137,8 +146,14 @@ looked. So the preparation is the part with a deadline:
 
   Both, not one: DE's `Goals` is the source `from_chain` asks first and its
   `Desc` is an internal path, while WFCD's is prose — the two shapes are the
-  thing worth having side by side, and the first is the one no test has ever
-  seen for this event.
+  thing worth having side by side.
+
+  **And `Goals` is the field, not `Events`.** Searching the worldstate for
+  "plague" on 2026-09-09 returned five hits and not one was an event: they are
+  `Events[20].Messages[*]`, a news item titled *"Operation: Plague Star
+  Returns!"* posted 09-02. Its `EventEndDate` is 2026-09-23T00:00:00Z, so DE
+  publish the end date in the news feed days before the Goal exists — useful as
+  an early warning, and a trap for anyone grepping.
 - ~~**Check the detection actually fires.**~~ **Our half is verified, 2026-09-08,
   a day early and by staging.** A live window planted on `meta.bounties.events`
   put **both** gated rows into the ranking with *Include event nodes* still
@@ -2289,14 +2304,34 @@ Purge or Plague Star without one of them running — their tags are unobserved �
 it means the first sighting yields a permanent answer rather than another guess.
 
 **Also useful when one runs:** `activation`/`expiry` are already used, but events
-carry `node` (`"Orb Vallis (Venus)"`), `maximumScore`, `interimSteps` and
-`rewards[]` too. Capture the whole entry, not just the window.
+carry `node`, `maximumScore`, `interimSteps` and `rewards[]` too. Capture the
+whole entry, not just the window. **Qualified 2026-09-09**: on a *recurring
+alert* those score fields are `null` and `[]` — they belong to the scored
+Operation shape. What a Ghoul Purge carries instead is `Jobs[]` with level bands
+and reward-table paths. `PROJECT.md §7` has both shapes.
 
-**What to do when one of them next runs:** refresh the data, check the build log
-says `limited-time events running - Ghoul Purge` (or `Plague Star`), and confirm
-the bounty appears in the planner without the checkbox. If it does not, capture the
-raw worldstate entry — that is the fixture this cannot be written against today.
-Plague Star matters most: it carries 26 relics, more than any other bounty.
+~~**What to do when one of them next runs.**~~ **Done for Ghoul Purge,
+2026-09-09** — the whole checklist, against DE's real data rather than a staged
+window. Refreshed the data; the build log said
+`limited-time events running - Ghoul Purge`; the tag `GhoulEmergence` was
+captured and is now in `EVENT_TAGS`; and the gated rows reach the ranking
+**without the checkbox**, measured through `reachableSource` against the real
+payload:
+
+| row | event running | reachable, switch off | switch on |
+|---|---|---|---|
+| `Level 15 - 25 Ghoul Bounty` | yes | **yes** | yes |
+| `Level 40 - 50 Ghoul Bounty` | yes | **yes** | yes |
+| `Level 15 - 25 Plague Star` | no | **no** | yes |
+
+That last row is the control and it is the one worth keeping: a *listed* event
+that is not running stays out, which is what `eventRunning` returning false on
+an entry with no expiry is supposed to buy.
+
+**Still open for Plague Star**, which carries 26 relics, more than any other
+bounty. Nothing needs building for it — the path is the same one the Ghoul
+Purge just exercised end to end — only DE's tag, which cannot be had until it
+runs. Do not guess it.
 
 ### The worldstate publishes far more than the two fields we read
 

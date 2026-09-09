@@ -7625,6 +7625,65 @@ now rejects a row whose tag names a *different* event, so a Ghoul bounty can no
 longer be read as a Plague Star one by keyword. The scan stays for anything
 untagged, which is how the next one gets captured.
 
+### The Ghoul Purge entry, in both shapes, captured 2026-09-09
+
+`maximumScore`, `interimSteps` and `rewards[]` are read and dropped; nothing in
+the pipeline keeps them, and they cannot be reconstructed after the event ends.
+`TODO.md` asked for this to be pasted here while an event was live. **This is
+that paste**, and it is the first one — trimmed only of `_id`/`Icon` noise.
+
+**Digital Extremes, `Goals[]` from `worldState.php`** — 1,706 bytes:
+
+```json
+{ "Activation": {"$date": {"$numberLong": "1788889782638"}},
+  "Expiry":     {"$date": {"$numberLong": "1790704182638"}},
+  "HealthPct": 0.8913036, "VictimNode": "SolNode228", "Regions": [2],
+  "Desc":    "/Lotus/Language/GameModes/RecurringGhoulAlert",
+  "ToolTip": "/Lotus/Language/GameModes/RecurringGhoulAlertDesc",
+  "Tag": "GhoulEmergence", "JobAffiliationTag": "CetusSyndicate", "Success": 0,
+  "Jobs": [
+    { "jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/GhoulAlertBountyHunt",
+      "rewards": "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/GhoulBountyTableARewards",
+      "masteryReq": 1, "minEnemyLevel": 15, "maxEnemyLevel": 25,
+      "xpAmounts": [270, 270, 270, 400] },
+    { "jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/GhoulAlertBountyExt",
+      "rewards": "/Lotus/Types/Game/MissionDecks/EidolonJobMissionRewards/GhoulBountyTableBRewards",
+      "masteryReq": 3, "minEnemyLevel": 40, "maxEnemyLevel": 50,
+      "xpAmounts": [550, 550, 550, 800] } ],
+  "PreviousJobs": [ "…the same two, previous standing values…" ] }
+```
+
+**WFCD, `/pc/events`** — 14,897 bytes, same instant. Keys:
+`activation, affiliatedWith, altActivation, altExpiry, archwingDrops,
+completionBonuses, concurrentNodes, currentScore, description, expiry, health,
+id, interimSteps, isCommunity, jobs, largeInterval, maximumScore, metadata,
+nextAlt, previousId, previousJobs, progressSteps, regionDrops, rewards,
+showTotalAtEndOfMission, smallInterval, tag, tooltip, victimNode`. The values
+that matter: `description: "Ghoul Purge"`, `tooltip: "Help Konzu rid the plains
+of Grineer Ghouls"`, `tag: "GhoulEmergence"`, `health: 89.13`, and two `jobs`
+whose `rewardPool` carries **33 resolved reward rows each**.
+
+**Three things this settled.**
+
+1. **`maximumScore` is `null` and `interimSteps` is `[]`.** The instruction to
+   capture them assumed the *Operation* shape — a score event like Thermia
+   Fractures, whose raw Goal does carry `Goal`, `InterimGoals`, `InterimRewards`
+   and `ScoreVar`. A recurring alert has none of it and is a **`Jobs` event**
+   instead. So there are two event shapes, not one, and code that reaches for a
+   score field will find nothing on half of them. Plague Star is likely to carry
+   *both*, being a scored operation delivered through bounties.
+2. **The `Desc` path form is now observed, and the guess was wrong.** Every test
+   before this used `/Lotus/Language/Alerts/GhoulEmergence`, invented on
+   2026-09-04. The real value is `/Lotus/Language/GameModes/RecurringGhoulAlert`
+   — different directory, and `Ghoul` sits *inside* `RecurringGhoulAlert` rather
+   than standing as the final segment. `/ghoul/i` matches either, which is luck
+   worth pinning: a pattern anchored to a trailing segment would keep every
+   existing test green and go blind on the source `from_chain` asks first. It is
+   pinned now, in `test_build.py`, against the measured value.
+3. **The 8.7x expansion has its cause.** Those 66 resolved reward rows are why
+   WFCD's copy is 14,897 bytes against DE's 1,706 — see the `api_events` ceiling
+   entry above. One job-bearing event costs ~15 KB in that feed.
+
 ---
 
 ## 8. Gotchas discovered while building

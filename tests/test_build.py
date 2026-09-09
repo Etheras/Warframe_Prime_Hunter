@@ -2096,6 +2096,78 @@ def test_bounties_and_events_read_from_the_first_party_worldstate() -> None:
     check("events: and a window", events[0]["expiry"], "2026-08-27T07:30:25.511Z")
 
 
+def test_a_real_ghoul_purge_as_digital_extremes_actually_published_it() -> None:
+    """The first live event this project has ever seen, pinned as a fixture.
+
+    Every event test before this one was written against an **invented** DE
+    shape, and said so: the path form of `Desc` had never been observed, so
+    `/Lotus/Language/Alerts/GhoulEmergence` was somebody's reasonable guess at
+    what one looks like. On 2026-09-09 a Ghoul Purge was running and the real
+    entry could be read. **The guess was wrong in both halves** — the real path
+    is `/Lotus/Language/GameModes/RecurringGhoulAlert`: a different directory,
+    and the word `Ghoul` sitting mid-token inside `RecurringGhoulAlert` rather
+    than standing alone as the last segment.
+
+    Nothing broke, because `/ghoul/i` matches either. That is exactly why this
+    is worth pinning rather than shrugging at: the pattern survived a shape
+    nobody had designed it for, and the next person tempted to anchor it — to
+    `Alerts/(\\w+)`, or to a trailing segment — would keep every existing test
+    green and go blind on the source that answers first.
+
+    Trimmed to the fields the adapter reads, and otherwise verbatim from
+    `api.warframe.com/cdn/worldState.php`. `PROJECT.md section 7` carries the
+    whole entry, because nothing in the pipeline keeps it.
+    """
+    doc = {"Goals": [{
+        "Tag": "GhoulEmergence",
+        "Desc": "/Lotus/Language/GameModes/RecurringGhoulAlert",
+        "ToolTip": "/Lotus/Language/GameModes/RecurringGhoulAlertDesc",
+        "Activation": {"$date": {"$numberLong": "1788889782638"}},
+        "Expiry": {"$date": {"$numberLong": "1790704182638"}},
+        "VictimNode": "SolNode228",
+        "JobAffiliationTag": "CetusSyndicate",
+        "Jobs": [
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/GhoulAlertBountyHunt",
+             "minEnemyLevel": 15, "maxEnemyLevel": 25},
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/GhoulAlertBountyExt",
+             "minEnemyLevel": 40, "maxEnemyLevel": 50},
+        ],
+    }]}
+
+    events = official.events_from_worldstate(doc)
+    check("ghoul: DE's own Goal survives the adapter", len(events), 1)
+    check("ghoul: and Desc arrives as the path it really is",
+          events[0]["description"], "/Lotus/Language/GameModes/RecurringGhoulAlert",
+          "the prose form is WFCD's; this is what the first-party route delivers")
+
+    found = build_data.find_live_events(events, [])
+    check("ghoul: the real path form is matched, not just the invented one",
+          found.get("Ghoul Purge", {}).get("expiry"), "2026-09-29T17:49:42.638Z",
+          "a pattern anchored to the last path segment would go blind here")
+    check("ghoul: and DE's tag comes back with it",
+          found["Ghoul Purge"].get("tag"), "GhoulEmergence")
+
+    check_true("ghoul: the tag is now a recorded fact rather than an empty map",
+               build_data.EVENT_TAGS.get("GhoulEmergence") == "Ghoul Purge",
+               "observed 2026-09-09; the scan is what captured it, and this is "
+               "the first of the two relic-bearing events ever seen running")
+
+    # The tag decides on its own: strip the text the pattern needs and it still
+    # resolves, which is the whole reason a machine identifier was wanted.
+    mute = [dict(events[0], description="/Lotus/Language/GameModes/Redacted",
+                 name="", tooltip="")]
+    check("ghoul: with the tag known, prose is no longer load-bearing",
+          "Ghoul Purge" in build_data.find_live_events(mute, []), True,
+          "DE may reword a description; they do not renumber a Tag")
+
+    # Both level bands DE publish are the two the planner gates on, and a
+    # mismatch here is how an event row silently stops being reachable.
+    bands = [(j["minEnemyLevel"], j["maxEnemyLevel"]) for j in doc["Goals"][0]["Jobs"]]
+    check("ghoul: DE's two job bands are the two gated bounty rows",
+          bands, [(15, 25), (40, 50)],
+          "EVENT_BOUNTIES keys 'Level 15 - 25' and 'Level 40 - 50' name these")
+
+
 def test_the_rotation_letter_is_read_then_cross_checked() -> None:
     """
     The letter Digital Extremes print on each bounty is the primary reading, and
@@ -4805,6 +4877,7 @@ def main() -> int:
                          test_the_rotation_letter_is_read_then_cross_checked,
                          test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_event_is_recognised_by_tag_first_and_in_either_source_shape,
+                         test_a_real_ghoul_purge_as_digital_extremes_actually_published_it,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
