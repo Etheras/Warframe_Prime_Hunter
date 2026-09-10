@@ -186,6 +186,108 @@ the entry moved up to *Model and ranking*, because what it is waiting on now is 
 owner, not the wiki. Seven mission types that carry no rotation confirmation at all
 are still unverified and are still tedious, but they are no longer what blocks it.
 
+### Citrine Prime ships unattended on 2026-09-23 — on the 24th, find what the pipeline missed
+
+**Set by the owner on 2026-09-10.** The pipeline has never been watched meeting
+a brand-new Prime, and the owner wants the first time to be unaided, so that
+every flaw surfaces on its own instead of being papered over by hand. The goal
+behind it: **the next Prime Access should need nobody's hand at all.** Citrine
+Prime Access opens on **2026-09-23**
+([DE's announcement](https://www.warframe.com/en/news/citrine-prime-access)).
+
+**Do nothing on the 23rd.** No hand-dispatched run, no local build, no alias
+added in advance. If a push lands that day for unrelated reasons, write down its
+time — a push is a full build, and it blurs which mechanism delivered the items.
+
+**What should appear, and what should not:**
+
+| Item | Expected |
+|---|---|
+| Citrine Prime | Warframe |
+| Steflos Prime | Primary — announced as a shotgun |
+| Corufell Prime | announced only as a "heavy weapon": Melee if a heavy blade, Archgun if an arch-gun. Both are already mapped on both routes |
+| Sphatika Prime Syandana, Alumeti Prime Sugatra, Prismatic Gem Prime Decoration, Spinele Prime Facial Accessory / Earpiece / Oculus | **absent** — Prime Access only, so bought rather than earned (hard rule 10), and cut by `NON_RELIC_CATEGORIES` |
+
+**What runs unattended**, read from Task Scheduler on 2026-09-10. The first two
+need this PC switched on, so record whether it was:
+
+- *Warframe Prime Hunter data refresh*, every ten minutes: a local
+  `build_data.py --if-changed`, then `gh workflow run publish.yml -f full=false`.
+- *… (daily full rebuild)*, 18:07 local: `gh workflow run publish.yml -f full=true`.
+- GitHub's own crons in `publish.yml`, which delivered about one tick in fifteen
+  when measured — the comment in `tools/schedule.ps1` has the figures.
+
+**Baselines, from the local build of 2026-09-10 18:02Z**, so a change on the 24th
+can be attributed:
+
+- `vaultSoon` flags the two oldest farmable releases: **Xaku Prime, Trumna Prime,
+  Quassus Prime** (2024-11-13) and **Lavos Prime, Cedo Prime, Dual Zoren Prime**
+  (2025-02-12). If the cadence comment at `build_data.py:2096` is right — each
+  Prime Access vaults the release from seven earlier — the first three go on the
+  23rd.
+- No item has `isNew`. Every part has an `itemCount`. Four parts have no `ducats`.
+- Plague Star also ends on the 23rd (entry above), so planner rows that vanish
+  that day are not all vaulting.
+
+**On the 24th, answer these — the deployed site first, because it is the one the
+owner uses:**
+
+```bash
+curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.json | python -c "import json,sys;d=json.load(sys.stdin);[print(i['name'],i['category'],i['isNew'],bool(i.get('image')),i['farmableRelics'],[(p['name'],p['itemCount'],p.get('ducats'),p.get('plat')) for p in i['parts']]) for i in d['items'] if any(w in i['name'] for w in ('Citrine','Steflos','Corufell','Sphatika','Alumeti','Prismatic','Spinele'))]"
+```
+
+1. **Did all three arrive, in the right category, with none of the six
+   accessories — and when?** `gh run list` and `data/feed-log.json` say which run
+   carried them first (light or full; dispatch, cron or push) and how long after
+   release.
+2. **By which route?** `isNew: true` means DE's Public Export listed the item
+   before the wiki page did (`build_data.py:1729`). Did the wiki route take over
+   later, and after how long?
+3. **Are the parts right?** Names, quantities and Ducats against the wiki, and
+   against the baseline above.
+4. **Relics.** Are the new relics in `relics` with sources, is `farmableRelics`
+   non-empty, and did the Primes vaulted that day go vaulted in the same build?
+   Check against the `vaultSoon` baseline.
+5. **Artwork and Platinum.** A picture, or the glyph fallback? When did `plat`
+   appear? A missing `plat` is a supported state, so record the delay, not a
+   defect.
+6. **Local against deployed.** This machine reaches DE and the runner often does
+   not — *Digital Extremes 403 the GitHub runner*, below. If the local
+   `data/prime-data.json` carried them hours before the deployed one, that gap is
+   the measurement.
+7. **Run `python tests/test_build.py`** and record every red check. The likely
+   candidates are `parts: only the items DE do not publish fall back` and the two
+   `wiki coverage:` checks. Those fire if the wiki files Corufell under a section
+   we do not know, or if a name needs `NAME_ALIASES`.
+
+**Suspected weak spots, from reading the code on 2026-09-10 — none of them seen
+to fail yet:**
+
+- **Delivery depends on DE answering the runner.** A light remote build only
+  downloads when its fingerprint moves, and the fingerprint is DE's export hash
+  plus the drop-table headers. If DE refuse the runner, the release may wait for
+  the 18:07 full dispatch, or for the routes that do not depend on DE (the wiki
+  page, WFCD's item data, the drop-table mirror) to catch up. If the lag turns
+  out real, one candidate is to have the local `--if-changed` run, which does
+  reach DE, dispatch `full=true` when it sees the export hash move. Not designed.
+- **Parts from the drop-table fallback carry no quantity and no Ducats.**
+  `catalogue.parts_from_droptables` builds `itemCount: None` with no `ducats`
+  key (`catalogue.py:83`), and `needOf` in `model.js` reads a missing quantity
+  as 1, so a part that needs two would read as needing one. This only bites if
+  DE's recipes and WFCD's list both miss the item.
+- **A new weapon class disappears from the export route without a word.**
+  `collect_prime_items` (`official.py:461`) skips any `productCategory` missing
+  from `PRODUCT_CATEGORY`, with no log line. Only the wiki route's category check
+  would notice.
+- **The Kavasa pin cannot tell "too new" from "broken".** `test_build.py:841`
+  expects exactly `["Kavasa Prime Collar"]`, so a build that catches a Prime
+  before DE's recipes arrive fails it. It may need to exempt `isNew` items — a
+  candidate, not a decision.
+
+**Then:** write each real flaw up as its own `###` entry, with its evidence, and
+the owner decides which get fixed. Delete this entry once that is done: the
+observation belongs in those entries, not here.
+
 ### Not work
 
 The availability precedence asks for something that is **already true** — see its
