@@ -310,6 +310,26 @@ jobs:
           assert any(i["flags"]["farmable"] for i in items), "nothing is farmable"
           PY
 
+      # The built-payload checks, against the payload this run is about to
+      # publish. *Run the tests* above comes before the build, so until
+      # 2026-09-11 those checks only ever saw a local payload - and a local
+      # payload can be built from a cache that no longer matches upstream. That
+      # is how the wiki respelling its Founder marker shipped Excalibur, Lato and
+      # Skana Prime as merely vaulted while every local run stayed green: the
+      # check that fails on all three at once existed, and never saw this file.
+      #
+      # WARN-ONLY until the Citrine Prime test is read on 2026-09-24 (TODO.md).
+      # Some of these checks assert upstream data a brand-new Prime cannot meet
+      # on day one - DE's recipe for it, a warframe.market price on every reward
+      # row - so a blocking gate would stop the very release that test watches.
+      # After it, drop the `|| echo` so a failure blocks the deploy, with new
+      # Primes exempt from whatever that day showed they trip. No `if:` on
+      # purpose: the light build publishes too, and from a cache.
+      - name: Check the payload about to be published
+        run: |
+          python tests/test_build.py --payload \
+            || echo "::warning::the built-payload checks failed on the payload being published - see this step's log"
+
       - name: Assemble the site
         run: |
           mkdir -p _site

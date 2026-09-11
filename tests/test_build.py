@@ -4,6 +4,8 @@ Prime Hunter's test suite. Standard library only, like everything else here.
 
     python tests/test_build.py            # everything that needs no network
     python tests/test_build.py --online   # adds the real clone-and-build test
+    python tests/test_build.py --payload  # only the checks on the built payload,
+                                          # which is what CI runs after its build
 
 Three kinds of test live here.
 
@@ -4095,6 +4097,60 @@ def test_the_ci_probe_asks_about_the_source_that_refuses() -> None:
                "different thing from asking whether they answer")
 
 
+def test_the_published_payload_is_checked_after_it_is_built() -> None:
+    """
+    The built-payload group only ever ran where a payload already existed, and
+    on CI that is nowhere: *Run the tests* comes before the build. So every check
+    on the payload saw a local one, and a local payload can be built from a cache
+    that no longer matches upstream.
+
+    Found 2026-09-11. The wiki rewrote its Founder marker, the deployed build read
+    the new page and shipped Excalibur, Lato and Skana Prime as merely vaulted,
+    and every local run stayed green on a two-day-old copy of the page. The check
+    that fails on all three at once - partless items must be Founder, Baro or
+    special - already existed. It was simply never shown the payload that got
+    published.
+
+    Two halves, because either alone is a check that cannot fire: `--payload`
+    runs that group and nothing else, and the workflow calls it after both build
+    steps, on the light path as well as the full one.
+    """
+    # The child is this same suite, so it must not start another: if `--payload`
+    # ever stopped filtering, every generation would run this test again.
+    if os.environ.get("TEST_BUILD_CHILD"):
+        return
+    run = subprocess.run([sys.executable, os.path.abspath(__file__), "--payload"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=ROOT, timeout=300,
+                         env=dict(os.environ, TEST_BUILD_CHILD="1"))
+    heads = [ln for ln in run.stdout.splitlines()
+             if ln and not ln[0].isspace() and not ln.startswith("-")]
+    check_true("payload gate: --payload runs the built-payload group",
+               "built payload" in heads, f"group headers printed: {heads[:6]}")
+    check("payload gate: and no other group",
+          [h for h in heads if h in ("parsers", "join", "bounties", "integration",
+                                     "browser", "online")], [],
+          "the gate reads the payload; the rest of the suite already ran before the build")
+
+    workflow = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(workflow):
+        print("  skip payload gate workflow (no workflow checked out)")
+        return
+    yml = read_text(workflow)
+    gate = yml.find("tests/test_build.py --payload")
+    check_true("payload gate: the workflow runs it", gate >= 0)
+    builds = [m.start() for m in re.finditer(r"run: python tools/build_data\.py", yml)]
+    assemble = yml.find("name: Assemble the site")
+    check_true("payload gate: after every build step and before the site is assembled",
+               gate >= 0 and bool(builds) and all(b < gate for b in builds)
+               and 0 <= gate < assemble,
+               "before the build there is no payload, and after assembly it has shipped")
+    step = yml[yml.rfind("- name:", 0, gate):yml.find("\n      - ", gate)] if gate >= 0 else ""
+    check_true("payload gate: on both paths, not only the full build",
+               bool(step) and not re.search(r"(?m)^\s*if:", step),
+               "the light build publishes too, and from a cache - the case that hid this")
+
+
 def test_the_full_build_matches_a_schedule_that_exists() -> None:
     """
     `FULL` decides whether a scheduled run rebuilds everything or takes the light
@@ -5084,6 +5140,7 @@ def main() -> int:
                          test_a_check_that_dies_still_lowers_the_flag,
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
+                         test_the_published_payload_is_checked_after_it_is_built,
                          test_the_full_build_matches_a_schedule_that_exists,
                          test_no_workflow_expression_is_pasted_into_a_shell,
                          test_our_invented_buckets_each_still_behave_as_one_thing,
@@ -5096,6 +5153,12 @@ def main() -> int:
         ("browser", [test_browser_assets]),
         ("online", [lambda: test_clone_and_build(online)]),
     ]
+    # `--payload` runs the built-payload group and nothing else. CI calls it after
+    # the build (*Check the payload about to be published*), because the full run
+    # comes before the build there and so never has a payload to read.
+    payload_only = "--payload" in sys.argv
+    if payload_only:
+        groups = [g for g in groups if g[0] == "built payload"]
     for title, tests in groups:
         print(f"\n{title}")
         for t in tests:
@@ -5127,7 +5190,7 @@ def main() -> int:
     # number nobody acts on. What matters is the line above: everything passed,
     # or something did not. Do not reintroduce a count here or in the docs.
 
-    if not online:
+    if not online and not payload_only:
         print("(clone-and-build skipped — re-run with --online for the full set)")
     return 0
 

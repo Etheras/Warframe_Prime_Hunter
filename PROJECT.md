@@ -214,9 +214,12 @@ knowing as a shape rather than as a number. A GitHub runner is Linux and runs th
 suite *before* the build step, so four groups skip there for four different
 reasons: `built payload` (`data/` does not exist yet), `task registration` (a
 Windows-only feature), `page tests` (Playwright is not installed on the runner)
-and `clone-and-build` (needs `--online`). The runner names every skip and its
-reason in its own output, so nothing is hidden — it just has to be read rather
-than inferred from an exit code. A green CI means everything reachable on a cold
+and `clone-and-build` (needs `--online`). The first of those then runs on its own
+after the build, as *Check the payload about to be published* (`--payload`), so
+the payload that actually ships is checked on the runner too — warn-only while
+that step ends in `|| echo`, which `publish.yml` explains. The runner names every
+skip and its reason in its own output, so nothing is hidden — it just has to be
+read rather than inferred from an exit code. A green CI means everything reachable on a cold
 Linux box passed, which is a different and still useful claim, and it is why the
 complete local run stays the gate.
 
@@ -610,7 +613,9 @@ green says nothing about the four lines you just changed, and the habit trains y
 to skim the one output that should never be skimmed.
 
 **While building, run only what covers what you touched.** The Node suites are
-addressed directly; there is no filter flag on `test_build.py`.
+addressed directly. `test_build.py` has one filter, `--payload`, which runs only
+the built-payload group; it exists for CI's post-build check (below), not as a
+finer split for the pipeline.
 
 ```bash
 node --test tests/test_assets.mjs
@@ -661,7 +666,8 @@ mistake, not the looking.
 failure** — four groups skip there for four different reasons: `built payload` (the
 suite runs before the build step, so `data/` does not exist yet), `task
 registration` (a Windows feature), `page tests` (no Playwright on the runner) and
-`clone-and-build` (needs `--online`). Each one prints its own reason. So `app.js`
+`clone-and-build` (needs `--online`). Each one prints its own reason, and the
+first runs again on its own after the build (*A green CI*, above). So `app.js`
 and `plan.js` get `node --check` on CI and nothing else, which makes the **local**
 Playwright run the only evidence those two files work.
 
@@ -7941,6 +7947,59 @@ nothing to farm, and the planner could rank no places for them.
 at the owner's direction. It is the undo for both buttons beside it, and without
 the third slice a reader who wanted a screenful and changed their mind had no
 way back but forty clicks.
+
+### The published payload is checked after the build, not only before it
+
+**Found 2026-09-11, from the owner's screenshot.** Excalibur, Lato and Skana Prime
+showed on the deployed site with *Founder exclusive* unticked, badged `VAULTED`.
+The page was right about its data: the payload carried `founder: false` on all
+three. The wiki had respelled the marker in revision 2806878, 15:13 UTC on
+2026-09-10 — *"Use more consistent notation (F) for Founder-exclusive Primes"* —
+from `<sup>{{Tooltip|1|Founder-exclusive Prime}}</sup>` to `([[Founders|F]])`,
+the same shape as `V`, `B` and `P`. A deliberate edit, so there is nothing to
+report to the wiki. `catalogue.py` knew only the tooltip; it reads both now, and
+the old spelling stays because a cached copy of the page can still hold it.
+
+**Why nothing noticed is the part worth keeping.** *"payload: partless items are
+all Founder/Baro/special"* fails on all three at once and had long existed. It
+never saw the broken payload. CI runs the suite *before* the build, so the
+`built payload` group skips there, and *Sanity-check the result* afterwards
+asserts counts and `farmable` only. Locally, the light build had reused a
+two-day-old `.cache/wiki_prime.gz` that still held the old spelling — the wiki is
+not in the `--if-changed` fingerprint, so a light build whose fingerprint has not
+moved reads it from the cache — and every local run stayed green while the
+deployed site was wrong. **A cache is exactly what hides an upstream markup
+change**, so a check that only ever reads a local payload cannot see one.
+
+**Decided by the owner the same day, from a menu of the options:**
+
+- **The whole built-payload group runs on CI after the build**, as *Check the
+  payload about to be published*, on the full path and the light one alike.
+  Chosen over the partless check alone, and over a bare "at least one Founder"
+  floor, which the partless check already covers because Founder items never
+  have parts.
+- **Through a filter on the suite, `test_build.py --payload`**, rather than a copy
+  of the checks inline in the workflow or the tests moved into `tools/`. The rule
+  exists once and runs locally exactly as before. A test pins both halves: that
+  the flag runs that group and no other, and that the step sits after every build
+  step, before assembly, with no `if:`.
+- **It will block the publish**, not warn: a `::warning::` sends no email, so in
+  practice nobody reads one. Measured before choosing: `actions/cache` saves only
+  on `success()`, so a failed full build leaves the last good cache in place, and
+  light builds whose fingerprint has not moved keep publishing from it. A block
+  stalls the updates that needed a fresh fetch; it does not freeze the site.
+- **But warn-only until the Citrine Prime test is read on 2026-09-24.** Some
+  checks in the group assert upstream data a brand-new Prime cannot satisfy on
+  day one — DE's recipe for it, a warframe.market price on every reward row — and
+  a gate that blocked on the 23rd would stop the very release that test exists to
+  watch. So the step ends in `|| echo "::warning::…"` for now.
+- **New Primes will be exempt once it blocks**, defined from what the 23rd
+  actually trips rather than from a prediction. Deliberately not added yet: while
+  the gate only warns, an exemption blocks nothing and would only hide the
+  warnings that day is meant to produce. `TODO.md` holds that and the switch.
+- **The wiki page is not re-read more often.** It sends `max-age=0` and no ETag,
+  so every ask is a full ~56 KB download, and a fresher copy only finds a markup
+  change sooner — it cannot prevent one.
 
 ---
 

@@ -994,7 +994,8 @@ python tests/test_build.py
 No network needed, about half a minute — most of it the browser tests, so without
 Playwright installed it finishes in a second or two. That one command runs
 everything. Add `--online` to also clone the repo into a temporary folder and build
-it from scratch — the path a new user takes.
+it from scratch — the path a new user takes. `--payload` runs only the checks on
+the built data, which is what CI runs after its own build.
 
 **Node.js is recommended, not required.** The tests that cover the JavaScript —
 the rotation model, the bounty clock, the saved-progress keys — run under Node's

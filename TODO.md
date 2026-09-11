@@ -259,6 +259,11 @@ curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.json | p
    candidates are `parts: only the items DE do not publish fall back` and the two
    `wiki coverage:` checks. Those fire if the wiki files Corufell under a section
    we do not know, or if a name needs `NAME_ALIASES`.
+   **Read CI's own answer first.** Since 2026-09-11 every run ends with *Check the
+   payload about to be published* — the same checks, against the payload that
+   actually shipped — and it only warns until this entry has been read. Its
+   `::warning::` on the runs of the 23rd is the deployed half of this question,
+   and *The payload gate only warns* (below) is waiting on the answer.
 
 **Suspected weak spots, from reading the code on 2026-09-10 — none of them seen
 to fail yet:**
@@ -279,10 +284,11 @@ to fail yet:**
   `collect_prime_items` (`official.py:461`) skips any `productCategory` missing
   from `PRODUCT_CATEGORY`, with no log line. Only the wiki route's category check
   would notice.
-- **The Kavasa pin cannot tell "too new" from "broken".** `test_build.py:841`
-  expects exactly `["Kavasa Prime Collar"]`, so a build that catches a Prime
-  before DE's recipes arrive fails it. It may need to exempt `isNew` items — a
-  candidate, not a decision.
+- **The Kavasa pin cannot tell "too new" from "broken".** The check `parts: only
+  the items DE do not publish fall back` expects exactly `["Kavasa Prime Collar"]`,
+  so a build that catches a Prime before DE's recipes arrive fails it. The owner
+  chose on 2026-09-11 to exempt new Primes once the payload gate blocks; what
+  "new" means is that entry's open question (*The payload gate only warns*).
 
 **Then:** write each real flaw up as its own `###` entry, with its evidence, and
 the owner decides which get fixed. Delete this entry once that is done: the
@@ -2671,31 +2677,31 @@ read the rank, because both cost a measurement to find:
   dropped for whichever page runs second in the single-file build. Anything that
   needs a repaint on a rank change needs a subscriber list, not a callback.
 
-### No check reads the wiki's markers on the build that gets published
+### The payload gate only warns — make it block after Citrine, with new Primes exempt
 
-Found 2026-09-11, from the owner's screenshot: Excalibur, Lato and Skana Prime
-showed on the deployed site with *Founder exclusive* unticked, badged `VAULTED`.
-The wiki had rewritten its Founder marker on 2026-09-10 (`Last-Modified`
-15:13 UTC) from `<sup>{{Tooltip|1|Founder-exclusive Prime}}</sup>` to
-`([[Founders|F]])`, and `catalogue.py` knew only the first. The parser now reads
-both; this entry is about why nothing noticed.
+**Owner's decision, 2026-09-11** (`PROJECT.md §7`, *The published payload is
+checked after the build*). The built-payload group now runs on CI after the build
+as *Check the payload about to be published*, and ends in `|| echo "::warning::…"`,
+so a failure annotates the run and publishes anyway. Warn-only is deliberate and
+temporary: some of its checks are expected to trip on a brand-new Prime (the
+Citrine Prime entry above), and a gate that blocked on the 23rd would stop the
+release that test exists to watch.
 
-The check that would have caught it already exists — *"payload: partless items
-are all Founder/Baro/special"* in `test_build.py`, which three partless items
-with no flag fail at once. It never saw the broken payload:
+Still to do, on or after 2026-09-24:
 
-- **CI** runs the suite *before* the build (`publish.yml`, *Run the tests*), so
-  `built payload` skips there, and *Sanity-check the result* afterwards asserts
-  counts and `farmable` only — no flag.
-- **Locally** the payload was built from `.cache/wiki_prime.gz` of 2026-09-09,
-  which still held the old spelling, so the local run passed while the deployed
-  site was wrong. The cache is exactly what hides an upstream markup change.
-
-Options, not decided: run the partless-item check (or the whole payload group)
-in *Sanity-check the result*, where it sees what is about to be published; or
-have that step refuse a build with zero `founder` items, a marker that has never
-legitimately been empty. Either fails the publish rather than shipping it, which
-is what that step already does for a missing catalogue.
+1. **Drop the `|| echo`**, so a failure fails the run and blocks the deploy.
+2. **Exempt a Prime in its first days** from whatever the 23rd showed actually
+   trips. Predicted: `parts: only the items DE do not publish fall back` (a Prime
+   can arrive before its recipe is in our copy of DE's export) and `platinum:
+   every Prime-part reward row carries plat` (no misses allowed, and
+   warframe.market is read at most daily). **"New" is not defined yet**: `isNew`
+   is only set when DE's export lists an item before the wiki does, so it may
+   never be true for Citrine.
+3. **Decide the two that are not release lag.** `wiki coverage:` fires on a name
+   or section the build cannot place — a real gap, so exempting it would hide a
+   flaw rather than a delay. `bounties: … the three shapes DE actually ships`
+   asserts exactly `[3, 4, 5]`, so a change DE make to bounty length would block
+   the site.
 
 ## Settled — answered, kept so the answer is not lost
 
