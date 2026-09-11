@@ -117,7 +117,7 @@ looked. So the preparation is the part with a deadline:
   it, and it works against the deployed site rather than needing a local build:
 
   ```bash
-  curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.json | python -c "import json,sys;print(json.dumps(json.load(sys.stdin)['meta']['bounties']['events'],indent=2))"
+  curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.js | python -c "import json,sys;r=sys.stdin.read();print(json.dumps(json.loads(r[r.index('{'):r.rindex('}')+1])['meta']['bounties']['events'],indent=2))"
   ```
 
   Then put the real tag into `EVENT_TAGS` as a fact. **Do not guess it now** — a
@@ -233,7 +233,7 @@ can be attributed:
 owner uses:**
 
 ```bash
-curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.json | python -c "import json,sys;d=json.load(sys.stdin);[print(i['name'],i['category'],i['isNew'],bool(i.get('image')),i['farmableRelics'],[(p['name'],p['itemCount'],p.get('ducats'),p.get('plat')) for p in i['parts']]) for i in d['items'] if any(w in i['name'] for w in ('Citrine','Steflos','Corufell','Sphatika','Alumeti','Prismatic','Spinele'))]"
+curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.js | python -c "import json,sys;r=sys.stdin.read();d=json.loads(r[r.index('{'):r.rindex('}')+1]);[print(i['name'],i['category'],i['isNew'],bool(i.get('image')),i['farmableRelics'],[(p['name'],p['itemCount'],p.get('ducats'),p.get('plat')) for p in i['parts']]) for i in d['items'] if any(w in i['name'] for w in ('Citrine','Steflos','Corufell','Sphatika','Alumeti','Prismatic','Spinele'))]"
 ```
 
 1. **Did all three arrive, in the right category, with none of the six
