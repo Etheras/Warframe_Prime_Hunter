@@ -158,7 +158,13 @@ def parse_prime_page(text: str) -> list[dict]:
             "permanent": bool(re.search(r"Never Vaulted\|P\]\]", stripped)),
             "baro": bool(re.search(r"\[\[Baro Ki'?Teer\|B\]\]", stripped)),
             "special": bool(re.search(r"\{\{Tooltip\|S\|", stripped)),
-            "founder": bool(re.search(r"\{\{Tooltip\|1\|Founder", stripped)),
+            # Two spellings. The wiki rewrote this marker on 2026-09-10 from a
+            # superscript tooltip into the same ([[Page|letter]]) shape as the
+            # others, and a cached copy of the page can still hold the old one.
+            # Reading only the old one shipped all three Founder items as merely
+            # vaulted, visible with *Founder exclusive* unticked.
+            "founder": bool(re.search(r"\{\{Tooltip\|1\|Founder|\[\[Founders?\|F\]\]",
+                                      stripped)),
         }
 
         # plain wikilink, used by the Cosmetic gallery: "[[Abbera Prime Syandana]]"

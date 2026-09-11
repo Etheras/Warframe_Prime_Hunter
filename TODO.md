@@ -2671,6 +2671,32 @@ read the rank, because both cost a measurement to find:
   dropped for whichever page runs second in the single-file build. Anything that
   needs a repaint on a rank change needs a subscriber list, not a callback.
 
+### No check reads the wiki's markers on the build that gets published
+
+Found 2026-09-11, from the owner's screenshot: Excalibur, Lato and Skana Prime
+showed on the deployed site with *Founder exclusive* unticked, badged `VAULTED`.
+The wiki had rewritten its Founder marker on 2026-09-10 (`Last-Modified`
+15:13 UTC) from `<sup>{{Tooltip|1|Founder-exclusive Prime}}</sup>` to
+`([[Founders|F]])`, and `catalogue.py` knew only the first. The parser now reads
+both; this entry is about why nothing noticed.
+
+The check that would have caught it already exists — *"payload: partless items
+are all Founder/Baro/special"* in `test_build.py`, which three partless items
+with no flag fail at once. It never saw the broken payload:
+
+- **CI** runs the suite *before* the build (`publish.yml`, *Run the tests*), so
+  `built payload` skips there, and *Sanity-check the result* afterwards asserts
+  counts and `farmable` only — no flag.
+- **Locally** the payload was built from `.cache/wiki_prime.gz` of 2026-09-09,
+  which still held the old spelling, so the local run passed while the deployed
+  site was wrong. The cache is exactly what hides an upstream markup change.
+
+Options, not decided: run the partless-item check (or the whole payload group)
+in *Sanity-check the result*, where it sees what is about to be published; or
+have that step refuse a build with zero `founder` items, a marker that has never
+legitimately been empty. Either fails the publish rather than shipping it, which
+is what that step already does for a missing catalogue.
+
 ## Settled — answered, kept so the answer is not lost
 
 ### The planner cannot say how many missions to run **[settled]**

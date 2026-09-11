@@ -161,6 +161,17 @@ def test_parse_prime_page() -> None:
         "AshPrimeIcon.png|link=Ash_Prime|{{WF|Ash Prime|icon=0}} "
         "([[Prime Vault|V]])|alt=Ash Prime (V)\n"
         "MagPrimeIcon.png|link=Mag_Prime|{{WF|Mag Prime|icon=0}}|alt=Mag Prime\n"
+        # the Founder marker as the wiki has written it since 2026-09-10, in the
+        # same ([[Page|letter]]) shape as the others - read with the old pattern
+        # alone, all three Founder items shipped as merely vaulted
+        "File:ExcaliburPrime_Thumb.png|link=Excalibur_Prime|alt=Excalibur Prime (F)"
+        "|{{WF|Excalibur Prime|icon=0}} ([[Founders|F]])\n"
+        "</gallery>\n"
+        "===Melee===\n"
+        "<gallery>\n"
+        # and as it was written before, which a cached copy can still hold
+        "SkanaPrime.png|link=Skana Prime|{{Weapon|Skana Prime|icon=0}}"
+        "<sup>{{Tooltip|1|Founder-exclusive Prime}}</sup>|alt=Skana Prime1\n"
         "</gallery>\n"
         # note the leading space: a plain find() misses this and leaks Mods in
         "== Prime Related==\n"
@@ -174,6 +185,10 @@ def test_parse_prime_page() -> None:
     check_true("prime page: nbsp normalised", "Ash Prime" in names,
                "a non-breaking space must not survive into an item name")
     check_true("prime page: Mag parsed", "Mag Prime" in names)
+    founder = sorted(e["name"] for e in entries if e["wikiFlags"]["founder"])
+    check("prime page: Founder marker read in both spellings", founder,
+          ["Excalibur Prime", "Skana Prime"],
+          "the wiki rewrote it as ([[Founders|F]]) on 2026-09-10")
     check_true("prime page: section boundary respected",
                "Primed Continuity" not in names,
                "'== Prime Related==' has a leading space; find() missed it")
