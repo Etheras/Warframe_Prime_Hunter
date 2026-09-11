@@ -5390,7 +5390,11 @@ different set of bounties was live.
 The entry above named `de_worldstate` as the one to watch and had the reasoning
 right for the wrong row: **a live feed's size moves with game state, so one sample
 of one is not a measurement of it.** That is a different kind of number from the
-catalogue sources, where 10.4 MB of items is 10.4 MB until DE ship something. The
+catalogue sources, where 10.4 MB of items is 10.4 MB until DE ship something — or
+until the third party serving it changes its shape. On 2026-09-11 WFCD's item list
+stood at 16.7 MB, and 5.8 MB of the 6.2 MB it had gained was WFCD nesting each
+part's own components, not anything DE released; the headroom canary caught it at
+78% and the ceiling was redoubled from the new figure. The
 five live feeds are now set at twice the *largest* figure seen rather than twice
 the local one, with extra room besides — most of all `api_events`, which was
 sampled with no limited-time event running at all and so was measured at its

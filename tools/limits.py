@@ -102,7 +102,11 @@ MAX_EXPANDED = {
     # get for the reason written above them.
     "wm_items":                        3_200 * KB,   #  1,614,035 (3,840 items)
     "wm_ducats":                       1_100 * KB,   #    520,195 (742 rows)
-    "api_items":                      21_000 * KB,   # 10,443,694
+    # api_items re-measured 2026-09-11, up 60% from 10,443,694: WFCD's item data
+    # now nests each part's own components (1.1 MB of that field became 6.9 MB),
+    # and the build reads only the top-level list (build_data.py `components`).
+    # The headroom canary in test_build.py caught it at 78% of the old 21,000 KB.
+    "api_items":                      33_000 * KB,   # 16,674,344 (2026-09-11)
     "official_droptables":             9_000 * KB,   #  4,419,528
     "export_ExportManifest.json":      7_600 * KB,   #  3,780,187
     "drops_relics.json":               4_800 * KB,   #  2,385,503
