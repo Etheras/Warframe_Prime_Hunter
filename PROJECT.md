@@ -8051,7 +8051,9 @@ when it was questioned on 2026-09-15 the owner checked in play: **no Hemocyte in
 a standard run.** DE's worldstate has the Basic and Advanced jobs paying the
 same `PlagueStarTableRewards`, so the table carries over unchanged; Steel Path
 pays `PlagueStarTableSteelPathRewards`, which DE do not publish, so it cannot be
-priced. Offered one row per tier, one row as the Advanced run, or the Hemocytes
+priced — their 2023 notes describe that tier only as the Advanced stages under
+Steel Path modifiers, with more Kuva and Endo in the stage rewards, and say
+nothing about relics. Offered one row per tier, one row as the Advanced run, or the Hemocytes
 put on the 15–25 row, the owner chose **one row as the Advanced run**:
 `Level 55 - 65 Plague Star`, whose `lvl` follows from the name. Advanced costs
 two event ingredients to enter; both are earned in play, so hard rule 10 holds.

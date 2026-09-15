@@ -194,6 +194,30 @@ to fail yet:**
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
+### The refresh task still runs every ten minutes, and `PROJECT.md §4` still argues for it
+
+**Found 2026-09-15, preparing to clear.** Two things disagree with the 150-minute
+cadence `tools/schedule.ps1` has defaulted to since 2026-09-09
+(`$EveryMinutes = 150`, the bounty rotation — `PROJECT.md §7`, *The cadence is
+the bounty rotation*; `README.md` says 150 too):
+
+- **The registered task.** `Get-ScheduledTask` on this machine reads *Warframe
+  Prime Hunter data refresh* as repeating every **PT10M**, from a start boundary
+  of 2026-09-04T18:32. A new default reaches only a task registered after it,
+  and this one predates it. So `gh run list` shows a dispatched light build
+  every ten minutes — 144 a day where the default makes 9.6, each a local build
+  asking DE and a CI build asking WFCD — and the deployed `data/feed-log.json`
+  held 105 light builds in the 24 hours to 2026-09-15T19:22Z.
+- **`PROJECT.md §4`**, *Install the ten-minute task*, still says the task runs
+  `--if-changed` "every ten minutes", and keeps a *Why ten minutes* argument
+  whose one reason, the fissure badges, `§7` records as expired on 2026-09-08.
+
+**Leave the task alone until the Citrine test has been read on the 24th** — that
+entry lists the ten-minute task among what runs unattended, so changing the
+cadence first changes the experiment. Then it is the owner's call which side
+moves: re-register at the default and rewrite `§4`, or keep ten minutes and say
+so in `§7`.
+
 ### Not work
 
 The availability precedence asks for something that is **already true** — see its
@@ -1339,8 +1363,11 @@ since both are earned in play. What is missing is the reader being told: the row
 says *level 55–65* and nothing about the fee, so someone holding none picks a run
 they cannot start.
 
-Offered on the fix menu on 2026-09-15 and not chosen that day. If wanted: one
-tooltip line beside *"Includes the 4 Hemocytes"*, fed from the Goal's
+Offered on two fix menus on 2026-09-15 and chosen on neither. The owner asked
+why it matters when a standard run pays the same stage table: because the one
+ranked row *is* the Advanced run, and its Hemocyte drops — about 0.8 relic
+draws a run, and the only source of Meso K8 — are what the fee buys. If wanted:
+one tooltip line beside *"Includes the 4 Hemocytes"*, fed from the Goal's
 `requiredItems` rather than a name written into code. The row only exists while
 Plague Star runs, so a live check needs the event.
 
