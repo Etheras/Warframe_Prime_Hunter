@@ -1313,9 +1313,13 @@ out to be a category error.
 That matters because the planner presents all of them as places to go:
 
 - **`Enemy`** is not a destination. It is an enemy that drops relics wherever it
-  spawns — the Hemocyte, and it now carries a badge saying so.
+  spawns — the Hemocyte, the only one. **Resolved 2026-09-15**: the build folds
+  it into Advanced Plague Star (`fold_event_enemies`), so a normal build ships no
+  `Enemy` row at all.
 - **`Key`** is not a mission type. It is an extra key-gated objective attached to
-  an existing mission, and nobody runs one exclusively for it.
+  an existing mission, and nobody runs one exclusively for it. **Measured
+  2026-09-15**: all 240 live-relic `Key` rows are quest missions, tagged `quest`
+  and never ranked — so today it leaks nowhere, by the data rather than by design.
 - **`Special`** is a bag holding Void Storms, Faceoff and Duviri tables together.
 - Three of DE's own labels are not wiki mission types either: `Caches` (a reward
   stream *inside* a Railjack mission), `The Circuit` and `The Perita Rebellion`
@@ -1734,6 +1738,13 @@ thing nobody had before. Both theories above are dead at that point, and the nex
 suspect is the one the original entry named and could not test: timing under
 load, in a group that runs last after half a minute of subprocesses.
 
+**It recurred on 2026-09-09, and this time the output named it.** In a full run,
+`js: the server decides who is told how to fix stale data` failed with `got 'not
+ok', wanted 'ok'`; the page suite on its own passed 78 of 78 moments later, and
+the next full run was clean. Both earlier theories were fixed by then, so this is
+the recurrence the paragraph above was waiting for: the suspect is timing under
+load, and that test is where to start.
+
 ### ~~A backend refresh finds new fissures and the ranking does not move~~
 
 **It already did, and had since 2026-09-01.** Picked up on 2026-09-08 to be
@@ -2015,6 +2026,24 @@ Still to do, on or after 2026-09-24:
    flaw rather than a delay. `bounties: … the three shapes DE actually ships`
    asserts exactly `[3, 4, 5]`, so a change DE make to bounty length would block
    the site.
+
+### Advanced Plague Star's row does not say it costs two event ingredients
+
+**Found 2026-09-15**, when the Hemocyte fold made the one Plague Star row the
+Advanced run (`EVENT_ENEMY_FOLDS`). DE's worldstate gives that job
+`requiredItems` — **Eidolon Phylaxis** and **Infested Catalyst**, DE's own names
+from `ExportResources`, both made from event materials — with
+`useRequiredItemsAsMiscItemFee`, so each run spends them. Hard rule 10 holds,
+since both are earned in play. What is missing is the reader being told: the row
+says *level 55–65* and nothing about the fee, so someone holding none picks a run
+they cannot start.
+
+Offered on the fix menu on 2026-09-15 and not chosen that day. If wanted: one
+tooltip line beside *"Includes the 4 Hemocytes"*, fed from the Goal's
+`requiredItems` rather than a name written into code. The row only exists while
+Plague Star runs, so a live check needs the event.
+
+**Size: small.**
 
 ## Settled — answered, kept so the answer is not lost
 
