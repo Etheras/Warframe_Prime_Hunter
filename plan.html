@@ -83,31 +83,31 @@
     <label class="check">
       <input type="checkbox" id="p-squad" />
       <span class="box"></span>
-      <span class="lbl" data-tip="A four-player premade cracking the same relic at the same refinement sees four rewards and keeps the best, so a chance p becomes 1 - (1 - p)^4.&#10;&#10;It also unlocks Disruption rotation A, which needs the squad to under-defend conduits to a schedule. Leave off for solo or public runs.">4-man premade</span>
+      <span class="lbl" data-tip="Four players opening the same relic each see a reward and keep the best, so a chance p becomes 1 - (1 - p)^4. Also unlocks Disruption rotation A. Leave off for solo or public runs.">4-man premade</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-aya" checked="checked" />
       <span class="box"></span>
-      <span class="lbl" data-tip="One Aya buys one relic of your choosing at Varzia, and Varzia stocks the current Prime Resurgence rotation. That makes an Aya drop worth more than a random relic, because you pick which one.&#10;&#10;What it is worth depends on whether you are chasing something she is selling.&#10;&#10;  On her shelf   Aya is one of the relics on your list, so it counts in&#10;                 full and somewhere that drops it is a place to go. An&#10;                 Aya bounty can rank above a node carrying a part.&#10;  Not on it      Aya still counts against the vault at large, at 30%. It&#10;                 only lifts a node you were already going to run, and&#10;                 will never send you somewhere on its own.&#10;&#10;Worth nothing here if nothing vaulted is missing and you want nothing from the current rotation, however useful the Aya may be later.">Count Aya drops</span>
+      <span class="lbl" data-tip="One Aya buys a relic of your choice from Varzia's current stock.&#10;&#10;She stocks one on your list: Aya counts in full, and an Aya bounty can be a place to go.&#10;She doesn't: it counts at 30%, and only adds to places you'd run anyway.">Count Aya drops</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-event" />
       <span class="box"></span>
-      <span class="lbl" data-tip="Digital Extremes' drop table lists event nodes permanently but never names the event, and the node only exists on your star chart while that event is running — so they are left out by default. Switch on only if you know an event is live.">Include event nodes</span>
+      <span class="lbl" data-tip="Event nodes exist only while their event runs, and DE's drop table never says which event, so they're off by default. Switch on only if you know one is live.&#10;&#10;An event bounty the build can see running appears by itself — no switch needed.">Include event nodes</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-railjack" />
       <span class="box"></span>
-      <span class="lbl" data-tip="Railjack is a different activity with its own setup, so it is left out of the ranking by default. Five live relics drop only there, though.">Include Railjack</span>
+      <span class="lbl" data-tip="Railjack is its own activity, so it's off by default. A relic that drops nowhere else is shown anyway.">Include Railjack</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-steel" />
       <span class="box"></span>
-      <span class="lbl" data-tip="A Steel Path fissure runs on a second star chart, so it is a different instance of the node than the one you reach normally — running the ordinary node cracks nothing. Left out by default; switch on if you farm the Steel Path.">Include Steel Path fissures</span>
+      <span class="lbl" data-tip="A Steel Path fissure is on the second star chart — running the ordinary node doesn't count. Off by default; switch on if you farm the Steel Path.">Include Steel Path fissures</span>
     </label>
     <label class="check check-switch">
       <input type="checkbox" id="p-capped" />
-      <span class="lbl" data-tip="Your ceiling is (Mastery Rank × 50) + 100 — 1600 at rank 30. A Radiant costs 100 of it.&#10;&#10;Off, the default: you have room, so a node handing the relic over already Radiant saves you that 100 and is scored 25% higher.&#10;&#10;On: you are at the cap, the saving is not real, and the bonus comes off. Either way this never tells you to crack a relic at a lower refinement.">Capped Void Traces</span>
+      <span class="lbl" data-tip="Your trace cap is (MR × 50) + 100, and a Radiant costs 100.&#10;&#10;Off: you have room, so a node that hands the relic over already Radiant scores 25% higher.&#10;On: you're at the cap, so that saving isn't real and the bonus comes off.">Capped Void Traces</span>
       <span class="switch-group">
         <span class="switch-end end-off">room to spare</span>
         <span class="switch" aria-hidden="true"><span class="switch-knob"></span></span>
@@ -116,7 +116,7 @@
     </label>
 
     <details class="advanced gap-lg">
-      <summary data-tip="Ranking per minute moved Capture and Exterminate up over a hundred places against one player's own timings, and dropped Spy by a factor of ten. Too big to ignore and too personal to ship — the numbers depend on your gear and your progression, so they are yours to give and blank until you do.&#10;&#10;One reward is the only unit that holds still: how far you take an endless mission is your own choice. A Defense reward is three waves, a Survival reward five minutes.&#10;&#10;Getting in and out is charged once a run, so it lands almost entirely on the short ones — 35 seconds makes a Capture cost 39% more and a six-round Survival 2%.">Effort — optional</summary>
+      <summary data-tip="Give minutes and the list is ranked by time instead of reward count. Blank by default: the numbers depend on your gear, so they're yours to give.&#10;&#10;Getting in and out is charged once per run, so it weighs most on short missions.">Effort — optional</summary>
       <p class="hint">Minutes for <strong>one reward</strong> — a Defense round, a Spy
         vault, a bounty stage.</p>
       <div id="effortRows" class="effort"></div>
@@ -156,7 +156,7 @@
         <h3 class="plan-h">Where to go</h3>
         <div class="plan-side plan-side-end">
         <select id="p-sort" class="rank-by" aria-label="Rank places on"
-                data-tip="Both count the same thing — wanted relics — and differ in what they divide it by.&#10;&#10;  Per reward   how fast a place fills the stack for the effort it costs.&#10;               One reward draw: a Defense round, a Spy vault, a bounty&#10;               stage. Becomes per minute once you give effort weights.&#10;  Per run      how much one trip hands over, however long the trip is.&#10;&#10;They disagree whenever a long run is worth going on with: a four-round Defense pays more per run than per round.&#10;&#10;A reward is the same unit on every row, which is what lets two different missions be compared at all. It is not the same amount of WORK — a Defense reward is three waves and an Excavation reward is one dig. Give effort weights and the ranking switches to minutes, which is the only unit that really is comparable.&#10;&#10;Whichever you pick is the big number on every row, because a row has to be sorted by the number it shows largest.">
+                data-tip="Per reward: how fast a place fills your list for the effort — a Defense round, a Spy vault, a bounty stage. Becomes per minute once you give effort times.&#10;Per run: how much one trip hands over, however long it takes.&#10;&#10;They disagree on long runs — a four-round Defense pays more per run than per round. The big number on each row is whichever you pick.">
           <option value="rate">per reward</option>
           <option value="run">per run</option>
         </select>

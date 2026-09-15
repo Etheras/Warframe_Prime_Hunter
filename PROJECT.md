@@ -8112,6 +8112,37 @@ The backlog entry that tracked it — titled *"The Ghoul and Plague Star detecti
 has never seen a live event"* until 2026-09-09 — went with it. Both captures, and
 the wrong prediction about Plague Star's tag, are in the sections above.
 
+### The planner's wording, cut by half
+
+**Asked for by the owner on 2026-09-05 and done on 2026-09-15** — *"trim the form
+text, and Effort (optional) by A LOT"*, taken as licence rather than a spec. The
+planner's nine tooltips went from **3,664 characters to 1,766**: *Count Aya drops*
+817 → 227, the sort control 912 → 351, *Effort — optional* 621 → 227. The status
+line under the Effort form lost its commentary as well.
+
+**What was cut, and the rule that decided it.** `STYLE.md §4` says a tooltip
+explains and never repeats, and §5 that explanation belongs collapsed at the foot
+rather than in the way. So each tooltip now carries the decision its control asks
+you to make and nothing else: what the switch does, and when to flip it. What went
+were the measurements that justified building each feature — Capture moving "over
+a hundred places", 35 seconds costing a Capture 39% more. That was the argument
+for the design, addressed to the person using it; it lives here and in the history,
+where the next person changing the design will look for it.
+
+**One number is gone for its own reason.** The Railjack tip said *"Five live relics
+drop only there"*, a count written into markup that went stale on every vault
+rotation. It now says what is always true: a relic with nowhere else to drop is
+shown anyway, which is the stranded-relic rule in `plan.js`.
+
+**One sentence was added.** *Include event nodes* now says an event bounty the build
+can see running appears by itself. With Plague Star live a reader could otherwise
+tick the box believing the bounty needs it, and it never has — `eventRunning`
+gates it on the window.
+
+**What the tests pin about wording is almost nothing.** No page test asserts a
+planner tooltip's text. One pins the shape of the Effort status line — `/\d+ set/`
+must not appear when the only saved value is hidden — and both branches keep it.
+
 ---
 
 ## 8. Gotchas discovered while building

@@ -1683,21 +1683,15 @@
          and saying so is the difference between a control that waits and one
          that is broken. */
       const overNote = over > 0
-        ? ` Every run also costs <b>${n2(over)} min</b> in getting in and out, ` +
-          `charged once however far you take it.`
+        ? ` Plus <b>${n2(over)} min</b> a run for getting in and out.`
         : "";
       note.innerHTML = !modes.length ? ""
         : set.length
-          ? `<b>${set.length} set.</b> Every other type is costed at their average, ` +
-            `${n2(mean)} min — shown in amber on the row, so a borrowed number is ` +
-            `never mistaken for one of yours.` + overNote
-          : `Nothing set, so every mission is costed by its <b>reward count</b> ` +
-            `— four rounds, three vaults, one run. That is the default and it works. ` +
-            `Fill in a single type and the whole list re-sorts on real minutes.` +
-            (over > 0
-              ? ` Getting in and out is saved and waits for them: a flat ${n2(over)} min ` +
-                `cannot be charged against a reward count.`
-              : "");
+          ? `<b>${set.length} set.</b> The rest use their average, ${n2(mean)} min, ` +
+            `shown in amber.` + overNote
+          : `Nothing set, so missions are costed by <b>reward count</b>. ` +
+            `Fill in one type to rank by minutes.` +
+            (over > 0 ? ` Getting in and out (${n2(over)} min) waits until you do.` : "");
     }
     const clear = $("#effortClear");
     // `saved`, not `set` — the escape hatch has to reach values the rows cannot
