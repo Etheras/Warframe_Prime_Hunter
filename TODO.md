@@ -1824,56 +1824,40 @@ ours, `objectivesOf` keys off them, and a future member that behaves differently
 would be mis-costed until somebody noticed. That is a real risk and not an urgent
 one, and it is now a guarded risk rather than an unguarded one.
 
-### Plague Star and Profit-Taker are the same shape, modelled two ways
+### A bounty run is counted as one draw, and charged every stage
 
-**No longer a prediction — observed 2026-09-09.** Plague Star opened at 15:00Z
-(to 2026-09-23T14:00Z), so the "when Plague Star next runs" this entry has waited
-on since 2026-08-14 is **now**, and the fortnight to answer it in is running.
+**Found 2026-09-15, while folding the Hemocyte into Plague Star.** Not fixed: it
+moves every bounty in the planner at once, so it is the owner's decision rather
+than a bug fix.
 
-**What the two rows actually look like, on a wishlist of four Primes with the
-event live**, read off the rendered planner rather than reasoned about:
+A bounty pays a reward at **every stage**, each from that stage's own table. DE's
+Plague Star table has three that apply to a four-stage run: Stage 1 (10 relics at
+1.14%), Stages 2 and 3 (21 relics at 0.58%), and the Final Stage (22 relics at
+0.67%).
 
-| rank of 118 | row |
-|---|---|
-| **2** | `Hemocyte (Enemy) — Enemy drops` |
-| **113** | `Level 15 - 25 Plague Star (Bounty) — Cetus (Plains of Eidolon)` |
+The model sees one of them. `normalise_sources` (`relics.py`) collapses every row
+a relic has at a node into its **best single-stage chance**, and `bountyRun`
+(`rotation.js`) then counts **one draw** per run — `tally({ none: 1, … })` —
+while `objectivesOf` charges the full **four stages**. So a bounty's per-reward
+figure is one stage's draw spread over four stages' cost.
 
-So the phantom destination is not merely present, it is **near the top of the
-list while the real node it rides on is near the bottom** — 111 places apart,
-for one trip. That is worse than the entry predicted, and it is the shape a
-reader acts on first. The `Enemy` badge and the "four spawn in the Plague Star
-final stage" note are doing the only work stopping it from being a straight lie.
+**Measured on DE's own table:** Neo C7 is in Stage 1 at 1.14% and in Stages 2 and
+3 at 0.58% each, so a run holds **at least 2.30%** of it. The model counts
+**1.14%**. The collapse and the single draw are generic, so every bounty goes
+through them — Cetus, Solaris, Entrati and Zariman alike. How much each one loses
+depends on how many of its stages carry relics, and that is not measured here.
 
-Everything below was written before either row could be seen.
+**What the 2026-09-15 fold did and did not change.** Its Hemocyte term is exact
+whatever this becomes: four kills at DE's 20% gate is 0.8 draws a run, in the
+same unit. The bounty's own term keeps this undercount, so the Advanced Plague
+Star row is still low, by the same factor as every other bounty.
 
-**Raised by the owner 2026-08-14, and they are right that something is off.**
-Both are gated multi-stage activities that end in a boss dropping relics. Four of
-the five differences are real and the models follow them correctly — Profit-Taker
-is permanent so it gets a badge, Plague Star is a recurring Operation so it gets an
-event gate (`PROJECT.md §7`).
+**What fixing it needs.** Keep a relic's rows per stage instead of collapsing to
+the best one, and have `bountyRun` count a draw per stage — or, equivalently, sum
+a relic's stage chances into a per-run chance in the build.
 
-**The fifth is ours.** DE file Profit-Taker's boss rewards inside the bounty table
-and Plague Star's boss rewards in the enemy table — the same game structure,
-published two ways. We follow the publication rather than the structure, so when
-Plague Star next runs the planner will list **two rows for one trip**:
-`Level 15 - 25 Plague Star` at 1.14%, and `Hemocyte` at 12.91% with eleven relics,
-from `planet: "Enemy drops"`, a place that does not exist.
-
-`Hemocyte` is the only enemy in DE's entire relic table, so this is a list of
-one — but a list of one that reads as a phantom destination scoring ten times
-the real node beside it.
-
-**Half-fixed:** the row carries an `Enemy` badge saying it is not a place, that four
-spawn in the Plague Star final stage, and that the two rows are one trip. That stops
-it lying without pretending to be finished.
-
-**The rest, when Plague Star next runs.** Folding the enemy rows into the bounty
-they ride needs a probability structure the model does not have. DE publish
-`Hemocyte Relic Drop Chance: 20.00%` and then 12.91% per relic within that, and
-four spawn per run — so a run is worth `4 × 0.20 = 0.8` relic rolls, not the one
-roll currently assumed. Getting that right is arithmetic; getting it *checked*
-needs the event live, which is the same blocker as the detection below. Do both
-in the same sitting.
+**Size: medium.** One collapse rule, one draw count, and a pass over the bounty
+tests that pin today's figures.
 
 ### ~~A Radiant node is worth 25% more, and still nobody can see it~~
 

@@ -612,7 +612,10 @@ SYNDICATE_SECTION = {
 EVENT_BOUNTIES = {
     "Level 15 - 25 Ghoul Bounty": "Ghoul Purge",
     "Level 40 - 50 Ghoul Bounty": "Ghoul Purge",
-    "Level 15 - 25 Plague Star": "Plague Star",
+    # The Advanced run, not the 15-25 label DE's drop table gives it:
+    # `fold_event_enemies` renames the row before this is read, because the
+    # Hemocytes it now carries spawn only on Advanced. See EVENT_ENEMY_FOLDS.
+    "Level 55 - 65 Plague Star": "Plague Star",
 }
 EVENT_PATTERNS = {
     "Ghoul Purge": re.compile(r"ghoul", re.I),
@@ -691,9 +694,108 @@ QUEST_MISSIONS = frozenset({
 })
 
 # Enemies that only exist while an event runs. The Hemocyte appears solely in
-# the final stage of the Plague Star bounty - "a total of four spawning during
-# the final stage" - so it rides the window the bounty already rides.
+# the final stage of the Advanced and Steel Path Plague Star bounties - "a total
+# of four spawning during the final stage" - so it rides the window the bounty
+# already rides. Since 2026-09-15 it is normally folded into that bounty below,
+# and this gate is what still holds it when the fold cannot run.
 EVENT_ENEMIES = {"Hemocyte": "Plague Star"}
+
+# An enemy that spawns inside a bounty is part of that bounty's run, not a place
+# of its own, so its relic table is folded into the bounty and its own row goes.
+# Owner's decision, 2026-09-15, taken with the event live.
+#
+# DE file the Hemocyte's relics under *enemies* and Plague Star's stage rewards
+# under the bounty - one trip published as two tables. Followed literally that
+# is two rows, and read off the planner on 2026-09-10 it put the phantom second
+# of 118 and the bounty it rides 113th: charged "one run" instead of the four
+# stages it takes to reach, and valued at one full roll per run where DE's own
+# gate makes it a fifth of one per kill.
+#
+# **The row is the Advanced run, and its name says so.** Hemocytes appear only
+# on the Advanced (55-65) and Steel Path variants, never on the 15-25 one DE's
+# drop table names - the wiki's Hemocyte page says so, and it fits the owner's
+# own runs. DE's worldstate has the Basic and Advanced jobs paying the same
+# `PlagueStarTableRewards`, so the table carries over unchanged and only the
+# level band and the Hemocytes differ. Steel Path pays a table DE do not
+# publish, so it cannot be priced at all. Of the three shapes offered the owner
+# chose this one: a single row as the Advanced run, rather than a row per tier.
+#
+# `spawns` is the one number in here that no DE table carries. Four, at 25, 50,
+# 75 and 99% of the final stage: the wiki's Hemocyte page, confirmed by the
+# owner in play on 2026-09-15. The gate is DE's and is read off the drop table
+# rather than written here - see the enemy section of `official.parse_droptables`.
+EVENT_ENEMY_FOLDS = {
+    "Hemocyte": {"bounty": "Level 15 - 25 Plague Star",
+                 "as": "Level 55 - 65 Plague Star", "spawns": 4},
+}
+
+
+def fold_event_enemies(relic_sources: dict) -> dict:
+    """
+    Fold each event enemy's relic rows into the bounty it spawns in.
+
+    What one run adds, in the model's own unit - expected copies of a relic per
+    run - is `spawns x gate x chance`: four Hemocytes, each dropping a relic 20%
+    of the time, each relic a share of that. It is **added to the relic's chance
+    on the bounty rather than listed beside it**, and that is not cosmetic.
+    `M.creditRelics` discounts a row whose parts are already covered to a
+    quarter, so the same relic listed twice at one node would lose three
+    quarters of its extra copies to a rule written for *different* relics.
+
+    The rename is unconditional and the merge is not. Without a gate there is no
+    honest per-kill figure, so the enemy rows are left where they were - still
+    tied to their event by `tag_access`, which is how every build behaved before
+    this - and the build log says so. The bounty is renamed either way, because
+    `EVENT_BOUNTIES` gates it under the new name, and a row that slipped its
+    gate would be listed as though the event ran all year.
+
+    Returns `{enemy: {"folded": n, "added": n}}`, or `{enemy: {"unfolded":
+    why}}` for one left as it was, so the log can say which happened and why.
+    The three reasons are different news: a missing gate is DE's table changing
+    shape, while an enemy with no rows at all is only the event's table gone.
+    """
+    report: dict = {}
+    for enemy, fold in EVENT_ENEMY_FOLDS.items():
+        on_bounty = [r for rows in relic_sources.values() for r in rows
+                     if r.get("kind") == "bounty" and r.get("node") == fold["bounty"]]
+        for r in on_bounty:
+            r["node"] = fold["as"]
+        enemy_rows = [(name, r) for name, rows in relic_sources.items() for r in rows
+                      if r.get("kind") == "enemy" and r.get("node") == enemy]
+        gates = {r.get("gate") for _, r in enemy_rows}
+        why = ("it has no rows in this build's drop table" if not enemy_rows
+               else "the bounty it spawns in is not in the drop table" if not on_bounty
+               else "DE's table gave no single relic gate for it"
+               if len(gates) != 1 or None in gates else None)
+        if why:
+            report[enemy] = {"unfolded": why}
+            continue
+        gate = gates.pop() / 100
+        template = on_bounty[0]
+        folded = added = 0
+        for name, row in enemy_rows:
+            rows = relic_sources[name]
+            rows.remove(row)
+            host = next((r for r in rows if r.get("kind") == "bounty"
+                         and r.get("node") == fold["as"]), None)
+            if host is None:
+                # A relic only the enemy drops - Meso K8, for the Hemocyte. It
+                # still comes from this run, in the final stage.
+                host = {"kind": "bounty", "planet": template.get("planet"),
+                        "node": fold["as"], "mode": template.get("mode"),
+                        "rotation": template.get("rotation"), "chance": 0,
+                        "rarity": row.get("rarity"), "stage": "Final Stage"}
+                rows.append(host)
+                added += 1
+            host["chance"] = round((host.get("chance") or 0)
+                                   + fold["spawns"] * gate * (row.get("chance") or 0), 2)
+            host["folded"] = {"enemy": enemy, "spawns": fold["spawns"],
+                              "gate": round(gate * 100, 2)}
+            rows.sort(key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "",
+                                     s.get("node") or ""))
+            folded += 1
+        report[enemy] = {"folded": folded, "added": added}
+    return report
 
 
 def tag_access(relic_sources: dict, aya_sources: list) -> dict:
@@ -1691,6 +1793,16 @@ def main() -> int:
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)
+
+    # Fold an event enemy into the bounty it spawns in - the Hemocyte into
+    # Advanced Plague Star - before anything else reads either row: before
+    # `tag_access` gates what is left, and before `lvl` is read off node names.
+    for enemy, got in fold_event_enemies(relic_sources).items():
+        if "unfolded" in got:
+            log(f"~ fold: {enemy} left as its own row - {got['unfolded']}")
+        else:
+            log(f"fold: {enemy} into its bounty - {got['folded']} relic(s), "
+                f"{got['added']} of them new to it")
 
     # Tag what cannot be entered today, so the planner can leave it out while
     # the collection view still says where a relic comes from.

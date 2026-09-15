@@ -1589,7 +1589,13 @@ file at all because a preamble was deleted around them. `TODO.md` carries it.
 ```
 
 `chances` is keyed by refinement: `{ Intact, Exceptional, Flawless, Radiant }`.
-`kind` is one of `mission`, `bounty`, `key`, `transient`, `enemy`.
+`kind` is one of `mission`, `bounty`, `key`, `transient`, `enemy` — though since
+2026-09-15 the only enemy DE list, the Hemocyte, is folded into the bounty it
+spawns in, so a normal build ships no `enemy` row at all. Two optional keys came
+with that: a bounty row carrying folded drops has `folded: { enemy, spawns,
+gate }`, and an enemy row the fold could not use keeps DE's own `gate` — the
+*Relic Drop Chance* on its header, as a percentage. §7, *The Hemocyte is folded
+into Advanced Plague Star*, has why.
 
 ### A bounty's rotation is a wall clock, not a depth
 
@@ -8004,6 +8010,80 @@ change**, so a check that only ever reads a local payload cannot see one.
 - **The wiki page is not re-read more often.** It sends `max-age=0` and no ETag,
   so every ask is a full ~56 KB download, and a fresher copy only finds a markup
   change sooner — it cannot prevent one.
+
+### The Hemocyte is folded into Advanced Plague Star
+
+**Owner's decision, 2026-09-15, taken with the event live and three shapes
+offered.** DE file the Hemocyte's relics under enemies and Plague Star's stage
+rewards under the bounty — one trip, published as two tables — and followed
+literally that was two rows. Read off the planner the day the event opened, the
+phantom ranked **second of 118** and the bounty it rides **113th**.
+
+**Two things were wrong with the enemy row, and they compounded.** It was charged
+*one run*, the default for a row that is neither a bounty nor a fixed-length
+mission, when the only way to reach a Hemocyte is to run the bounty to its final
+stage. And it was valued at a full roll per run: DE's header reads *Relic Drop
+Chance: 20.00%*, and the chances beneath it are shares inside that gate — the
+eleven relics sum to 100.01% — which the parser read past and threw away.
+
+**The fold.** `fold_event_enemies` (`build_data.py`) adds `spawns × gate ×
+chance` to each relic's chance on the bounty — four kills at 20%, which is 0.8
+draws a run — and deletes the enemy rows. Meso K8, which only the Hemocyte
+drops, gets a new row on the bounty in its final stage. The gate is now parsed
+off DE's header into each enemy row (`official.parse_droptables`) rather than
+written in code. The spawn count — four, at 25, 50, 75 and 99% of the final
+stage — is the one figure no DE table carries: it is the wiki's, confirmed by the
+owner in play.
+
+**Added to the relic's row rather than listed beside it, and that was forced.**
+`M.creditRelics` discounts a row whose parts are already covered to 25%, so a
+second row for the same relic at the same node would have lost three quarters of
+its extra copies to a rule written for *different* relics.
+
+**Why the row is the Advanced run.** The wiki's Hemocyte page says they appear
+only on the Advanced (55–65) and Steel Path variants, never on the 15–25 one
+DE's drop table names. DE's worldstate has the Basic and Advanced jobs paying the
+same `PlagueStarTableRewards`, so the table carries over unchanged; Steel Path
+pays `PlagueStarTableSteelPathRewards`, which DE do not publish, so it cannot be
+priced. Offered one row per tier, one row as the Advanced run, or the Hemocytes
+put on the 15–25 row, the owner chose **one row as the Advanced run**:
+`Level 55 - 65 Plague Star`, whose `lvl` follows from the name. Advanced costs
+two event ingredients to enter; both are earned in play, so hard rule 10 holds.
+
+**The owner's first instinct was that Hemocytes drop no relics, and the evidence
+said otherwise.** DE's current table gives the 20% gate and eleven relics, and
+the wiki's own patch history records DE adding relics as in-world Hemocyte drops
+in Update 30.7 and a pickup notice for them in 30.7.4. Only the page's intro
+leaves them out. Put to the owner as a choice with both in front of them, they
+followed DE's table.
+
+**What stays unfolded, by design.** With no gate there is no honest per-kill
+figure, so the enemy rows are left as they were — tied to their event by
+`tag_access`, badged `Enemy` by `enemyDemand` — and the build log says why. The
+bounty is renamed regardless, because `EVENT_BOUNTIES` gates it under the new
+name and a row that slipped its gate would read as though the event ran all year.
+
+**The bounty half of the row is still low, and that is a separate question.**
+The model counts one draw per bounty run, at each relic's best stage, while
+charging every stage — `TODO.md`, *A bounty run is counted as one draw, and
+charged every stage*. The Hemocyte term is exact whatever that becomes.
+
+### A test left two rows in the published feed log on every full CI build
+
+**Found 2026-09-15**, by matching the deployed log against the runs that wrote
+it: each full build wrote three rows — two `offline` about ten seconds in, then
+its own. `test_offline_build` runs the real `build_data.py --offline` twice, and
+it snapshot-and-restores `data/` so it cannot overwrite the owner's freshness
+markers. But it restored only what *existed*, and on CI nothing does, because the
+suite runs before the build step. So the two test builds' `data/feed-log.json` —
+the deployed log plus two `offline` rows — was left behind, and the real build
+continued it and published all three. Locally `data/` always exists, which is
+why it never showed here.
+
+The fix keeps the test's design — the real command, run the real way — and
+restores **absence** as well. Whether `data/` and `CHANGELOG.md` existed is read
+before the `try`, so a copy that fails half-way cannot be mistaken for "it was
+not there" and cost the real `data/`.
 
 ---
 

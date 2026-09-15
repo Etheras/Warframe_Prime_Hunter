@@ -421,7 +421,7 @@ def test_live_event_bounties() -> None:
 
     meta = build_data.build_bounty_meta(
         official.bounty_rotation_pools(_BOUNTY_PAGE), [], events, True, _NOW)
-    star = meta["events"]["Level 15 - 25 Plague Star"]
+    star = meta["events"]["Level 55 - 65 Plague Star"]   # the Advanced run - EVENT_ENEMY_FOLDS
     check("events: window emitted, not a boolean", star.get("expiry"),
           "2026-08-20T00:00:00Z")
     check("events: a bounty nobody is running has no window",
@@ -732,6 +732,15 @@ def test_offline_build() -> None:
     data_dir = os.path.join(ROOT, "data")
     changelog = os.path.join(ROOT, "CHANGELOG.md")   # appended to on a change
     before = _tree_state(data_dir, changelog)
+    # **Absent is a state too, and on CI it is the only one.** The suite runs
+    # before the build step there, so `data/` does not exist yet, and restoring
+    # "what was there" restored nothing: these two builds' `data/feed-log.json`
+    # - two `offline` rows appended to the deployed log - was left behind, and
+    # the real build continued it and published all three. Every full CI build
+    # did this until 2026-09-15. Locally `data/` always exists, so it never
+    # showed here. Read before the `try`, so a failed copy below cannot be
+    # mistaken for absence and cost the real `data/`.
+    had_data, had_log = os.path.isdir(data_dir), os.path.isfile(changelog)
     keep = tempfile.mkdtemp(prefix="primehunter-data-")
     try:
         if os.path.isdir(data_dir):
@@ -763,9 +772,13 @@ def test_offline_build() -> None:
         if os.path.isdir(saved):
             shutil.rmtree(data_dir, ignore_errors=True)
             shutil.copytree(saved, data_dir)
+        elif not had_data:
+            shutil.rmtree(data_dir, ignore_errors=True)   # it was not there - see above
         saved_log = os.path.join(keep, "CHANGELOG.md")
         if os.path.isfile(saved_log):
             shutil.copy2(saved_log, changelog)
+        elif not had_log and os.path.isfile(changelog):
+            os.remove(changelog)
         shutil.rmtree(keep, ignore_errors=True)
 
     # Every file that existed before must be byte-identical after. Files that did
@@ -2319,10 +2332,11 @@ def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> Non
                "only activation, expiry, tag and node reach meta.bounties.events")
 
     bands = [(j["minEnemyLevel"], j["maxEnemyLevel"]) for j in doc["Goals"][0]["Jobs"]]
-    check("plague star: DE publish three bands and the drop tables only one",
+    check("plague star: DE publish three bands, and the one row is the Advanced run",
           (bands, sorted(g for g in build_data.EVENT_BOUNTIES if "Plague" in g)),
-          ([(15, 25), (55, 65), (100, 110)], ["Level 15 - 25 Plague Star"]),
-          "the Advanced and Steel Path tiers carry no relics of their own")
+          ([(15, 25), (55, 65), (100, 110)], ["Level 55 - 65 Plague Star"]),
+          "Hemocytes spawn only on Advanced and Steel Path; Basic and Advanced pay "
+          "one table, and Steel Path's is not published - see EVENT_ENEMY_FOLDS")
 
 
 def test_the_rotation_letter_is_read_then_cross_checked() -> None:
@@ -2927,9 +2941,101 @@ def test_unreachable_sources_are_tagged() -> None:
         check("no live quest mission is left untagged",
               sorted({s["node"] for s in live
                       if s["node"] in build_data.QUEST_MISSIONS and not s.get("access")}), [])
-        check("Hemocyte is tagged in the real data",
-              sorted({s.get("access") for s in live if s["node"] == "Hemocyte"}),
-              ["event:Plague Star"])
+        # Since 2026-09-15 the Hemocyte is folded into Advanced Plague Star, so
+        # a payload built from DE's own table has no enemy row left for this to
+        # tag - and the one that did survive is exactly the case to catch. The
+        # fold itself is tested on a fixture below; this is the real table.
+        check("no live enemy row survives the fold in the real data",
+              sorted({s["node"] for s in live if s["kind"] == "enemy"}), [],
+              "DE's relic gate was not read, or the fold did not run")
+        check("and nothing still carries the 15-25 name it is folded out of",
+              sorted({s["node"] for s in live if s["node"] == "Level 15 - 25 Plague Star"}),
+              [], "a row under the old name slips EVENT_BOUNTIES' gate")
+        star = [s for s in live if s["node"] == "Level 55 - 65 Plague Star"]
+        if star:
+            check_true("and Advanced Plague Star carries the Hemocyte's relics",
+                       any(s.get("folded") for s in star), f"{len(star)} rows on it")
+
+
+def test_an_event_enemy_is_folded_into_the_bounty_it_spawns_in() -> None:
+    """
+    One trip, published as two tables, is one row. Owner's decision, 2026-09-15.
+
+    DE file the Hemocyte's relics under enemies and Plague Star's stage rewards
+    under the bounty. Taken literally that was two rows, and on 2026-09-10 the
+    planner ranked the phantom second of 118 and the bounty it rides 113th:
+    charged "one run" rather than the four stages it takes to reach, and valued
+    as a full roll per run where DE's gate makes it a fifth of one per kill.
+
+    Three things are pinned, and the second is the one a tidier fold would get
+    wrong. The arithmetic: `spawns x gate x chance`, four kills at 20%. That it
+    is **added to the relic's existing row** rather than listed beside it,
+    because `M.creditRelics` discounts a row whose parts are already covered to
+    a quarter, and a second row for the same relic is exactly that shape. And
+    that without DE's gate nothing is folded - there is no honest per-kill
+    figure - while the bounty is renamed anyway, since EVENT_BOUNTIES gates it
+    under the new name.
+    """
+    def fixture(gate=20.0):
+        def enemy(chance, rarity):
+            row = {"kind": "enemy", "planet": "Enemy drops", "node": "Hemocyte",
+                   "mode": "Enemy", "rotation": None, "chance": chance, "rarity": rarity}
+            if gate is not None:
+                row["gate"] = gate
+            return row
+        bounty = lambda chance: {"kind": "bounty", "planet": "Cetus (Plains of Eidolon)",
+                                 "node": "Level 15 - 25 Plague Star", "mode": "Bounty",
+                                 "rotation": "A", "chance": chance,
+                                 "rarity": "Ultra Rare", "stage": "Stage 1"}
+        return {
+            "Neo C7": [bounty(1.14), enemy(4.51, "Rare")],        # on both tables
+            "Meso K8": [{"kind": "mission", "planet": "Void", "node": "Ukko",
+                         "mode": "Capture", "rotation": None, "chance": 10.0},
+                        enemy(12.91, "Uncommon")],              # the enemy's alone
+            "Lith Q3": [bounty(1.14)],                            # the bounty's alone
+        }
+
+    rows = fixture()
+    check("fold: it reports what it did",
+          build_data.fold_event_enemies(rows), {"Hemocyte": {"folded": 2, "added": 1}})
+    everything = [s for rs in rows.values() for s in rs]
+    check("fold: no enemy row survives it",
+          [s for s in everything if s["kind"] == "enemy"], [])
+    check("fold: the bounty is the Advanced run now, under one name",
+          sorted({s["node"] for s in everything if s["kind"] == "bounty"}),
+          ["Level 55 - 65 Plague Star"])
+
+    c7 = [s for s in rows["Neo C7"] if s["kind"] == "bounty"]
+    check("fold: a relic on both tables is still one row",
+          len(c7), 1, "a second row would be discounted to 25% as redundant")
+    check("fold: four kills at DE's gate are added to the bounty's own chance",
+          c7[0]["chance"], round(1.14 + 4 * 0.20 * 4.51, 2))
+    check("fold: and the row says what it carries, for the tooltip",
+          c7[0]["folded"], {"enemy": "Hemocyte", "spawns": 4, "gate": 20.0})
+
+    k8 = next(s for s in rows["Meso K8"] if s["kind"] == "bounty")
+    check("fold: a relic only the enemy drops gets a row on the bounty",
+          (k8["chance"], k8["stage"], k8["rotation"], k8["planet"]),
+          (round(4 * 0.20 * 12.91, 2), "Final Stage", "A", "Cetus (Plains of Eidolon)"))
+    check("fold: and its sources are re-sorted, best first",
+          rows["Meso K8"][0]["node"], "Level 55 - 65 Plague Star",
+          "10.33% beats Ukko's 10% and has to lead")
+    check("fold: a relic the enemy never drops is renamed and nothing else",
+          (rows["Lith Q3"][0]["chance"], "folded" in rows["Lith Q3"][0]), (1.14, False))
+    check("fold: and the level band follows the new name",
+          official.group_levels(c7[0]["node"]), [55, 65])
+
+    rows = fixture(gate=None)
+    check("fold: no gate, no fold, and it says why",
+          build_data.fold_event_enemies(rows),
+          {"Hemocyte": {"unfolded": "DE's table gave no single relic gate for it"}})
+    check("fold: the enemy rows stay, for tag_access to gate as before",
+          len([s for rs in rows.values() for s in rs if s["kind"] == "enemy"]), 2)
+    check("fold: but the bounty is renamed anyway, or it would slip its gate",
+          sorted({s["node"] for rs in rows.values() for s in rs if s["kind"] == "bounty"}),
+          ["Level 55 - 65 Plague Star"])
+    check_true("fold: and the new name is the one EVENT_BOUNTIES gates",
+               build_data.EVENT_BOUNTIES.get("Level 55 - 65 Plague Star") == "Plague Star")
 
 
 def test_an_optional_source_cannot_fail_the_build() -> None:
@@ -5126,6 +5232,7 @@ def main() -> int:
                          test_an_unreadable_export_index_degrades_instead_of_crashing,
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
+                         test_an_event_enemy_is_folded_into_the_bounty_it_spawns_in,
                          test_an_optional_source_cannot_fail_the_build,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,

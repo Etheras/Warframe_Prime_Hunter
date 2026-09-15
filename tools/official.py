@@ -290,18 +290,34 @@ def parse_droptables(page: str):
             })
 
     # ---- relics dropped by enemies --------------------------------------
-    enemy = None
+    # DE print a gate on each enemy's header - `Hemocyte | Relic Drop Chance:
+    # 20.00%` - and the chances beneath it are shares *inside* that gate: the
+    # Hemocyte's eleven relics sum to 100.01%. So a row's `chance` is what a
+    # relic is worth once a relic drops at all, and `gate` is how often one does.
+    # Carried rather than multiplied in, because what a kill is worth depends on
+    # how many kills a run has, and that is not in this table - see
+    # `fold_event_enemies` in build_data.py. Until 2026-09-15 the gate was read
+    # past and thrown away, which is how the Hemocyte came to be valued as a full
+    # roll per run.
+    enemy = gate = None
     for is_head, cells in _rows(sections.get("relicByAvatar", "")):
         if is_head:
-            enemy = cells[0]
+            enemy, gate = cells[0], None
+            for cell in cells[1:]:
+                m = re.search(r"Relic Drop Chance:\s*([\d.]+)\s*%", cell, re.I)
+                if m:
+                    gate = float(m.group(1))
             continue
         if not enemy or len(cells) < 2:
             continue
         rarity, chance = _split_rate(cells[-1])
-        add_source(cells[-2], {
+        row = {
             "kind": "enemy", "planet": "Enemy drops", "node": enemy, "mode": "Enemy",
             "rotation": None, "chance": chance, "rarity": rarity,
-        })
+        }
+        if gate is not None:
+            row["gate"] = gate
+        add_source(cells[-2], row)
 
     return relic_contents, relic_sources, aya_sources
 

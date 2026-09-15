@@ -760,6 +760,10 @@
         if (prev == null || (s.chance || 0) > prev.chance) {
           n.relics.set(rname, { chance: s.chance || 0, rotation: s.rotation });
         }
+        /* The build folded an event enemy's drops into this bounty - the four
+           Hemocytes of Advanced Plague Star - so the row has to say its chances
+           include them. See `fold_event_enemies` in build_data.py. */
+        if (s.folded && !n.folded) n.folded = s.folded;
       });
     });
 
@@ -1233,6 +1237,16 @@
         ? n.eventBounty.event + " is running until " +
           String(n.eventBounty.expiry).slice(0, 10) + "."
         : n.eventBounty.event + " is not running, so this bounty is not on the board.");
+    }
+    /* The run's relic chances include an event enemy's drops, folded in by the
+       build rather than listed as a row of their own - see `fold_event_enemies`
+       in build_data.py. Said here because nothing else on the row shows it. */
+    if (n.folded) {
+      lines.push("");
+      lines.push("Includes the " + n.folded.spawns + " " + n.folded.enemy +
+        "s of the final stage. Each drops");
+      lines.push("a relic " + n.folded.gate + "% of the time, and those are counted");
+      lines.push("in this row rather than as a row of their own.");
     }
 
     const label = b.letter ? "rot " + b.letter

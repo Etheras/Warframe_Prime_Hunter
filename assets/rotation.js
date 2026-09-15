@@ -879,13 +879,16 @@
   /* An enemy is not a place you can go.
      DE files relic-dropping enemies in their own section, and there is exactly
      one in the whole table: the Hemocyte, which spawns four to a run in the
-     final stage of the Plague Star bounty. That makes it a *second row for a
-     trip already listed* - the Plague Star bounty is the other one - rather
-     than somewhere else to be.
+     final stage of Advanced Plague Star. Since 2026-09-15 the build folds it
+     into that bounty (`fold_event_enemies` in build_data.py), so on a normal
+     build no enemy row reaches this at all.
 
-     Keyed on the kind rather than the name, so a second relic-dropping enemy
-     would be caught too. The tip names the event when the build knows it, which
-     is the only thing that makes such a row reachable at all. */
+     Kept for the two cases the fold leaves behind: a build whose drop table
+     gave no relic gate, where the Hemocyte stays a row of its own, and a second
+     relic-dropping enemy DE add before anyone folds it. Keyed on the kind
+     rather than the name for exactly that reason. The tip names the event when
+     the build knows it, which is the only thing that makes such a row
+     reachable at all. */
   function enemyDemand(s) {
     const ev = String(s.access || "").indexOf("event:") === 0
       ? String(s.access).slice(6) : null;
