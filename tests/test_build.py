@@ -408,16 +408,13 @@ def test_live_event_bounties() -> None:
                "activation": "2026-08-01T00:00:00Z", "expiry": "2026-08-20T00:00:00Z"},
               {"description": "Thermia Fractures", "node": "Orb Vallis (Venus)",
                "activation": "2026-08-01T00:00:00Z", "expiry": "2026-08-24T00:00:00Z"}]
-    found = build_data.find_live_events(events, [])
+    found = build_data.find_live_events(events)
     check("events: Plague Star found", "Plague Star" in found, True)
     check("events: unrelated events ignored", "Ghoul Purge" in found, False)
-
-    # a purge arrives as a syndicate whose tag WFCD does not map
-    purge = [{"syndicate": "GhoulEmergenceSyndicate", "jobs": [{"type": "Ghoul Bounty"}],
-              "activation": "2026-08-10T00:00:00Z", "expiry": "2026-08-17T00:00:00Z"}]
-    check("events: a purge found on the syndicate list",
-          build_data.find_live_events([], purge)["Ghoul Purge"]["expiry"],
-          "2026-08-17T00:00:00Z")
+    # The bounty boards were a second way in until 2026-09-15, looking for a
+    # syndicate named after an event. It could not fire from either source and
+    # was deleted; a purge is found on its Goal, which the Ghoul fixture further
+    # down pins against DE's real entry.
 
     meta = build_data.build_bounty_meta(
         official.bounty_rotation_pools(_BOUNTY_PAGE), [], events, True, _NOW)
@@ -2047,7 +2044,7 @@ def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> Non
         "tooltip": "", "name": "PlagueStar",
         "activation": "2026-09-09T00:00:00Z", "expiry": "2026-09-23T00:00:00Z",
     }]
-    found = build_data.find_live_events(de_shape, [])
+    found = build_data.find_live_events(de_shape)
     check("event: found in Digital Extremes' shape, where Desc is a path",
           found.get("Plague Star", {}).get("expiry"), "2026-09-23T00:00:00Z",
           "DE do not publish prose; a pattern that needs a space goes blind here")
@@ -2059,7 +2056,7 @@ def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> Non
                    "activation": "2026-09-09T00:00:00Z",
                    "expiry": "2026-09-23T00:00:00Z"}]
     check("event: and still found in the proxy's prose shape",
-          "Plague Star" in build_data.find_live_events(wfcd_shape, []), True,
+          "Plague Star" in build_data.find_live_events(wfcd_shape), True,
           "the proxy answers most CI builds, so both shapes are live")
 
     # The tag branch: a known tag decides on its own, and the text need not match.
@@ -2073,7 +2070,7 @@ def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> Non
                      "activation": "2026-09-09T00:00:00Z",
                      "expiry": "2026-09-23T00:00:00Z"}]
         check("event: a known tag identifies it with nothing else to go on",
-              "Plague Star" in build_data.find_live_events(nameless, []), True,
+              "Plague Star" in build_data.find_live_events(nameless), True,
               "this is what a sighting buys: prose DE can reword stops mattering")
 
         # A tag DE gave to something else must not be read as ours.
@@ -2081,7 +2078,7 @@ def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> Non
                   "tooltip": "", "name": "", "node": "",
                   "activation": "2026-09-09T00:00:00Z",
                   "expiry": "2026-09-23T00:00:00Z"}]
-        got = build_data.find_live_events(wrong, [])
+        got = build_data.find_live_events(wrong)
         check("event: a tag naming another event beats a keyword that agrees",
               sorted(got), ["Plague Star"],
               "the tag is the machine identifier; the blob is prose and loses")
@@ -2093,7 +2090,7 @@ def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> Non
                     "activation": "2026-09-09T00:00:00Z",
                     "expiry": "2026-09-23T00:00:00Z"}]
         check("event: an unrecognised tag falls through to the scan",
-              "Plague Star" in build_data.find_live_events(unknown, []), True,
+              "Plague Star" in build_data.find_live_events(unknown), True,
               "an unknown tag must read as 'no opinion', never as 'not this'")
     finally:
         build_data.EVENT_TAGS.clear()
@@ -2206,7 +2203,7 @@ def test_a_real_ghoul_purge_as_digital_extremes_actually_published_it() -> None:
           events[0]["description"], "/Lotus/Language/GameModes/RecurringGhoulAlert",
           "the prose form is WFCD's; this is what the first-party route delivers")
 
-    found = build_data.find_live_events(events, [])
+    found = build_data.find_live_events(events)
     check("ghoul: the real path form is matched, not just the invented one",
           found.get("Ghoul Purge", {}).get("expiry"), "2026-09-29T17:49:42.638Z",
           "a pattern anchored to the last path segment would go blind here")
@@ -2223,7 +2220,7 @@ def test_a_real_ghoul_purge_as_digital_extremes_actually_published_it() -> None:
     mute = [dict(events[0], description="/Lotus/Language/GameModes/Redacted",
                  name="", tooltip="")]
     check("ghoul: with the tag known, prose is no longer load-bearing",
-          "Ghoul Purge" in build_data.find_live_events(mute, []), True,
+          "Ghoul Purge" in build_data.find_live_events(mute), True,
           "DE may reword a description; they do not renumber a Tag")
 
     # Both level bands DE publish are the two the planner gates on, and a
@@ -2299,7 +2296,7 @@ def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> Non
                build_data.EVENT_TAGS.get("InfestedPlains") == "Plague Star",
                "observed 2026-09-09T15:00Z; the second of the two ever seen")
 
-    found = build_data.find_live_events(events, [])
+    found = build_data.find_live_events(events)
     check("plague star: the window reaches the payload",
           (found.get("Plague Star", {}).get("activation"),
            found.get("Plague Star", {}).get("expiry")),
@@ -2310,7 +2307,7 @@ def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> Non
     saved = dict(build_data.EVENT_TAGS)
     try:
         build_data.EVENT_TAGS.clear()
-        blind = build_data.find_live_events(events, [])
+        blind = build_data.find_live_events(events)
         check("plague star: an UNKNOWN tag is still found, on the fields DE do "
               "print the name on", blind.get("Plague Star", {}).get("tag"),
               "InfestedPlains",
@@ -2320,7 +2317,7 @@ def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> Non
         # those fields and it goes dark again, which is exactly what shipped.
         bare = [{k: v for k, v in events[0].items() if k != "marks"}]
         check("plague star: without them the first-party route is blind",
-              "Plague Star" in build_data.find_live_events(bare, []), False,
+              "Plague Star" in build_data.find_live_events(bare), False,
               "this is the bug, reproduced - the proxy's prose was covering it")
     finally:
         build_data.EVENT_TAGS.clear()
@@ -2328,7 +2325,7 @@ def test_plague_star_is_named_after_the_plains_and_not_after_the_poster() -> Non
 
     # `marks` is scanned, never shown. A reader must never see a /Lotus/ path.
     check_true("plague star: marks are for matching, not for display",
-               "marks" not in build_data.find_live_events(events, [])["Plague Star"],
+               "marks" not in build_data.find_live_events(events)["Plague Star"],
                "only activation, expiry, tag and node reach meta.bounties.events")
 
     bands = [(j["minEnemyLevel"], j["maxEnemyLevel"]) for j in doc["Goals"][0]["Jobs"]]

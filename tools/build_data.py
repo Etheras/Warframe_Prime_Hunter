@@ -1015,16 +1015,26 @@ def derive_bounty_rotation(pools: dict, syndicate_missions: list,
     return families
 
 
-def find_live_events(events: list, syndicate_missions: list) -> dict:
+def find_live_events(events: list) -> dict:
     """
     {event name: {activation, expiry}} for the ones the worldstate is carrying.
 
-    Deliberately a keyword scan across both endpoints rather than a match on
-    one known field. Neither event was running while this was written, so the
-    exact shape DE gives them could not be observed, and a scan that looks in
-    several places degrades to "not running" instead of to a crash. The window
-    is emitted rather than a boolean so the page can expire it against its own
-    clock - a build from three days ago still knows a purge ends tomorrow.
+    A scan over the event rows - DE's `Goals`, or WFCD's `/pc/events` - that
+    prefers a known tag and falls back to a keyword. The window is emitted
+    rather than a boolean so the page can expire it against its own clock - a
+    build from three days ago still knows a purge ends tomorrow.
+
+    **It read the bounty boards too, until 2026-09-15.** That half looked for a
+    syndicate named after an event - WFCD used to publish a Ghoul Purge as its
+    own `GhoulEmergenceSyndicate` - and it could no longer fire from either
+    source. Measured with a purge *and* Plague Star live: DE list only the
+    Entrati, Cetus and Solaris boards as carrying jobs and put the event bounties
+    inside the Goals themselves; `syndicate_missions_from_worldstate` keeps only
+    the four boards in `SYNDICATE_TAGS`, so a fifth would be dropped before any
+    scan saw it; and WFCD's own list carried no event syndicate either. The Goals
+    are where DE put these bounties, and `_goal_marks` already reads their jobs.
+    Deleted at the owner's decision, rather than kept as a net that catches
+    nothing and reads as protection.
     """
     found: dict[str, dict] = {}
 
@@ -1057,15 +1067,6 @@ def find_live_events(events: list, syndicate_missions: list) -> dict:
         for name in EVENT_PATTERNS:
             consider(name, blob, ev.get("activation"), ev.get("expiry"),
                      ev.get("tag"), ev.get("node"))
-
-    for entry in syndicate_missions or []:
-        # a purge arrives as its own syndicate whose tag WFCD does not map, so
-        # the raw name ("GhoulEmergenceSyndicate") comes through as-is
-        blob = str(entry.get("syndicate") or "")
-        if not (entry.get("jobs") or []):
-            continue
-        for name in EVENT_PATTERNS:
-            consider(name, blob, entry.get("activation"), entry.get("expiry"))
 
     return found
 
@@ -1160,7 +1161,7 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
                       now: datetime | None = None) -> dict:
     """The whole bounty block of the payload."""
     families = derive_bounty_rotation(pools, syndicate_missions, now) if checked else {}
-    live = find_live_events(events, syndicate_missions) if checked else {}
+    live = find_live_events(events) if checked else {}
 
     # Every bounty whose payout depends on the letter, with the letters it
     # actually publishes: a couple of tiers publish two rather than three, and

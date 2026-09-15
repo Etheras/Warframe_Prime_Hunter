@@ -8085,6 +8085,33 @@ restores **absence** as well. Whether `data/` and `CHANGELOG.md` existed is read
 before the `try`, so a copy that fails half-way cannot be mistaken for "it was
 not there" and cost the real `data/`.
 
+### The syndicate half of the event detector is deleted
+
+**Owner's decision, 2026-09-15, taken on a measurement rather than a suspicion.**
+`find_live_events` had two ways in. The events half scans DE's `Goals` — or
+WFCD's `/pc/events` — and is what found both relic-bearing events this month. The
+syndicate half scanned the bounty boards for a syndicate named after an event,
+because WFCD once published a Ghoul Purge as a `GhoulEmergenceSyndicate` of its
+own.
+
+Measured on 2026-09-10, with a Ghoul Purge *and* Plague Star both running, it
+could not fire from either source. DE list only the Entrati, Cetus and Solaris
+boards as carrying jobs, and put the event bounties inside the Goals themselves —
+two jobs on the Ghoul Goal, three on Plague Star's. `syndicate_missions_from_worldstate`
+keeps only the four boards in `SYNDICATE_TAGS`, so an event syndicate from DE
+would have been dropped before any scan saw it. And WFCD's own
+`/pc/syndicateMissions`, fetched fresh, carried no event syndicate either.
+
+**So it went, rather than staying as a second net.** The case for keeping it was
+redundancy, and the case against is what Plague Star taught the same week: the
+scan *can* miss an event, which makes "there is a second net" exactly the belief
+not to leave lying in the code. The Goals are where DE put these bounties, and
+`_goal_marks` already reads their jobs and reward tables.
+
+The backlog entry that tracked it — titled *"The Ghoul and Plague Star detection
+has never seen a live event"* until 2026-09-09 — went with it. Both captures, and
+the wrong prediction about Plague Star's tag, are in the sections above.
+
 ---
 
 ## 8. Gotchas discovered while building
