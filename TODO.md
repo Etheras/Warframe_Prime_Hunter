@@ -212,38 +212,18 @@ repository.
 
 **The second independent security review of this project**, against commit
 `16ee027` and compared against the commit the first one read. It found **no
-Critical and no High**. Both Highs from the first review were re-tested and are
-fixed: the remote artwork filename that could escape `assets/img`, and the
-stored DOM XSS through numeric fields with no CSP behind it. What is left is
-five Medium and four Low, and not one of them is an observed compromise — they
-are the software supply chain, resource limits, LAN mode, and two sentences that
-describe the app inaccurately.
+Critical and no High**; both Highs from the first review were re-tested and
+found fixed — the remote artwork filename that could escape `assets/img`, and
+the stored DOM XSS through numeric fields with no CSP behind it. It filed five
+Medium and four Low, none an observed compromise: the software supply chain,
+resource limits, LAN mode, and two sentences that described the app
+inaccurately.
 
-**All nine were re-checked against the working tree on 2026-09-01**, after the
-four commits that have landed since the reviewed one, and all nine are still
-true as descriptions of the code. The line numbers below are this tree's;
-several had drifted from the review's by the time they were checked, which is
-the usual reason to re-derive them rather than copy them.
-
-**Still true is not the same as still open.** Two of the nine — the unbounded
-backup import, and non-atomic writes — are things the owner examined and
-**declined** on 2026-08-26, after the first review filed them. The second review
-had no way to know that and filed them again. They are marked below rather than
-re-opened, with the answer left where it lives in `PROJECT.md §7`; the
-atomic-writes one is narrowed to the single write site that genuinely postdates
-the decline. **A tenth entry follows them that neither review filed**, found
-while checking those two against the code.
-
-**The review's assurance gap is already closed and has no entry here.** It
-reported the release gate red — one cadence assertion and four wiki-generation
-assertions — and it no longer is: `python tests/test_build.py` was run on
-2026-09-01 and passed, with `clone-and-build` skipped for want of `--online`.
-The cadence assertion went green when the light refresh went back to ten minutes
-(`070f527`), and the four wiki assertions when the standing notices started
-being found by shape rather than by position (`a67b6d5`, `4947bca`). The
-*shape* of the cadence test is still wrong and keeps its own entry — *The
-schedule tests assert equality where they should assert a ceiling* — but being
-wrong is not the same as being red, and it is no longer red.
+**All nine are closed.** Each has shipped, or been examined and declined or
+accepted, and `PROJECT.md §7` has the reasoning — the framing finding, for one,
+is *accepted rather than unnoticed*. The one entry left below is kept for a
+different reason: it has been filed twice, and a third review will file it
+again.
 
 ### A backup import will read a file of any size **[settled — declined 2026-08-26]**
 
@@ -817,25 +797,6 @@ what decides it is which runner IP the job happens to draw, not when it asks. A
 cron time cannot choose an IP. **And do not reach for retries**: the entry below
 already records that this is a refusal rather than a hiccup.
 
-**Two things this exposed that are worth fixing, and neither is the 403:**
-
-- **The record designed to answer this cannot answer it.** `data/feed-log.json`
-  is meant to accumulate one row per build over 24 hours, and the deployed copy
-  holds **one row**. Because the file is tracked, a CI checkout finds a local
-  copy and never fetches the published one (`read_feed_log` prefers local); the
-  committed copy is three rows from 2026-08-27, which `trim_feed_log` then drops
-  as older than a day. So every run starts empty and writes a single row. The
-  cleanup already noted under *`data/feed-log.json` is tracked on purpose* is
-  what fixes it, and until then this question has to be answered by reading
-  eighteen CI logs by hand, which is how the table above was built.
-- **The probe step does not ask about the endpoint in question.** *Probe the data
-  sources* curls five URLs — the wiki, the drop tables, `origin.warframe.com`'s
-  export index, and two WFCD hosts — and **not**
-  `api.warframe.com/cdn/worldState.php`, which is the one that decides whether
-  the live feeds come from DE or the proxy. The probe exists to record which
-  sources answer a datacentre IP, and it is silent about the only source that
-  routinely does not. One line to add.
-
 **Found 2026-08-27, from the banner on the deployed site**, which the owner asked
 about:
 
@@ -939,14 +900,13 @@ not visible before, and they are why this entry stays open.
 
 **What is left, in order of what it would buy:**
 
-- **Watch `meta.feeds` on the deployed payload.** It ships as of 2026-08-28 and
-  one `curl` reads it, so the rate needs no log spelunking. What is worth knowing
-  is whether `"worldstate"` ever appears there — if it never does, the first-party
-  path on CI is decorative and the entry below becomes the real question.
 - **Whether to ask DE.** Their forums are the documented channel, and an
   allowlisted runner is the only thing that would restore the first-party path
-  from CI. This has moved up: it is no longer a nicety if DE effectively never
-  answer the runner.
+  from CI. It is not a nicety, measured from the deployed `data/feed-log.json`:
+  DE answered **11 of 181** builds on 2026-09-09, and on 2026-09-15 — light
+  builds no longer asking — **1 of 5** full builds, the other four falling
+  through to the proxy. That window's four `offline` rows are the test leak
+  fixed that day, not builds.
 - **Whether the local scheduled refresh has been masking it.** `schedule.ps1`
   runs where the fetch works. Worth knowing how much of the published freshness
   has been coming from there rather than from CI.
@@ -1164,12 +1124,10 @@ unset stays unset and says nothing, which is the default everything else in this
 project takes, and the reason is stronger here than elsewhere: a guessed rank
 would feed a trace cap that is simply wrong.
 
-**Still not built, and still the point of the field:** the demand badge. The
-worldstate publishes `minMR` per bounty tier and it matches the wiki exactly — MR1
-at level 10–30 up to MR10 at 100–100 (see *The worldstate publishes far more than
-the two fields we read*). A node could say **"asks MR5"** the same way it says
-**"Railjack"**, shown only when the player's rank is below it. The rank is now on
-hand to do it; nothing reads it yet.
+**Not a candidate: the rank-gate badge.** A node saying **"asks MR5"** beside
+**"Railjack"** was built on 2026-08-27 and reverted the same day at the owner's
+direction — **[settled]**, with the reasoning under *The worldstate publishes far
+more than the two fields we read*.
 
 ### The worldstate publishes far more than the two fields we read
 
