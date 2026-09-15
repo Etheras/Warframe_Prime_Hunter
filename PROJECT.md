@@ -8045,7 +8045,10 @@ its extra copies to a rule written for *different* relics.
 
 **Why the row is the Advanced run.** The wiki's Hemocyte page says they appear
 only on the Advanced (55–65) and Steel Path variants, never on the 15–25 one
-DE's drop table names. DE's worldstate has the Basic and Advanced jobs paying the
+DE's drop table names. DE's own 2023 patch notes say the same — *"Unlike the
+standard Bounty, delivering the Toxin to the Boil summons the Hemocyte"* — and
+when it was questioned on 2026-09-15 the owner checked in play: **no Hemocyte in
+a standard run.** DE's worldstate has the Basic and Advanced jobs paying the
 same `PlagueStarTableRewards`, so the table carries over unchanged; Steel Path
 pays `PlagueStarTableSteelPathRewards`, which DE do not publish, so it cannot be
 priced. Offered one row per tier, one row as the Advanced run, or the Hemocytes
