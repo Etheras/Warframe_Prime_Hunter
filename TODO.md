@@ -1515,6 +1515,20 @@ side of one changeover saw B → C across all six vault tiers.
 **No local workaround** — the app follows the clock, which is what the evidence
 supports. The second page is what needs correcting.
 
+### The Plague Star reward tables are a run out of date
+
+[`Operation: Plague Star`](https://wiki.warframe.com/w/Operation:_Plague_Star)
+renders its *Bounty Rewards* from `Module:DropTables/data`, and its relics are not
+the ones DE list now. Checked 2026-09-15 with the event live: Stage 1 shares
+**1 relic of 10** with DE's drop table (Lith A12), and Stages 2–3 share **3 of
+21**. Every non-relic row and every percentage matches on both, which is the
+shape of a table copied from an earlier run and not refreshed. Neither source
+has a table for the Steel Path tier: DE's worldstate gives it its own,
+`PlagueStarTableSteelPathRewards`, and DE do not publish that one (`PROJECT.md
+§7`, *The Hemocyte is folded into Advanced Plague Star*).
+
+**No local workaround** — the build reads DE's table, never this module.
+
 ### Not wiki issues
 
 Recorded here only so they are not mistaken for one:
