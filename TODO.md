@@ -1359,41 +1359,6 @@ ours, `objectivesOf` keys off them, and a future member that behaves differently
 would be mis-costed until somebody noticed. That is a real risk and not an urgent
 one, and it is now a guarded risk rather than an unguarded one.
 
-### A bounty run is counted as one draw, and charged every stage
-
-**Found 2026-09-15, while folding the Hemocyte into Plague Star.** Not fixed: it
-moves every bounty in the planner at once, so it is the owner's decision rather
-than a bug fix.
-
-A bounty pays a reward at **every stage**, each from that stage's own table. DE's
-Plague Star table has three that apply to a four-stage run: Stage 1 (10 relics at
-1.14%), Stages 2 and 3 (21 relics at 0.58%), and the Final Stage (22 relics at
-0.67%).
-
-The model sees one of them. `normalise_sources` (`relics.py`) collapses every row
-a relic has at a node into its **best single-stage chance**, and `bountyRun`
-(`rotation.js`) then counts **one draw** per run — `tally({ none: 1, … })` —
-while `objectivesOf` charges the full **four stages**. So a bounty's per-reward
-figure is one stage's draw spread over four stages' cost.
-
-**Measured on DE's own table:** Neo C7 is in Stage 1 at 1.14% and in Stages 2 and
-3 at 0.58% each, so a run holds **at least 2.30%** of it. The model counts
-**1.14%**. The collapse and the single draw are generic, so every bounty goes
-through them — Cetus, Solaris, Entrati and Zariman alike. How much each one loses
-depends on how many of its stages carry relics, and that is not measured here.
-
-**What the 2026-09-15 fold did and did not change.** Its Hemocyte term is exact
-whatever this becomes: four kills at DE's 20% gate is 0.8 draws a run, in the
-same unit. The bounty's own term keeps this undercount, so the Advanced Plague
-Star row is still low, by the same factor as every other bounty.
-
-**What fixing it needs.** Keep a relic's rows per stage instead of collapsing to
-the best one, and have `bountyRun` count a draw per stage — or, equivalently, sum
-a relic's stage chances into a per-run chance in the build.
-
-**Size: medium.** One collapse rule, one draw count, and a pass over the bounty
-tests that pin today's figures.
-
 ### ~~A Radiant node is worth 25% more, and still nobody can see it~~
 
 **Shipped 2026-08-25.** The owner's ruling replaced two failed attempts at

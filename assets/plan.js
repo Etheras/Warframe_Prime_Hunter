@@ -764,6 +764,10 @@
            Hemocytes of Advanced Plague Star - so the row has to say its chances
            include them. See `fold_event_enemies` in build_data.py. */
         if (s.folded && !n.folded) n.folded = s.folded;
+        /* How many rewards a run of this bounty draws its relics from - see
+           `collapse_bounty_stages` in build_data.py. Absent means one, which is
+           every node that pays in a single stage. */
+        if ((s.draws || 1) > (n.draws || 1)) n.draws = s.draws;
       });
     });
 
@@ -940,6 +944,8 @@
            worth something, which is the same condition its value uses. */
         n.cnt[slot] += (a.chance || 0) / 100;
         n.aya = Math.max(n.aya || 0, a.chance || 0);
+        // an Aya bounty node is as many draws a run as a relic one - see above
+        if ((a.draws || 1) > (n.draws || 1)) n.draws = a.draws;
       });
     }
 
@@ -974,7 +980,11 @@
     const fissureAt = (n) =>
       ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack, opts.steel)[0] || null;
     nodes.forEach((n) => {
-      const live = n.kind === "bounty" ? liveRotation(n.node) : null;
+      /* `draws` rides on `live` because `live` is what `runValue` hands the
+         bounty model; left off when the node's sources say one. */
+      const live = n.kind === "bounty"
+        ? Object.assign(liveRotation(n.node), n.draws > 1 ? { draws: n.draws } : {})
+        : null;
       /* Railjack is excluded from the fissure branch for the same reason its
          bonus is: Void Storms are their own nodes with their own tables and no
          rotations to stay for, so "run it to five rotations" means nothing. */

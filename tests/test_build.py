@@ -3002,18 +3002,26 @@ def test_an_event_enemy_is_folded_into_the_bounty_it_spawns_in() -> None:
           sorted({s["node"] for s in everything if s["kind"] == "bounty"}),
           ["Level 55 - 65 Plague Star"])
 
+    # The fold files the four kills as a per-run row of their own, and the stage
+    # collapse is what makes one row of a relic - so the shape the planner sees
+    # is asserted after it. Nothing here publishes a stage count and the only
+    # heading is Stage 1, so a run is one draw and `chance` is the per-run sum.
+    build_data.collapse_bounty_stages(rows, [], {})
     c7 = [s for s in rows["Neo C7"] if s["kind"] == "bounty"]
     check("fold: a relic on both tables is still one row",
           len(c7), 1, "a second row would be discounted to 25% as redundant")
     check("fold: four kills at DE's gate are added to the bounty's own chance",
-          c7[0]["chance"], round(1.14 + 4 * 0.20 * 4.51, 2))
+          c7[0]["chance"], round(1.14 + 4 * 0.20 * 4.51, 4))
     check("fold: and the row says what it carries, for the tooltip",
           c7[0]["folded"], {"enemy": "Hemocyte", "spawns": 4, "gate": 20.0})
 
     k8 = next(s for s in rows["Meso K8"] if s["kind"] == "bounty")
     check("fold: a relic only the enemy drops gets a row on the bounty",
-          (k8["chance"], k8["stage"], k8["rotation"], k8["planet"]),
-          (round(4 * 0.20 * 12.91, 2), "Final Stage", "A", "Cetus (Plains of Eidolon)"))
+          (k8["chance"], k8["rotation"], k8["planet"]),
+          (round(4 * 0.20 * 12.91, 4), "A", "Cetus (Plains of Eidolon)"))
+    check("fold: and it is filed in the final stage, not under an internal label",
+          k8.get("stage"), "Final Stage",
+          "the per-run marker is the collapse's business and never reaches the payload")
     check("fold: and its sources are re-sorted, best first",
           rows["Meso K8"][0]["node"], "Level 55 - 65 Plague Star",
           "10.33% beats Ukko's 10% and has to lead")
@@ -3033,6 +3041,102 @@ def test_an_event_enemy_is_folded_into_the_bounty_it_spawns_in() -> None:
           ["Level 55 - 65 Plague Star"])
     check_true("fold: and the new name is the one EVENT_BOUNTIES gates",
                build_data.EVENT_BOUNTIES.get("Level 55 - 65 Plague Star") == "Plague Star")
+
+
+def test_a_bounty_run_counts_every_stage_it_pays() -> None:
+    """
+    A bounty pays a reward at every stage, from that stage's own table, and the
+    model counted one. Owner's choice from the fix menu, 2026-09-15.
+
+    `normalise_sources` kept each relic's best single stage and `bountyRun`
+    rolled once, while `objectivesOf` charged every stage: Neo C7 holds 2.97% of
+    a Plague Star run and was valued at 1.14%. The fix sums a relic's stage rows
+    at the multiplicity DE's shared headings pay for that bounty's length, and
+    publishes a per-draw chance with `draws` beside it.
+
+    Pinned: the multiplicity for three, four and five stages, and that it always
+    sums to the stage count; that a relic listed twice in one stage is two
+    chances, because DE's own table sums to 100% only with both; that a node
+    paying in one stage, an ordinary node and an unlabelled fallback row come
+    out exactly as they went in; that a row only a longer bounty reaches is
+    dropped rather than priced; that Aya on the node shares its draw count; and
+    that the fallback stage count is the one rotation.js costs with.
+    """
+    m = build_data.stage_multiplicity
+    heads = ["Stage 1", "Stage 2, Stage 3 of 4, and Stage 3 of 5", "Stage 4 of 5",
+             "Final Stage"]
+    for n in (3, 4, 5):
+        check(f"stages: DE's headings pay exactly {n} rewards on a {n}-stage run",
+              sum(m(h, n) for h in heads), n)
+    check("stages: the shared heading is two rewards of a four-stage run",
+          m("Stage 2, Stage 3 of 4, and Stage 3 of 5", 4), 2)
+    check("stages: and Stage 4 of 5 is none of one", m("Stage 4 of 5", 4), 0)
+    check("stages: DE's lower-case 'Final stage' is the same heading",
+          m("Final stage", 3), 1)
+    check("stages: a heading nobody taught it is unknown, not guessed",
+          m("Stage 6 of 7", 4), None)
+
+    def bounty(node, stage, chance):
+        return {"kind": "bounty", "planet": "Cetus", "node": node, "mode": "Bounty",
+                "rotation": "A", "chance": chance, "stage": stage}
+    ps = "Level 15 - 25 Plague Star"
+    kept = relics.normalise_sources({"Neo C7": [bounty(ps, "Stage 4 of 5", 0.42),
+                                                bounty(ps, "Stage 4 of 5", 0.42)]})
+    check("stages: normalise_sources keeps both stage rows for the collapse to sum",
+          len(kept["Neo C7"]), 2, "keeping the best one is what counted a run as one draw")
+
+    rows = {
+        # Neo C7 as DE publish it, the Stage 4 of 5 duplicate included
+        "Neo C7": [bounty(ps, "Stage 1", 1.14),
+                   bounty(ps, "Stage 2, Stage 3 of 4, and Stage 3 of 5", 0.58),
+                   bounty(ps, "Stage 4 of 5", 0.42), bounty(ps, "Stage 4 of 5", 0.42),
+                   bounty(ps, "Final Stage", 0.67)],
+        "Lith Z9": [bounty(ps, "Stage 4 of 5", 0.42)],        # only a longer run
+        "Axi V1": [bounty("Level 30 - 40 Isolation Vault", "Final Stage", 3.13)],
+        "Meso M1": [{"kind": "mission", "planet": "Void", "node": "Ukko",
+                     "mode": "Capture", "rotation": None, "chance": 10.0}],
+        "Neo W1": [{"kind": "bounty", "planet": "Cetus", "mode": "Bounty",
+                    "node": "Level 5 - 15 Cetus Bounty", "rotation": "A",
+                    "chance": 2.0}],                            # WFCD: no stage
+    }
+    aya = [bounty(ps, "Final Stage", 5.0), bounty(ps, "Stage 1", 3.0)]
+    got = build_data.collapse_bounty_stages(
+        rows, aya, {"Level 30 - 40 Isolation Vault": {"stages": 4}})
+
+    c7 = rows["Neo C7"]
+    check("stages: a relic is one row per node after the collapse", len(c7), 1)
+    check("stages: a four-stage run is four draws", c7[0].get("draws"), 4,
+          "Stage 1, stages 2 and 3, the final stage - Stage 4 of 5 is not in it")
+    check("stages: and one draw is worth the run's sum over four",
+          c7[0]["chance"], round((1.14 + 2 * 0.58 + 0.67) / 4, 4))
+    check("stages: so a run holds 2.97% of it, not the 1.14% one draw was",
+          round(c7[0]["chance"] * c7[0]["draws"], 2), 2.97)
+    check("stages: a row only a longer bounty reaches is dropped, key and all",
+          ("Lith Z9" in rows, got["dropped"]), (False, 1))
+    check("stages: a node paying in one stage comes out exactly as it was",
+          (rows["Axi V1"][0]["chance"], "draws" in rows["Axi V1"][0]), (3.13, False))
+    check("stages: an ordinary node is untouched", rows["Meso M1"][0]["chance"], 10.0)
+    check("stages: an unlabelled fallback row is untouched",
+          (rows["Neo W1"][0]["chance"], "draws" in rows["Neo W1"][0]), (2.0, False))
+    check("stages: Aya on the node shares its draw count",
+          [(a["chance"], a.get("draws")) for a in aya], [(round((5.0 + 3.0) / 4, 4), 4)],
+          "a node has one run length, whichever reward is being counted")
+    check("stages: and nothing in the fixture is an unknown heading", got["unknown"], [])
+
+    # A duplicate is a second chance: DE's own Stage 4 of 5 sums to 99.95% with
+    # it and 97.43% without, so a five-stage run has to count both.
+    five = {"Neo C7": [bounty("Five", "Stage 4 of 5", 0.42),
+                       bounty("Five", "Stage 4 of 5", 0.42), bounty("Five", "Final Stage", 0.67)]}
+    build_data.collapse_bounty_stages(five, [], {"Five": {"stages": 5}})
+    row = five["Neo C7"][0]
+    check("stages: on five stages both duplicates are counted",
+          (row["draws"], round(row["chance"] * row["draws"], 2)), (2, 1.51))
+
+    rot = read_text(os.path.join(ROOT, "assets", "rotation.js"))
+    found = re.search(r"const BOUNTY_STAGES = (\d+);", rot)
+    check("stages: the build's fallback stage count is the one rotation.js costs with",
+          int(found.group(1)) if found else None, build_data.BOUNTY_STAGES_FALLBACK,
+          "value and cost are read off one stage count, or the rate is off by their ratio")
 
 
 def test_an_optional_source_cannot_fail_the_build() -> None:
@@ -5230,6 +5334,7 @@ def main() -> int:
                          test_cold_failure_is_fatal,
                          test_unreachable_sources_are_tagged,
                          test_an_event_enemy_is_folded_into_the_bounty_it_spawns_in,
+                         test_a_bounty_run_counts_every_stage_it_pays,
                          test_an_optional_source_cannot_fail_the_build,
                          test_no_writer_leaves_orphans,
                          test_launchers_are_runnable,

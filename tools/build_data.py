@@ -776,26 +776,149 @@ def fold_event_enemies(relic_sources: dict) -> dict:
         for name, row in enemy_rows:
             rows = relic_sources[name]
             rows.remove(row)
-            host = next((r for r in rows if r.get("kind") == "bounty"
-                         and r.get("node") == fold["as"]), None)
-            if host is None:
-                # A relic only the enemy drops - Meso K8, for the Hemocyte. It
-                # still comes from this run, in the final stage.
-                host = {"kind": "bounty", "planet": template.get("planet"),
-                        "node": fold["as"], "mode": template.get("mode"),
-                        "rotation": template.get("rotation"), "chance": 0,
-                        "rarity": row.get("rarity"), "stage": "Final Stage"}
-                rows.append(host)
-                added += 1
-            host["chance"] = round((host.get("chance") or 0)
-                                   + fold["spawns"] * gate * (row.get("chance") or 0), 2)
-            host["folded"] = {"enemy": enemy, "spawns": fold["spawns"],
-                              "gate": round(gate * 100, 2)}
-            rows.sort(key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "",
-                                     s.get("node") or ""))
+            if not any(r.get("kind") == "bounty" and r.get("node") == fold["as"]
+                       for r in rows):
+                added += 1          # a relic only the enemy drops - Meso K8
+            # A row of its own, holding the per-run amount. Since 2026-09-15 it is
+            # not merged into a stage row here: a stage row's chance is multiplied
+            # by the rewards its heading pays, and "Stage 2, Stage 3 of 4" pays
+            # two, so merging into one would have doubled the Hemocytes.
+            # `collapse_bounty_stages` adds this in once, and does not count the
+            # four kills as reward draws - they come inside the final stage.
+            rows.append({"kind": "bounty", "planet": template.get("planet"),
+                         "node": fold["as"], "mode": template.get("mode"),
+                         "rotation": template.get("rotation"),
+                         "rarity": row.get("rarity"), "stage": FOLDED_STAGE,
+                         "chance": fold["spawns"] * gate * (row.get("chance") or 0),
+                         "folded": {"enemy": enemy, "spawns": fold["spawns"],
+                                    "gate": round(gate * 100, 2)}})
             folded += 1
         report[enemy] = {"folded": folded, "added": added}
     return report
+
+
+# The stage a folded event enemy's drops are filed under. Not one of DE's
+# headings: it marks a per-run amount that `collapse_bounty_stages` adds in once
+# and never counts as a reward draw.
+FOLDED_STAGE = "Final Stage, folded enemy"
+
+# The stage count for a bounty DE publish none for - the event bounties, the
+# Profit-Taker phases, the tiers with no job on the board. It must equal
+# `BOUNTY_STAGES` in rotation.js, which costs those same bounties: value and cost
+# have to be read off one stage count or the rate is off by their ratio. A test
+# compares the two.
+BOUNTY_STAGES_FALLBACK = 4
+
+
+def stage_multiplicity(heading, stages: int):
+    """
+    How many of an N-stage bounty run's rewards come from a DE stage heading.
+
+    DE write one table per heading and share headings between bounty lengths,
+    so the count depends on N. "Stage 2, Stage 3 of 4, and Stage 3 of 5" is
+    stage 2 always and stage 3 as well when there are four or five; "Stage 4 of
+    5" exists only in a five-stage run. Summed over DE's headings this is always
+    N - one reward a stage - which is the check that the reading is right.
+
+    `None` for a heading this does not know, so the caller can say so rather
+    than guess.
+    """
+    t = str(heading or "").strip().lower()
+    if t in ("stage 1", "final stage"):
+        return 1
+    if t == "stage 2, stage 3 of 4, and stage 3 of 5":
+        return 2 if stages >= 4 else 1
+    if t == "stage 4 of 5":
+        return 1 if stages >= 5 else 0
+    return None
+
+
+def collapse_bounty_stages(relic_sources: dict, aya_sources: list, groups: dict) -> dict:
+    """
+    One row per relic per bounty node, worth what one draw of a run is worth,
+    and `draws` for how many a run makes. Owner's choice, 2026-09-15.
+
+    **Until this, a bounty run was one draw.** `normalise_sources` kept each
+    relic's best single stage and `bountyRun` counted one roll, while
+    `objectivesOf` charged every stage. Neo C7 is in Plague Star's Stage 1 at
+    1.14% and in its Stages 2 and 3 at 0.58% each, so a run holds 2.97% of it
+    once the Final Stage is counted; the model had 1.14%.
+
+    Each row's per-run amount is the sum over its stage rows of `chance x
+    stage_multiplicity`, plus any folded enemy row once. `D`, the node's draw
+    count, is the multiplicities of the headings its tables use, relics and Aya
+    together, so both share one. The row's `chance` is the per-run amount over
+    `D`, and `draws` carries `D` whenever it is above one - so a node paying in
+    a single stage, the plain vaults and the Profit-Taker phases, comes out
+    exactly as it was, with no field added. `bountyRun` multiplies back up.
+
+    A row whose stages all fall outside the run - only in "Stage 4 of 5" on a
+    four-stage bounty - is worth nothing there and is dropped, and a relic left
+    with no source at all loses its key, so membership stays true.
+
+    Returns `{"nodes": n with D > 1, "dropped": n, "unknown": [(node, heading)]}`.
+    """
+    stages_of = lambda node: ((groups or {}).get(node) or {}).get("stages") \
+        or BOUNTY_STAGES_FALLBACK
+    unknown: set = set()
+
+    def mult(heading, node):
+        m = stage_multiplicity(heading, stages_of(node))
+        if m is None:
+            unknown.add((node, heading))
+            return 1
+        return m
+
+    heads = collections.defaultdict(set)
+    for rows in list(relic_sources.values()) + [aya_sources or []]:
+        for r in rows:
+            if r.get("kind") == "bounty" and r.get("stage") and r["stage"] != FOLDED_STAGE:
+                heads[r["node"]].add(r["stage"])
+    draws = {node: sum(mult(h, node) for h in hs) for node, hs in heads.items()}
+    dropped = 0
+
+    def collapse(rows):
+        nonlocal dropped
+        kept, by_key = [], collections.defaultdict(list)
+        for r in rows:
+            if r.get("kind") == "bounty" and r.get("stage"):
+                by_key[(r.get("planet"), r.get("node"), r.get("mode"),
+                        r.get("rotation"))].append(r)
+            else:
+                kept.append(r)
+        for (_, node, _, _), rs in by_key.items():
+            d = draws.get(node) or 1
+            per_run = sum((r.get("chance") or 0)
+                          * (1 if r["stage"] == FOLDED_STAGE else mult(r["stage"], node))
+                          for r in rs)
+            if per_run <= 0:
+                dropped += 1
+                continue
+            real = [r for r in rs if r["stage"] != FOLDED_STAGE] or rs
+            row = {k: v for k, v in max(real, key=lambda r: r.get("chance") or 0).items()
+                   if k not in ("folded", "draws")}
+            if row.get("stage") == FOLDED_STAGE:
+                # a relic only the enemy drops: filed where the enemy spawns, so
+                # the per-run marker never reaches the payload
+                row["stage"] = "Final Stage"
+            row["chance"] = round(per_run / d, 4)
+            if d > 1:
+                row["draws"] = d
+            fold = next((r["folded"] for r in rs if r.get("folded")), None)
+            if fold:
+                row["folded"] = fold
+            kept.append(row)
+        return sorted(kept, key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "",
+                                           s.get("node") or ""))
+
+    for relic in list(relic_sources):
+        relic_sources[relic] = collapse(relic_sources[relic])
+        if not relic_sources[relic]:
+            del relic_sources[relic]
+    if aya_sources is not None:
+        aya_sources[:] = collapse(aya_sources)
+    return {"nodes": sum(1 for d in draws.values() if d > 1), "dropped": dropped,
+            "unknown": sorted(unknown)}
 
 
 def tag_access(relic_sources: dict, aya_sources: list) -> dict:
@@ -1922,6 +2045,17 @@ def main() -> int:
 
     bounties = build_bounty_meta(rotation_pools, syndicate_missions, world_events,
                                  checked=bool(rotation_pools and syndicate_missions))
+
+    # The stage counts are known from here on, so each bounty relic's stage rows
+    # can be summed into what one draw is worth and how many draws a run makes -
+    # before anything reads the sources for more than whether a relic has any.
+    staged = collapse_bounty_stages(relic_sources, aya_sources, bounties["groups"])
+    log(f"bounty stages: {staged['nodes']} node(s) pay in more than one stage"
+        + (f", {staged['dropped']} row(s) only a longer bounty reaches"
+           if staged["dropped"] else ""))
+    if staged["unknown"]:
+        log(f"! bounty stages: headings nobody has taught stage_multiplicity, "
+            f"each counted as one reward: {staged['unknown']}")
     if bounties["families"]:
         for fam, f in sorted(bounties["families"].items()):
             log(f"bounties: {fam} on rotation {f['letter']} "

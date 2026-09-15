@@ -912,6 +912,35 @@ test("a single-table bounty has nothing to wait for", () => {
   assert.equal(r.bounty.unknown, false, "one table is not an unknown rotation");
 });
 
+test("a bounty run is as many draws as the build says, and one when it says nothing", () => {
+  /* Since 2026-09-15 the build sums a relic's stage chances into what one draw
+     is worth and publishes `draws`, the rewards a run makes. Value and count
+     scale by it; "at least one" is the chance over that many draws, which is
+     not the one-draw figure times four. Both sides use the same per-draw
+     table, so only `draws` differs. */
+  const ROT = loadRotation({ data: BOUNTY_DATA });
+  const rot = { A: 0.1, B: 0, C: 0, none: 0 };
+  const alt = { A: 0.1, B: 0, C: 0, none: 0 };
+  const one = ROT.runValue(rot, "Bounty", false,
+                           ROT.liveRotation("Level 15 - 25 Plague Star"), alt);
+  const four = ROT.runValue(rot, "Bounty", false,
+                            { ...ROT.liveRotation("Level 15 - 25 Plague Star"), draws: 4 }, alt);
+  assert.ok(Math.abs(four.total - 4 * one.total) < 1e-12, "four draws are worth four times one");
+  assert.ok(Math.abs(four.count - 4 * one.count) < 1e-12, "and hand over four times the relics");
+  assert.ok(Math.abs(four.any - (1 - Math.pow(0.9, 4))) < 1e-12,
+            `at least one in four draws at 10% is 34.39%, not 40%: got ${four.any}`);
+  assert.equal(four.perRound, one.perRound, "what one draw is worth does not move");
+
+  // and the lettered branch scales the same way
+  const lettered = ROT.liveRotation("Level 5 - 15 Cetus Bounty");        // board on C
+  const c1 = ROT.runValue({ A: 0, B: 0, C: 0.2, none: 0 }, "Bounty", false, lettered,
+                          { A: 0, B: 0, C: 0.2, none: 0 });
+  const c3 = ROT.runValue({ A: 0, B: 0, C: 0.2, none: 0 }, "Bounty", false,
+                          { ...lettered, draws: 3 }, { A: 0, B: 0, C: 0.2, none: 0 });
+  assert.ok(Math.abs(c3.total - 3 * c1.total) < 1e-12);
+  assert.ok(Math.abs(c3.any - (1 - Math.pow(0.8, 3))) < 1e-12);
+});
+
 test("with no bounty data at all the letter is unknown, never guessed", () => {
   const ROT = loadRotation({ data: { meta: {}, relics: {} } });
   const live = ROT.liveRotation("Level 5 - 15 Cetus Bounty");

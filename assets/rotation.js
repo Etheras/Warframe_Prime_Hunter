@@ -350,41 +350,50 @@
      read, or a bounty that publishes two letters while the board is on the
      third - every letter it does publish is as likely as any other, so the run
      is valued at their mean and labelled unknown. Counting all of them, which
-     is what the round model did, is the one answer that is certainly wrong. */
+     is what the round model did, is the one answer that is certainly wrong.
+
+     **A run is `live.draws` draws, since 2026-09-15, and one when absent.** The
+     build sums each relic's stage chances into what one draw is worth and says
+     how many draws a run makes (`collapse_bounty_stages`), so the value and the
+     count scale by it here, and "at least one" is taken over that many draws
+     rather than the one-draw figure multiplied. `perRound` stays per draw.
+     Absent is one, which is exactly every node that pays in a single stage and
+     every build made before the field existed. */
   function bountyRun(rot, live, alt) {
     const pays = ["A", "B", "C"].filter((t) => (rot[t] || 0) > 0);
     const flat = rot.none || 0;
     const onTable = !live.published || live.published.indexOf(live.letter) >= 0;
     const letter = live.letter && onTable ? live.letter : null;
+    const d = live.draws || 1;
 
     if (letter) {
       const v = rot[letter] || 0;
       const counts = pays.indexOf(letter) >= 0 ? { [letter]: 1 } : null;
       return Object.assign({
-        total: v + flat, perRound: v + flat, rounds: null,
+        total: (v + flat) * d, perRound: v + flat, rounds: null,
         counts,
         stranded: pays.filter((t) => t !== letter),
         planName: null, nonStandard: false,
         bounty: { letter, endsAt: live.endsAt, published: live.published,
                   stages: live.stages || null, offTable: false, unknown: false },
-      }, tally(Object.assign({ none: 1 }, counts), alt));
+      }, tally(Object.assign({ none: d }, counts ? { [letter]: d } : null), alt));
     }
     const mean = pays.length ? pays.reduce((s, t) => s + rot[t], 0) / pays.length : 0;
     /* Nothing is known about which letter is up, so the count and the
-       probability follow the value: one roll at the average of the letters this
-       bounty does publish. */
+       probability follow the value: each of the run's draws at the average of
+       the letters this bounty does publish. */
     const altMean = alt && Object.assign({}, alt, {
       mean: pays.length
         ? pays.reduce((s, t) => s + Math.min(1, alt[t] || 0), 0) / pays.length : 0,
     });
     return Object.assign({
-      total: mean + flat, perRound: mean + flat, rounds: null,
+      total: (mean + flat) * d, perRound: mean + flat, rounds: null,
       counts: null, stranded: null, planName: null, nonStandard: false,
       bounty: { letter: null, endsAt: live.endsAt, published: live.published,
                 stages: live.stages || null,
                 offTable: !!live.letter, unknown: pays.length > 1,
                 live: live.letter },
-    }, tally({ none: 1, mean: pays.length ? 1 : 0 }, altMean));
+    }, tally({ none: d, mean: pays.length ? d : 0 }, altMean));
   }
 
   /* ── restarting is not free, and the model used to think it was ───

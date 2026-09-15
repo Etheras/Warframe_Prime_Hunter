@@ -24,10 +24,20 @@ def normalise_sources(sources: dict[str, list]) -> dict[str, list]:
     """
     Collapse duplicate rows and put the best drop first.
 
-    One node can list the same relic several times (bounty stages, repeated
-    rotation entries), and neither source path emits rows in a useful order.
-    Both paths run through here so the site never shows a 1.84% node above an
-    11.06% one.
+    One node can list the same relic several times (repeated rotation entries),
+    and neither source path emits rows in a useful order. Both paths run through
+    here so the site never shows a 1.84% node above an 11.06% one.
+
+    **Except a bounty row that names its stage, which is kept as it is - every
+    one, duplicates included.** A bounty pays a reward at every stage, from that
+    stage's own table, and DE list a relic twice within one stage when it has two
+    chances there: Plague Star's "Stage 4 of 5" sums to 99.95% with its
+    duplicates and 97.43% without. Keeping only the best row is what made a
+    four-stage run count as one draw. The stages are summed later, at the
+    multiplicity each heading pays, by `collapse_bounty_stages` in build_data.py,
+    which has the stage counts this function cannot see. A bounty row with no
+    stage - the WFCD fallback publishes none - keeps the old rule below, so a
+    build from that path is valued exactly as it was.
 
     Every row is kept. There used to be a `sources[:40]` cap here, which threw
     away 68% of all rows and made the planner blind to real farms: Sedna/Kappa
@@ -41,14 +51,18 @@ def normalise_sources(sources: dict[str, list]) -> dict[str, list]:
     out: dict[str, list] = {}
     for relic, rows in sources.items():
         best: dict[tuple, dict] = {}
+        staged: list[dict] = []
         for row in rows:
+            if row.get("kind") == "bounty" and row.get("stage"):
+                staged.append(row)
+                continue
             k = (row.get("kind"), row.get("planet"), row.get("node"),
                  row.get("mode"), row.get("rotation"))
             cur = best.get(k)
             if cur is None or (row.get("chance") or 0) > (cur.get("chance") or 0):
                 best[k] = row
         out[relic] = sorted(
-            best.values(),
+            list(best.values()) + staged,
             key=lambda s: (-(s.get("chance") or 0), s.get("planet") or "", s.get("node") or ""),
         )
     return out

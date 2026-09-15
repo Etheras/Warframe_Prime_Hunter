@@ -1595,7 +1595,10 @@ spawns in, so a normal build ships no `enemy` row at all. Two optional keys came
 with that: a bounty row carrying folded drops has `folded: { enemy, spawns,
 gate }`, and an enemy row the fold could not use keeps DE's own `gate` — the
 *Relic Drop Chance* on its header, as a percentage. §7, *The Hemocyte is folded
-into Advanced Plague Star*, has why.
+into Advanced Plague Star*, has why. A bounty row can also carry `draws`, and its
+`chance` is then **per draw**: the build sums a relic's stages into one row, and
+`draws` is how many rewards a run makes, absent meaning one. §7, *A bounty run
+counts every stage it pays*.
 
 ### A bounty's rotation is a wall clock, not a depth
 
@@ -8063,10 +8066,10 @@ figure, so the enemy rows are left as they were — tied to their event by
 bounty is renamed regardless, because `EVENT_BOUNTIES` gates it under the new
 name and a row that slipped its gate would read as though the event ran all year.
 
-**The bounty half of the row is still low, and that is a separate question.**
-The model counts one draw per bounty run, at each relic's best stage, while
-charging every stage — `TODO.md`, *A bounty run is counted as one draw, and
-charged every stage*. The Hemocyte term is exact whatever that becomes.
+**The bounty half of the row was still low, and was fixed the same day.** The
+model counted one draw per bounty run, at each relic's best stage, while charging
+every stage — see *A bounty run counts every stage it pays* below. The Hemocyte
+term was exact either way.
 
 ### A test left two rows in the published feed log on every full CI build
 
@@ -8142,6 +8145,67 @@ gates it on the window.
 **What the tests pin about wording is almost nothing.** No page test asserts a
 planner tooltip's text. One pins the shape of the Effort status line — `/\d+ set/`
 must not appear when the only saved value is hidden — and both branches keep it.
+
+### A bounty run counts every stage it pays
+
+**Owner's choice from the fix menu, 2026-09-15.** A bounty pays a reward at every
+stage, each from that stage's own table, and the model counted one.
+`normalise_sources` kept a relic's best single-stage chance at each node and
+`bountyRun` rolled once, while `objectivesOf` charged every stage. On Plague Star,
+Neo C7 is in Stage 1 at 1.14%, in Stages 2 and 3 at 0.58% each and in the Final
+Stage at 0.67% — 2.97% a run. The model had 1.14%.
+
+**How DE's headings map to stages.** DE write one table per heading and share the
+headings across bounty lengths: *Stage 1*; *Stage 2, Stage 3 of 4, and Stage 3 of
+5*, which is stage 2 always and stage 3 as well on a four- or five-stage run;
+*Stage 4 of 5*, only on five; and *Final Stage*, sometimes spelt *Final stage*.
+`stage_multiplicity` encodes that, and its sum over DE's headings is always the
+stage count, which is the check that the reading is right. A heading it does not
+know is logged, never guessed.
+
+**A duplicate is a second chance.** DE list some relics twice within one stage,
+and summing the stage's own table decides what that means: Plague Star's *Stage 4
+of 5* comes to 99.95% with its duplicates and 97.43% without, its Final Stage to
+99.98% and 99.31%. So `normalise_sources` now keeps every stage-labelled bounty
+row, duplicates included, and the collapse sums them — Meso X1, listed twice in
+Plague Star's Final Stage, is counted twice.
+
+**The shape.** `collapse_bounty_stages` runs once the stage counts are known,
+right after `build_bounty_meta`, and leaves one row per relic per node. Its
+`chance` is the per-run sum over `D`, and `draws` is `D`, the rewards the node's
+tables pay across a run, counted over relic and Aya rows together so both share
+it. `bountyRun` multiplies back by `draws`, so value and count are the per-run
+sum and "% of runs drop at least one" is taken over `D` draws, rather than an
+expected count read as a probability. Chosen over a per-run `chance`, which would
+sum past 1 on a rich table and be capped by `tally`.
+
+**What it leaves alone, by construction.** A node whose tables pay in a single
+stage — the plain Isolation Vaults, the Profit-Taker phases, the Zariman, Entrati
+Lab and 1999 bounties — gets `D = 1` and no `draws` field, so it comes out
+exactly as before. So does a bounty row with no stage: the WFCD fallback
+publishes none and keeps the best-chance rule. For a bounty DE give no stage
+count, `BOUNTY_STAGES_FALLBACK` applies, and a test holds it equal to
+`rotation.js`'s `BOUNTY_STAGES`, because value and cost must read the same number.
+
+**What it moved, measured rather than assumed.** 22 of 46 bounty nodes pay in
+more than one stage: Plague Star, both Ghoul tiers and the three Arcana Isolation
+Vaults on their relics, and 16 Cetus, Orb Vallis and Cambion Drift tiers on their
+Aya, which *Count Aya drops* includes by default. It was first described as every
+bounty, then as six nodes; the Aya rows are the truth in between. On the owner's
+four-Prime farm list, Advanced Plague Star went from rank 68 of 115 to 55, from
+0.14 wanted relics a reward to 0.17 and from 0.55 a run to 0.69. Its "% of runs
+drop at least one" fell, from 55.34% to 52.89%, and that is the correction rather
+than a cost — the old figure was a count read as a single-draw probability.
+
+**The Hemocyte fold changed shape with it.** Its drops became a per-run row of
+their own that the collapse adds in once, instead of being merged into one stage
+row: a "Stage 2 and 3" row pays twice, so a merge there would have doubled them.
+The four kills are never counted as reward draws.
+
+**Verified** by a mutation that counted the shared heading once: seven assertions
+went red — the stage sums for four and five, the four-draw count, the per-draw
+chance, the 2.97% run total and Aya's shared draw count — and green again with it
+reverted.
 
 ---
 
