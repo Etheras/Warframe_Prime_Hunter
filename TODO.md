@@ -1050,9 +1050,11 @@ FAIL js: the collection view names the node that is a fissure, as the planner do
 ```
 
 It then passed twice: alone, and in a full pages run of 84. Worth two notes for
-whoever measures this. The suite had **just grown by one page test**, which fits
-the resource reading rather than the timing one — more page loads in the same
-run, nothing changed about that test. And it is a **fissure** test, so before
+whoever measures this. The suite had **just grown by one page test**, which was
+read at the time as fitting the resource explanation rather than the timing one —
+more page loads in the same run, nothing changed about that test. The
+measurement below weakens that reading: the suite grew by two more tests the same
+day and still peaks at 4% of the port range. And it is a **fissure** test, so before
 calling it this flake, rule out the other one: a test planting a fissure on only
 one of the two sources fails exactly when `data/fissures.json` happens to hold a
 live fissure that is not the planted one, and reads identically to this. That
@@ -1067,6 +1069,31 @@ below, and it is the first evidence pointing at a resource rather than at
 Playwright. It happened in a session that had also run the suite half a dozen
 times and driven a preview server, so the machine was unusually far through its
 port range.
+
+**Measured 2026-09-16, and the port half of that does not hold.** Sampling
+`Get-NetTCPConnection` every 400 ms across a full `node --test
+tests/test_pages.mjs`:
+
+| | loopback sockets at peak |
+|---|---|
+| one pages run (85 tests) | **663**, of which 647 `TIME_WAIT` |
+| three runs back to back | **971** |
+
+This machine's range is the Windows default — `netsh int ipv4 show dynamicport
+tcp` gives 49152 + 16384 ports, with `TcpTimedWaitDelay` unset, so 120 s. That
+puts one run at **4% of the range** and three stacked runs at **6%**. Sockets do
+accumulate across runs, which the second row confirms, but "unusually far through
+its port range" is not something this suite does to itself — it would take
+roughly fifty consecutive runs inside one `TIME_WAIT` window.
+
+**And it did not reproduce**: three consecutive runs, 255 tests, zero failures.
+
+So the **ephemeral-port** explanation is ruled out at this scale and should not
+be chased again. The **non-paged pool** half of the same sentence is untested and
+is what remains of the resource reading, along with anything outside the suite
+holding sockets — a preview server, a browser pane, another build. The method
+above is the cheap way to check it: sample while running, and compare the peak
+against `netsh`, rather than reasoning from the error name.
 
 Both pass immediately afterwards when `node --test tests/test_pages.mjs` is run
 on its own — the second was confirmed at 47 of 47. So the failures are not about
