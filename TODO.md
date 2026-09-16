@@ -428,7 +428,21 @@ effort is collected per reward and the default costs by reward count
 (`PROJECT.md §7`) — and what is left is not a modelling gap but an ordinary
 unknown.
 
-### Seven rotation-bearing mission types are still unverified
+### `Skirmish`'s cadence is the last one still assumed, and only a run settles it
+
+**Retitled 2026-09-16, because the old heading — *Seven rotation-bearing mission
+types are still unverified* — outlived the work by a fortnight and read as open.**
+Six of the seven are closed: `Legacyte Harvest` is verified on the wiki, `Rush`
+shipped as a fix in `b60b219`, `Key` and `Special` turned out not to be mission
+types at all and moved to *Our four invented "mission types" leak into the
+ranking*, and `The Circuit` and `The Perita Rebellion` have entries of their own
+below. **What is left is `Skirmish`, and only its cadence** — which of its nodes
+pay on what cycle. No source states it: DE's tables list what each rotation
+contains and never how often it comes round, and the wiki documents no Railjack
+reward rotations at all. **Ten minutes in game settles it and nothing else will**
+— complete a Proxima Skirmish and count the reward screens. The history below is
+kept because the three node shapes it measured are the reason a plain reading of
+the wiki is not enough.
 
 Swept 2026-08-10. Of the 31 mission types in the data, 9 carry no rotation at all so
 the cycle never applies, 11 are confirmed A→A→B→C against the wiki (Defense,
@@ -583,15 +597,15 @@ Five types, five different outcomes:
 | Type | What the wiki says | Standing |
 |---|---|---|
 | `Legacyte Harvest` | *"The order of the rotations is AABC"*, rewards offered every capture, endless | **verified** — no longer an assumption |
-| `Rush` | a single-completion race paying **one** reward: 1/2/3 transports destroyed gives rotation A/B/C | **defect, see below** |
+| `Rush` | a single-completion race paying **one** reward: 1/2/3 transports destroyed gives rotation A/B/C | **was a defect, shipped in `b60b219`** — `FIXED_LENGTH` charges it one run paying C; `PROJECT.md §7`, *`Rush` pays once* |
 | `Skirmish` | the Railjack page documents no reward rotations at all; the *Empyrean* page says a completion grants **one major reward** | still unverified on cadence, but the evidence now points at fixed-length rather than AABC — see below |
 | `The Circuit` | tier-based with weekly caps and no rotation cycle — while DE's table publishes A/B/C for the same node | **the two sources disagree**; see the note below |
 | `The Perita Rebellion` | not endless, a 12-minute timer; rotation A every 3 Orders, B every Order, C on completion | structure differs from AABC, effect unmeasured |
 
-**So one is verified, one is a defect, one is undocumented, and two have sources
-that disagree.** Worth knowing before the next pass: reading five wiki pages
-produced one confirmation and one bug, which is a better yield than this entry
-had assumed when it called the work "tedious rather than hard".
+**So one is verified, one was a defect and is now fixed, one is undocumented, and
+two have sources that disagree.** Worth knowing before the next pass: reading five
+wiki pages produced one confirmation and one bug, which is a better yield than this
+entry had assumed when it called the work "tedious rather than hard".
 
 #### Skirmish, looked at again 2026-09-05 — and the shapes are the news
 
@@ -729,7 +743,7 @@ resources, and no relics whatever. It is not what the build reads and should not
 be mistaken for it.
 
 **No code change came out of the table sweep**, which was the honest result
-there. The wiki sweep found one, and it is `Rush` above.
+there. The wiki sweep found one, `Rush` above, and it shipped in `b60b219`.
 
 ### Our four invented "mission types" leak into the ranking
 
@@ -743,9 +757,9 @@ nodes among them** — they are read from `keyRewards.json` and
 `transientRewards.json`, which are separate files with no `(Type)` in them at
 all. So these are not mission types DE publish under a different name; there is
 no DE row behind them to disagree with. That is the strongest form this entry's
-claim can take, and it also removed two names from *Seven rotation-bearing
-mission types are still unverified*, where asking their rotation cycle turned
-out to be a category error.
+claim can take, and it also removed two names from *`Skirmish`'s cadence is the
+last one still assumed*, where asking their rotation cycle turned out to be a
+category error.
 
 That matters because the planner presents all of them as places to go:
 
@@ -939,74 +953,38 @@ not visible before, and they are why this entry stays open.
 a refusal rather than a hiccup, and `PROJECT.md §2` is explicit that every request
 is somebody else's bandwidth. Retrying an address-range block just spends it.
 
-### One Cambion Drift tier labels a different letter from the rest of its family
-
-**Found 2026-08-27**, while implementing the rotation-letter cross-check, and
-left alone because it does not change today's answer and the fix is not obvious.
-
-With the three-table gate applied, the standard family reads **16 of 17** jobs as
-`C`. The one dissenter is a job at levels `[25, 30]` whose reward-table path says
-`TableA`, matched to *Level 25 - 30 Cambion Drift Bounty* — a group that does
-publish all three tables, so the gate does not exclude it and its label is a
-genuine claim.
-
-**The suspicion is that it is filed in the wrong family.** Its rewards read as
-Isolation Vault — Ayatan Amber Star, Carnis Mandible — while the family is
-decided purely by matching `group_levels`, and an Isolation Vault bounty sharing
-levels with a Cambion Drift tier would land in `standard` regardless of what it
-actually is. If that is right, the vault family is under-counted by one and the
-standard family carries a stray.
-
-**Why it is not urgent.** Sixteen against one is not close, the cross-check
-agrees on `C`, and the vote abstains on that job entirely rather than dissenting
-— so nothing shipped is wrong today. What it costs is margin: a family decided
-16–1 is one upstream change away from being decided 9–8.
-
-**Checked against a live window on 2026-09-02, which is what this asked for, and
-the suspicion above is wrong.** Read straight off DE's worldstate:
-
-| Family | Letters published live | Dissenter |
-|---|---|---|
-| standard | A ×17, **B ×1** | `EntratiSyndicate` 30-40, `TierDTableBRewards` |
-| vault | C ×3 | none |
-
-**It is not a misfiled Isolation Vault bounty.** Every vault job carries a
-`VaultBounty` prefix in its reward path — `VaultBountyTierATableCRewards` and
-its two siblings — all three publish `C`, and the join in `build_data.py` already
-keys on that prefix (`key = (sid, tuple(levels), "VaultBounty" in name)`). The
-families are cleanly separated and the level collision at 30-40 is handled.
-
-The dissenter is a **genuine standard Cambion Drift job** publishing `TableB`
-while seventeen standard jobs across Cetus, Fortuna and Deimos publish `TableA`.
-Seen in two windows a day apart, both times at 30-40 on Deimos.
-
-**So the interesting reading is the right one: the letter is per tier, not per
-family.** DE publish a letter for every tier independently, and at least one tier
-disagrees with its family's majority persistently rather than by accident. The
-family split is an approximation, and this is the case that shows it.
-
-**Why it costs nothing today, concretely.** Not merely "16 against 1 is not
-close" — **no Cambion Drift bounty group carries a relic at all**, measured on
-the payload. The mislabelled tier never reaches a ranked number, because this
-app ranks relic sources and that tier has none. If DE ever put a relic in it, the
-letter would be wrong on screen the same day.
-
-**And the fix direction is now known rather than unknown.** The per-group letter
-is already captured — `live_bounty_letters` returns `out[group] = {letter,
-stages, minMR}` — while `rotation.js:211` scores from
-`BOUNTY.families[name]` instead. Preferring the group's own published letter,
-and falling back to the family only where a group has none, would remove the
-approximation without deriving anything new. What needs deciding is what the
-*countdown* means once tiers can disagree, since `walkFrom` advances one letter
-for a whole family.
-
 ### `PROJECT.md` section 7 needs an entry-by-entry pass against its own contract
 
 **The contract was written on 2026-09-08 and the section does not yet meet it.**
 It says what belongs there — *would a future session, lacking this, redo the work
-or re-litigate the decision?* — and it currently holds **99 entries over 5,700
-lines, 79% of `PROJECT.md`**, of which **87 carry a date**. That is the shape of
-a changelog, and `git log` is better at being one.
+or re-litigate the decision?* — and **the figures in this entry were themselves
+out of date within a week**: re-measured 2026-09-16 it holds **115 entries over
+6,693 lines, 80% of `PROJECT.md`**, of which **103 carry a date in the body**,
+not the 99 over 5,700 this entry claimed. That is the shape of a changelog, and
+`git log` is better at being one.
+
+**First batch done 2026-09-16, and the finding is that pruning was the wrong
+instrument for it.** *Three derived ideas worth knowing* (328 lines, the largest)
+was read paragraph by paragraph against the contract and almost all of it
+passed — it names rejected options, traps already fallen into, and measured
+numbers. What failed was the **shape**: a heading promising three ideas over an
+entry holding a dozen decisions, which a reader cannot find anything in. It was
+**split into 13 entries, losing no text**, on the same reasoning that removed the
+backlog's summary table — `###` headings *are* the index, so the way to make a
+section findable is more headings, not a list of contents that can drift. The
+largest piece is now 73 lines.
+
+One real defect fell out of the read, which is the argument for doing the rest:
+the run-mode table described `aabcaa` as chosen on value, while *Six rounds is a
+premade's option* — 4,000 lines further down, and shipped 2026-09-01 — had
+already made it a premade-only option gated on rotation A being the only thing
+wanted. **Measured before correcting**: `aabcaa` is unreachable with the squad
+option off, 0 of 35 node shapes. §7 held both the superseded description and the
+decision that replaced it, and a reader meets the stale one first.
+
+**Still to do:** *Two security findings examined and declined* (279 lines) is now
+the largest and is untouched, and 114 entries have not been read against the
+contract.
 
 **Deliberately not done in the same sitting as the contract.** Pruning 99 entries
 quickly is how reasoning gets lost, and this file has the evidence: during the
@@ -1023,9 +1001,8 @@ to the rule it taught, or deleting it where it taught nothing. **Not in one
 commit** — a batch at a time, so a bad call is one revert rather than a
 reconstruction.
 
-Two candidates to start from, because they are the largest and their size is not
-obviously earned: *Three derived ideas worth knowing* (328 lines) and *Two
-security findings examined and declined* (279 lines).
+The candidate to start from, because it is the largest and its size is not
+obviously earned: *Two security findings examined and declined* (279 lines).
 
 **Size: session, and it is the kind that must not be rushed.**
 

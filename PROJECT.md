@@ -1715,7 +1715,7 @@ that misses a live event is a nuisance rather than a dead end. The build records
 The inherited limit is that "running" means running as of the last `refresh-data`;
 these events last days, and the staleness banner already carries that message.
 
-### Three derived ideas worth knowing
+### Two derived payload flags, `flags.farmable` and `isNew`
 
 **`flags.farmable`** is the honest availability signal: true when at least one relic
 containing one of the item's parts currently drops somewhere. Computed from the drop
@@ -1727,8 +1727,9 @@ by `parts_from_droptables` — reward names are always `"<Item Name> <Part>"`, s
 prefix is unambiguous. Verified end to end by removing a frame from the wiki parse
 and confirming it comes back with all four parts and working farm locations.
 
-**The planner picks refinement by bottleneck, not by hit rate.** Maximising the
-chance of getting *anything* wanted is the wrong objective when relics are
+### The planner picks refinement by bottleneck, not by hit rate
+
+Maximising the chance of getting *anything* wanted is the wrong objective when relics are
 finite: a common's 25.33% drowns out a rare you are actually blocked on, and the
 advice comes back "Intact" while the rare sits at 2%. What matters is how long it
 takes to get *everything* you want out of that relic, which is set by its
@@ -1745,7 +1746,9 @@ cutting the rare to ~10 while the common only slips from 3.9 to 6.
 Forma never sets the bottleneck — you are not blocked on it — but still counts
 towards the tie-break and the node score.
 
-**Refinement, and when the middle steps matter.** The odds move monotonically —
+### Refinement, and when the middle steps matter
+
+The odds move monotonically —
 common 25.33 → 16.67 (worse), uncommon 11 → 20, rare 2 → 10 — so for a *single*
 target the answer is always one of the two ends, which is why the per-part advice
 in the collection view only ever reads Intact or Radiant.
@@ -1763,6 +1766,8 @@ falling curves cross in the middle:
 
 The planner optimises over the whole wanted set per relic, so it finds these; the
 collection view answers the narrower per-part question and does not.
+
+### "Best places to farm" ranks by what a run is worth, not by relic overlap
 
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every
 still-dropping relic for an item by mission node, then ranks nodes by *how many of
@@ -1791,14 +1796,18 @@ it could have said "here, and you will need a ship". It says exactly that now, o
 each row, through the `Railjack` demand badge; a page test pins it by searching
 the dataset for any item in that position rather than naming Nyx.
 
-**Void Fissures need no special handling.** DE publishes no fissure reward table —
+### Void Fissures need no special handling
+
+DE publishes no fissure reward table —
 a fissure is an overlay on an ordinary node, so the mission still pays out that
 node's own rotation rewards, which is the data we already use. A fissure run that
 hands you a relic is therefore already priced in: the `P(relic drops here)` term
 *is* that event. (Railjack's Void Storms do get their own table and are parsed,
 but they drop at 2.5% and fall below the 40-source cap.)
 
-**A node is valued as a whole run, not one rotation at a time.** DE's published
+### A node is valued as a whole run, not one rotation at a time
+
+DE's published
 drop chance is *conditional on that rotation coming up*, so it is not comparable
 across rotations as it stands. But weighting each rotation separately is not enough
 either: a run collects **every rotation it passes through**. Take AABCAA — you
@@ -1817,7 +1826,7 @@ Rewards cycle A → A → B → C, one per round: rounds 1–2 pay A, 3 pays B, 
 | Run | Pattern | Rounds | Chosen when |
 |---|---|---|---|
 | `reset` | everything up to the **last wanted rotation** | 2, 3 or 4 — per node | what you want sits deep in the cycle, so staying buys rotations you want nothing from |
-| `aabcaa` | A×4 + B + C | 6 | staying pays: usually rotation A, and rotation C on a Disruption held at four conduits |
+| `aabcaa` | A×4 + B + C | 6 | **a premade only**, and only where rotation A is the sole thing wanted — see *Six rounds is a premade's option* below |
 | `bonus` | A×3 + B + C | 5 | a Void Fissure is running here **right now** |
 
 **Nobody is asked which, as of 2026-08-24.** There was a *How far you run*
@@ -1826,7 +1835,9 @@ over: it asked the reader to know something the model can work out, and it
 applied one answer to nodes that want different ones. Every way of playing a
 node is scored now and the best rate wins.
 
-**What made that possible was pricing the restart.** A run costs its rounds *and*
+### Pricing the restart, and why `RUN_OVERHEAD` is two rounds
+
+A run costs its rounds *and*
 the getting in and out — matchmaking, two loading screens, the walk to
 extraction — and none of that was costed, so leaving after two rounds and
 starting again looked free. `reset` therefore won everywhere by never being
@@ -1852,7 +1863,9 @@ accident: **where two ways of running a node come out within two per cent, the
 difference is inside the error of the constant, and the tie goes to the one with
 fewer restarts.**
 
-**The fissure is chosen, not compared.** An endless Void Fissure hands over a free
+### The fissure is chosen, not compared
+
+An endless Void Fissure hands over a free
 relic for depth — five rotations gives a random *Exceptional* of the tier, ten a
 Flawless, every fifth after fifteen a Radiant. That relic is not in the drop table,
 so the rate cannot see it; a node carrying a fissure right now is run to five and
@@ -1871,6 +1884,8 @@ now conditioned on one anyway, at the owner's direction. What that buys is a row
 that means what it says — *this* node pays a free relic, not *some* node might. What
 it costs is the thing the original decision protected: the top of the list now
 moves when the fissure map does, roughly every hour or two.
+
+### `reset` covers the set you want, it does not maximise a rate
 
 `reset` stops at the **deepest rotation holding something you want**, not at the
 best-rate stopping point. Want a part from A and another from C? You run to C — 4
@@ -1894,6 +1909,8 @@ A node with **no rotation** pays once per run and is added flat. That equates on
 round to one whole mission, which flatters long missions — deliberate, since mission
 length is not modelled anywhere (see the tie-break note above). It shows up as
 bounties and enemy drops climbing under `full` and `aabcaa`.
+
+### Disruption does not use the A → A → B → C cycle, and rotation A is gated
 
 **Disruption does not use the A → A → B → C cycle**, and is the only mission type
 that does not. It pays one reward per round, but the tier depends on the round *and*
@@ -1966,7 +1983,9 @@ from `runMode`, so the two concerns stay separate: **mission type decides what a
 round pays, run mode decides how many rounds you stay.** Nodes on a non-standard
 rotation render their label in `--odd` amber with the full explanation on hover.
 
-**The score is a whole run, not a rate** (decided 2026-08-10). Dividing by rounds
+### The score is a whole run, not a rate
+
+Decided 2026-08-10. Dividing by rounds
 produced a dominance violation: Kappa and Ur were identical in rotations A and B,
 but Ur *also* dropped something wanted in rotation C, which forced it a round deeper
 and pushed its per-round rate below Kappa's — so the node offering strictly more
@@ -1986,7 +2005,9 @@ collection page writes back to the planner's store rather than keeping its own. 
 headline percentage is **per run**; the row names only the rotations the run
 actually reaches, and the round count is what it is divided by for the rate.
 
-**Aya is valued by what it buys, not guessed at.** Aya is a currency, not a
+### Aya is valued by what it buys, not guessed at
+
+Aya is a currency, not a
 reward, so it never reached the site before — DE lists it in the same drop rows as
 relics and the parser discarded it. It matters because Varzia sells relics for
 **1 Aya each** (`vaultTrader.inventory[].credits`), and Varzia stocks the current
@@ -2039,7 +2060,9 @@ marker at the end of the meta line, after the relic count — in the same colour
 everything else on that line, since it is one more fact about the node rather than a
 state or a warning.
 
-**Squad odds** are display-only: with the toggle on, a per-opening chance `p` is
+### Squad odds are display-only
+
+With the toggle on, a per-opening chance `p` is
 shown as `1 - (1 - p)^4`, since four players cracking the same relic see four
 rewards and keep the best.
 
