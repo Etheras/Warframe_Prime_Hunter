@@ -122,7 +122,7 @@ can be attributed:
 
 - `vaultSoon` flags the two oldest farmable releases: **Xaku Prime, Trumna Prime,
   Quassus Prime** (2024-11-13) and **Lavos Prime, Cedo Prime, Dual Zoren Prime**
-  (2025-02-12). If the cadence comment at `build_data.py:2096` is right — each
+  (2025-02-12). If the cadence comment beside `vaultSoon` in `build_data.py` is right — each
   Prime Access vaults the release from seven earlier — the first three go on the
   23rd.
 - No item has `isNew`. Every part has an `itemCount`. Four parts have no `ducats`.
@@ -141,7 +141,7 @@ curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.js | pyt
    carried them first (light or full; dispatch, cron or push) and how long after
    release.
 2. **By which route?** `isNew: true` means DE's Public Export listed the item
-   before the wiki page did (`build_data.py:1729`). Did the wiki route take over
+   before the wiki page did — it is `fromExport`, in `build_data.py`. Did the wiki route take over
    later, and after how long?
 3. **Are the parts right?** Names, quantities and Ducats against the wiki, and
    against the baseline above.
@@ -181,7 +181,7 @@ to fail yet:**
   as 1, so a part that needs two would read as needing one. This only bites if
   DE's recipes and WFCD's list both miss the item.
 - **A new weapon class disappears from the export route without a word.**
-  `collect_prime_items` (`official.py:461`) skips any `productCategory` missing
+  `collect_prime_items` (in `official.py`) skips any `productCategory` missing
   from `PRODUCT_CATEGORY`, with no log line. Only the wiki route's category check
   would notice.
 - **The Kavasa pin cannot tell "too new" from "broken".** The check `parts: only
@@ -982,9 +982,36 @@ wanted. **Measured before correcting**: `aabcaa` is unreachable with the squad
 option off, 0 of 35 node shapes. §7 held both the superseded description and the
 decision that replaced it, and a reader meets the stale one first.
 
-**Still to do:** *Two security findings examined and declined* (279 lines) is now
-the largest and is untouched, and 114 entries have not been read against the
-contract.
+**Second batch done 2026-09-16**, the other named candidate: *Two security
+findings examined and declined* (279 lines) held nine subjects, only the first of
+which the heading described — the two declined findings, the review's own yield,
+the `serve.py` allowlist lesson, the one-path-parser rule, boundary coercion, the
+CSP redirect trap, seven smaller repairs, a testing rule, and a survivors list.
+**Split into nine entries.** Again almost nothing failed the contract: declined
+findings *are* rejected-options-and-why, which is the first thing the contract
+says to keep.
+
+**The finding was in its citations, and it generalises.** The entry complains
+that the outside review's *"citations had drifted six commits"* while carrying
+**eight `file.py:NNN` citations of its own, all eight drifted** — `wiki.py:273`
+now a helper, `build_data.py:692` a quest list, `shared.js:218` a comment,
+`app.js:351` a date comparator. Every claim behind them was still true, which is
+what makes it dangerous: a reader who follows one finds unrelated code and cannot
+tell a moved line from a withdrawn fact. All eight are symbols now, and the rule
+is written into the entry — **a line number is a measurement of a file at one
+commit, and nothing here re-measures it.**
+
+**Swept the same day, because two were time-critical:** `CLAUDE.md`'s `image_for`
+citation and two inside the Citrine checklist above — the `vaultSoon` cadence
+comment and the `isNew` pointer — had all drifted, and that checklist is read
+unaided on the 24th. Fixed in place as wrong sentences.
+
+**Still to do:** 113 entries have not been read against the contract. **Six
+numeric citations remain in `PROJECT.md`**, all inside entries this pass has not
+reached — `catalogue.py:159`, `build_data.py:1823`, `plan.js:1255` and three in
+`app.js`. Convert each as its entry is read rather than in a sweep: checking
+whether the sentence around it is still true is the actual work, and a sweep that
+only fixes addresses would make eight stale claims look freshly verified.
 
 **Deliberately not done in the same sitting as the contract.** Pruning 99 entries
 quickly is how reasoning gets lost, and this file has the evidence: during the

@@ -4914,8 +4914,8 @@ that falls back to the default.
 **What it did not fix, because it was never broken.** The collection page
 already validated every one of these where it read them — `avail` intersected
 with the buckets that exist and taken as booleans only, `cats` filtered against
-`CATEGORIES`, each flag type-checked, and `sort` normalised against `SORTS` at
-`app.js:351`, the first line where that object exists. So no unrecognised value
+`CATEGORIES`, each flag type-checked, and `sort` normalised against `SORTS` in
+`app.js`, just below where that object is defined. So no unrecognised value
 was ever *used*; it was stored, and sat in the reader's own `localStorage` until
 the next save. This is defence in depth and one function reading consistently.
 The argument for doing it anyway is the one the backlog entry made second and it
@@ -4935,7 +4935,7 @@ own fetch, so nobody can plant an entry. The flagship scenario has no impact eit
 — a bad body is cached with its ETag, so the next run gets a 304 and identical
 bytes, which is exactly what a fresh fetch would return while upstream is unchanged.
 Two of the cited lines contain the guard the finding says is missing
-(`artwork.py:96-97` raises on an empty body *before* the write), `--refresh-images`
+(`artwork.py`'s download loop raises on an empty body *before* the write), `--refresh-images`
 already detects a truncated image by size and refetches it, and `save_state()` runs
 **after** the emit, so `--if-changed` cannot skip past a torn payload on the next
 run. A torn emit fails loudly rather than persisting as plausible wrong data: the
@@ -4947,11 +4947,13 @@ the right shape and is worth doing if that code is being touched for another rea
 It is not worth a backlog entry standing on its own, which is why it is recorded
 here instead of there.
 
-**The review of 2026-08-26, and what came of it.** An outside review filed ten
+### An outside review is re-derived before any of it is written down
+
+An outside review filed ten
 findings against `46ae037`. Every one was re-derived from the source before being
 written down, which is the rule the 2026-08-24 batch was held to and it earned its
 keep again: **three stood as written, seven were inflated, and both worked examples
-for its best finding were duds** — the artwork guard at `artwork.py:80` blocks the
+for its best finding were duds** — the artwork guard in `artwork.local_name()` blocks the
 two files it named, so the case that mattered was one it never wrote down. Its
 citations had also drifted six commits.
 
@@ -4960,7 +4962,25 @@ shipped; two further findings were examined and declined and are recorded below.
 **Four of the twelve were things the review never filed** — they surfaced only
 because checking its findings meant reading the code around them.
 
-**What else was swept — and what that sweep got wrong.** The review covered ten
+**Cite by symbol, never by line number**, and this section is the evidence rather
+than the exception. It held the drifted-citations complaint above while carrying
+**eight `file.py:NNN` citations of its own, all eight of which had drifted** by
+2026-09-16 — every one pointing at unrelated code. `wiki.py:273` had become a
+helper, `build_data.py:692` a quest list, `shared.js:218` a comment, and
+`app.js:351` a date comparator. The claims behind them were all still true; only
+the addresses were wrong, which is the dangerous combination, because a reader
+who follows one finds something irrelevant and cannot tell a moved line from a
+withdrawn fact.
+
+A name survives what a number does not: `artwork.local_name()`, `FILTER_SHAPE`,
+`FISSURE_TIERS` and `build_fissures` were all cited by name in the same section
+and all still resolve. Every citation here is a symbol now. **A line number is a
+measurement of a file at one commit, and nothing in this repository re-measures
+it.**
+
+### "I checked this and it is fine" is the most expensive sentence here
+
+The review covered ten
 things; the areas below were checked afterwards because it had not looked at them.
 
 **The first version of this list, committed on 2026-08-26, called `serve.py`'s
@@ -4974,7 +4994,9 @@ is fine"* is the most expensive sentence in this repository — it stops the nex
 reader looking — and this is the second time a document in it has vouched for
 something that was not true.
 
-**Both path defects were fixed the same day.** The shape of each fix is the same,
+### One path parser, or two that have to be kept in step
+
+Both path defects were fixed the same day. The shape of each fix is the same,
 and it is the general answer to this class:
 
 - **`serve.py` now has one path parser.** `translate_path` is overridden to build
@@ -4990,8 +5012,10 @@ and it is the general answer to this class:
   write as well — redundant today, deliberately, so a future loosening of the
   derivation still cannot write outside the folder.
 
-**The three untrusted-value-into-markup defects were fixed the same day, and the
-fix has two layers because they have two different sources.**
+### Untrusted values are coerced at the boundary, and there are two boundaries
+
+The three untrusted-value-into-markup defects were fixed the same day, and the
+fix has two layers because they have two different sources.
 
 - **`build_data.as_int` is the boundary.** `masteryReq`, `ducats` and `itemCount`
   are documented as numeric and arrive as third-party JSON, which is not the same
@@ -5023,7 +5047,9 @@ fix has two layers because they have two different sources.**
   `guard_text` runs over whole JavaScript files, where `<!--` is a legal line
   comment and an inserted backslash is a syntax error.
 
-**The CDN is a redirector, and the CSP did not know it.** Found on 2026-08-26 while
+### A CSP is enforced on every hop, and the CDN is a redirector
+
+Found on 2026-08-26 while
 costing the meta-CSP options, and unrelated to that decision.
 `cdn.warframestat.us/img/AshPrime.png` answers **301** to
 `raw.githubusercontent.com/wfcd/warframe-items/master/data/img/AshPrime.png`, and a
@@ -5039,7 +5065,9 @@ visibly allows. The error points at the one host that is not the problem. Both h
 are named now, and the test asserts them as a pair — allowing one without the other
 is the broken state, so neither can be removed on its own.
 
-**The seven remaining entries shipped the same day.** None changed a decision; each
+### Seven smaller repairs, each making a document true
+
+The seven remaining entries shipped the same day. None changed a decision; each
 made something true that a document or a comment already claimed:
 
 - **The stall timeout moved to the class that can apply it.** `SiteHandler.timeout`
@@ -5081,10 +5109,14 @@ made something true that a document or a comment already claimed:
   made the selector malformed, `querySelector` threw, and `render()` stopped. The
   existing defaults are the allowlist, so there is no second list to keep in step.
   `sort` is normalised where `SORTS` first exists, which is below the block that
-  restores it.
+  restores it. This is the page-side half of the story `FILTER_SHAPE` tells
+  above, and the two shipped together: the model stops the value being parsed,
+  the page stops it being used.
 
-**Both tests were written to fail first, and both replaced a test that could not
-see the bug.** The server test used to ask `allowed()` about paths that were already
+### A test must drive the path it is asserting about
+
+Both tests here were written to fail first, and both replaced a test that could
+not see the bug. The server test used to ask `allowed()` about paths that were already
 clean — it sent the answer, not the request — so it now drives `_relative()` and
 `translate_path` through a bare handler instance and asserts the invariant that
 actually matters: *the file opened is the file that was approved*. That is a property,
@@ -5092,18 +5124,22 @@ not a list of tricks; a blocklist of known payloads only ever knows the ones som
 thought of. The artwork test used to call `os.path.basename` **inside** its filter, so
 `../app.js` was tested as `app.js` and passed.
 
-What survives, with the corrections the re-check forced:
+### What the sweep left standing, and the three things it got backwards
+
+With the corrections the re-check forced:
 
 - **The `temp_mockup.html` carve-out is bounded by an exact-set membership and a
   loopback peer**, and `end_headers` recomputes both rather than trusting
   `allowed()`, which matters because it also runs on error responses. `LOOPBACK`
   covers `::ffff:127.` so the v4-mapped v6 case is handled, and a test compares the
-  two policies directive by directive (`tests/test_build.py:1448-1461`), asserting
+  two policies directive by directive (*standalone CSP: the same directives, no
+  more*), asserting
   the relaxation is *exactly* `'unsafe-inline'` and that `unsafe-eval` never appears.
   **What that does not do is bind the policy to the body** — `rel` describes the
   request path, not the file that gets opened, so the same desync above can attach
   the relaxed policy to a different file. That half is part of the `TODO.md` entry.
-  `temp_mockup.html` is absent from this disk, so the carve-out is currently inert.
+  The carve-out does nothing while the file is absent, which is its normal state —
+  `temp_mockup.html` is gitignored and exists only while a proposal is open.
 - **`wiki.py` carries no upstream string into the wiki today.** This said it was
   worth knowing "because that job holds `contents: write`", and **since
   2026-09-01 it does not** — `wiki.py` runs in the read-only `generate` job now
@@ -5111,22 +5147,23 @@ What survives, with the corrections the re-check forced:
   always the better one: whatever `wiki.py` emits gets pushed to a public page,
   token or no token. It assembles from `README.md`, `PROJECT.md` and **`TODO.md`** (not
   `NOTICE.md`, which is only a link-rewrite target), and two of the six figures in
-  its stats table — `meta.itemCount` and `meta.dropSource` (`wiki.py:273, :277`) —
+  its stats table — `meta.itemCount` and `meta.dropSource` —
   are raw dict reads interpolated into an f-string with no coercion and no escaping.
   They are safe because `acquire_drops()` returns one of two string literals, which
   is an invariant of `build_data.py` rather than a property of `wiki.py`.
 - **Both cross-tab handlers re-read through `load()`** and neither touches
-  `e.newValue` — `shared.js:218` and `shared.js:674`, the second of which the first
-  sweep never opened. **That is not a sanitisation claim**, and the first version of
+  `e.newValue` — the two `storage` listeners in `shared.js`, the second of which
+  the first sweep never opened. **That is not a sanitisation claim**, and the first version of
   this list implied it was: `load()` is `JSON.parse` in a `try`/`catch` with a
   default and validates nothing, so re-reading yields exactly what
   `JSON.parse(e.newValue)` would. The Mastery Rank listener is genuinely safe because
   `mrClamp` is a real type gate; the collection listener is not gated, and where that
   leads is in `TODO.md`.
 - **The live fissure path is safe because of a build-time allowlist, not because of
-  escaping.** `build_data.py:692` drops any `tier` outside five exact literals, and
-  `tier` is the only fissure string rendered. `node` and `mode` reach the payload as
-  free-form upstream text (`:698, :700`); nothing renders them, and `mode` has no
+  escaping.** `build_fissures` drops any `tier` outside the five literals in
+  `FISSURE_TIERS`, and `tier` is the only fissure string rendered. `node` and
+  `mode` reach the payload from the same function as free-form upstream text;
+  nothing renders them, and `mode` has no
   consumer at all. **This is evidence for coercing at the boundary, not against it** —
   the first version of this list cited it as proof the three unescaped numbers in
   `TODO.md` were an acceptable exception, which is backwards.
