@@ -2077,7 +2077,10 @@ def test_an_event_bounty_says_what_a_run_costs_to_start() -> None:
           "fee" in other, False,
           "levels are the join; the standard run must not inherit the Advanced fee")
 
-    # A name we cannot resolve must drop the whole line rather than half of it.
+    # A name we cannot resolve must drop the whole line rather than half of it -
+    # and must NOT quietly reach for EVENT_FEES, which holds this very row. DE
+    # answered; a table written from an older sighting does not get to overrule
+    # them just because their answer was inconvenient.
     half = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star", dict(live),
                                  {"/Lotus/Types/Items/Eidolon/InfestedEventIngredient":
                                   "Eidolon Phylaxis"})
@@ -2085,10 +2088,49 @@ def test_an_event_bounty_says_what_a_run_costs_to_start() -> None:
           "fee" in half, False,
           "a shorter bill than the game takes is worse than saying nothing")
 
-    # The proxy publishes no job fees at all, so a proxied build says nothing.
-    proxied = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
-                                    {"activation": "a", "expiry": "b"}, resources)
-    check("event fee: no fee data means no claim", "fee" in proxied, False)
+
+def test_a_proxied_build_falls_back_to_the_recorded_event_fee() -> None:
+    """
+    The fee is first-party-only: DE put it on the job, WFCD publish no job fees,
+    and `api.warframe.com` refuses a datacentre IP on about 94% of published
+    builds with no second host to ask. So the line shipped on 2026-09-16 was
+    correct locally and **absent on the deployed site**, measured within the
+    hour. `EVENT_FEES` is the fallback, and this is the shape of it.
+
+    Deliberately not the same shape as relaying a worldstate from a machine DE
+    answer, which was the alternative and was declined - `PROJECT.md §7`.
+
+    Three edges, and each is a decision rather than an accident: the fallback
+    needs the event to be **running**, since a fee for a bounty nobody can start
+    is not a thing to publish; it is keyed on the **name** rather than the tag,
+    because a tag only arrives on the route these builds did not get; and it
+    yields to a first-party answer completely, which the sibling test above
+    pins from the other side.
+    """
+    running = {"activation": "2026-09-09T15:00:00.000Z",
+               "expiry": "2026-09-23T14:00:00.000Z"}
+
+    got = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
+                                dict(running), {})
+    check("event fee: a proxied build falls back to what was recorded",
+          got.get("fee"), ["Eidolon Phylaxis", "Infested Catalyst"],
+          "no fallback means the line only ever shows on ~6% of builds")
+    check("event fee: and needs no resource manifest to do it",
+          "fees" in got, False,
+          "the table holds names already, which is why it survives a cold build")
+
+    # A tier with nothing recorded stays silent rather than borrowing a sibling's.
+    other = build_data._event_row("Level 15 - 25 Ghoul Bounty", "Ghoul Purge",
+                                  dict(running), {})
+    check("event fee: a tier with no recorded fee says nothing",
+          "fee" in other, False)
+
+    # Not running: no window, so there is no run to charge for.
+    over = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
+                                 {"activation": "2026-08-01T00:00:00Z"}, {})
+    check("event fee: an event that is not running is not billed",
+          "fee" in over, False,
+          "the payload should not carry a price for a bounty nobody can start")
 
 
 def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> None:
@@ -5487,6 +5529,7 @@ def main() -> int:
                          test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_event_is_recognised_by_tag_first_and_in_either_source_shape,
                          test_an_event_bounty_says_what_a_run_costs_to_start,
+                         test_a_proxied_build_falls_back_to_the_recorded_event_fee,
                          test_a_real_ghoul_purge_as_digital_extremes_actually_published_it,
                          test_plague_star_is_named_after_the_plains_and_not_after_the_poster,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,

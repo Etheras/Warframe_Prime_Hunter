@@ -676,6 +676,34 @@ EVENT_TAGS: dict[str, str] = {
     "InfestedPlains": "Plague Star",
 }
 
+# What one run of a limited-time bounty spends to start, for the builds that
+# could not ask Digital Extremes.
+#
+# **This exists because the fee is first-party-only and the deployed site almost
+# never gets a first-party answer.** DE publish `requiredItems` on the job;
+# WFCD publish no job fees at all; and `api.warframe.com` refuses a datacentre
+# IP on roughly 94% of published builds, with no second host to ask (the dead
+# ends are written down beside `WORLDSTATE` in `sources.py`). So without this
+# the fee line is correct locally and absent on the site the owner actually
+# reads. Relaying a worldstate from a machine DE do answer was the alternative
+# and was declined - `PROJECT.md §7` has that decision and why.
+#
+# **Keyed by event name and levels, not by tag.** A tag is the sturdier
+# identifier and `EVENT_TAGS` above is right to use it, but it only arrives on
+# the first-party route - which is precisely the route these builds did not
+# get. The name is resolved on both shapes, and the levels are already how a
+# fee is matched to its tier.
+#
+# **A first-party answer always wins, including a first-party "no".** This is
+# consulted only when DE were not reached at all; when they were, a tier they
+# list no fee for has no fee, and a stale entry here cannot contradict them.
+# `build_bounties` logs any fee DE report that does not match this table, the
+# same way it logs an unknown tag, so it is maintained from observation rather
+# than from memory.
+EVENT_FEES: dict[tuple[str, tuple[int, ...]], tuple[str, ...]] = {
+    ("Plague Star", (55, 65)): ("Eidolon Phylaxis", "Infested Catalyst"),
+}
+
 CYCLE_MINUTES = 150       # one full day/night of the landscape
 SEQUENCE = "ABC"
 
@@ -1371,15 +1399,24 @@ def _event_row(group: str, name: str, live: dict | None, resources: dict) -> dic
     a `/Lotus/StoreItems/...` path is not something to show a reader, and the
     page has no way to turn one into a name.
 
-    Silent on anything it cannot answer, in both directions. No window means the
-    event is not running and there is nothing to charge for; the WFCD route
-    publishes no job fees, so a proxied build says nothing rather than carrying
-    the last first-party answer into a build that did not ask.
+    No window means the event is not running and there is nothing to charge for,
+    so nothing is said either way.
+
+    **A build that could not reach DE falls back to `EVENT_FEES`**, because the
+    fee is first-party-only and the published site is almost never first-party.
+    The fallback is consulted only when DE were not reached *at all*: if they
+    answered, a tier they list no fee for genuinely has no fee, and a table
+    written from an older sighting must not contradict them.
     """
     row = {"event": name, **(live or {})}
     fees = row.pop("fees", None)
     levels = official.group_levels(group)
-    if not fees or not levels:
+    if not levels or not row.get("expiry"):
+        return row
+    if not fees:
+        known = EVENT_FEES.get((name, tuple(levels)))
+        if known:
+            row["fee"] = sorted(known)
         return row
     for fee in fees:
         if list(fee.get("levels") or []) != levels:
@@ -1390,6 +1427,14 @@ def _event_row(group: str, name: str, live: dict | None, resources: dict) -> dic
         # the one the game actually takes, which is worse than not saying it.
         if named and len(named) == len(fee.get("items") or []):
             row["fee"] = sorted(named)
+        else:
+            # Said out loud rather than dropped quietly. This is the one case
+            # where DE answered and we still publish nothing, so silence here
+            # would hide a fee that had changed into something unnameable -
+            # and `EVENT_FEES` would go on serving the old one to every
+            # proxied build with nothing to say it had drifted.
+            log(f"bounties: ! {group} charges a fee whose items could not all "
+                f"be named - {', '.join(fee.get('items') or [])}")
         break
     return row
 
@@ -2130,6 +2175,19 @@ def main() -> int:
         if e.get("expiry") and e.get("tag") and e["tag"] not in EVENT_TAGS:
             log(f"bounties: ! {e['event']} is running and DE tag it '{e['tag']}' "
                 f"- add that to EVENT_TAGS in tools/build_data.py")
+    # Same idea for the fee, and the same reason: it is first-party-only, so the
+    # builds that need `EVENT_FEES` are exactly the ones that cannot check it.
+    # This fires only on a build that DID reach DE, which is where a correction
+    # can come from - if what they publish differs from the table, the table is
+    # out of date and a person has to move it.
+    for group, e in bounties["events"].items():
+        if not e.get("expiry"):
+            continue
+        levels = official.group_levels(group)
+        fee = tuple(e.get("fee") or ())
+        if fee and fee != tuple(EVENT_FEES.get((e["event"], tuple(levels or ())), ())):
+            log(f"bounties: ! {group} spends {', '.join(fee)} per run "
+                f"- update EVENT_FEES in tools/build_data.py")
 
     if bounties.get("published"):
         log(f"bounties: DE publish the letter for {bounties['published']} of "

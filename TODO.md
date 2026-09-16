@@ -953,54 +953,21 @@ not visible before, and they are why this entry stays open.
 a refusal rather than a hiccup, and `PROJECT.md §2` is explicit that every request
 is somebody else's bandwidth. Retrying an address-range block just spends it.
 
-### The event-bounty fee never reaches the deployed site
+**And do not re-propose moving the fetch — that was costed and declined on
+2026-09-16 [settled].** Relaying the worldstate from the owner's machine, and
+letting that machine publish the site, were both worked out in detail and both
+turned down: they commit data to the repository and put a desktop on the
+critical path for a site meant to build itself. `PROJECT.md §7` has the full
+reasoning and the measurements behind it, including the finish of the
+alternative-host search — **there is no second host for the worldstate**, so
+there is no URL-level fix left to find.
 
-**Measured 2026-09-16, minutes after shipping it.** The Plague Star row's fee
-line — *"Each run spends Eidolon Phylaxis and Infested Catalyst"* — is correct
-locally and **absent on the published site**, which is the one the owner uses.
-Read from the deployed payload itself:
-
-```
-built:  2026-09-16T15:12:16+00:00
-feeds:  vaultTrader proxy | bounties proxy | fissures proxy | voidTrader proxy
-Level 55 - 65 Plague Star | window: yes | fee: none
-```
-
-**Nothing is broken and no code is wrong.** The fee comes from `requiredItems`
-on DE's job, WFCD publish no job fees, and the build is deliberately silent
-rather than guessing — that decision is `PROJECT.md §7` and it stands. The row
-still has a window, so it correctly shows as running. It is the *reach* that is
-the problem: by the 403 measurement above, **DE answered one build in eighteen**,
-so the feature is visible about 6% of the time and never predictably.
-
-**What makes this fixable at all is that a fee is static.** Unlike a window, a
-rotation or a fissure, a job's `requiredItems` does not change minute to minute —
-it is fixed for the event's whole run. So carrying one forward is not the
-"a reused copy is not a first-party answer" trap, which is about snapshots of
-moving things.
-
-**`EVENT_TAGS` is the precedent, and it is a close one.** A tag is also a static
-first-party fact that only DE publish; it lives in `build_data.py` as a
-hand-maintained constant, and the build **logs when it sees a new one** so a
-human can commit it. Same shape, same source, same reason.
-
-Three ways out, and the owner picks:
-
-- **Leave it.** Honest, never wrong, and the line appears on the builds that
-  reach DE. Costs nothing and delivers little.
-- **Log the observed fee the way a new tag is logged**, and keep a constant
-  beside `EVENT_TAGS` that fills the gap when the first-party route did not
-  answer — first-party still wins whenever it is there. Matches existing
-  practice; costs a hand-maintained table that can go stale silently, which is
-  exactly the exposure `EVENT_TAGS` already carries and the project accepted.
-- **Ask DE for the Goal from a machine that is not 403'd.** The local scheduled
-  refresh already fetches successfully; whether it can be made to contribute to
-  the published build is the open question in the entry above, and it would fix
-  far more than this one line.
-
-**Do not solve it by reading the fee from WFCD.** They do not publish it, and a
-value reconstructed from their bounty list would be our guess wearing DE's
-authority.
+**What is still open is this entry's own subject**: the published site's live
+feeds come from the proxy on ~94% of builds and the stale-data banner says so.
+The agreed direction is to close each first-party-only gap on its own terms
+rather than the delivery, which `EVENT_FEES` now does for the event-bounty fee.
+Anything else DE alone publish is a candidate for the same treatment, and the
+open question is which fields those are — nobody has enumerated them.
 
 ### Nothing notices when one section 7 entry supersedes another
 

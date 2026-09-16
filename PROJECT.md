@@ -8430,6 +8430,72 @@ read. It ticks the box in both halves now, and the second half asserts the row i
 still there before asserting what it does not say. Found by mutation, which is
 the only thing that finds a test passing for the wrong reason.
 
+### The 403 is not routed around; the gaps it opens are closed one at a time
+
+**Decided by the owner on 2026-09-16**, after the event-bounty fee shipped that
+morning and was measured absent from the deployed site within the hour.
+
+**What the investigation settled, so nobody repeats it.** The 403 had been
+written down as *"DE's endpoints refuse a datacentre IP"*, which is drawn too
+broadly. From the runner's own probe step:
+
+| Host | From a GitHub runner |
+|---|---|
+| `api.warframe.com` | **403** |
+| `origin.warframe.com` | **403** |
+| `www.warframe.com` (drop tables) | 200 |
+| `wiki.warframe.com` | 200 |
+| `content.warframe.com` | 200 |
+
+So the consequence is per-source, not global. The export index already routes
+around its 403 by asking `content.warframe.com` instead (`EXPORT_INDEX_HOSTS`),
+which is why a CI build still gets DE's own parts and Ducats. **The worldstate
+cannot**, and that search is now finished: every combination of DE's four hosts
+with both known paths was tried — `content./cdn` 404, `origin./cdn` 503,
+`api./dynamic` 404, `www./cdn` 404 — and the results are written beside
+`WORLDSTATE` in `sources.py` so the question is closed.
+
+**That leaves one endpoint, and no URL-level fix.** Anything wanting a
+first-party worldstate in a published build has to change *where the fetch
+happens*. Two mechanisms were costed and **both were declined**:
+
+- **Relay the worldstate from the owner's machine.** It already fetches DE
+  successfully every ten minutes, already builds a payload, and already talks to
+  GitHub through `gh`; the document is only 139 KB, and `WORLDSTATE_MAX_AGE`
+  would have judged a relayed copy by DE's own `Time` stamp, so it could not
+  have published stale data. It was still declined: it commits data to the
+  repository, which this project does not do, and it puts a desktop on the
+  critical path for a site that is meant to build itself.
+- **Let that machine publish the site.** Same objection, larger — and the
+  `pages` concurrency group only serialises Actions deploys, so a local deploy
+  and a CI deploy could race with nothing guarding them.
+
+**What was chosen instead: close each first-party-only gap on its own terms.**
+The live feeds keep coming from the proxy, the stale-data banner keeps telling
+the truth, and a field that only DE publish gets a recorded fallback when it is
+worth one. The first of those is `EVENT_FEES`.
+
+**`EVENT_FEES` is `EVENT_TAGS` applied to a second fact.** A job's
+`requiredItems` is static for the event's whole run — unlike a window, a
+rotation or a fissure — so recording one is not the "a reused copy is not a
+first-party answer" trap, which is about snapshots of moving things. It is keyed
+on **event name and levels rather than the tag**, and that is the one place it
+departs from its model: a tag is sturdier, but it only arrives on the
+first-party route, which is exactly the route these builds did not get.
+
+**A first-party answer wins completely, including a first-party "no".** The
+table is consulted only when DE were not reached *at all*. If they answered and
+list no fee for a tier, that tier has no fee; if they answered with a fee whose
+items cannot all be named, nothing is published and the build says so out loud,
+because that is the one case where silence would let a drifted fee go on being
+served from the table with nothing to flag it.
+
+**Proved against the deployed payload rather than a fixture**: the exact Plague
+Star row the site published on 2026-09-16, which carried no fee, comes back from
+the new code with both materials, while the two Ghoul rows stay empty. And on a
+first-party build the maintainer notice stays silent, which is the table
+agreeing with what DE publish today.
+
 ### This section was read entry by entry, and the diagnosis was wrong
 
 **Done 2026-09-16, all 137 entries, against the contract set on 2026-09-08** —
