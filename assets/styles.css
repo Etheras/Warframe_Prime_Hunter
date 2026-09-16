@@ -596,6 +596,35 @@ button,input,select,textarea{font:inherit;color:inherit}
   display:flex;align-items:center;gap:10px;
   padding:9px 12px;background:var(--panel);
 }
+/* The part's rarity band, in the game's own bronze / silver / gold. It sits on
+   the HEAD rather than on the relic rows beneath, because those rows are
+   exactly what is missing when it is needed: 95% of relics are vaulted, so with
+   `Hide vaulted` on the usual part has no relic row on screen at all and the
+   only colour left was the panel. The chips stay on the relic rows, which are a
+   different surface, so STYLE.md 1's rule against tinting a background and
+   putting rarity chips on it still holds. */
+.part.rar-part-Common .part-head{
+  background:linear-gradient(90deg,rgba(198,120,54,.18) 0,rgba(198,120,54,.18) 34%,var(--panel) 74%);
+}
+.part.rar-part-Uncommon .part-head{
+  background:linear-gradient(90deg,rgba(206,214,226,.13) 0,rgba(206,214,226,.13) 34%,var(--panel) 74%);
+}
+.part.rar-part-Rare .part-head{
+  background:linear-gradient(90deg,rgba(255,206,64,.24) 0,rgba(255,206,64,.24) 34%,var(--panel) 74%);
+}
+/* A part whose rarity differs between the relics that drop it — 70 of 586, and
+   the reason this is a band rather than a word. Both ends in rarity order, so
+   the row shows the range it spans instead of picking a winner it only has in
+   some relics. `Common-Rare` covers the four parts that span the lot. */
+.part.rar-part-Common-Uncommon .part-head{
+  background:linear-gradient(90deg,rgba(198,120,54,.18) 0,rgba(206,214,226,.13) 42%,var(--panel) 78%);
+}
+.part.rar-part-Uncommon-Rare .part-head{
+  background:linear-gradient(90deg,rgba(206,214,226,.13) 0,rgba(255,206,64,.24) 42%,var(--panel) 78%);
+}
+.part.rar-part-Common-Rare .part-head{
+  background:linear-gradient(90deg,rgba(198,120,54,.18) 0,rgba(255,206,64,.24) 42%,var(--panel) 78%);
+}
 .part-name{font-size:13.5px;font-weight:600;flex:1}
 .part.part-done .part-name{color:var(--txt-dim)}
 
@@ -691,10 +720,19 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
   padding:8px 12px;border-top:1px solid var(--line-soft);font-size:12.5px;
 }
 /* rarity reads off the row itself, so the chips can stay quiet */
-/* Hold the rarity colour, then ease out. Vaulted rows fade into violet instead
-   of nothing — the same hue as the Resurgence badge, since Prime Resurgence is
-   how vaulted things come back. DE publishes no official "vault" colour that I
-   could find, so this is our own convention, kept consistent with the badge. */
+/* Hold the rarity colour, then ease out. A vaulted row keeps its rarity and
+   ends in violet — the same hue as the Resurgence badge, since Prime Resurgence
+   is how vaulted things come back. DE publishes no official "vault" colour that
+   I could find, so this is our own convention, kept consistent with the badge.
+
+   **The violet used to win, and that was backwards.** It was laid on at .16
+   over a rarity dimmed to .07–.14, so the row read as "vaulted" first and as
+   bronze/silver/gold second — on 95% of relics, which makes the washed-out
+   version the one a reader almost always sees. Rarity is the fact that decides
+   whether a relic is worth trading for; vaulted is already said twice on the
+   same row, by the `shut` state label and by the dimmed name. So the rarity
+   comes up and the violet goes back to a tail: enough to place the row, not
+   enough to repaint it. */
 .relic-row.rar-row-Common{
   background:linear-gradient(90deg,rgba(198,120,54,.16) 0,rgba(198,120,54,.16) 38%,transparent 76%);
 }
@@ -705,13 +743,13 @@ span.mat-name{color:var(--txt-dim);padding:3px 0}
   background:linear-gradient(90deg,rgba(255,206,64,.22) 0,rgba(255,206,64,.22) 38%,transparent 76%);
 }
 .relic-row.is-vaulted.rar-row-Common{
-  background:linear-gradient(90deg,rgba(198,120,54,.10) 0,rgba(198,120,54,.10) 38%,rgba(157,123,234,.16) 82%);
+  background:linear-gradient(90deg,rgba(198,120,54,.13) 0,rgba(198,120,54,.13) 42%,rgba(157,123,234,.09) 88%);
 }
 .relic-row.is-vaulted.rar-row-Uncommon{
-  background:linear-gradient(90deg,rgba(206,214,226,.07) 0,rgba(206,214,226,.07) 38%,rgba(157,123,234,.16) 82%);
+  background:linear-gradient(90deg,rgba(206,214,226,.09) 0,rgba(206,214,226,.09) 42%,rgba(157,123,234,.09) 88%);
 }
 .relic-row.is-vaulted.rar-row-Rare{
-  background:linear-gradient(90deg,rgba(255,206,64,.14) 0,rgba(255,206,64,.14) 38%,rgba(157,123,234,.16) 82%);
+  background:linear-gradient(90deg,rgba(255,206,64,.18) 0,rgba(255,206,64,.18) 42%,rgba(157,123,234,.09) 88%);
 }
 .relic-row.is-vaulted .relic-name{color:var(--txt-dim)}
 .relic-name{font-weight:600;min-width:76px}

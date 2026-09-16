@@ -1767,6 +1767,74 @@ falling curves cross in the middle:
 The planner optimises over the whole wanted set per relic, so it finds these; the
 collection view answers the narrower per-part question and does not.
 
+### A part's rarity is a band, and the part head is where it goes
+
+**Shipped 2026-09-16, from the owner noticing that a fully vaulted part shows no
+colour at all.** Every rarity colour on the collection page lived on the relic
+rows. `Hide vaulted` is on by default and **95% of relics are vaulted**, so the
+ordinary part has no relic row on screen — and the rows that would have carried
+the colour are exactly the ones just removed. The part head now carries it.
+
+**The obvious source was the Ducat value, and it is the wrong one — but it is
+how the answer was found.** The value is printed on that row already, so
+colouring from it can never disagree with the number beside it. It is also a
+proxy: measured over a build, 15d is Common for 94% of parts, 45d Uncommon for
+97%, 100d Rare for 97%. The exact answer was already in the payload —
+`parts[].relics[].rarity`, present whether or not those relics are rendered — so
+a 94%-accurate stand-in was never needed.
+
+**What the Ducat value did settle is the shape of the problem.** Rarity is a
+property of *(part, relic)*, not of a part: **70 of 586 parts** hold more than
+one, Ash Prime Systems being Rare in some relics and Uncommon in others. DE
+price exactly those parts at the in-between values — **all 17 parts at 25 Ducats
+are mixed, and 32 of 34 at 65** — which is Digital Extremes answering the same
+question and declining to pick an end. So the tint is a **band**, lowest to
+highest, and a mixed part shows both.
+
+**Resolving a band to one end was rejected, both ways round.** Taking the best
+claims a rarity the part only has in some relics; taking the worst hides one it
+really reaches. Neither is cheaper than the blend, and both are wrong on the
+same 70 parts.
+
+**Lowest-and-highest rather than the whole set**, because the set has four shapes
+and the pair has three: `Common+Uncommon` (29), `Uncommon+Rare` (37),
+`Common+Uncommon+Rare` (3) and `Common+Rare` (1). The last two both span the full
+range, so collapsing to the ends costs nothing and saves a fourth tint for four
+parts.
+
+**The band reads the chances, not DE's rarity word** — the rule `rarityOf`
+applies everywhere else, and the one `tools/official.py` matches. Checked rather
+than assumed: the two **agree on all 4,033 reward rows** in a current build, so
+this is consistency rather than a correction. The published word is the fallback
+for a row carrying no chances.
+
+**A part with nothing to go on takes no tint.** The four akimbo second-weapon
+components have no relics of their own, and `partRarity` returns `null` rather
+than guessing.
+
+The logic is in `model.js` (`partRarity`, `partRarityClass`) rather than in
+`app.js`, so it is testable without a browser — the same rule as everything else
+that decides what a row says.
+
+### A state almost everything is in cannot be the loudest thing on the row
+
+**Shipped 2026-09-16, beside the entry above and at the owner's direction.** A
+vaulted relic row laid violet at `.16` over a rarity dimmed to `.07`–`.14`, so
+it read as *vaulted* first and as bronze/silver/gold second. The CSS comment
+called it "fade into violet instead of nothing", which was true of the colour and
+wrong about the priority.
+
+**The measurement is the argument: 95% of relics are vaulted.** So the washed-out
+row was not a special case shown occasionally, it was what the list normally
+looks like — and a state shared by almost every row carries no information. It
+was also *already* said twice on that row, by the `shut` state chip and by the
+dimmed relic name, while rarity was said nowhere else once the chips were
+quietened. Rarity now leads and the violet is a tail: enough to place the row,
+not enough to repaint it.
+
+Kept rather than removed, because the hue is doing a second job — it matches the
+Resurgence badge, which is how vaulted things come back.
+
 ### "Best places to farm" ranks by what a run is worth, not by relic overlap
 
 **"Best places to farm"** (`app.js → bestSpots`) groups every source of every

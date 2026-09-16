@@ -1120,9 +1120,11 @@
             </label>
           </span>
         </div>
-        <p class="legend">Each row is shaded by how rare <b>this part</b> is inside that
-          relic. Hover the rarity for the odds at every refinement and what they cost in
-          Void Traces; hover a rotation or a relic count for detail. Best odds first, and
+        <p class="legend">Each part is shaded by how rare it is, and each row beneath it
+          by how rare <b>this part</b> is inside that relic — a part shading across two
+          colours is rarer in some relics than in others. Hover the rarity for the odds at
+          every refinement and what they cost in Void Traces; hover a rotation or a relic
+          count for detail. Best odds first, and
           <b>Intact</b> means don't refine — refining a common reward makes it rarer.</p>`;
 
       shownParts.forEach((p) => {
@@ -1141,7 +1143,14 @@
 
         const need = needOf(p), have = haveOf(it.id, p.name);
         const full = have >= need;
-        html += `<div class="part${full ? " part-done" : ""}">
+        /* The part's own rarity band, so the row keeps saying what it is worth
+           when every relic under it is vaulted and hidden — which is the usual
+           case, not the exception: 95% of relics are vaulted. Without it the
+           only rarity on screen lives on the relic rows, and those are the rows
+           `hideVaultedRelics` has just removed. */
+        const band = M.partRarityClass(p);
+        html += `<div class="part${full ? " part-done" : ""}${
+          band ? ` rar-part-${esc(band)}` : ""}">
           <div class="part-head">
             <button class="part-own${full ? " on" : ""}" data-part="${esc(p.name)}"
                     data-tip="Click to change how many you own${need > 1 ? ` (0–${need})` : ""}">

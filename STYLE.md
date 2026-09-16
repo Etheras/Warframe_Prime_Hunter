@@ -23,6 +23,32 @@ Rarity uses the game's own bronze/silver/gold language, so it reads without a
 legend. Never tint a background by rarity *and* put rarity chips on it — that
 was the first attempt and the chips vanished into the gradient.
 
+**A part's head is tinted by rarity, and that is not an exception to the line
+above**: the chips live on the relic rows inside it, which are a different
+surface, so nothing is asked to read a chip against its own gradient. It is
+there because the relic rows are precisely what is missing when it is wanted —
+95% of relics are vaulted, `Hide vaulted` is on by default, and without it the
+usual part shows no rarity anywhere on screen.
+
+**Rarity is a band, not always a word.** A part can be Uncommon in one relic and
+Rare in another — 70 of 586 are — so the head is tinted from the least rare it
+reaches to the most, giving three blends on top of the three solids:
+
+| Band | Tint | Parts |
+|---|---|---:|
+| `Common-Uncommon` | bronze → silver | 29 |
+| `Uncommon-Rare` | silver → gold | 37 |
+| `Common-Rare` | bronze → gold, for anything spanning the lot | 4 |
+
+Never resolve a band to one end. Taking the best of them claims a rarity the
+part only has in some relics, and taking the worst hides one it really reaches;
+the blend is the only honest answer, and it is the one Digital Extremes
+themselves give — the parts priced at the in-between values, 25 and 65 Ducats,
+are almost exactly the parts whose rarity varies.
+
+**A part with no rarity at all takes no tint.** The four akimbo second-weapon
+components have no relics of their own, and an uncoloured row is correct there.
+
 The third channel is `.demand`: `Railjack`, `PvPvE`, `Old Mate` (Solaris United
 Rank 5, for the Profit-Taker phases), `Steel Path`, and `Enemy`. It states a
 **requirement, not a verdict**: all of them are perfectly good farms and none is
@@ -115,9 +141,19 @@ runs the server and by anyone they shared the address with. Only the first can f
 anything, so only they are told how — and in their terms, the file they double-click,
 never a command line. Everyone else gets the warning and nothing they cannot act on.
 
-**Vaulted / unobtainable fades to violet** (`rgba(157,123,234,…)`), matching the
+**Vaulted / unobtainable ends in violet** (`rgba(157,123,234,…)`), matching the
 Resurgence badge, because Prime Resurgence is how vaulted things come back. This
 is our convention, not a Digital Extremes palette — none is published.
+
+**It ends there; it does not take the row over.** Until 2026-09-16 a vaulted
+relic row laid violet at `.16` over a rarity dimmed to `.07`–`.14`, so it read as
+*vaulted* first and as bronze/silver/gold second. That is backwards on two
+counts: vaulted is already said twice on the same row, by the state chip and by
+the dimmed name, while rarity is said nowhere else — and since 95% of relics are
+vaulted, the washed-out version was not the exception but the normal
+appearance of the list. Rarity leads and the violet is a tail. **A state that
+almost everything is in cannot be the loudest thing on the row**; it carries no
+information precisely because it is everywhere.
 
 ---
 

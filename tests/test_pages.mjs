@@ -584,6 +584,59 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
   assert.deepEqual(errors, []);
 });
 
+page_test("a part keeps a rarity colour when every relic under it is hidden", async () => {
+  /* The case this is about is the ordinary one rather than an edge: 95% of
+     relics are vaulted, and `Hide vaulted` in the drawer is on by default, so
+     most parts show no relic row at all — and the relic rows were where every
+     rarity colour on this page lived. The band on the part head is what is left
+     saying whether a spare is a bronze or a gold.
+
+     Asked of the payload rather than of a named Prime. Any card on screen whose
+     parts all carry relics will do, and which Primes those are is exactly what
+     DE change every quarter. */
+  const { page, errors } = await open("/index.html");
+  const ids = await shownIds(page);
+  assert.ok(ids.length, "the grid rendered no cards at all");
+  const subject = await page.evaluate((shown) => {
+    const by = new Map((window.WFPRIME_DATA.items || []).map((i) => [i.id, i]));
+    for (const id of shown) {
+      const it = by.get(id);
+      const parts = (it && it.parts) || [];
+      if (parts.length && parts.every((p) => ((p.relics || []).length))) {
+        return { id: it.id, name: it.name, parts: parts.length };
+      }
+    }
+    return null;
+  }, ids);
+  assert.ok(subject, "no card on screen has every one of its parts backed by a relic");
+
+  await page.locator(`[data-id="${subject.id}"]`).click();
+  // Stated rather than inherited, even though it is the default: this test is
+  // about what survives the hiding, so the hiding has to be its own assertion.
+  await setCheck(page, "#hideVaulted", true);
+
+  const rows = page.locator("#drawerBody .part");
+  assert.equal(await rows.count(), subject.parts,
+               `${subject.name} has ${subject.parts} parts and the drawer must show them all`);
+
+  const bands = await rows.evaluateAll((els) => els.map((e) =>
+    (String(e.className).match(/\brar-part-(\S+)/) || [])[1] || null));
+  const BANDS = ["Common", "Uncommon", "Rare",
+                 "Common-Uncommon", "Uncommon-Rare", "Common-Rare"];
+  bands.forEach((b, i) => {
+    assert.ok(b, `part ${i + 1} of ${subject.name} carries no rarity band at all`);
+    assert.ok(BANDS.includes(b), `"${b}" is not one of the six bands`);
+  });
+
+  // and the thing it is protecting against: with vaulted relics hidden, this
+  // part really does have no relic row of its own to take a colour from.
+  const hidden = await rows.first().locator(".relic-row").count();
+  const note = await rows.first().locator(".relic-none").count();
+  assert.ok(hidden === 0 ? note > 0 : true,
+            "a part showing no relic row must say why it is empty");
+  assert.deepEqual(errors, []);
+});
+
 page_test("the Baro filter says when he is next on a relay, and never moves itself", async () => {
   /* He is on a relay two days a fortnight, so *Baro Ki'Teer* is the one bucket
      whose answer has a clock on it. The label says when — the half of the Baro

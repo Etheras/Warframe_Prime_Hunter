@@ -33,6 +33,51 @@
     return i >= 20 ? "Common" : i >= 6 ? "Uncommon" : "Rare";
   }
 
+  const RARITY_ORDER = ["Common", "Uncommon", "Rare"];
+
+  /* The rarity band a whole PART sits in, as `{lo, hi}` — the least and most
+     rare it is anywhere. `lo === hi` is a part that reads the same in every
+     relic; the two differing is not noise but the real shape of the thing.
+
+     **Rarity is a property of (part, relic), not of a part.** Measured on the
+     built payload: of 586 parts, 509 hold one rarity everywhere and 70 do not —
+     Ash Prime Systems is Rare in some relics and Uncommon in others. A single
+     word cannot describe those, and picking the best or the worst of them
+     states something the part only has in some relics.
+
+     Lowest-and-highest rather than the whole set, because the set has four
+     shapes and the pair has three: `Common+Uncommon` (29 parts),
+     `Uncommon+Rare` (37), `Common+Uncommon+Rare` (3) and `Common+Rare` (1). The
+     last two both span the full range, so collapsing to the ends costs nothing
+     and saves the page a fourth tint for four parts.
+
+     Read from the chances rather than from DE's rarity word, the same rule
+     `rarityOf` applies everywhere else — the two agree on all 4,033 reward rows
+     in a current build, and `rarityOf` is the one `tools/official.py` matches.
+     Falls back to the published word only where a row carries no chances.
+
+     `null` when nothing can be said: the four akimbo second-weapon components
+     (Akbronco, Aklex, Akmagnus, Akvasto) have no relics of their own, and a
+     part with no rarity must go uncoloured rather than guess. */
+  function partRarity(part) {
+    const seen = [];
+    ((part && part.relics) || []).forEach((r) => {
+      const c = rarityOf(r && r.chances) || (r && r.rarity) || "";
+      if (RARITY_ORDER.indexOf(c) >= 0 && seen.indexOf(c) < 0) seen.push(c);
+    });
+    if (!seen.length) return null;
+    seen.sort((a, b) => RARITY_ORDER.indexOf(a) - RARITY_ORDER.indexOf(b));
+    return { lo: seen[0], hi: seen[seen.length - 1] };
+  }
+
+  /* The class suffix for a part's band: `Common`, or `Common-Rare` when it
+     spans. Built here rather than in the page so a test can pin it without a
+     browser, and so both ends of the name come from one place. */
+  function partRarityClass(part) {
+    const band = partRarity(part);
+    return band ? (band.lo === band.hi ? band.lo : band.lo + "-" + band.hi) : "";
+  }
+
   const TRACE_COST = { Intact: 0, Exceptional: 25, Flawless: 50, Radiant: 100 };
 
   /* Which end to take a relic to for ONE part. The odds move monotonically with
@@ -665,7 +710,7 @@
 
   window.WFPrimeModel = {
     REFINEMENTS, TRACE_COST, PLAN_OPTIONS, migrateCapped,
-    needOf, rarityOf, refineAdvice, statusOf, bucketsOf,
+    needOf, rarityOf, partRarity, partRarityClass, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,
     REDUNDANCY_WEIGHT, creditRelics, partLabel,

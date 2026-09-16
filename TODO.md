@@ -1023,6 +1023,23 @@ FAIL js: the search sits at the centre of the bar, whatever is beside it
   page.goto: net::ERR_NO_BUFFER_SPACE at http://127.0.0.1:55152/index.html
 ```
 
+**A fourth on 2026-09-16**, in a `node --test tests/test_pages.mjs` run of its
+own rather than inside the full suite — which is the first time the pattern this
+entry is named after has not held:
+
+```
+FAIL js: the collection view names the node that is a fissure, as the planner does
+```
+
+It then passed twice: alone, and in a full pages run of 84. Worth two notes for
+whoever measures this. The suite had **just grown by one page test**, which fits
+the resource reading rather than the timing one — more page loads in the same
+run, nothing changed about that test. And it is a **fissure** test, so before
+calling it this flake, rule out the other one: a test planting a fissure on only
+one of the two sources fails exactly when `data/fissures.json` happens to hold a
+live fissure that is not the planted one, and reads identically to this. That
+file is rewritten every ten minutes by the refresh task on this machine.
+
 Passed on the next full run, 602 of 602. `ERR_NO_BUFFER_SPACE` is the OS refusing
 a socket, not a missed wait — it is **ephemeral port or non-paged pool
 exhaustion on Windows**, which is what a long session of builds, subprocesses and

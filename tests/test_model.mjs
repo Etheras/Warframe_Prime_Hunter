@@ -80,6 +80,62 @@ test("rarity comes from the unrefined chance, not from DE's wording", () => {
   assert.equal(M.rarityOf({}), "", "an unknown chance is not a rarity");
 });
 
+/* A part as the payload carries it: a list of the relics it drops in, each with
+   its own chances. Rarity is a property of (part, relic), which is the whole
+   reason a part needs a band rather than a word. */
+const part = (...chances) => ({ relics: chances.map((c) => ({ chances: c })) });
+
+test("a part that reads the same in every relic gets one rarity, not a band", () => {
+  const M = load();
+  assert.deepEqual(plain(M.partRarity(part(UNCOMMON, UNCOMMON, UNCOMMON))),
+                   { lo: "Uncommon", hi: "Uncommon" });
+  assert.equal(M.partRarityClass(part(UNCOMMON, UNCOMMON, UNCOMMON)), "Uncommon");
+  assert.equal(M.partRarityClass(part(COMMON)), "Common");
+  assert.equal(M.partRarityClass(part(RARE, RARE)), "Rare");
+});
+
+test("a part whose rarity differs between relics spans both ends", () => {
+  const M = load();
+  // the Ash Prime Systems shape: Rare in some relics, Uncommon in others
+  assert.deepEqual(plain(M.partRarity(part(RARE, UNCOMMON, RARE))),
+                   { lo: "Uncommon", hi: "Rare" });
+  assert.equal(M.partRarityClass(part(RARE, UNCOMMON)), "Uncommon-Rare");
+  assert.equal(M.partRarityClass(part(COMMON, UNCOMMON)), "Common-Uncommon");
+  // order of the relics must not decide the order of the band
+  assert.equal(M.partRarityClass(part(UNCOMMON, COMMON)), "Common-Uncommon");
+});
+
+test("a part spanning all three rarities collapses to the two ends", () => {
+  const M = load();
+  // three parts in the dataset do this, and one more is Common+Rare with no
+  // middle. Both span the full range, so both get one tint rather than two.
+  assert.equal(M.partRarityClass(part(COMMON, UNCOMMON, RARE)), "Common-Rare");
+  assert.equal(M.partRarityClass(part(COMMON, RARE)), "Common-Rare");
+});
+
+test("a part with nothing to go on is not given a rarity", () => {
+  const M = load();
+  // the four akimbo second-weapon components carry no relics of their own
+  assert.equal(M.partRarity({ relics: [] }), null);
+  assert.equal(M.partRarity({}), null);
+  assert.equal(M.partRarity(null), null);
+  assert.equal(M.partRarityClass({ relics: [] }), "",
+               "no rarity must leave the row uncoloured rather than guess");
+  // a row carrying neither chances nor a word says nothing
+  assert.equal(M.partRarity({ relics: [{}] }), null);
+});
+
+test("a part's band reads the chances, and falls back to the published word", () => {
+  const M = load();
+  // where a row has chances, they win - the rule rarityOf applies everywhere
+  assert.equal(M.partRarityClass({ relics: [{ chances: RARE, rarity: "Common" }] }),
+               "Rare", "the chance decides, not DE's wording");
+  // where it has none, the published word is better than nothing
+  assert.equal(M.partRarityClass({ relics: [{ rarity: "Uncommon" }] }), "Uncommon");
+  assert.equal(M.partRarityClass({ relics: [{ chances: COMMON }, { rarity: "Rare" }] }),
+               "Common-Rare");
+});
+
 test("the per-part advice is one end or the other, never the middle", () => {
   const M = load();
   assert.equal(M.refineAdvice(RARE).label, "Radiant", "a rare only gets better");

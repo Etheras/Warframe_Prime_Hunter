@@ -310,9 +310,11 @@ Click any card. A panel slides in from the right with:
    name, and hovering "4 of 7 relics" lists which relics you'd be after there.
    Ties break towards lower-level nodes.
 3. **Parts and the relics that drop them** — every part, which relics contain it,
-   and whether to refine. Each row is shaded by how rare that part is inside that
-   relic; hover the rarity for the odds at every refinement and what they cost in
-   Void Traces. **Hide collected** and **Hide vaulted** trim the list down.
+   and whether to refine. Each part is shaded by how rare it is — bronze, silver
+   or gold — and each row beneath it by how rare that part is inside that relic;
+   hover the rarity for the odds at every refinement and what they cost in Void
+   Traces. A part shaded across two colours is rarer in some relics than in
+   others. **Hide collected** and **Hide vaulted** trim the list down.
 
 Vaulted Primes show their relics too, greyed out — useful when you're looking to
 trade for a specific one.
