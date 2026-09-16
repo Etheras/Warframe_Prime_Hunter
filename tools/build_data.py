@@ -152,7 +152,8 @@ def acquire_export(offline: bool):
         # the count that matters rather than the number: keep the two paths
         # agreeing, and keep the test that says so.
         log(f"! public export index unavailable ({exc})")
-        return [], {}, None, {"textures": {}, "nodeNames": {}, "partSpecs": {}}
+        return [], {}, None, {"textures": {}, "nodeNames": {}, "partSpecs": {},
+                              "resourceNames": {}}
 
     exports = {}
     for want in EXPORT_WANTED:
@@ -202,7 +203,11 @@ def acquire_export(offline: bool):
             official.node_levels(exports),
             hashlib.sha256(blob).hexdigest()[:16],
             {"textures": textures, "nodeNames": official.node_names(exports),
-             "partSpecs": official.prime_part_specs(exports)})
+             "partSpecs": official.prime_part_specs(exports),
+             # What an event bounty's `requiredItems` are called. Here rather
+             # than plumbed out as a second return value, which is what this
+             # bag exists to stop.
+             "resourceNames": official.resource_names(exports)})
 
 
 
@@ -1161,7 +1166,8 @@ def find_live_events(events: list) -> dict:
     """
     found: dict[str, dict] = {}
 
-    def consider(name: str, blob: str, activation, expiry, tag=None, node=None) -> None:
+    def consider(name: str, blob: str, activation, expiry, tag=None, node=None,
+                 fees=None) -> None:
         """
         `tag` is matched first where one is known, because it is a machine
         identifier and the blob is prose. Where none is known - which is both of
@@ -1182,6 +1188,12 @@ def find_live_events(events: list) -> dict:
                 row["tag"] = str(tag)
             if node:
                 row["node"] = str(node)
+            if fees:
+                # Carried unresolved; `build_bounty_meta` matches them to a
+                # group by level and turns the paths into names. Absent on the
+                # WFCD route, which publishes no job fees at all - so the fee
+                # line is simply not said on a proxied build rather than guessed.
+                row["fees"] = fees
             found[name] = row
 
     for ev in events or []:
@@ -1189,7 +1201,7 @@ def find_live_events(events: list) -> dict:
                         ("description", "tooltip", "node", "tag", "name", "marks"))
         for name in EVENT_PATTERNS:
             consider(name, blob, ev.get("activation"), ev.get("expiry"),
-                     ev.get("tag"), ev.get("node"))
+                     ev.get("tag"), ev.get("node"), ev.get("fees"))
 
     return found
 
@@ -1281,8 +1293,15 @@ def read_bounty_jobs(pools: dict, syndicate_missions, now: datetime | None = Non
 
 
 def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
-                      now: datetime | None = None) -> dict:
-    """The whole bounty block of the payload."""
+                      now: datetime | None = None, resources: dict | None = None) -> dict:
+    """The whole bounty block of the payload.
+
+    `resources` is `ExportResources` as path -> name, used only to turn a job's
+    `requiredItems` into something a reader recognises. Optional because every
+    other part of this block predates it and a build without the manifest should
+    lose the fee line rather than the bounty data.
+    """
+    resources = resources or {}
     families = derive_bounty_rotation(pools, syndicate_missions, now) if checked else {}
     live = find_live_events(events) if checked else {}
 
@@ -1332,9 +1351,47 @@ def build_bounty_meta(pools: dict, syndicate_missions, events, checked: bool,
         "disagreed": sorted(disagreed),
         "groups": groups,
         # every limited-time bounty we know of, with the window if it is running
-        "events": {group: {"event": name, **(live.get(name) or {})}
+        "events": {group: _event_row(group, name, live.get(name), resources)
                    for group, name in EVENT_BOUNTIES.items()},
     }
+
+
+def _event_row(group: str, name: str, live: dict | None, resources: dict) -> dict:
+    """One `meta.bounties.events` row: the event, its window, and what a run costs.
+
+    **The fee is per tier, and only the tier we rank carries one.** DE publish
+    `requiredItems` on the job rather than on the Goal, so the standard Plague
+    Star run has none while the Advanced run - which is the row this project
+    ranks, after `fold_event_enemies` renames it - spends two event materials.
+    Matching on the levels in the group name is what keeps those apart; a fee
+    attached to the event as a whole would say the wrong thing about the run
+    nobody here is being sent on.
+
+    `fees` comes off the row unresolved and does not survive into the payload:
+    a `/Lotus/StoreItems/...` path is not something to show a reader, and the
+    page has no way to turn one into a name.
+
+    Silent on anything it cannot answer, in both directions. No window means the
+    event is not running and there is nothing to charge for; the WFCD route
+    publishes no job fees, so a proxied build says nothing rather than carrying
+    the last first-party answer into a build that did not ask.
+    """
+    row = {"event": name, **(live or {})}
+    fees = row.pop("fees", None)
+    levels = official.group_levels(group)
+    if not fees or not levels:
+        return row
+    for fee in fees:
+        if list(fee.get("levels") or []) != levels:
+            continue
+        named = [resources[p] for p in store_items_to_real(fee.get("items"))
+                 if p in resources]
+        # Every path or none. A half-named fee would read as a shorter bill than
+        # the one the game actually takes, which is worse than not saying it.
+        if named and len(named) == len(fee.get("items") or []):
+            row["fee"] = sorted(named)
+        break
+    return row
 
 
 # --------------------------------------------------------------------------
@@ -2044,7 +2101,8 @@ def main() -> int:
             f"{(baro_window or {}).get('expiry', '?')[:16]})")
 
     bounties = build_bounty_meta(rotation_pools, syndicate_missions, world_events,
-                                 checked=bool(rotation_pools and syndicate_missions))
+                                 checked=bool(rotation_pools and syndicate_missions),
+                                 resources=export_extra.get("resourceNames") or {})
 
     # The stage counts are known from here on, so each bounty relic's stage rows
     # can be summed into what one draw is worth and how many draws a run makes -

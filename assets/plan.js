@@ -34,7 +34,7 @@
   /* Storage, the escaper, the tooltip, the staleness banner and the backup
      file are shared with the collection view - see assets/shared.js. */
   const S = window.WFPrimeShared;
-  const { esc, $, $$, load, save } = S;
+  const { esc, $, $$, load, save, listWords } = S;
   const KEY_PARTS = S.KEYS.parts;
   const KEY_WISH = S.KEYS.wishlist;
   const KEY_PLAN = S.KEYS.plan;
@@ -1247,6 +1247,19 @@
         ? n.eventBounty.event + " is running until " +
           String(n.eventBounty.expiry).slice(0, 10) + "."
         : n.eventBounty.event + " is not running, so this bounty is not on the board.");
+      /* What a run costs to start, which nothing else on the row says. DE put
+         `requiredItems` on the job rather than the Goal, so this is true of the
+         tier we rank - the Advanced run - and not of the standard one beside it
+         in game. Only while it is running: the price of a run nobody can start
+         is not news.
+
+         Named from DE's own `ExportResources`, never written into the page, so
+         a renamed ingredient arrives with the next build. Absent when the build
+         could not reach the worldstate, and saying nothing is correct there. */
+      const fee = eventRunning(n.eventBounty) && (n.eventBounty.fee || []);
+      if (fee && fee.length) {
+        lines.push("Each run spends " + listWords(fee) + ", earned in play.");
+      }
     }
     /* The run's relic chances include an event enemy's drops, folded in by the
        build rather than listed as a row of their own - see `fold_event_enemies`

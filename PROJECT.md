@@ -8374,6 +8374,62 @@ went red — the stage sums for four and five, the four-draw count, the per-draw
 chance, the 2.97% run total and Aya's shared draw count — and green again with it
 reverted.
 
+### An event bounty says what a run costs to start
+
+**Shipped 2026-09-16, with Plague Star live and a week left to check it against.**
+After `fold_event_enemies` made the one ranked Plague Star row the *Advanced*
+run, the row said *level 55–65* and nothing about the two event materials each
+run spends — so a reader holding none could pick a run they cannot start.
+
+**DE publish it, on the job rather than on the Goal.** `requiredItems` is a list
+of StoreItem paths and `useRequiredItemsAsMiscItemFee` says they are spent rather
+than merely held. Both halves are required before anything is said: a job naming
+items without that flag is stating a prerequisite you keep, which is a different
+sentence.
+
+**The per-job part is the whole reason it is read per job.** Measured on the live
+Goal: three jobs, and only two carry a fee.
+
+| job | levels | fee |
+|---|---|---|
+| `InfestedPlainsBounty` | 15–25 | **none** |
+| `InfestedPlainsBountyAdvanced` | 55–65 | two materials |
+| `InfestedPlainsBountySteelPath` | — | two materials |
+
+The row this project ranks is the Advanced run, so a fee attached to the *event*
+would be a claim about a run nobody here is being sent on — and it is exactly the
+claim a reader would make for themselves from "Plague Star costs ingredients".
+
+**Joined on levels, not on the job path.** The group names carry levels and
+nothing else (`Level 55 - 65 Plague Star`), so matching a `jobType` to a group
+name would be a second naming rule to keep in step with the first.
+
+**Named from `ExportResources`, never written into code** — *Eidolon Phylaxis*
+and *Infested Catalyst* reach the payload through the same `/StoreItems` hop
+`build_baro_relics` uses, so a renamed ingredient arrives with the next build.
+That needed a second reading of the manifest: `prime_parts` keeps only rows with
+a `primeSellingPrice`, and an event material has none, so it would have been
+filtered out by the very test that finds Prime parts.
+
+**Silent in four directions, and each one is a decision.** No window means the
+event is not running and there is nothing to charge for. The WFCD route publishes
+no job fees, so a proxied build says nothing rather than carrying a first-party
+answer into a build that did not ask. A fee whose names do not all resolve is
+dropped whole, because a shorter bill than the game takes is worse than none. And
+the raw paths never reach the payload — `/Lotus/StoreItems/...` is not something
+to show a reader.
+
+**Hard rule 10 holds and is why this is in scope at all**: both materials are
+built from event drops, so the row is telling you about something you earn rather
+than something you buy.
+
+**The page test had to be told to keep the row on screen.** With *Include event
+nodes* off, an event that is not running has no row — so the assertion that the
+fee is *absent* passed while the guard was deleted, because there was nothing to
+read. It ticks the box in both halves now, and the second half asserts the row is
+still there before asserting what it does not say. Found by mutation, which is
+the only thing that finds a test passing for the wrong reason.
+
 ### This section was read entry by entry, and the diagnosis was wrong
 
 **Done 2026-09-16, all 137 entries, against the contract set on 2026-09-08** —

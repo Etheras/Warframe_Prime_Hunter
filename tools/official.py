@@ -761,7 +761,60 @@ def events_from_worldstate(doc: dict) -> list[dict]:
             "activation": _worldstate_instant(goal.get("Activation")),
             "expiry": _worldstate_instant(goal.get("Expiry")),
             "marks": _goal_marks(goal),
+            "fees": _goal_fees(goal),
         })
+    return out
+
+
+def _goal_fees(goal: dict) -> list[dict]:
+    """What each of a Goal's jobs costs to start, by the levels it is fought at.
+
+    DE put it on the job: `requiredItems` is a list of StoreItem paths and
+    `useRequiredItemsAsMiscItemFee` says they are **spent** rather than merely
+    held. Both halves are required here - a job naming items without that flag
+    is stating a prerequisite you keep, which is a different sentence and not
+    one this build makes.
+
+    Measured on the live Plague Star Goal, 2026-09-16: three jobs, and only two
+    carry a fee. `InfestedPlainsBounty` - the standard run - has none, while
+    `InfestedPlainsBountyAdvanced` and `InfestedPlainsBountySteelPath` each
+    spend `InfestedEventIngredient` and `InfestedEventClanIngredient`. **That
+    asymmetry is the whole reason this is worth reading**: our one ranked row is
+    the Advanced run, so the fee is true of the row we show and false of the
+    variant a reader might assume it means.
+
+    Keyed by enemy level rather than by `jobType`, because the group names this
+    project ranks on carry levels and nothing else - `Level 55 - 65 Plague Star`
+    - and matching a job path to a group name would be a second naming rule to
+    keep in step. Paths are returned unresolved: turning one into *Eidolon
+    Phylaxis* needs `ExportResources`, which this adapter does not have and
+    should not fetch.
+    """
+    out = []
+    for job in (goal.get("Jobs") or []):
+        if not isinstance(job, dict) or not job.get("useRequiredItemsAsMiscItemFee"):
+            continue
+        items = [str(p) for p in (job.get("requiredItems") or []) if p]
+        lo, hi = job.get("minEnemyLevel"), job.get("maxEnemyLevel")
+        if items and isinstance(lo, int) and isinstance(hi, int):
+            out.append({"levels": [lo, hi], "items": items})
+    return out
+
+
+def resource_names(exports: dict) -> dict[str, str]:
+    """Every `ExportResources` row as path -> display name.
+
+    Deliberately not the `named` map inside `prime_parts`, which keeps only rows
+    carrying a `primeSellingPrice` because there it is looking for Prime parts.
+    An event ingredient has no ducat value and would be filtered out by exactly
+    that test, so this is a second reading of the same manifest rather than a
+    duplicate of the first.
+    """
+    out = {}
+    for row in ((exports.get("ExportResources_en.json") or {}).get("ExportResources") or []):
+        path, name = row.get("uniqueName"), row.get("name")
+        if path and name:
+            out[str(path)] = str(name)
     return out
 
 

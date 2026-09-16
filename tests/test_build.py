@@ -2018,6 +2018,79 @@ def test_fissures_read_from_the_first_party_worldstate() -> None:
           unnamed, [], "a new Proxima node DE add before we do would land here")
 
 
+def test_an_event_bounty_says_what_a_run_costs_to_start() -> None:
+    """
+    Advanced Plague Star spends two event materials per run and the row said
+    nothing about it, so a reader holding none could pick a run they cannot
+    start. DE publish it: `requiredItems` on the job, with
+    `useRequiredItemsAsMiscItemFee` saying they are spent rather than held.
+
+    **The fee is per job, and that is the whole reason it has to be read per
+    job.** Measured on the live Goal, 2026-09-16: `InfestedPlainsBounty` - the
+    standard run - carries none, while the Advanced and Steel Path jobs each
+    carry two. Our one ranked row is the Advanced run, so a fee attached to the
+    event rather than to the tier would be a claim about a run nobody here is
+    being sent on.
+
+    Levels are the join, because the group names this project ranks carry levels
+    and nothing else. The fixture uses DE's real paths and level ranges, and
+    asserts against the standard job in the same Goal, so a change that started
+    charging every tier fails here rather than on the page.
+    """
+    goal = {
+        "Tag": "InfestedPlains",
+        "Jobs": [
+            {"jobType": "/Lotus/Types/Gameplay/Eidolon/Jobs/Events/InfestedPlainsBounty",
+             "minEnemyLevel": 15, "maxEnemyLevel": 25},
+            {"jobType": "/Lotus/…/InfestedPlainsBountyAdvanced",
+             "minEnemyLevel": 55, "maxEnemyLevel": 65,
+             "requiredItems": ["/Lotus/StoreItems/Types/Items/Eidolon/InfestedEventIngredient",
+                               "/Lotus/StoreItems/Types/Items/Eidolon/InfestedEventClanIngredient"],
+             "useRequiredItemsAsMiscItemFee": True},
+            # names items but does NOT spend them: a prerequisite, not a fee
+            {"jobType": "/Lotus/…/InfestedPlainsBountyOther",
+             "minEnemyLevel": 30, "maxEnemyLevel": 40,
+             "requiredItems": ["/Lotus/StoreItems/Types/Items/Eidolon/InfestedEventIngredient"]},
+        ],
+    }
+    fees = official._goal_fees(goal)
+    check("event fee: only a job that SPENDS its required items is a fee",
+          [f["levels"] for f in fees], [[55, 65]],
+          "the standard run carries none and the third holds rather than spends")
+
+    resources = {"/Lotus/Types/Items/Eidolon/InfestedEventIngredient": "Eidolon Phylaxis",
+                 "/Lotus/Types/Items/Eidolon/InfestedEventClanIngredient": "Infested Catalyst"}
+    live = {"activation": "2026-09-09T15:00:00.000Z",
+            "expiry": "2026-09-23T14:00:00.000Z", "tag": "InfestedPlains",
+            "fees": fees}
+
+    row = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
+                                dict(live), resources)
+    check("event fee: the tier we rank is charged, with DE's own names",
+          row.get("fee"), ["Eidolon Phylaxis", "Infested Catalyst"])
+    check("event fee: the raw paths do not reach the payload",
+          "fees" in row, False, "a /Lotus/StoreItems path is not for a reader")
+
+    other = build_data._event_row("Level 15 - 25 Ghoul Bounty", "Plague Star",
+                                  dict(live), resources)
+    check("event fee: a tier the fee is not for is not charged",
+          "fee" in other, False,
+          "levels are the join; the standard run must not inherit the Advanced fee")
+
+    # A name we cannot resolve must drop the whole line rather than half of it.
+    half = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star", dict(live),
+                                 {"/Lotus/Types/Items/Eidolon/InfestedEventIngredient":
+                                  "Eidolon Phylaxis"})
+    check("event fee: a half-named fee is not published",
+          "fee" in half, False,
+          "a shorter bill than the game takes is worse than saying nothing")
+
+    # The proxy publishes no job fees at all, so a proxied build says nothing.
+    proxied = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
+                                    {"activation": "a", "expiry": "b"}, resources)
+    check("event fee: no fee data means no claim", "fee" in proxied, False)
+
+
 def test_an_event_is_recognised_by_tag_first_and_in_either_source_shape() -> None:
     """
     Operation Plague Star runs 2026-09-09 to 09-23 and carries 26 relics, more
@@ -2807,12 +2880,17 @@ def test_an_unreadable_export_index_degrades_instead_of_crashing() -> None:
         # still carry every key the caller reads, or the giving-up path trades a
         # ValueError for a KeyError and nothing is gained.
         # `partSpecs` joined the bag on 2026-08-27, when the part list, the
-        # quantities and the ducat values moved to DE's own manifests. It is
-        # named here on purpose: an empty one falls the parts back to the item
-        # API, and a MISSING one would be a KeyError on the giving-up path,
-        # which is exactly what this check exists to prevent.
+        # quantities and the ducat values moved to DE's own manifests, and
+        # `resourceNames` on 2026-09-16 for the event-bounty fee. Both are named
+        # here on purpose: an empty one degrades (the parts fall back to the item
+        # API, the fee line is not said), and a MISSING one would be a KeyError
+        # on the giving-up path, which is exactly what this check prevents.
+        # This assertion is exact rather than a subset, so adding a key to the
+        # bag without adding it to the giving-up path fails here — which is how
+        # `resourceNames` was caught the day it was added.
         check("export: and the bag has the keys the caller reads, empty",
-              extra, {"textures": {}, "nodeNames": {}, "partSpecs": {}})
+              extra, {"textures": {}, "nodeNames": {}, "partSpecs": {},
+                      "resourceNames": {}})
     finally:
         build_data.fetch = real
 
@@ -5408,6 +5486,7 @@ def main() -> int:
                          test_the_rotation_letter_is_read_then_cross_checked,
                          test_bounties_and_events_read_from_the_first_party_worldstate,
                          test_an_event_is_recognised_by_tag_first_and_in_either_source_shape,
+                         test_an_event_bounty_says_what_a_run_costs_to_start,
                          test_a_real_ghoul_purge_as_digital_extremes_actually_published_it,
                          test_plague_star_is_named_after_the_plains_and_not_after_the_poster,
                          test_an_unreadable_export_index_degrades_instead_of_crashing,

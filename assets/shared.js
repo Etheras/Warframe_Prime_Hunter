@@ -341,6 +341,10 @@
     return FEED_ORDER.filter((name) => hit[name]);
   }
 
+  /* "a", "a and b", "a, b and c". Exported since 2026-09-16 because the planner
+     needs it too, for the event-bounty fee — and a second copy of a sentence is
+     a second sentence, which is the rule `objectivesText` already exists to
+     keep. It had three callers in this file, one of them written out inline. */
   const listWords = (a) => (a.length < 2 ? (a[0] || "")
     : a.slice(0, -1).join(", ") + " and " + a[a.length - 1]);
 
@@ -906,8 +910,7 @@
          reader nothing they can act on, and which one it is happens to be the
          difference between Digital Extremes and a community mirror. */
       const named = remote.map((h) => link(h, h.replace(/^https?:\/\//i, "")));
-      const joined = named.length === 1 ? named[0]
-        : named.slice(0, -1).join(", ") + " and " + named[named.length - 1];
+      const joined = listWords(named);
       return "Data is served from this site, but artwork loads from " + joined +
         ", which therefore " + (named.length === 1 ? "sees" : "see") +
         " your address and which items you looked at. " +
@@ -1192,7 +1195,7 @@
 
   window.WFPrimeShared = {
     esc, count, $, $$, KEYS, load, save, showTip, staleBanner, staleNotice,
-    wireFileBackup, squadOdds,
+    wireFileBackup, squadOdds, listWords,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     /* Exported so the suite can drive the allowlist and the ordering against
        real upstream rows without a browser — this is the one piece of the live

@@ -4268,6 +4268,74 @@ page_test("a self-contradictory backup restores the same way on both pages", asy
                "and in the same words — two copies of a sentence are two sentences");
 });
 
+page_test("an event bounty says what a run costs, and only while it is running", async () => {
+  /* Advanced Plague Star spends two event materials per run, which nothing on
+     the row said — so a reader holding none could pick a run they cannot start.
+
+     **Staged, never waited for.** Plague Star runs a fortnight a year and ends
+     2026-09-23, so a test that read the real window would pass today and be
+     meaningless by the time anyone read it. Both the window and the fee are
+     planted, which makes the assertion about the gate rather than the date the
+     suite happens to run on — the same reason the Baro tests plant `meta.baro`.
+
+     Asked of the payload rather than of a named bounty: whichever event group
+     the build actually carries will do, and which events exist is exactly what
+     DE change. */
+  const { page, errors } = await open("/plan.html");
+  const group = await page.evaluate(() =>
+    Object.keys((window.WFPRIME_DATA.meta.bounties || {}).events || {})[0] || null);
+  assert.ok(group, "the payload carries no event bounty to stage");
+
+  /* Every event row is rewritten, not just one. Plague Star is genuinely
+     running while this is being written and genuinely carries a fee, so staging
+     a single group left the real row in the same list saying the real thing —
+     and the "not running" half passed for the wrong reason. Same trap the Baro
+     staging names: clear the payload's own answer first, or it leaks in. */
+  const plant = async (running) => {
+    const now = Date.now();
+    await page.addInitScript(([act, exp]) => {
+      let held;
+      Object.defineProperty(window, "WFPRIME_DATA", {
+        configurable: true,
+        get() { return held; },
+        set(next) {
+          const ev = next && next.meta && (next.meta.bounties || {}).events;
+          Object.keys(ev || {}).forEach((g) => {
+            ev[g].activation = act;
+            ev[g].expiry = exp;
+            ev[g].fee = ["Eidolon Phylaxis", "Infested Catalyst"];
+          });
+          held = next;
+        },
+      });
+    }, [new Date(now - 3600e3).toISOString(),
+        new Date(running ? now + 3600e3 : now - 60e3).toISOString()]);
+    await page.reload({ waitUntil: "load" });
+    await wishFarmable(page, 6);
+    /* *Include event nodes* on in both halves, and that is what makes the
+       second half mean anything. With it off, an event that is not running has
+       no row at all — so an assertion that the fee is absent would pass because
+       the row is gone, not because the guard works. Confirmed: with the guard
+       deleted the test still passed until this line was added. */
+    await setCheck(page, "#p-event", true);
+    const more = page.locator("#moreNodes");
+    if (await more.count()) await more.click();
+    return page.locator(".rot").evaluateAll((els) =>
+      els.map((e) => e.getAttribute("data-tip") || "").join("\n---\n"));
+  };
+
+  const live = await plant(true);
+  assert.match(live, /Each run spends Eidolon Phylaxis and Infested Catalyst/,
+               "a running event bounty has to say what starting it costs");
+
+  const over = await plant(false);
+  assert.match(over, /is not running, so this bounty is not on the board/,
+               "the row has to still be on screen, or the next assertion is vacuous");
+  assert.ok(!/Each run spends/.test(over),
+            "the price of a run nobody can start is not news");
+  assert.deepEqual(errors, []);
+});
+
 page_test("a Prime Resurgence Prime gets a crack list, and is told why there is nowhere to run", async () => {
   /* A Resurgence relic is **vaulted by definition** — that is what being in
      Resurgence means — so `rec.vaulted` alone dropped all of them out of the

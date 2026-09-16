@@ -1338,27 +1338,6 @@ Still to do, on or after 2026-09-24:
    asserts exactly `[3, 4, 5]`, so a change DE make to bounty length would block
    the site.
 
-### Advanced Plague Star's row does not say it costs two event ingredients
-
-**Found 2026-09-15**, when the Hemocyte fold made the one Plague Star row the
-Advanced run (`EVENT_ENEMY_FOLDS`). DE's worldstate gives that job
-`requiredItems` — **Eidolon Phylaxis** and **Infested Catalyst**, DE's own names
-from `ExportResources`, both made from event materials — with
-`useRequiredItemsAsMiscItemFee`, so each run spends them. Hard rule 10 holds,
-since both are earned in play. What is missing is the reader being told: the row
-says *level 55–65* and nothing about the fee, so someone holding none picks a run
-they cannot start.
-
-Offered on two fix menus on 2026-09-15 and chosen on neither. The owner asked
-why it matters when a standard run pays the same stage table: because the one
-ranked row *is* the Advanced run, and its Hemocyte drops — about 0.8 relic
-draws a run, and the only source of Meso K8 — are what the fee buys. If wanted:
-one tooltip line beside *"Includes the 4 Hemocytes"*, fed from the Goal's
-`requiredItems` rather than a name written into code. The row only exists while
-Plague Star runs, so a live check needs the event.
-
-**Size: small.**
-
 ## Settled — answered, kept so the answer is not lost
 
 ### The planner cannot say how many missions to run **[settled]**
