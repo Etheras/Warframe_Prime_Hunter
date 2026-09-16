@@ -196,6 +196,22 @@ DE_TEXTURES = "https://content.warframe.com/PublicExport"
 # and a ten-minute build is well inside it. The two hosts `PROJECT.md §6` records as 404
 # are `/dynamic/worldState.php` on content. and origin.warframe.com; those are
 # still 404 and this is a third host nobody had tried until 2026-08-27.
+#
+# **There is no second host for this, and the search is finished.** The export
+# index above survives DE's 403 by asking content.warframe.com instead, so the
+# obvious question is whether the worldstate has the same escape. It does not —
+# every combination of DE's four hosts with both known paths was tried on
+# 2026-09-16 and this is the only one that exists:
+#
+#   404  content.warframe.com/cdn/worldState.php
+#   503  origin.warframe.com/cdn/worldState.php
+#   404  api.warframe.com/dynamic/worldState.php
+#   404  www.warframe.com/cdn/worldState.php
+#
+# So the 403 on a datacentre IP cannot be routed around the way the export index
+# routes around it, and anything that wants a first-party worldstate in a
+# published build has to change *where the fetch happens* rather than which URL
+# it asks for. `TODO.md` carries that question.
 WORLDSTATE = "https://api.warframe.com/cdn/worldState.php"
 
 STATE_FILE = "state.json"  # inside .cache — drives --if-changed
