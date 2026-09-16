@@ -3168,8 +3168,16 @@ dependency.
 The two halves fail separately, which is what makes the distinction load-bearing
 rather than pedantic: the WFCD worldstate proxy went 404 on 2026-08-24 and stayed
 down for days while DE's own worldstate was served, complete, throughout. That is
-why the table below asks *"first party?"* about the **route** and answers
-`resurgence` with *"yes, proxied"* — the fact is DE's, the delivery was not.
+why the table below asks *"first party?"* about the **route** rather than about
+the fact — a fact can be DE's while the delivery is not.
+
+**That distinction stopped describing the normal case on 2026-08-27**, when the
+live feeds moved to DE's own worldstate and the proxy became the second step of
+`from_chain` rather than the route. The table read *"yes, proxied"* for
+`resurgence` until 2026-09-16. Measured on the build of that morning, all four
+feeds — `vaultTrader`, `bounties`, `fissures`, `voidTrader` — answered
+`worldstate`, and `meta.stale` was empty. The proxy is what makes a refusal
+survivable, not what normally answers; `meta.feeds` says which did, per build.
 
 Its part naming
 disagrees with the drop table (`Chassis` vs `Chassis Blueprint`), so
@@ -4186,7 +4194,11 @@ sitting in the list beside it.
 
 **Obtainable is not the same as owned**, and this fix only got away with
 conflating them because Resurgence relics are both. The general case — a player
-holding vaulted relics the planner refuses to rank — is open in `TODO.md`.
+holding vaulted relics the planner refuses to rank — is **settled and declined**,
+not open: `TODO.md`, *Relic inventory* **[settled]**. The blocker is data entry
+rather than value, and the entry names the only shape worth re-proposing, which
+is to ask about the live relics alone. Do not read this paragraph as an invitation
+to design it.
 
 ### Bounties and events came off the proxy too, and `meta.stale` went empty
 
@@ -4431,7 +4443,7 @@ exists, while a missing node list is wrong data rather than a missing nicety.
 | relic contents, odds, drop locations | DE drop tables | **yes** |
 | enemy levels | DE Public Export | **yes** |
 | existence of a brand-new Prime | DE Public Export | **yes** |
-| `resurgence` | live worldstate, via the WFCD proxy | yes, proxied |
+| `resurgence` | live worldstate — DE, then WFCD, then our cache | **yes**, with a proxied fallback |
 | `vaulted` | WFCD's `vaulted`, wiki `(V)` as fallback | no |
 | category | wiki page sections | no |
 | `permanent` `baro` `special` `founder` | wiki markers only | **no — editorial** |
