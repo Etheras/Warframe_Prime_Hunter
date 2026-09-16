@@ -1550,10 +1550,14 @@ chances to break a pointer for no reader's benefit. The title changed instead,
 because *"Data model"* stopped describing nine-tenths of the contents some time
 ago.
 
-**The entry-by-entry pass is outstanding**, and deliberately not done in the same
-sitting as the contract: pruning 99 entries quickly is how reasoning gets lost,
-and this project has already had one hour today where four lessons existed in no
-file at all because a preamble was deleted around them. `TODO.md` carries it.
+**The entry-by-entry pass was done on 2026-09-16**, deliberately not in the same
+sitting as the contract: pruning entries quickly is how reasoning gets lost, and
+this project had already had one hour where four lessons existed in no file at
+all because a preamble was deleted around them. It read all 137 and concluded
+that the section is not padded — see *This section was read entry by entry, and
+the diagnosis was wrong* at the foot of §7, which also carries the three rules it
+produced. **The open question it leaves is whether an entry is still true**, not
+whether it earns its place.
 
 ---
 
@@ -6949,7 +6953,7 @@ removed.
 which had been open since the badges shipped on 2026-09-04.
 
 **The two things called "Baro" were never the same fact.** `flags.baro` is the
-wiki's `[[Baro Ki'Teer|B]]` marker (`catalogue.py:159`) and means *he has sold
+wiki's `[[Baro Ki'Teer|B]]` marker (read in `catalogue.py`) and means *he has sold
 this Prime*; it is read once per build and sits on **nine** items. His shelf is a
 live feed — `VoidTraders[0].Manifest`, 41 rows on 2026-09-04, of which exactly
 **one** was a relic, `Axi M5`, covering **two** of the nine. And over his whole
@@ -6960,8 +6964,9 @@ Primes he was selling nothing for.
 **His box holds his counter, because every box beside it already works that
 way.** That is the argument that settled it, and it is a fact about the build
 rather than a preference: `flags.farmable` is `bool(farmable_relics)` — *"can a
-relic for this be farmed right now"* — and `flags.resurgence` is Varzia's live
-rotation (`build_data.py:1823`). Both change membership every build as the game
+relic for this be farmed right now"* — and `flags.resurgence` is membership of
+Varzia's live rotation, `name in resurgence` where the item flags are built. Both
+change membership every build as the game
 changes. **`baro` was the only availability bucket driven by a static wiki
 marker**, and that is what made the reader's actual selection — *Farmable,
 Resurgence, Railjack, Baro, because he is live* — carry seven Primes he was
@@ -7152,7 +7157,7 @@ Measured, not reasoned about. With `sort: "constructor"` saved:
 | | |
 |---|---|
 | `sortBy()` returns | the `Object` constructor — truthy, so the fallback never fires |
-| `scoreBlock` calls | `by.unit(perMin)` at `plan.js:1255`, and `Object.unit` is not a function |
+| `scoreBlock` calls | `by.unit(perMin)`, and `Object.unit` is not a function |
 | what the reader sees | ***Where to go* renders empty** — no rows at all |
 
 So the symptom is a blank ranking rather than a mis-ordered one, which is the
@@ -7371,9 +7376,9 @@ is not one.** Every remaining read of `flags.baro` in `assets/` was checked on
 
 | site | what it does | why it is right |
 |---|---|---|
-| `app.js:397` | `f.special && !f.baro` chooses a badge | a classification, not an availability claim — Gotva Prime carries `(S)` on the wiki but is really a Baro item, so *other source* steps aside |
-| `app.js:1023` | `f.baro && baroSellingNow(it)` | gated on the live shelf and the page's clock |
-| `app.js:1029` | `f.baro` alone → *"Baro Ki'Teer — sometimes"* | describes the marker **as** a marker: *"the wiki marks this Prime as one he has sold before, not one he is selling now"* |
+| `badgesFor` | `f.special && !f.founder && !f.baro` chooses a badge | a classification, not an availability claim — Gotva Prime carries `(S)` on the wiki but is really a Baro item, so *other source* steps aside |
+| the drawer callout | `f.baro && baroSellingNow(it)` | gated on the live shelf and the page's clock |
+| its `else` arm | `f.baro` alone → *"Baro Ki'Teer — sometimes"* | describes the marker **as** a marker: *"the wiki marks this Prime as one he has sold before, not one he is selling now"* |
 
 The distinction that makes all three fine and made the fourth a bug: reading the
 marker to say *"he sometimes sells this"* is what it is for. Reading it to
@@ -8365,6 +8370,62 @@ The four kills are never counted as reward draws.
 went red — the stage sums for four and five, the four-draw count, the per-draw
 chance, the 2.97% run total and Aya's shared draw count — and green again with it
 reverted.
+
+### This section was read entry by entry, and the diagnosis was wrong
+
+**Done 2026-09-16, all 137 entries, against the contract set on 2026-09-08** —
+*would a future session, lacking this, redo the work or re-litigate the
+decision?* The backlog entry that asked for it expected a prune: 137 entries over
+6,800 lines, 80% of this file, almost all dated, which is the shape of a
+changelog, and `git log` is better at being one.
+
+**Almost nothing failed the contract.** Entry after entry names a rejected option
+and why, a trap already fallen into, or a number nobody should re-measure. The
+two candidates picked out as "largest, size not obviously earned" were read
+paragraph by paragraph and kept nearly whole. **A section being long is not
+evidence that it is padded**, and the changelog resemblance was superficial — a
+dated entry that records *why* is not a changelog line, it only looks like one
+from the table of contents.
+
+**What was actually wrong was drift between entries, and it was everywhere the
+section was oldest.** Nine defects, and eight are one shape: **a decision
+recorded in the place it was made and left standing in the place it was first
+written.** The reader meets the stale copy first, because it is older and
+therefore higher up.
+
+| the stale passage | the entry that had already overturned it |
+|---|---|
+| `aabcaa` chosen on value | *Six rounds is a premade's option* |
+| `PER_REWARD` holding Onslaught at two zones | *An objective is the thing that pays a reward* |
+| `max-age` quoted as a fixed 23 seconds | *`max-age` is a countdown, not a policy* |
+| Radiant nodes "still not visible" | *Eight is the default, and there is a way out of it* |
+| `resurgence` routed via the WFCD proxy | *Prime Resurgence comes from Digital Extremes now* |
+| relic inventory "open in `TODO.md`" | that entry is **[settled]** and says so |
+
+Two more of the nine were not drift between entries but drift out of the section:
+a count of another file's entries kept by hand, and two paragraphs filed under a
+heading with nothing to do with them.
+
+**Three rules came out of it.**
+
+- **Cite by symbol, never by line number** — *An outside review is re-derived
+  before any of it is written down* has the measurement, which is that every one
+  of this section's numeric citations had drifted while every symbol still
+  resolved.
+- **When a decision is reversed, the entry that recorded the old one is part of
+  the change.** Updating the code, the comment and the new entry is three of four
+  places. The fourth is what a reader finds first.
+- **Findability comes from more headings, not from fewer entries.** The two
+  oversized entries were split into thirteen and nine, losing no text, on the
+  same reasoning that removed the backlog's summary table: the `###` headings
+  *are* the index, and a second place to say what is in a section drifts from the
+  first. The largest entry is now 145 lines against 328, and the median is 46.
+
+**So the section stays 80% of this file, and that is now an answer rather than an
+unmet target.** The contract asks whether an entry would be re-derived without
+it, not whether the file is tidy. What it does not yet ask, and should, is
+whether the entry is still *true* — which is the failure this pass actually
+found.
 
 ---
 
