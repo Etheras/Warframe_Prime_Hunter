@@ -2201,12 +2201,12 @@ The toggle is **on by default**, alone among the assumptions, because the owner'
 ruling is that this is the common case. Leaving it off would make the app almost
 always understate a Radiant source.
 
-All eleven gain exactly 25% and climb — ESO #41 → #33 of 86 folded rows. **They
-are still not visible**: the interface exposes 28 places, eight rows and twenty in
-the overflow tooltip. Surfacing ESO by thumb alone would need 2.37×, a +137%
-bonus, which would stop being a nudge. Its real obstacle is cost — rotation C on
-Onslaught is twelve zones — and `TODO.md` records that the fix is a browsable
-ranking, not a bigger number.
+All eleven gain exactly 25% and climb — ESO #41 → #33 of 86 folded rows. **Being
+visible was a separate problem, and a bigger bonus was the wrong fix for it**:
+surfacing ESO by thumb alone would need 2.37×, a +137% bonus, which would stop
+being a nudge, and its real obstacle is cost — rotation C on Onslaught is twelve
+zones. The answer was to let the reader see past the top eight, which is *Eight
+is the default, and there is a way out of it* below; ESO shows at #38 there.
 
 ### One place names a run's cost, because two of them diverged
 
@@ -3045,16 +3045,25 @@ rise for the same reason.
 
 Three decisions inside it are worth keeping:
 
-- **The unit is one objective, never one run.** A Defense round, a Spy vault, a
+- **The unit is one reward draw, never one run.** A Defense round, a Spy vault, a
   bounty stage. How far you take an endless mission is your own choice — a question
-  whose unit moves cannot be answered once. Bounties are not on the round cycle at
-  all and are costed at four stages. This bullet used to add that Spy and Caches
+  whose unit moves cannot be answered once. It was called *per objective* until
+  2026-08-27, while the word meant two things at once; the entry below renamed it.
+  Bounties are not on the round cycle at all and are costed at the stage count DE
+  publish per tier — 3, 4 or 5 — with four surviving only as the fallback for a
+  tier they did not. This bullet used to add that Spy and Caches
   need no special case, "their rotation *is* the count of vaults opened or caches
-  found". That is true of the unit and false of the count, measured on 2026-08-25;
-  `TODO.md` carries the entry and the two wiki questions it waits on.
-- **How many objectives buy one reward is a second fact, and it is not always
-  one.** Added 2026-08-25, and it is the fix for the worst mis-costing found that
-  day. `rounds` counts *rewards* — `scorePlan` takes exactly one per iteration — and
+  found". That is true of the unit and false of the count, measured on 2026-08-25,
+  and both are settled now — `FIXED_LENGTH` states each one's objectives and
+  letters.
+- **How many objectives buy one reward was tried as a second fact, and the answer
+  turned out to be "always one".** Added 2026-08-25 as the fix for the worst
+  mis-costing found that day, and **reversed by the owner on 2026-08-27** — *An
+  objective is the thing that pays a reward, and nothing else*, below, is the
+  decision that governs, and `PER_REWARD` ships empty. Kept because the wiki
+  reading inside it is real, would otherwise be re-derived, and is what the sweep
+  that overturned it was built on.
+  `rounds` counts *rewards* — `scorePlan` takes exactly one per iteration — and
   for almost every mission that is also the objective count, because a Defense round
   pays a reward and a Spy vault pays a reward. Onslaught does not.
   `wiki.warframe.com/w/Sanctuary_Onslaught` states it outright: "Rewards are given
@@ -3071,29 +3080,22 @@ Three decisions inside it are worth keeping:
   it should be 0.3418, ordinary at 0.5344 where it should be 0.2672. Between them
   those two nodes carry 29 of the 34 live relics, so it was not a corner of the list.
 
-  It lives in `PER_REWARD` in `rotation.js`, beside `OBJECTIVE_UNIT` and
-  deliberately not merged into it: that table renames an objective, this one says
-  how many of them you buy, and a mission can need either without the other. Keyed
-  on mode, which is right rather than lucky — both Onslaught nodes share the mode
-  string and the wiki gives Elite no separate cadence, so one entry serves both.
+  It lived in `PER_REWARD` in `rotation.js`, which now ships as `{}`;
+  `OBJECTIVE_UNIT`, the table it sat beside, has since gone entirely. Measured on
+  the shipped build 2026-09-16: an Onslaught run costs **6 rounds**, and the
+  effort box asks for *min / round*. Both pages read the shared `objectivesOf`
+  for that phrasing, which is the part of this that survived and is worth
+  keeping — it is why the two cannot print different costs for one run.
 
-  **It has to be a hand-written constant, and that was the uncomfortable part.**
-  DE's table publishes three rotation headings per node and nothing else; the word
-  *zone* does not appear anywhere in the whole 4.4 MB of it, so the source the
-  pipeline parses cannot express cadence at all. The per-round assumption was ours,
-  inherited from the AABC fallback. Nothing machine-readable publishes the real
-  figure either, so this is a declared fact in the same class as the Disruption
-  conduit table — which is the precedent that made it acceptable rather than a new
-  kind of exception.
-
-  Two things followed it. Both pages had to stop printing `rounds` as the cost:
-  `plan.js` and `app.js` now read the shared `objectivesOf`, so an Onslaught row
-  says *12 zones* on the planner and *12 zones* on the collection page instead of
-  *6 rounds* on both. And the effort panel relabels itself for free — the box now
-  asks for *min / zone* rather than *min / round*, which matters because a player
-  timing themselves has only one countable unit and it is the zone. Typing a zone's
-  minutes into a box that meant two zones would have halved the run a second time,
-  in the per-minute ranking.
+  **The uncomfortable part is the part that outlasted the decision.** DE's table
+  publishes three rotation headings per node and nothing else; the word *zone*
+  does not appear anywhere in the whole 4.4 MB of it, so **the source the pipeline
+  parses cannot express cadence at all**. Nothing machine-readable publishes the
+  figure either. That is why the cadence had to be a hand-written constant in the
+  same class as the Disruption conduit table — and it is still true, so anything
+  that wants a per-objective cadence in future faces the same wall. What the
+  owner's ruling settled is that the model does not need one: the unit is the
+  reward draw, and work is measured in minutes.
 - **A blank type is costed at the average of the ones you filled in**, not at zero,
   which would sort it straight to the top of a list it was never measured against.
   The borrowed number is drawn in `--odd` amber on the row so it is a guess you can
