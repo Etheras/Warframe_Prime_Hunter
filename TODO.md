@@ -966,8 +966,18 @@ there is no URL-level fix left to find.
 feeds come from the proxy on ~94% of builds and the stale-data banner says so.
 The agreed direction is to close each first-party-only gap on its own terms
 rather than the delivery, which `EVENT_FEES` now does for the event-bounty fee.
-Anything else DE alone publish is a candidate for the same treatment, and the
-open question is which fields those are — nobody has enumerated them.
+
+**And that list is now known to be finished [settled 2026-09-16].** "Which other
+fields does only DE publish" was the open question here, and it was answered by
+diffing a fully proxied payload against a first-party one built the same day:
+**the bounty fee was the only structural difference.** Everything else — the
+event `tag` included, which a comment had wrongly called first-party-only —
+arrives on both routes. So there is no second gap of this shape waiting to be
+found, and the remaining cost of the 403 is **freshness, not missing fields**:
+a proxied build says the same things, from a copy of the world that is minutes
+rather than seconds old. Re-run that diff if DE add a field; do not re-derive it
+from reading the parsers, which is how the wrong answer was reached the first
+time.
 
 ### Nothing notices when one section 7 entry supersedes another
 

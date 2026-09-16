@@ -8480,8 +8480,23 @@ worth one. The first of those is `EVENT_FEES`.
 rotation or a fissure — so recording one is not the "a reused copy is not a
 first-party answer" trap, which is about snapshots of moving things. It is keyed
 on **event name and levels rather than the tag**, and that is the one place it
-departs from its model: a tag is sturdier, but it only arrives on the
-first-party route, which is exactly the route these builds did not get.
+departs from its model.
+
+**The reason first given for that was wrong, and is corrected here rather than
+quietly replaced.** It claimed a tag only arrives on the first-party route. It
+does not: WFCD publish `tag` on their events feed, and the deployed payload
+carries `InfestedPlains` on a fully proxied build — measured the same day, by
+diffing a proxied payload against a first-party one. That diff is worth keeping
+for its own sake, because it answers the question this section left open: **the
+fee is the only structural field that differs between the two routes.** Nothing
+else DE publish is missing from a proxied build.
+
+The real reason to key on the name is availability in the other direction. By
+the time a row reaches the table, `name` is a canonical name *this project*
+resolved — by tag through `EVENT_TAGS`, or by prose through `EVENT_PATTERNS` —
+so it is a normalised identifier rather than somebody's wording. An event matched
+by prose alone carries **no tag at all**, which is the shape `find_live_events`
+is tested against, and a tag key would silently lose its fee.
 
 **A first-party answer wins completely, including a first-party "no".** The
 table is consulted only when DE were not reached *at all*. If they answered and

@@ -2103,9 +2103,14 @@ def test_a_proxied_build_falls_back_to_the_recorded_event_fee() -> None:
     Three edges, and each is a decision rather than an accident: the fallback
     needs the event to be **running**, since a fee for a bounty nobody can start
     is not a thing to publish; it is keyed on the **name** rather than the tag,
-    because a tag only arrives on the route these builds did not get; and it
-    yields to a first-party answer completely, which the sibling test above
-    pins from the other side.
+    because an event matched by prose alone carries no tag and a tag key would
+    silently lose its fee; and it yields to a first-party answer completely,
+    which the sibling test above pins from the other side.
+
+    That middle reason replaced a wrong one. The table first said a tag "only
+    arrives on the first-party route" - WFCD publish it, and a fully proxied
+    payload carries `InfestedPlains`. The choice was right and the argument for
+    it was not, which is the more dangerous of the two to leave lying around.
     """
     running = {"activation": "2026-09-09T15:00:00.000Z",
                "expiry": "2026-09-23T14:00:00.000Z"}
@@ -2115,6 +2120,14 @@ def test_a_proxied_build_falls_back_to_the_recorded_event_fee() -> None:
     check("event fee: a proxied build falls back to what was recorded",
           got.get("fee"), ["Eidolon Phylaxis", "Infested Catalyst"],
           "no fallback means the line only ever shows on ~6% of builds")
+    # `running` above carries no tag, which is the point rather than an
+    # oversight: an event matched by prose alone has none, and that is the case
+    # a tag-keyed table would lose. A tagged row must reach the same answer.
+    tagged = build_data._event_row("Level 55 - 65 Plague Star", "Plague Star",
+                                   {**running, "tag": "InfestedPlains"}, {})
+    check("event fee: found with a tag and without one",
+          tagged.get("fee"), got.get("fee"),
+          "the key is the name; a tag must neither be required nor consulted")
     check("event fee: and needs no resource manifest to do it",
           "fees" in got, False,
           "the table holds names already, which is why it survives a cold build")

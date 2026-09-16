@@ -688,11 +688,19 @@ EVENT_TAGS: dict[str, str] = {
 # reads. Relaying a worldstate from a machine DE do answer was the alternative
 # and was declined - `PROJECT.md §7` has that decision and why.
 #
-# **Keyed by event name and levels, not by tag.** A tag is the sturdier
-# identifier and `EVENT_TAGS` above is right to use it, but it only arrives on
-# the first-party route - which is precisely the route these builds did not
-# get. The name is resolved on both shapes, and the levels are already how a
-# fee is matched to its tier.
+# **Keyed by event name and levels, not by tag** - and not for the reason this
+# comment first gave. It said a tag only arrives on the first-party route, which
+# is false: WFCD publish `tag` on their events feed and the deployed payload
+# carries `InfestedPlains` on a fully proxied build. Measured 2026-09-16, the
+# day after the claim was written here.
+#
+# The real reason is availability in the other direction. By the time a row
+# reaches this table, `name` is a canonical name *this project* resolved - by
+# tag through `EVENT_TAGS`, or by prose through `EVENT_PATTERNS` - so it is
+# already a normalised identifier rather than somebody's wording. An event
+# matched by prose alone carries no tag at all, which is the shape
+# `find_live_events` is tested against, and a tag key would silently lose its
+# fee. The name is present on every row that got this far; the tag is not.
 #
 # **A first-party answer always wins, including a first-party "no".** This is
 # consulted only when DE were not reached at all; when they were, a tier they
