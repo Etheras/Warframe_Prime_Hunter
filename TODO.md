@@ -1627,8 +1627,11 @@ contents are old, which is a regenerate job, not an edit. The page says so
 itself: *"Readers can update `Module:DropTables/data` and cross reference with
 official drop tables"*.
 
-**Whoever files this has until 2026-09-23**, when the event ends and the live
-table stops being there to check against.
+**Written down in this much detail because it stops being checkable on
+2026-09-23.** Plague Star runs a fortnight a year, and when it ends DE's table
+for it goes with it — so this is not a note that someone must act on by then, it
+is the evidence itself, captured while there was something to capture. Until the
+next run, this entry *is* the record; re-deriving it will not be possible.
 
 **No local workaround** — the build reads DE's table, never this module.
 
