@@ -981,12 +981,14 @@ and a reversal landing next week has the same gap in front of it.
   the behaviour and fix every entry naming it, not only the newest. Cheapest, and
   it is the rule the pass actually followed. It is also exactly the kind of rule
   that erodes, because the person reversing a decision is looking at the code.
-- **A mechanical check on symbols.** Every `` `IDENTIFIER` `` in the docs that
-  looks like a code symbol must still exist somewhere in the tree. That would have
-  caught `OBJECTIVE_UNIT`, which §7 described as living beside `PER_REWARD` when
-  it had been deleted outright — **one of the eight, and only one.** The other
-  seven name symbols that still exist and describe them wrongly. Cheap, worth
-  having, and it must not be sold as solving this.
+- **A mechanical check on symbols — built 2026-09-16, and it is the smallest of
+  the three.** `test_the_docs_cite_code_by_symbol_and_never_by_line` asserts that
+  a symbol cited *with a file* is in that file. It would have caught
+  `OBJECTIVE_UNIT`, which §7 described as living beside `PER_REWARD` after it was
+  deleted outright — **one of the eight, and only one.** The other seven name
+  symbols that still exist and describe them wrongly, which no regex reaches.
+  Recorded here so the next reader does not mistake it for a solution to this
+  entry; `PROJECT.md §7` has why it checks pointers rather than every identifier.
 - **A "superseded by" line on the older entry.** Two entries already carry one
   (*The collection's default order*, *The Mastery Rank field*) and both are the
   clearest in the section. The cost is that it is a second place to keep true —
@@ -995,32 +997,6 @@ and a reversal landing next week has the same gap in front of it.
 
 **Not decided.** The measurement is the entry; which of the three to build is the
 owner's call, and the first two are not exclusive.
-
-### The cite-by-symbol rule has no test, and every citation that predated it had drifted
-
-**The pass of 2026-09-16 converted fourteen numeric citations by hand** — eight in
-*Two security findings examined and declined*, six in three later entries — plus
-three more in `TODO.md` and one in `CLAUDE.md`. **Every single one had drifted**,
-except `catalogue.py:83`, which was converted anyway because a line number that
-happens to be right today is not a different kind of citation.
-
-The rule is now written down in `PROJECT.md §7`: *a line number is a measurement
-of a file at one commit, and nothing in this repository re-measures it.* Nothing
-enforces it, and §7's own lesson applies to it — **a fix without a test is a fix
-with an expiry date**, and it does not announce itself, because the wrong address
-still looks like a citation.
-
-**The check is one regex over the tracked `.md` files**: no `` `file.ext:NNN` ``.
-Measured now, six remain and **four are deliberate** — *An outside review is
-re-derived before any of it is written down* quotes `wiki.py:273`,
-`build_data.py:692`, `shared.js:218` and `app.js:351` as the evidence that they
-all drifted. So the test needs those four to be expressible.
-
-**Spell them differently rather than allowlisting them.** An allowlist of four
-line numbers is a second list to keep true, and the entry does not need them in
-backticks — it needs them readable. Writing them as *wiki.py line 273* costs
-nothing and leaves the regex with no exceptions to carry. That is the difference
-between a rule with a test and a rule with a test and an exemption.
 
 ### The page tests flake in a full run and pass on their own
 

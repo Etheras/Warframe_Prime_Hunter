@@ -4994,10 +4994,13 @@ because checking its findings meant reading the code around them.
 
 **Cite by symbol, never by line number**, and this section is the evidence rather
 than the exception. It held the drifted-citations complaint above while carrying
-**eight `file.py:NNN` citations of its own, all eight of which had drifted** by
-2026-09-16 — every one pointing at unrelated code. `wiki.py:273` had become a
-helper, `build_data.py:692` a quest list, `shared.js:218` a comment, and
-`app.js:351` a date comparator. The claims behind them were all still true; only
+**eight line-number citations of its own, all eight of which had drifted** by
+2026-09-16 — every one pointing at unrelated code. `wiki.py` line 273 had become
+a helper, `build_data.py` line 692 a quest list, `shared.js` line 218 a comment,
+and `app.js` line 351 a date comparator. **They are spelled out in words here on
+purpose**, so the test that forbids this shape needs no allowlist — an exemption
+list of four line numbers would be one more thing to keep true, which is the
+failure the rule is about. The claims behind them were all still true; only
 the addresses were wrong, which is the dangerous combination, because a reader
 who follows one finds something irrelevant and cannot tell a moved line from a
 withdrawn fact.
@@ -8426,6 +8429,41 @@ unmet target.** The contract asks whether an entry would be re-derived without
 it, not whether the file is tidy. What it does not yet ask, and should, is
 whether the entry is still *true* — which is the failure this pass actually
 found.
+
+### The citation rule has a test, and what it deliberately does not check
+
+**Shipped 2026-09-16**, straight after the pass, because a rule written down and
+not enforced is the expiry-date shape this file already names. Two halves.
+
+**No line-number citations in any tracked `.md` file, with no allowlist.** The
+four this section quotes as evidence of drift are spelled out in words —
+*`wiki.py` line 273* — rather than exempted. An allowlist of four line numbers
+would be one more thing to keep true, which is the failure the rule is about; a
+rule with a test and an exemption is a weaker thing than a rule with a test.
+
+**And a symbol cited *with a file* must be in that file.** That is the half
+catching the defect rather than the spelling: `image_for` in `build_data.py` is a
+pointer, and a pointer to something absent sends somebody looking. Only three
+explicit shapes count — ``sym (`file`)``, ``sym in `file` ``, ``` `file`'s sym ```.
+
+**The looser version was measured first and rejected on its false positives.**
+Pairing any backticked identifier with any filename within ninety characters of
+it found 52 pointers and two that did not resolve, and **both were wrong**: a CI
+job called `generate` sitting beside `wiki.py`, and `FileReader` beside
+`model.js`. Neither is a pointer; both are words near a filename. The explicit
+shapes find 21 and all 21 resolve.
+
+**What it must never become is "every identifier in the docs must exist".** That
+was the obvious design and it is the wrong one, because this section *correctly*
+records removals — `OBJECTIVE_UNIT` has gone entirely, `TRACE_PIVOT` went with
+the trace warning — and a check forbidding their mention would forbid writing
+down what was deleted, which is a large part of what §7 is for. The rule is
+about pointers, not about vocabulary.
+
+**A guard on the guard.** If the pointer spellings ever stop matching, the check
+passes by finding nothing — the one failure it cannot report. So it also asserts
+it still matched at least a dozen real pointers. Verified by breaking a live
+pointer and watching only the intended check go red.
 
 ---
 

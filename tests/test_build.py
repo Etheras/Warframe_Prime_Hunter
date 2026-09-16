@@ -4570,6 +4570,86 @@ def test_a_check_that_dies_still_lowers_the_flag() -> None:
         serve._freshness.update(saved)
 
 
+def test_the_docs_cite_code_by_symbol_and_never_by_line() -> None:
+    """
+    `PROJECT.md section 7` records the rule and the measurement behind it: a line
+    number is a measurement of a file at one commit, and nothing here re-measures
+    it. The pass of 2026-09-16 converted fourteen `file.py:NNN` citations by hand
+    and **every one had drifted** - `wiki.py` line 273 had become a helper,
+    `build_data.py` line 692 a quest list. The claims behind them were still
+    true, which is what makes the shape dangerous: a reader who follows one finds
+    unrelated code and cannot tell a moved line from a withdrawn fact.
+
+    Two halves, because the rule has a positive and a negative side.
+
+    **No line-number citations at all.** There is deliberately no allowlist. The
+    four that the review entry quotes as evidence of drift are spelled out in
+    words - "`wiki.py` line 273" - precisely so this test carries no exemption
+    list, since a list of four line numbers would be one more thing to keep true
+    and that is the failure the rule is about.
+
+    **And a symbol cited with a file must be in that file.** This is the half
+    that catches the real defect rather than the spelling: `image_for` in
+    `build_data.py` is a pointer, and a pointer to something that is not there
+    sends somebody looking. Only the three explicit pointer shapes are checked -
+    ``sym (`file`)``, ``sym in `file` ``, ``` `file`'s sym ``` - rather than any
+    identifier that happens to sit near a filename, which was measured first and
+    produced two false positives: a CI job name beside `wiki.py` and `FileReader`
+    beside `model.js`.
+
+    Deliberately NOT "every identifier named in the docs must exist". Section 7
+    correctly records removals - `OBJECTIVE_UNIT` has gone entirely, `TRACE_PIVOT`
+    went with the trace warning - and a check that forbade naming them would
+    forbid writing down what was deleted, which is most of what that section is
+    for.
+    """
+    docs = [d for d in subprocess.run(["git", "ls-files", "*.md"], cwd=ROOT,
+                                      capture_output=True, text=True).stdout.split()
+            if os.path.exists(os.path.join(ROOT, d))]
+    check_true("docs: there are tracked .md files to check", len(docs) >= 4)
+
+    cite = re.compile(r"`[\w/]+\.(?:py|js|mjs|yml|css|html):\d+")
+    check("docs: no code is cited by line number",
+          sorted(f"{d}:{i}" for d in docs
+                 for i, line in enumerate(read_text(os.path.join(ROOT, d)).split("\n"), 1)
+                 if cite.search(line)), [],
+          "cite by symbol - a line number is a measurement of one commit")
+
+    src = {}
+    for root, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in
+                   {".git", "node_modules", "data", "dist", ".cache",
+                    "__pycache__", ".claude"}]
+        for fn in files:
+            if fn.endswith((".py", ".js", ".mjs", ".html", ".css", ".yml",
+                            ".ps1", ".sh")):
+                src.setdefault(fn, read_text(os.path.join(root, fn)))
+
+    FILE = r"`(?:[\w/]*/)?(\w+\.(?:py|js|mjs|html|css|yml|ps1|sh))`"
+    IDENT = r"`([A-Za-z_]\w*)(?:\(\))?`"
+    shapes = ((re.compile(IDENT + r"\s*\(" + FILE + r"\)"), False),
+              (re.compile(IDENT + r"\s+in\s+" + FILE), False),
+              (re.compile(FILE + r"'s\s+" + IDENT), True))
+    pointers, dangling = 0, []
+    for d in docs:
+        for i, line in enumerate(read_text(os.path.join(ROOT, d)).split("\n"), 1):
+            for pat, file_first in shapes:
+                for m in pat.finditer(line):
+                    ident, fname = ((m.group(2), m.group(1)) if file_first
+                                    else (m.group(1), m.group(2)))
+                    if fname not in src:
+                        continue
+                    pointers += 1
+                    if not re.search(r"\b" + re.escape(ident) + r"\b", src[fname]):
+                        dangling.append(f"{d}:{i} `{ident}` -> {fname}")
+    check("docs: every symbol cited with a file is in that file", sorted(dangling), [],
+          "a pointer to something that is not there sends the reader looking")
+    # A guard on the guard: if the shapes stop matching anything, the check above
+    # passes by finding nothing, which is the failure mode it cannot report.
+    check_true("docs: the symbol-pointer check still matches real pointers",
+               pointers >= 12, f"only {pointers} matched - has the spelling changed?")
+
+
 def test_the_wiki_can_still_be_built_from_the_docs() -> None:
     """
     The GitHub wiki is generated from README.md, PROJECT.md and TODO.md, and it
@@ -5356,6 +5436,7 @@ def main() -> int:
                          test_the_server_caps_connections_not_just_requests,
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
+                         test_the_docs_cite_code_by_symbol_and_never_by_line,
                          test_the_wiki_can_still_be_built_from_the_docs,
                          test_the_wiki_token_is_confined_to_the_job_that_pushes,
                          test_bundle_is_self_contained]),
