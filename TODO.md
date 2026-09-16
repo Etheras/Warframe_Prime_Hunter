@@ -1545,7 +1545,38 @@ has a table for the Steel Path tier: DE's worldstate gives it its own,
 `PlagueStarTableSteelPathRewards`, and DE do not publish that one (`PROJECT.md
 §7`, *The Hemocyte is folded into Advanced Plague Star*).
 
+**Re-verified 2026-09-16 against DE's live table**, fetched that day rather than
+from our week-old cache, and the original figures hold exactly: Stage 1 shares
+**1 of 10** (Lith A12), Stages 2–3 share **3 of 21** (Axi A21, Lith A12,
+Lith K12). Two things that pass adds:
+
+- **The wiki has three reward tables where DE publish four stage groups** —
+  Stage 1; *Stage 2, Stage 3 of 4, and Stage 3 of 5*; *Stage 4 of 5* (26
+  relics, the largest); and Final Stage. So it is not only stale values: a
+  whole group is unaccounted for, and the rendered tables carry **no stage
+  captions at all**, which is why nothing on the page says which is which.
+- **Overlap cannot align them.** Matching each wiki table against every DE
+  stage by shared relics scores 0–3 everywhere, so the tables no longer
+  identifiably correspond to any particular stage. That is worth knowing before
+  anyone tries a row-by-row patch: there is nothing to patch *against*.
+
+**The diagnosis is confirmed rather than assumed.** Every non-relic reward and
+every percentage matches DE exactly — Augur Message 25%, Endo x300 25%, Kuva
+x100 23.86%, Naramon Lens 14.77%, then ten slots at 1.14% — while the relic
+names in those slots are from an earlier run. The shape is intact and the
+contents are old, which is a regenerate job, not an edit. The page says so
+itself: *"Readers can update `Module:DropTables/data` and cross reference with
+official drop tables"*.
+
+**Whoever files this has until 2026-09-23**, when the event ends and the live
+table stops being there to check against.
+
 **No local workaround** — the build reads DE's table, never this module.
+
+**One trap for anyone re-running the comparison.** The wiki renders relic names
+with a **non-breaking space** (`Axi\xa0C10`), so a `^(Lith|Meso|Neo|Axi) ` match
+silently finds zero relics and reads as "the wiki lists none" rather than as a
+parsing failure. Normalise `\xa0` first.
 
 ### Not wiki issues
 
