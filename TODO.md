@@ -1021,8 +1021,40 @@ and a reversal landing next week has the same gap in front of it.
   the failure this file has already banned twice — though pointing forward is far
   cheaper to maintain than pointing back.
 
-**Not decided.** The measurement is the entry; which of the three to build is the
-owner's call, and the first two are not exclusive.
+**A second failure mode, found 2026-09-16 and not the one above.** A §7 entry
+written that afternoon claimed a tag "only arrives on the first-party route". It
+was not a decision that had been reversed and then left standing — it was
+**wrong when it was written**, and it stood for about an hour before a diff of a
+proxied payload against a first-party one happened to contradict it.
+
+**None of the three shapes reaches that.** The procedural rule fires only when a
+decision is reversed, and none was. The symbol check finds nothing, because the
+claim names no symbol. A *superseded by* line has nothing to point at, because
+no earlier entry disagreed — the section was simply given a fact nobody had
+checked.
+
+**What makes it a §7 problem rather than an ordinary mistake** is that the
+section's conventions make every entry read as measured. Entries cite figures,
+dates and sources, so a claim invented in the same paragraph as three measured
+ones inherits their authority. `CLAUDE.md` already carries exactly this rule for
+source comments — *do not ship an unmeasured explanation alongside a measured
+fact, because the fact carries the explanation's authority and nothing marks
+which half was checked* — and it was learnt from the wiki 403. **It has never
+been applied to §7**, where the same mixing is routine.
+
+So there is a fourth shape, and it is the cheapest of all:
+
+- **Mark the unmeasured half.** When a §7 entry explains *why* something is
+  true rather than *that* it is, say whether the explanation was checked. Costs a
+  clause. It is the only one of the four that addresses an entry being wrong on
+  arrival rather than going stale later, and the two failure modes are
+  independent — the pass of 2026-09-16 found eight of the first kind and this is
+  the first of the second, so neither count says much about the other yet.
+
+**Not decided.** The measurement is the entry; which to build is the owner's
+call, and none of the four are exclusive. Worth knowing before choosing: the
+claim above was caught by **re-running a measurement**, not by reading, which is
+the one thing none of the four proposes.
 
 ### The page tests flake in a full run and pass on their own
 
