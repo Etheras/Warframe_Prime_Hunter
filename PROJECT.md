@@ -605,6 +605,69 @@ supposed to.
 Going public has one other consequence: that same guard now passes, so every push
 to `main` and every daily cron actually publishes rather than building and stopping.
 
+### Keeping section 7 true when a decision changes
+
+**Three rules, chosen by the owner on 2026-09-16** from the four shapes the
+entry-by-entry pass left on the table. They exist because that pass found nine
+defects in 137 entries and **eight were one shape**: a decision was reversed, the
+code changed, the comment changed, a new §7 entry was written — and the older
+entry recording the *previous* decision was left standing, where the reader meets
+it first because it is older and therefore higher up the file.
+
+The section's own test — *would a future session, lacking this, redo the work or
+re-litigate the decision?* — cannot catch that, by construction. It asks whether
+an entry **earns its place**, and all eight did. They were wrong, not redundant.
+
+**1. A reversal is a change to every entry that records the old decision, not
+just to the code.** When you reverse something, search §7 for the constant or the
+behaviour and fix each entry naming it. Four places, not three: the code, the
+comment, the new entry, and the old one. This is the rule the pass itself
+followed, so it is known to work when applied — its weakness is that it erodes,
+because the person reversing a decision is looking at the code and nothing fires
+to remind them. Rules 2 and 3 are what fire.
+
+**2. The older entry gets a forward pointer.** Write `**Superseded <date>**` on
+it and say `See *<entry title>*`, spelling the title exactly as the heading
+spells it. Two entries carried one before this was a rule and both are among the
+clearest in the section.
+
+The cost is real and was weighed: a pointer is **a second place to keep true**,
+which this project has banned twice — the handoff section and the backlog index
+both died of exactly that. It is accepted here for one reason. Those two could
+not be checked and this one can: `test_a_supersession_points_at_an_entry_that_
+exists` asserts that every supersession names a heading that is really there, so
+renaming the target fails the build at the moment the pointer would otherwise
+have gone quietly stale. **It found a stale pointer on its first run** — the sort
+entry had been extended to *"and gains a third bulk button"* months after
+something pointed at its old title.
+
+What that test deliberately does not check is whether the new entry actually
+contradicts the old one. That is a judgement about meaning, and a check
+pretending to make it would be a third thing whose green says more than it knows.
+
+**3. Say which half was measured.** When an entry explains *why* something is
+true rather than *that* it is, mark whether the explanation was checked. This
+addresses a **different failure** from the two above, found the same day: an
+entry claimed a tag "only arrives on the first-party route", which was not a
+reversal at all — it was wrong when written, and stood about an hour until a
+payload diff contradicted it. No forward pointer helps, because no earlier entry
+disagreed; the section was simply handed a fact nobody had checked.
+
+What makes that a §7 problem rather than an ordinary slip is that the section's
+conventions make everything read as measured. Entries carry figures, dates and
+sources, so **a claim invented beside three measured ones inherits their
+authority**, and nothing marks which half was checked. That rule already existed
+for source comments — it was learnt from the wiki 403, where a measured fact
+shipped alongside an unmeasured explanation of it — and it had never been applied
+here.
+
+**One thing none of the three does**, worth knowing before trusting them: the
+claim above was caught by **re-running a measurement**, not by reading anything.
+A fourth shape — building checks that re-derive the mechanically checkable claims
+— was offered and not taken, on the grounds that most of §7 is reasoning that
+nothing can re-derive. The eight-to-one split between the two failure modes is
+also one pass's counting, not a frequency.
+
 ### Verifying a change
 
 **Two different runs, for two different moments.** Decided 2026-08-25, after a
@@ -4592,9 +4655,9 @@ The cost is real and was accepted: **category-then-name is no longer offered.**
 actually had. **Superseded 2026-09-09**: *Name (A–Z)* was itself dropped when the
 sort split into a grouping switch and an ordering, on the same reasoning taken one
 step further — the search box does that job better, because it matches parts and
-relic names too. See *The sort splits into a grouping switch and an ordering*
-below, which also records how a stored `"cat"` is translated now that redefining
-it is no longer enough.
+relic names too. See *The sort splits into a grouping switch and an ordering, and
+gains a third bulk button* below, which also records how a stored `"cat"` is
+translated now that redefining it is no longer enough.
 
 Both sorts that read a date now go through one `byRelease`, because there are two
 of them and they must not drift apart on the awkward case. **`releaseDate` is

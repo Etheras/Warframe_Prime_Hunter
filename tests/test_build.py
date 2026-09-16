@@ -4783,6 +4783,88 @@ def test_the_docs_cite_code_by_symbol_and_never_by_line() -> None:
                pointers >= 12, f"only {pointers} matched - has the spelling changed?")
 
 
+def test_a_supersession_points_at_an_entry_that_exists() -> None:
+    """
+    **The guard on the shape chosen 2026-09-16 for keeping section 7 honest.**
+
+    The entry-by-entry pass found that eight of its nine defects were one shape:
+    a decision was reversed, the code and a comment and a new entry all changed,
+    and the older entry recording the *previous* decision was left standing -
+    where the reader meets it first, because it is older and therefore higher up.
+    The fix is a forward pointer on the older entry, and two entries already
+    carried one before this was a rule.
+
+    **The stated cost of that fix is what this test exists to pay.** A pointer is
+    a second place to keep true, and this file has twice banned exactly that - the
+    handoff section and the backlog index both died of it. The difference here is
+    that a forward pointer is mechanically checkable and those were not: a title
+    either names an entry that exists or it does not.
+
+    So the convention has teeth rather than good intentions. Write
+    `**Superseded <date>**` and you must say `See *<entry title>*`, spelled the
+    way the heading is spelled. Rename the target and this fails, which is the
+    moment the pointer would otherwise have gone quietly stale.
+
+    Deliberately **not** checked: whether the superseding entry actually
+    contradicts the older one. That is a judgement about meaning, and a test that
+    pretended to make it would be the third banned thing - a check whose green
+    says more than it knows.
+
+    **A marker inside a code span is a mention, not a use.** `PROJECT.md §2` has
+    to spell this convention out using the convention's own syntax, and the first
+    run of this test failed on the rule that describes it - which is the whole
+    genre of bug where a checker cannot tell the map from the territory.
+    """
+    docs = {d: read_text(os.path.join(ROOT, d))
+            for d in ("PROJECT.md", "TODO.md")
+            if os.path.exists(os.path.join(ROOT, d))}
+    check_true("supersession: the docs it guards are present", len(docs) == 2)
+
+    headings = {re.sub(r"\s+", " ", line[4:]).strip()
+                for text in docs.values() for line in text.split("\n")
+                if line.startswith("### ")}
+    check_true("supersession: entry headings were found to resolve against",
+               len(headings) > 100, f"only {len(headings)} headings parsed")
+
+    MARK = re.compile(r"\*\*Superseded\b[^*]*\*\*")
+    POINT = re.compile(r"See \*([^*]+)\*")
+    # A marker inside a code span is the rule being *described*, not used - and
+    # `PROJECT.md §2` necessarily spells the convention out using the convention's
+    # own syntax. Blanking code spans to equal-length runs keeps every byte offset
+    # intact, so the line numbers below still point where they say they do.
+    def use_only(t: str) -> str:
+        return re.sub(r"`[^`\n]*`", lambda m: " " * len(m.group(0)), t)
+
+    marks, dangling, unpointed = 0, [], []
+    for name, raw in docs.items():
+        text = use_only(raw)
+        for m in MARK.finditer(text):
+            marks += 1
+            # Strip blockquote markers first: one of the two supersessions that
+            # existed before this rule is written as a `>` aside, so the pointer
+            # wraps with a `> ` in the middle of the title.
+            window = "\n".join(re.sub(r"^\s*>\s?", "", l) for l in
+                               text[m.end():m.end() + 700].split("\n"))
+            line_no = text[:m.start()].count("\n") + 1
+            target = POINT.search(window)
+            if not target:
+                unpointed.append(f"{name}:{line_no}")
+                continue
+            title = re.sub(r"\s+", " ", target.group(1)).strip()
+            if title not in headings:
+                dangling.append(f"{name}:{line_no} -> {title!r}")
+
+    check("supersession: every one says which entry replaced it",
+          sorted(unpointed), [],
+          "a supersession with no pointer leaves the reader where they started")
+    check("supersession: and that entry exists", sorted(dangling), [],
+          "rename the target and the pointer goes stale silently - this is that moment")
+    # A guard on the guard. If the spelling drifts, the two checks above pass by
+    # matching nothing at all, which is the one failure they cannot report.
+    check_true("supersession: the marker still matches real supersessions",
+               marks >= 2, f"only {marks} matched - has the spelling changed?")
+
+
 def test_the_wiki_can_still_be_built_from_the_docs() -> None:
     """
     The GitHub wiki is generated from README.md, PROJECT.md and TODO.md, and it
@@ -5572,6 +5654,7 @@ def main() -> int:
                          test_the_schedulers_outpace_the_banner_they_prevent,
                          test_a_refresh_clears_the_stale_banner,
                          test_the_docs_cite_code_by_symbol_and_never_by_line,
+                         test_a_supersession_points_at_an_entry_that_exists,
                          test_the_wiki_can_still_be_built_from_the_docs,
                          test_the_wiki_token_is_confined_to_the_job_that_pushes,
                          test_bundle_is_self_contained]),
