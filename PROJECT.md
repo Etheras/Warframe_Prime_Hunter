@@ -3135,7 +3135,11 @@ Two quirks we work around:
 **2. The WARFRAME Wiki — editorial.** Supplies the catalogue's categories and the
 `(V)` `(P)` `(B)` `(S)` and Founder markers. **DE publishes none of those flags**,
 so they exist only because wiki editors maintain them — which means they can be
-stale or simply wrong, and two currently are (see TODO). Categories stay here
+stale or simply wrong, and some are: `TODO.md`'s *Should be fixed on the wiki,
+not here* is the list, and it is deliberately not counted here, because a count
+kept in a second file is the drift this project has already banned twice. This
+said "two currently are" while three of its entries were marker defects.
+Categories stay here
 deliberately: the wiki agrees with the item API on 250 of 277 items and every
 disagreement favours the wiki, which keeps Exalted, Extractor and Robotic Weapon
 apart where the API flattens them into "Misc" and "Primary". Those three
@@ -3483,13 +3487,21 @@ does this change" but "how old is **this** copy", which is the one that matters
 when an edge is in the way.
 
 **The threshold is 15 minutes, and it is derived rather than picked.** Measured
-2026-08-28: a healthy fetch returned a document **36 seconds** old, against DE's
-declared `Cache-Control: max-age=23`; the scheduled refresh runs every ten
-minutes. Fifteen leaves room for a slow build, a clock a little out and a refresh
-that ran late, while staying far below the hour or two a fissure lasts — which is
-what this protects. It is a **detector, not a throttle**: `still_fresh` honours
-DE's 23 seconds and is what stops us asking too often; this decides whether what
-came back can be believed.
+2026-08-28: a healthy fetch returned a document **36 seconds** old; the scheduled
+refresh runs every ten minutes. Fifteen leaves room for a slow build, a clock a
+little out and a refresh that ran late, while staying far below the hour or two a
+fissure lasts — which is what this protects. It is a **detector, not a throttle**:
+`still_fresh` honours whatever `max-age` DE send and is what stops us asking too
+often; this decides whether what came back can be believed.
+
+**This entry quoted that `max-age` as a fixed 23 seconds until 2026-09-16, and it
+is not a constant.** It is a countdown to DE's next sixty-second regeneration —
+*`max-age` is a countdown, not a policy*, below, has the nine readings. The
+correction was made there and in `sources.py` on 2026-09-05 and never reached
+this entry, which is the same drift this section keeps producing: a fact fixed in
+the place it was found and left standing in the place it was first written. The
+36 seconds above is likewise not a curiosity but a sample of a 0–60 second
+spread, and it is why the refresh grid sits off the hour.
 
 **One thing it corrected immediately.** With the content check in place, an
 `--offline` build began reporting *"the proxy answered, the feeds are current"* —
@@ -3609,6 +3621,16 @@ so it would have needed its own answer whatever the other five got. And a wave i
 not comparable to a dig, so the cross-mission division would still have been a
 guess, only a more elaborate one that looked more precise.
 
+**`PER_REWARD` is kept as an empty table rather than deleted:** it is the seam
+where a genuine exception would go — a mode that pays a reward for something other
+than completing its own objective once — and a test asserts it is empty, so an
+entry appearing there without a decision behind it fails.
+
+**`FIXED_LENGTH` is untouched and is a different fact:** how many objectives a run
+*has*, not how many buy one reward. Spy is three vaults paying A, B, C — three
+rewards for three objectives, cadence one. Retiring the cadence table must not
+empty the length table, and a test says so.
+
 ### A relic that pays nothing the one beside it does is counted at a quarter
 
 **Found by the owner from the ranking on 2026-08-27, settled and shipped
@@ -3689,16 +3711,6 @@ drops at 65 nodes and `Axi D6` at 64, and A21 is the **sole route of the two at 
 Isolation Vault bounties**. It is redundant at Apollo and not redundant in general,
 so the node ranking can discount it honestly and the crack list — which is
 node-independent — must not.
-
-`PER_REWARD` is kept as an empty table rather than deleted: it is the seam where a
-genuine exception would go — a mode that pays a reward for something other than
-completing its own objective once — and a test asserts it is empty, so an entry
-appearing there without a decision behind it fails.
-
-`FIXED_LENGTH` is untouched and is a different fact: how many objectives a run
-*has*, not how many buy one reward. Spy is three vaults paying A, B, C — three
-rewards for three objectives, cadence one. Retiring the cadence table must not
-empty the length table, and a test says so.
 
 ### What a row claims, and what a free relic is really worth
 
