@@ -8574,6 +8574,15 @@ the new code with both materials, while the two Ghoul rows stay empty. And on a
 first-party build the maintainer notice stays silent, which is the table
 agreeing with what DE publish today.
 
+**Then observed in production the next morning**, which is the stronger claim and
+replaces the one above rather than repeating it. The build published
+2026-09-17T11:52:22Z took all four feeds from the proxy — so DE refused it, as
+they refuse roughly nineteen builds in twenty — and its Plague Star row carries
+`fee: ["Eidolon Phylaxis", "Infested Catalyst"]` while both Ghoul rows carry
+none. That is the fallback doing the job it was built for, on the site the owner
+actually reads, rather than a replay through the new code on a developer's
+machine.
+
 ### This section was read entry by entry, and the diagnosis was wrong
 
 **Done 2026-09-16, all 137 entries, against the contract set on 2026-09-08** —
