@@ -126,18 +126,21 @@ can be attributed:
   Prime Access vaults the release from seven earlier — the first three go on the
   23rd.
 - No item has `isNew`. Every part has an `itemCount`. Four parts have no `ducats`.
-- **Plague Star also ends on the 23rd**, at 14:00Z — so planner rows that vanish
-  that day have two possible causes, and the baseline below is what tells them
-  apart. Measured 2026-09-17, against both the local first-party build and the
-  deployed payload: **27 relics carry a Plague Star source and not one of them
-  exclusively** — every one has between 79 and 180 other sources. So the event
-  leaving should make nothing unfarmable, and the whole expected delta is three
-  things: `meta.bounties.events` drops to its two Ghoul keys, the ranked list
-  loses the single node `Level 55 - 65 Plague Star`, and **no item's
-  `farmableRelics` shrinks**. One that does shrink is Citrine-day vaulting, not
-  the event. (The 27 are DE's 26 plus `Meso K8`, which reaches the node only
-  through the Hemocyte fold.) Written down because it runs a fortnight a year:
-  after the 23rd none of it can be re-derived until the next run.
+- **Plague Star also ends on the 23rd**, at 14:00Z — so rows that vanish that day
+  have two possible causes. What separates them: **the event leaving changes
+  nothing in the payload's items or relics at all.** DE list all three event
+  bounties in their drop table year-round, so `relic_sources` keeps the Plague
+  Star rows and no `farmableRelics`, `flags.farmable` or relic `sources` list
+  moves. **The Ghoul Purge is the proof rather than the prediction**: it is not
+  running now, and both Ghoul bounties still carry their relics in today's build.
+  The whole expected delta is two things — `meta.bounties.events` **keeps** its
+  `Level 55 - 65 Plague Star` key and loses `activation`, `expiry`, `tag` and
+  `fee`, ending up the shape the Ghoul rows have today (it is built from
+  `EVENT_BOUNTIES`, so the key cannot disappear); and the node leaves the ranked
+  list unless *include event nodes* is ticked. **So an item that loses a farmable
+  relic on the 24th is Citrine-day vaulting, and never the event.** For scale,
+  measured 2026-09-17: 27 relics carry a Plague Star source, none exclusively —
+  DE's 26 plus `Meso K8`, which reaches the node only through the Hemocyte fold.
 
 **On the 24th, answer these — the deployed site first, because it is the one the
 owner uses:**
