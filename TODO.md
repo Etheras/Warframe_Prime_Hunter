@@ -126,8 +126,18 @@ can be attributed:
   Prime Access vaults the release from seven earlier — the first three go on the
   23rd.
 - No item has `isNew`. Every part has an `itemCount`. Four parts have no `ducats`.
-- Plague Star also ends on the 23rd (entry above), so planner rows that vanish
-  that day are not all vaulting.
+- **Plague Star also ends on the 23rd**, at 14:00Z — so planner rows that vanish
+  that day have two possible causes, and the baseline below is what tells them
+  apart. Measured 2026-09-17, against both the local first-party build and the
+  deployed payload: **27 relics carry a Plague Star source and not one of them
+  exclusively** — every one has between 79 and 180 other sources. So the event
+  leaving should make nothing unfarmable, and the whole expected delta is three
+  things: `meta.bounties.events` drops to its two Ghoul keys, the ranked list
+  loses the single node `Level 55 - 65 Plague Star`, and **no item's
+  `farmableRelics` shrinks**. One that does shrink is Citrine-day vaulting, not
+  the event. (The 27 are DE's 26 plus `Meso K8`, which reaches the node only
+  through the Hemocyte fold.) Written down because it runs a fortnight a year:
+  after the 23rd none of it can be re-derived until the next run.
 
 **On the 24th, answer these — the deployed site first, because it is the one the
 owner uses:**
