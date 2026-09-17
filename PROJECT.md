@@ -1634,7 +1634,8 @@ whether it earns its place.
             cycleMinutes: 150, sequence: "ABC", checked,
             families: { standard: { letter, windowEnd, votes, of }, vault: {…} },
             groups:   { "Level 5 - 15 Cetus Bounty": { family, rotations } },
-            events:   { "Level 15 - 25 Plague Star": { event, activation, expiry } },
+            events:   { "Level 55 - 65 Plague Star": { event, activation, expiry,
+                                                       tag, fee } },
           } },
   categories: [{ name, count }],
   items: [{
@@ -1769,8 +1770,12 @@ were checked against each other.
 
 ### Two bounties only exist sometimes
 
-`Level 15 - 25 Plague Star` carries **26 relics** — the largest bounty source in the
-data — and exists only while Operation: Plague Star runs, a few weeks a year. The two
+`Level 55 - 65 Plague Star` carries **27 relics** — the largest bounty source in the
+data — and exists only while Operation: Plague Star runs, a few weeks a year. DE's own
+table names that block `Level 15 - 25 Plague Star` and lists **26**; the row is renamed
+to the Advanced run and gains `Meso K8`, which reaches the node only through the
+Hemocyte's table (*The Hemocyte is folded into Advanced Plague Star*). Both counts
+re-measured 2026-09-17, DE's from `official_droptables` and ours from the payload. The two
 Ghoul tiers carry one relic each plus Aya, and exist only during a Ghoul Purge, which
 the wiki puts at "once every few weeks" with no published schedule. DE's drop table
 lists all three permanently.
@@ -8130,6 +8135,15 @@ Path (100–110), and neither has relics of its own, so `EVENT_BOUNTIES` needs n
 new key. With the fix, a fully first-party build reports *"limited-time events
 running — Ghoul Purge, Plague Star"*, all 26 relics become reachable, and the
 row carries **"Plague Star is running until 2026-09-23."**
+
+**Superseded 2026-09-15**, for the clause saying no new key was needed: one was.
+The row ships as the Advanced run, `Level 55 - 65 Plague Star`, the name
+`fold_event_enemies` gives it before the gate is read — so the name above is now
+the one that must *not* appear in that table, and a check asserts no row survives
+under it. See *The Hemocyte is folded into Advanced Plague Star*. The rest of the
+paragraph stands and was re-measured 2026-09-17: DE's drop table still carries a
+single `Level 15 - 25 Plague Star` block holding 26 distinct relics, and their
+worldstate still publishes the same three job bands.
 
 ### The sort splits into a grouping switch and an ordering, and gains a third bulk button
 
