@@ -203,9 +203,96 @@ to fail yet:**
   chose on 2026-09-11 to exempt new Primes once the payload gate blocks; what
   "new" means is that entry's open question (*The payload gate only warns*).
 
+**Read early, read-only, on 2026-09-23 at about 15:15Z, at the owner's request.**
+This does not replace the 24th. It records a measurement that would not have kept
+until then. Nothing had arrived on either side, and question 2 already has half
+its answer: the export route cannot deliver at all — see *DE's export manifests
+have been frozen since 27 August — the cache is keyed by file name, and the hash
+is in the URL*, below. The same look found *A CDN's `Age` is never counted
+against `max-age`, so a cached copy can be kept for up to twice the declared
+window*. Plague Star left as predicted in both payloads: `bounties.events` kept
+its key and lost `activation`, `expiry`, `tag` and `fee`.
+
 **Then:** write each real flaw up as its own `###` entry, with its evidence, and
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
+
+### DE's export manifests have been frozen since 27 August — the cache is keyed by file name, and the hash is in the URL
+
+**Found 2026-09-23, reading the Citrine test early, and it is why the export
+route could not deliver Citrine.** `acquire_export` asks for
+`ExportWarframes_en.json!<tag>` — the tag is DE's content hash from the export
+index — but caches the answer under `export_ExportWarframes_en.json`, which has
+no tag in it. DE answer a content-addressed URL with a `max-age` of about a year
+(`31532444` today; the sidecars on disk hold 30.2 to 30.9 million seconds). And
+`fetch` asks `still_fresh(path)` before it looks at the URL at all. So when DE
+publish a manifest under a new tag, the build returns the old copy without
+asking, and it keeps doing that until the old copy's year runs out. Nothing else
+clears these files: `prune_cache` touches only `wiki_*`.
+
+`PROJECT.md §7` has the premise right: *"the URL changes when the picture does,
+so it never needs revalidating"*. The window belongs to the URL, and the cache
+stores it against the file name.
+
+**Measured on 2026-09-23:**
+
+- DE's `ExportWarframes_en.json` at the index's current tag,
+  `00_95pW0dXReM0fA8aj7iX4oA`, was fetched once by hand into the scratchpad, not
+  the cache. It has `Last-Modified: 14:13:57Z` and lists **Citrine Prime**. The
+  cached copy dates from 27 Aug, has no Citrine Prime, and is 232,131 bytes
+  against 236,669.
+- DE's index changed between the 15:02Z and 15:12Z local builds. The signature
+  went from `d1c035aba2cf0ea1` to `123ada756ed96350`, and the index's own ETag
+  dates it to 15:03:01Z. So the 15:12Z build went to the network: `wiki_prime`,
+  `api_items` and `official_droptables` were all rewritten at that moment, but
+  `export_ExportWarframes`, `…Weapons` and `…Recipes` stayed at 27 Aug.
+- **CI has the same freeze, as far as can be seen from here.** `actions/cache`
+  restores mtimes. The `PROJECT.md §7` audit says so, and the same run logs its
+  restored worldstate as "11433 min old". So a restored export copy counts as
+  fresh by its own sidecar. The 15:07Z full run published at 15:08:19Z without
+  Citrine. What its restored cache actually held was not inspected.
+
+**It costs every DE manifest, not only Citrine.** New Primes by the export route
+(`isNew`), DE's parts, quantities and Ducats (`ExportRecipes`), artwork paths
+(`ExportManifest`), and node levels and names (`ExportRegions`) are all still
+whatever they were on 27 Aug. For Citrine, that leaves the wiki's Prime page,
+WFCD's item data and DE's drop table as the only way in. At the 15:12Z build
+none of them listed it, and the wiki page was last edited on 10 Sep.
+
+**Predicted, not yet seen:** when the wiki route does bring Citrine in, its parts
+will come from WFCD's list or the drop-table fallback instead of DE's recipes.
+That turns `parts: only the items DE do not publish fall back` red, for a reason
+the Kavasa pin was never meant to catch.
+
+**Shape of a fix, not designed:** make freshness follow the URL. Put the tag in
+the cache key, or keep the requested URL beside the body and count a mismatch as
+not fresh. DE's year-long window is still honoured, because it is correct for
+the URL it came with. **Left alone on the 23rd**, because fixing it in the
+middle of the Citrine test changes what the test measures.
+
+### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
+
+**Found 2026-09-23.** `write_maxage` stores the `max-age` number as it arrives,
+and `still_fresh` counts it from our own file's mtime. HTTP counts it from when
+the origin produced the response, and `Age` is how a CDN says how long ago that
+was (RFC 9111 §4.2.3: a response is fresh while its lifetime exceeds its current
+age, and `Age` is part of that age). A copy the CDN has already held for N
+seconds therefore gets N extra seconds here. That breaks hard rule 11 on its own
+terms, because the extra time is ours, not the server's number.
+
+**Measured:** `head_droptables` was fetched at 09:12:03Z with `max-age=86400`,
+`Age: 63672` and `cf-cache-status: HIT`. Cloudflare's copy went stale at about
+15:31Z, but this machine will not ask again until 09:12Z on the 24th, 17.7 hours
+beyond the window DE declared. That HEAD is the drop-table half of the
+`--if-changed` fingerprint, and the drop table is where Citrine's relics will
+first appear.
+
+**The fix is not a one-liner, and a careless one would ask too often.** DE's
+worldstate `max-age` is already a countdown: it and `Age` sum to 60 across nine
+readings (`PROJECT.md §7`). Subtracting `Age` there would count it twice and ask
+again early. So the fix has to tell a header that already nets out `Age` from
+one that does not, source by source, and nothing beyond these two has been
+measured.
 
 ### The refresh task still runs every ten minutes, and `PROJECT.md §4` still argues for it
 
