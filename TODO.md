@@ -267,8 +267,9 @@ the Kavasa pin was never meant to catch.
 **Shape of a fix, not designed:** make freshness follow the URL. Put the tag in
 the cache key, or keep the requested URL beside the body and count a mismatch as
 not fresh. DE's year-long window is still honoured, because it is correct for
-the URL it came with. **Left alone on the 23rd**, because fixing it in the
-middle of the Citrine test changes what the test measures.
+the URL it came with. **Left alone until the Citrine test has been read on the
+24th — owner's decision, 2026-09-23**, because fixing it in the middle of the
+test changes what the test measures.
 
 ### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
 
