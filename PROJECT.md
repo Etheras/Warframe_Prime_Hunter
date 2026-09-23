@@ -8771,11 +8771,28 @@ had expired, and on a quiet week that is days.
 
 **The rule now.** `acquire_drops` in `build_data.py` passes `fetch` the
 `Last-Modified` its HEAD saw, and `fetch` keeps the body's own `Last-Modified`
-beside it (`.lastmod`). A positive disagreement between the two means the body's
-window no longer applies, because the server has just said what we hold is old.
-**Only a positive disagreement counts.** A body with nothing recorded keeps its
-window, so a server that stops sending the header cannot turn this into a
-request on every run. An offline build asks no HEAD at all.
+beside it (`.lastmod`). When the HEAD's date is **later** than the body's, the
+body's window no longer applies, because the server has just said what we hold
+is old. **Only a provable disagreement counts.** A body with nothing recorded,
+a HEAD older than the body, or a date that will not parse all keep the window,
+so none of them can turn this into a request on every run. An offline build
+asks no HEAD at all.
+
+**Later, not different — learnt from the first real build.** The first draft
+refused the window on any difference. The first network build with it fetched
+DE's new drop table, `Last-Modified: 15:13:21Z` on release day, while the HEAD
+beside it still said 25 June, held there by its own window (*A CDN's `Age` is
+never counted against `max-age`* in `TODO.md` is why it was held so long). Under
+"different", every network build until that HEAD was next asked would have
+refused a newer body in favour of an older HEAD and downloaded it again.
+Measured, not argued: those are the two dates on disk after that build.
+
+**Release day, for the record.** DE's export files changed at 14:13:57Z, their
+export index at 15:03:01Z, and the drop table at 15:13:21Z. The local build that
+reached the new table did so at 16:04Z, and not through this fix: the URL fix's
+one-time re-ask fetched the body because no `.url` was recorded for it yet. The
+HEAD had not moved, so without that the fingerprint would not have noticed
+before 09:12Z on the 24th.
 
 **The same shape, and why it is a different fix from the URL one.** Both are a
 window applied to something other than what it was declared for: there, a URL
@@ -8783,7 +8800,8 @@ the window never covered; here, a version the server has since replaced. The
 URL fix cannot see this one, because the drop table's URL never changes.
 
 **Verified.** The test fails with the version check removed (*"got b'the June
-table'"*) and with the call site not passing the version. **The call-site half
+table'"*), with the call site not passing the version, and with "different" in
+place of "later". **The call-site half
 caught a real bug in the fix's first draft.** `acquire_drops` had a local named
 `sources`, which shadowed the module, so the new line raised. The function's own
 `except Exception` then fell back to the WFCD mirror without a word. The first

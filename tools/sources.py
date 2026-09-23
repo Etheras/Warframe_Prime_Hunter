@@ -27,6 +27,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import limits    # noqa: E402  (local module, sits beside this file)
@@ -434,6 +435,24 @@ def write_lastmod(path: str, value: str | None) -> None:
         pass
 
 
+def newer_version(seen: str | None, held: str | None) -> bool:
+    """Is `seen` a strictly later HTTP date than `held`?
+
+    **Later, not different.** The first real build with this in place fetched
+    DE's new drop table (Last-Modified 15:13:21Z on 2026-09-23) while the HEAD
+    beside it still said 25 June, held there by its own window. "Different"
+    would have refused the newer body in favour of an older HEAD on every network
+    build until that HEAD was next asked. False when either date is missing or
+    unreadable: only a provable disagreement costs a request.
+    """
+    if not seen or not held:
+        return False
+    try:
+        return parsedate_to_datetime(seen) > parsedate_to_datetime(held)
+    except (TypeError, ValueError):
+        return False
+
+
 def still_fresh(path: str, url=None) -> bool:
     """Is the cached copy still inside the window the source declared?
 
@@ -510,11 +529,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     GET with a small on-disk cache so reruns and --offline are cheap.
 
     `last_modified` is the version the caller has just seen for this document,
-    from a HEAD. When the cached body arrived with a **different** one, its
-    window no longer applies, because the server has just said what we hold is
-    old. Only a positive disagreement counts: a body with no recorded
-    `Last-Modified` keeps its window, so a server that stops sending one cannot
-    turn this into asking on every run.
+    from a HEAD. When that is **later** than the one the cached body arrived
+    with, the body's window no longer applies, because the server has just said
+    what we hold is old. Only a provable disagreement counts: a body with no
+    recorded `Last-Modified`, or a HEAD older than the body, keeps the window, so
+    neither a server that stops sending the header nor a stale HEAD can turn this
+    into asking on every run. See `newer_version`.
 
     `readonly` reads the cache but never writes it — no body, no `.etag`, no
     `.maxage`, and no entry in `STALE` or `MISSING`. It exists for one caller:
@@ -567,8 +587,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     # says `max-age=86400` and was being asked every ten minutes. The window
     # covers the URL it was declared for, and no other: see `url_path`. And it
     # covers the version it was declared for: see `lastmod_path`.
-    held = read_lastmod(path)
-    outdated = bool(last_modified and held and held != last_modified.strip())
+    outdated = newer_version(last_modified, read_lastmod(path))
     if still_fresh(path, urls) and not outdated:
         with gzip.open(path, "rb") as fh:
             return fh.read()

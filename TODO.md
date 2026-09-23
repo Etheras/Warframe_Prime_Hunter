@@ -218,6 +218,41 @@ window*, still open on both sides. It delays when either side sees DE's drop
 table, so to learn when **DE** updated it, read its `Last-Modified` directly. Plague Star left as predicted in both payloads:
 `bounties.events` kept its key and lost `activation`, `expiry`, `tag` and `fee`.
 
+**What the fixed local build showed at 16:03Z on the 23rd**, after one network
+build run by hand at the owner's request. The deployed site had none of this at
+the time.
+
+- **Questions 1 and 2:** all three arrived by the export route, `isNew: true`, in
+  the expected categories, with none of the accessories. The wiki's Prime page
+  still did not list them.
+- **When DE's sources moved:** export files at 14:13:57Z, export index at
+  15:03:01Z, drop table at 15:13:21Z. That is 76 seconds after the 15:12Z local
+  build had fetched the old table.
+- **Question 4:** eleven new relics dropping, so all three items are farmable
+  with four relics each. Fifteen relics stopped dropping. The changelog reads
+  *Vaulted (4): Akbronco Prime, Quassus Prime, Trumna Prime, Xaku Prime*. So the
+  cadence comment's three went, plus **Akbronco Prime, which nobody predicted**
+  and whose flags now read `permanent` rather than vaulted.
+- **Xaku, Trumna and Quassus read `farmable: false` with `vaulted: false`.** The
+  `vaulted` flag comes from sources that have not caught up. How the page
+  presents that combination is worth a look on the 24th.
+- **Question 3:** all twelve parts had no quantity and no Ducats. See *A Prime
+  WFCD have not indexed yet loses DE's own parts, Ducats and artwork*, below.
+- **Question 5:** no artwork on any of the three, same entry. No `plat` either,
+  which is a supported state.
+- **Question 7:** against this local payload, three built-payload checks were
+  red and every code test passed.
+  - `parts: every one agrees with DE's own manifests` and `platinum: every
+    Prime-part reward row carries ducats` are both the parts flaw above.
+  - `platinum: every Prime-part reward row carries plat` failed because
+    warframe.market has not listed the parts yet. The docs call a missing `plat`
+    a supported state, so **this check cannot pass on release day for any new
+    Prime**. It is the same shape as the Kavasa pin, and the payload gate will
+    need the same exemption.
+  - The Kavasa pin itself, `parts: only the items DE do not publish fall back`,
+    stayed green, because these parts fell back to the drop table and not to
+    WFCD's list.
+
 **Then:** write each real flaw up as its own `###` entry, with its evidence, and
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
@@ -256,17 +291,49 @@ against `max-age`*, below, so neither will ask DE's drop table again before
    because a cache from before them has no `.url` recorded. On CI that is the
    first full build after the push. Expected and harmless, but it shows up in
    the logs as a burst.
-4. **Check that DE's GET and HEAD agree on `Last-Modified`** for the drop table,
-   by comparing `official_droptables.gz.lastmod` with `head_droptables` after a
-   real build. If they ever differ while nothing has changed, the body would be
-   refused on every network build, and that is the one way the second fix could
-   over-ask.
+4. **Check that DE's GET and HEAD agree on `Last-Modified`** once the HEAD is
+   next asked, at 09:12Z on the 24th. Compare `official_droptables.gz.lastmod`
+   (15:13:21Z) with `head_droptables`. Only a HEAD *later* than the body refuses
+   the window, so a HEAD that lags is harmless. A HEAD that is persistently
+   ahead of what the GET returns would still re-download the body on every
+   network build.
 
 **On the deployed side, still unfixed, predicted and not yet seen:** when the
 wiki route brings Citrine in, its parts will come from WFCD's list or the
 drop-table fallback instead of DE's recipes. That turns `parts: only the items
 DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
 catch.
+
+### A Prime WFCD have not indexed yet loses DE's own parts, Ducats and artwork
+
+**Seen 2026-09-23 at 16:03Z, on the first local build that reached Citrine by
+the export route.** All twelve Citrine, Steflos and Corufell parts shipped with
+`itemCount: None` and no `ducats`, and none of the three items had a picture.
+DE's own manifests had all of it at the time: run through `prime_part_specs`
+they give four parts per item with counts and Ducats (`PROJECT.md §7`, *A
+freshness window belongs to the URL it was declared for*), and `ExportManifest`
+carries the textures.
+
+**Why, from the code.** Both joins go through WFCD's item record, which does not
+list Citrine yet. In the parts loop of `build_data.py`, DE's spec supplies the
+name, count and Ducats, but the relic link (`drops`) is borrowed from the
+matching WFCD component. With no WFCD record every part has no `drops`, `if not
+rel_map: continue` drops all four, and the item falls through to
+`parts_from_droptables`, which knows no quantities or Ducats. That confirms the
+Citrine entry's suspected weak spot *parts from the drop-table fallback carry no
+quantity and no Ducats*. `image_for` likewise looks the texture up by the WFCD
+record's `uniqueName`, although the export entry carries DE's own
+(`/Lotus/Powersuits/Geode/CitrinePrime`).
+
+**How much it matters.** Every quantity happens to be 1 this time, so nothing
+reads wrong yet. The missing Ducats drop out of the spare-value tie-break, and
+the missing picture falls back to the glyph. Both last only until WFCD index the
+item, but that gap is exactly the window the export route exists to cover.
+
+**Shape of a fix, not designed:** take the relic link from the drop table's own
+relic contents, which `parts_from_droptables` already reads, and keep DE's count
+and Ducats. Take the texture from the export entry's `uniqueName` when there is
+no WFCD record.
 
 ### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
 

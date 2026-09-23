@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import collections
 import datetime
+import email.utils
 import functools
 import json
 import os
@@ -2968,8 +2969,18 @@ def test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version() -> None:
         check("head version: and so does a caller who passes none",
               sources.fetch(url(doc), key), b"the June table")
 
+        # Release day, 2026-09-23: DE's new table said 15:13:21Z while the HEAD
+        # beside it, held by its own window, still said 25 June. An older HEAD
+        # must not refuse a newer body, or every network build re-downloads it.
+        check("head version: an older one the HEAD saw keeps the window",
+              sources.fetch(url(doc), key, last_modified="Thu, 25 Jun 2026 20:33:31 GMT"),
+              b"the June table")
+        check("head version: so does one that cannot be read as a date",
+              sources.fetch(url(doc), key, last_modified="not a date"), b"the June table")
+
+        tomorrow = email.utils.formatdate(time.time() + 86400, usegmt=True)
         check("head version: a newer one the HEAD saw is fetched",
-              sources.fetch(url(doc), key, last_modified="Thu, 24 Sep 2026 09:00:00 GMT"),
+              sources.fetch(url(doc), key, last_modified=tomorrow),
               b"the table DE published today",
               "the body came out of its own window over a HEAD that said it was old")
 
@@ -2981,7 +2992,7 @@ def test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version() -> None:
         with open(doc, "wb") as fh:
             fh.write(b"not asked for")
         check("head version: nothing recorded is not a disagreement",
-              sources.fetch(url(doc), key, last_modified="Fri, 25 Sep 2026 09:00:00 GMT"),
+              sources.fetch(url(doc), key, last_modified=tomorrow),
               b"the table DE published today")
         check("head version: nothing about any of it is stale",
               (list(sources.STALE), list(sources.MISSING)), ([], []))
