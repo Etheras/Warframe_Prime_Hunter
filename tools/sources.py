@@ -327,7 +327,8 @@ def read_maxage(path: str) -> float | None:
         return None
 
 
-def write_maxage(path: str, header: str | None, chosen: float | None = None) -> None:
+def write_maxage(path: str, header: str | None, chosen: float | None = None,
+                 age: str | None = None) -> None:
     """Record `max-age` from a `Cache-Control`, or forget any we held.
 
     `no-cache` and `no-store` are not a `max-age` of zero to us: they mean
@@ -348,16 +349,28 @@ def write_maxage(path: str, header: str | None, chosen: float | None = None) -> 
     A declared window always wins. If they ever start sending one, theirs is
     what gets written and this argument stops applying — which is the property
     that made storing it here, rather than in a table of our own, worth doing.
+
+    `age` is the response's `Age` header, and it is spent out of a *declared*
+    window. `max-age` counts from when the origin produced the response, not
+    from when we received it (RFC 9111 §4.2.3), so a copy a CDN has held for N
+    seconds has N fewer left. Ignoring it held the drop table's HEAD on
+    2026-09-23 until 09:12Z the next day, when Cloudflare's own copy (`Age:
+    63672`) had gone stale at 15:31Z — eighteen minutes after DE published
+    Citrine's relics. `PROJECT.md §7`, *A CDN's `Age` counts against `max-age`*.
+    A window we `chosen` is not the server's and is not reduced.
     """
     seconds = None
+    declared = False
     if header and "no-store" not in header and "no-cache" not in header:
         found = re.search(r"max-age\s*=\s*(\d+)", header)
         if found:
-            seconds = int(found.group(1))
-    if seconds is None and chosen:
+            declared = True
+            held = int(age.strip()) if age and age.strip().isdigit() else 0
+            seconds = int(found.group(1)) - held
+    if not declared and chosen:
         seconds = int(chosen)
     try:
-        if seconds:
+        if seconds and seconds > 0:
             with open(maxage_path(path), "w", encoding="utf-8") as fh:
                 fh.write(str(seconds))
         elif os.path.exists(maxage_path(path)):
@@ -642,6 +655,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                         raw = limits.gunzip_capped(raw, ceiling, key)
                     tag = resp.headers.get("ETag")
                     freshness = resp.headers.get("Cache-Control")
+                    held_for = resp.headers.get("Age")
                     modified = resp.headers.get("Last-Modified")
                 if readonly:
                     return raw            # answered, and deliberately not kept
@@ -649,7 +663,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 with gzip.open(path, "wb") as fh:
                     fh.write(raw)
                 write_etag(path, tag)
-                write_maxage(path, freshness, chosen_maxage)
+                write_maxage(path, freshness, chosen_maxage, age=held_for)
                 write_url(path, one)
                 if last_modified is not None:
                     write_lastmod(path, modified)
@@ -781,7 +795,7 @@ def head_cached(url: str, key: str, readonly: bool = False) -> dict:
             os.makedirs(CACHE_DIR, exist_ok=True)
             with gzip.open(path, "wb") as fh:
                 fh.write(json.dumps(headers).encode("utf-8"))
-            write_maxage(path, headers.get("cache-control"))
+            write_maxage(path, headers.get("cache-control"), age=headers.get("age"))
         except OSError:
             pass
     return headers
@@ -815,10 +829,11 @@ def upstream_signature(offline: bool = False, readonly: bool = False) -> dict:
     """
     A small fingerprint of every upstream that matters, cheap enough to poll
     on a schedule: the export index is ~500 bytes, the drop table is a HEAD,
-    and the trader window is a short JSON document.
+    the trader window is a short JSON document, and WFCD's item data is a
+    conditional request that is a 304 whenever it has not changed.
 
     `readonly` is for `tools/serve.py`, the one caller that is not a build. It
-    asks the same three questions in the same polite way and keeps none of the
+    asks the same questions in the same polite way and keeps none of the
     answers — see `fetch`. The two build callers leave it off, because filling
     the cache is the whole point when it is a build asking.
     """
@@ -832,6 +847,23 @@ def upstream_signature(offline: bool = False, readonly: bool = False) -> dict:
 
     h = head_cached(OFFICIAL_DROPTABLES, "head_droptables", readonly=readonly)
     sig["droptables"] = h.get("last-modified") or h.get("etag") or "?"
+
+    # WFCD's item data, since 2026-09-23. It is what DE's parts, Ducats and
+    # artwork join through, and it was not fingerprinted: on Citrine Prime's
+    # release day DE had published everything by 15:13Z and WFCD had not, and
+    # nothing would have noticed WFCD catching up short of DE moving again or
+    # the daily full build. Their `max-age=120` allows asking every ten minutes,
+    # the request is conditional, so an unchanged answer is a 304 with no body,
+    # and a changed one lands in the cache the build then reads from inside
+    # that window, so it is never downloaded twice. `PROJECT.md §7`, *WFCD's
+    # item data is part of the fingerprint*.
+    try:
+        items = fetch(ITEMS_API, "api_items", offline, critical=False,
+                      optional=True, readonly=readonly)
+        if items:
+            sig["itemsApi"] = hashlib.sha256(items).hexdigest()[:16]
+    except Exception:                             # noqa: BLE001 - a miss, not a fault
+        pass
 
     # First party, and the same document the build itself reads. This asked the
     # WFCD proxy until 2026-08-27, which meant every ten-minute freshness check

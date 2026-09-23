@@ -360,6 +360,12 @@ exactly what it should do.
 Per ten-minute cycle in the steady state that leaves: the worldstate is asked
 (its window is 28 seconds, so ten minutes is well past it), the export index is
 revalidated, and **the drop table is asked once a day instead of 144 times.**
+Since 2026-09-23 WFCD's item data is revalidated too, as part of the
+fingerprint. Its window is 120 seconds, so it is asked every cycle, and an
+unchanged answer is a 304 with no body (§7, *WFCD's item data is part of the
+fingerprint*). And "once a day" is now measured from when DE produced the answer
+rather than from when we received it (§7, *A CDN's `Age` counts against
+`max-age`*).
 
 Two details are deliberate. `no-cache` and `no-store` leave **no** window behind
 rather than a zero one, because they mean *revalidate* and the conditional
@@ -8781,8 +8787,8 @@ asks no HEAD at all.
 **Later, not different — learnt from the first real build.** The first draft
 refused the window on any difference. The first network build with it fetched
 DE's new drop table, `Last-Modified: 15:13:21Z` on release day, while the HEAD
-beside it still said 25 June, held there by its own window (*A CDN's `Age` is
-never counted against `max-age`* in `TODO.md` is why it was held so long). Under
+beside it still said 25 June, held there by its own window (*A CDN's `Age`
+counts against `max-age`*, below, is why it was held so long). Under
 "different", every network build until that HEAD was next asked would have
 refused a newer body in favour of an older HEAD and downloaded it again.
 Measured, not argued: those are the two dates on disk after that build.
@@ -8809,6 +8815,79 @@ run of the test really did fetch the mirror from the internet, about ten
 requests. The local is now `drops`, and the test stops the mirror path as well,
 so it cannot reach the network whatever the code does. Not yet verified: a real
 build against a real change in DE's drop table.
+
+### A CDN's `Age` counts against `max-age`
+
+**Fixed 2026-09-23 and committed locally only**, with the two entries above and
+at the owner's choice. The owner had asked whether to move the build time so
+that DE and WFCD would have updated first. This, with *WFCD's item data is part
+of the fingerprint* below, was chosen instead. The reason: every delay on
+release day traced to a defect, and none to the hour.
+
+**The defect.** `write_maxage` stored `max-age` as it arrived, and `still_fresh`
+counted it from our own file's mtime. `max-age` counts from when the origin
+produced the response, and `Age` is how long a cache in between has held it (RFC
+9111 §4.2.3). So a copy a CDN had held for N seconds got N extra seconds here,
+and that time was ours rather than the server's number, against hard rule 11 on
+its own terms.
+
+**Measured.** The drop table's HEAD, fetched at 09:12:03Z on release day, came
+back `max-age=86400`, `Age: 63672`, `cf-cache-status: HIT`. Cloudflare's copy
+therefore went stale at 15:30:51Z, while this build held it until 09:12Z the
+next day. DE published Citrine's relics at 15:13:21Z. With `Age` counted, the
+15:32Z ten-minute run would have asked, seen the new version and, under *A body
+is not fresh once its HEAD has seen a newer version*, fetched it: about twenty
+minutes after DE, at whatever hour they publish.
+
+**The rule now.** `Age` is spent out of a **declared** window, in both writers of
+one, `fetch` and `head_cached`. A window used up entirely leaves none, so the
+next run asks. A window we chose ourselves, warframe.market's, is ours rather
+than the server's and is not reduced. An `Age` that is not a number is ignored.
+
+**The one source where it double-counts, and why that changes nothing.** DE's
+worldstate `max-age` is already a countdown: it and `Age` sum to 60
+(*`max-age` is a countdown, not a policy*, above, has the nine readings).
+Subtracting `Age` there
+under-states a window of 60 seconds or less. Nothing asks the worldstate that
+often: the build runs every ten minutes and `serve.py`'s check hourly. Every
+other windowed source is either content-addressed with a window of a year, or
+WFCD at 120 seconds, and nothing asks either of those inside their window
+either. So the general rule changes behaviour only where it should, on the drop
+table. Argued from the cadences, not measured source by source.
+
+**Verified.** The test covers the arithmetic, `head_cached` with the release-day
+headers, and `fetch` against a loopback server that answers like a CDN hit.
+Removing the subtraction, or either caller's `age=`, turns its own check red.
+
+### WFCD's item data is part of the fingerprint
+
+**Added 2026-09-23 and committed locally only**, the other half of the owner's
+choice above.
+
+**Why.** WFCD's item record is what DE's parts, Ducats and artwork join through
+(`TODO.md`, *A Prime WFCD have not indexed yet loses DE's own parts, Ducats and
+artwork*). It was not in the `--if-changed` fingerprint, so when WFCD caught up
+after a patch nothing noticed until DE moved again or the daily full build ran.
+On release day DE had published everything by 15:13Z, and WFCD still had not
+listed Citrine at 16:16Z.
+
+**How.** `upstream_signature` hashes the item data it fetches through `fetch`,
+the same way it hashes the export index. WFCD declare `max-age=120`, so asking
+once per ten-minute cycle is within their terms. The request is conditional, so
+an unchanged answer is a 304 with no body. A changed answer lands in the cache,
+and the build reads it from there inside that same window, so it is never
+downloaded twice. `serve.py` asks read-only, like every other part of the
+fingerprint. A cold miss leaves the key out rather than failing the check.
+
+**What it costs.** Every time WFCD publish any change to their item data, the
+next cycle becomes a network build. How often that happens has not been
+measured. Their ETag held from 15:12Z to at least 16:16Z on release day. The
+first run after this lands is one such build regardless, because the saved
+signature has no `itemsApi` key yet.
+
+**Verified.** The test asserts the key is present, stays put for an unchanged
+answer, moves when a Prime is added, is asked read-only from `serve.py`, and is
+left out on no answer. Switching the block off turns it red.
 
 ---
 

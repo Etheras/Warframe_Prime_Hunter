@@ -207,15 +207,14 @@ to fail yet:**
 This does not replace the 24th. It records a measurement that would not have kept
 until then. Nothing had arrived on either side, and question 2 already has half
 its answer: the export route could not deliver at all. That is now fixed on
-this machine only, owner's decision, together with a drop-table defect found
-while planning the comparison. See *Two cache fixes run locally only — push them
-once the Citrine test is read and the light build's cost is settled*, below, and
+this machine only, owner's decision, together with three related defects found
+the same afternoon. See *Four fixes run locally only — push them once the
+Citrine test is read and the light build's cost is settled*, below, and
 `PROJECT.md §7` for the measurements. So from 2026-09-23 the local build is
 **not** unaided and the deployed one still is: question 6 compares a fixed
-pipeline with an unfixed one. The same look found *A CDN's `Age` is never counted
-against `max-age`, so a cached copy can be kept for up to twice the declared
-window*, still open on both sides. It delays when either side sees DE's drop
-table, so to learn when **DE** updated it, read its `Last-Modified` directly. Plague Star left as predicted in both payloads:
+pipeline with an unfixed one. The deployed side still ignores a CDN's `Age`, so
+to learn when **DE** updated the drop table, read its `Last-Modified` directly:
+it was 15:13:21Z. Plague Star left as predicted in both payloads:
 `bounties.events` kept its key and lost `activation`, `expiry`, `tag` and `fee`.
 
 **What the fixed local build showed at 16:03Z on the 23rd**, after one network
@@ -257,10 +256,10 @@ the time.
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
-### Two cache fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
+### Four fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
 
-**Fixed 2026-09-23 and deliberately not pushed — owner's decision.** Two
-defects, each with its own `PROJECT.md §7` entry:
+**Made 2026-09-23 and deliberately not pushed — owner's decision.** Each has its
+own `PROJECT.md §7` entry:
 
 - **DE's export manifests had been frozen since 27 August.** The cache checked a
   year-long window against the file name, when that window belongs to a hashed
@@ -268,12 +267,24 @@ defects, each with its own `PROJECT.md §7` entry:
 - **A drop-table change the fingerprint saw could be built from the old body**
   and then not fetched again for days. See *A body is not fresh once its HEAD
   has seen a newer version*.
+- **A CDN's `Age` was never counted**, which held the drop table's HEAD 17.7
+  hours past DE's window on release day. See *A CDN's `Age` counts against
+  `max-age`*.
+- **WFCD's item data was not fingerprinted**, so nothing noticed WFCD catching
+  up after a patch. See *WFCD's item data is part of the fingerprint*. The last
+  two were chosen instead of moving the build time, which the owner had asked
+  about.
 
-The local scheduled build runs both fixes from this working tree. CI builds
-`main` from GitHub and has neither, so the two sides can be compared while DE's
-drop table catches up. Both sides still carry *A CDN's `Age` is never counted
-against `max-age`*, below, so neither will ask DE's drop table again before
-09:12Z on the 24th.
+The local scheduled build runs all four from this working tree. CI builds `main`
+from GitHub and has none of them, so the two sides can be compared.
+
+**Two things will look odd locally and are expected.** The `Age` fix only
+applies to windows written after it, so the drop-table HEAD fetched at 09:12Z on
+the 23rd keeps its full day and is next asked at 09:12Z on the 24th. And the
+first ten-minute run after the WFCD fix is a network build, because the saved
+signature has no `itemsApi` key yet. How promptly WFCD are caught also depends
+on the cadence: ten minutes today, 150 if *The refresh task still runs every ten
+minutes* is settled towards the default.
 
 **Before it is pushed:**
 
@@ -334,30 +345,6 @@ item, but that gap is exactly the window the export route exists to cover.
 relic contents, which `parts_from_droptables` already reads, and keep DE's count
 and Ducats. Take the texture from the export entry's `uniqueName` when there is
 no WFCD record.
-
-### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
-
-**Found 2026-09-23.** `write_maxage` stores the `max-age` number as it arrives,
-and `still_fresh` counts it from our own file's mtime. HTTP counts it from when
-the origin produced the response, and `Age` is how a CDN says how long ago that
-was (RFC 9111 §4.2.3: a response is fresh while its lifetime exceeds its current
-age, and `Age` is part of that age). A copy the CDN has already held for N
-seconds therefore gets N extra seconds here. That breaks hard rule 11 on its own
-terms, because the extra time is ours, not the server's number.
-
-**Measured:** `head_droptables` was fetched at 09:12:03Z with `max-age=86400`,
-`Age: 63672` and `cf-cache-status: HIT`. Cloudflare's copy went stale at about
-15:31Z, but this machine will not ask again until 09:12Z on the 24th, 17.7 hours
-beyond the window DE declared. That HEAD is the drop-table half of the
-`--if-changed` fingerprint, and the drop table is where Citrine's relics will
-first appear.
-
-**The fix is not a one-liner, and a careless one would ask too often.** DE's
-worldstate `max-age` is already a countdown: it and `Age` sum to 60 across nine
-readings (`PROJECT.md §7`). Subtracting `Age` there would count it twice and ask
-again early. So the fix has to tell a header that already nets out `Age` from
-one that does not, source by source, and nothing beyond these two has been
-measured.
 
 ### The refresh task still runs every ten minutes, and `PROJECT.md §4` still argues for it
 

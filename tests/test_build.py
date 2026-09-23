@@ -34,6 +34,7 @@ import collections
 import datetime
 import email.utils
 import functools
+import hashlib
 import json
 import os
 import re
@@ -3048,6 +3049,134 @@ def test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version() -> None:
             real_fetch, real_json, real_head)
 
 
+def test_a_cdn_age_is_spent_out_of_max_age() -> None:
+    """
+    `max-age` counts from when the origin produced a response, and `Age` is how
+    long a cache in between has held it (RFC 9111 §4.2.3). Ignoring `Age` gave a
+    copy its whole window again on arrival. Measured 2026-09-23: the drop table's
+    HEAD came back `max-age=86400`, `Age: 63672` from a Cloudflare HIT at 09:12Z,
+    so Cloudflare's copy went stale at 15:31Z, eighteen minutes after DE published
+    Citrine's relics, while this build would not have asked again until 09:12Z
+    the next day. `PROJECT.md §7`.
+
+    Three places: the arithmetic, and both writers of a window. `fetch` is
+    exercised against a loopback server, because file:// cannot send `Age`.
+    """
+    import http.server
+    import threading
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-age-")
+    real_cache, real_head = sources.CACHE_DIR, sources.head
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    httpd = None
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        os.makedirs(sources.CACHE_DIR)
+        path = os.path.join(sources.CACHE_DIR, "probe.gz")
+        with open(path, "wb") as fh:
+            fh.write(b"body")
+
+        sources.write_maxage(path, "public, max-age=86400", age="63672")
+        check("age: it is spent out of the declared window",
+              sources.read_maxage(path), 22728.0)
+        sources.write_maxage(path, "max-age=120", age="300")
+        check("age: a window already used up leaves none", sources.read_maxage(path), None)
+        sources.write_maxage(path, "max-age=600", age="soon")
+        check("age: one that is not a number is ignored", sources.read_maxage(path), 600.0)
+        sources.write_maxage(path, None, chosen=86400, age="500")
+        check("age: a window we chose is ours, not the server's, and is not reduced",
+              sources.read_maxage(path), 86400.0)
+
+        # head_cached, which is how the drop table's HEAD is kept.
+        sources.head = lambda url: {"cache-control": "max-age=86400", "age": "63672",
+                                    "last-modified": "Thu, 25 Jun 2026 20:33:31 GMT"}
+        sources.head_cached("https://www.warframe.com/droptables", "head_probe")
+        check("age: the HEAD's window is what Cloudflare had left",
+              sources.read_maxage(sources.cache_path("head_probe")), 22728.0)
+
+        # fetch, against a server that answers the way a CDN hit does
+        class Hit(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"held by a CDN"
+                self.send_response(200)
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Age", "86000")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        httpd = http.server.HTTPServer(("127.0.0.1", 0), Hit)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        where = f"http://127.0.0.1:{httpd.server_address[1]}/table"
+        check("age: fetch still returns the body", sources.fetch(where, "api_events"),
+              b"held by a CDN")
+        check("age: and keeps only the window the CDN had left",
+              sources.read_maxage(sources.cache_path("api_events")), 400.0)
+        check("age: nothing about any of it is stale",
+              (list(sources.STALE), list(sources.MISSING)), ([], []))
+    finally:
+        if httpd is not None:
+            httpd.shutdown()
+            httpd.server_close()
+        sources.CACHE_DIR, sources.head = real_cache, real_head
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_wfcd_item_data_is_part_of_the_fingerprint() -> None:
+    """
+    WFCD's item record is what DE's parts, Ducats and artwork join through, and
+    until 2026-09-23 it was not fingerprinted. On Citrine Prime's release day DE
+    had published everything by 15:13Z and WFCD had not. When WFCD caught up,
+    nothing would have noticed short of DE moving again or the daily full build.
+    `PROJECT.md §7`.
+
+    The network is replaced, as in the fingerprint test above: what is asserted
+    is what the fingerprint consults and what moves it.
+    """
+    import sources
+    served = {"api_items": b'[{"name": "Ash Prime"}]'}
+    calls = []
+
+    def fake_fetch(url, key, *a, **k):
+        calls.append((key, k.get("readonly")))
+        return served.get(key, b"index")
+
+    real = (sources.fetch, sources.fetch_json, sources.head_cached)
+    stale = list(sources.STALE)
+    try:
+        sources.fetch = fake_fetch
+        sources.fetch_json = lambda *a, **k: None
+        sources.head_cached = lambda *a, **k: {}
+        sources.STALE[:] = []
+
+        before = sources.upstream_signature()
+        check("items: WFCD's item data is in the fingerprint",
+              before.get("itemsApi"),
+              hashlib.sha256(served["api_items"]).hexdigest()[:16])
+        check("items: and an unchanged answer does not move it",
+              sources.upstream_signature().get("itemsApi"), before.get("itemsApi"))
+
+        served["api_items"] = b'[{"name": "Ash Prime"}, {"name": "Citrine Prime"}]'
+        check_true("items: WFCD indexing a new Prime moves it",
+                   sources.upstream_signature().get("itemsApi") != before.get("itemsApi"))
+
+        calls.clear()
+        sources.upstream_signature(readonly=True)
+        check("items: serve.py's check asks it read-only, like everything else",
+              [r for key, r in calls if key == "api_items"], [True])
+
+        served["api_items"] = None
+        check("items: no answer at all leaves it out rather than failing",
+              "itemsApi" in sources.upstream_signature(), False)
+    finally:
+        sources.fetch, sources.fetch_json, sources.head_cached = real
+        sources.STALE[:] = stale
+
+
 def test_an_impossible_304_is_treated_as_stale() -> None:
     """
     A `304` says the server has confirmed what we hold is current, and `fetch`
@@ -5804,6 +5933,8 @@ def main() -> int:
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_a_window_covers_only_the_url_it_came_with,
                          test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version,
+                         test_a_cdn_age_is_spent_out_of_max_age,
+                         test_wfcd_item_data_is_part_of_the_fingerprint,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_what_the_build_writes_is_what_the_site_ships,

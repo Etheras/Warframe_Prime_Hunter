@@ -125,13 +125,14 @@ def pick_port(host: str) -> int:
 #
 # Verification only, in the sense that nothing is rebuilt - but this said "three
 # HEAD requests, no downloads" until 2026-08-26 and both halves were wrong.
-# `sources.upstream_signature` makes one HEAD (the drop table) and two GETs (the
-# export index, ~500 bytes, and the vault trader window), and both GETs go
-# through `fetch`, which writes the body to `.cache/*.gz` with an `.etag`
-# sidecar. So serving a page writes to the cache the build reads from. That is
-# harmless - it is the same conditional fetch the build would make, and it
-# leaves the cache warmer - but a comment that says "no downloads" is how
-# nobody notices.
+# `sources.upstream_signature` makes one HEAD (the drop table) and conditional
+# GETs through `fetch` for the export index (~500 bytes), the vault trader window
+# and, since 2026-09-23, WFCD's item data - each skipped inside the window its
+# source declared, and each a 304 with no body when nothing has changed. It runs
+# `readonly`, so since 2026-09-01 none of the answers is written to `.cache/`,
+# the build's cache. This comment went on saying it was for three weeks after,
+# which is the same failure as "no downloads": a sentence about the code that
+# nobody re-read when the code moved.
 #
 # Throttled to once an hour, failures included, so a reload does not hammer DE
 # and a blackholed network costs one slow load per hour per process rather than
