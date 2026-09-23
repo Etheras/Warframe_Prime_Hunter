@@ -207,31 +207,38 @@ to fail yet:**
 This does not replace the 24th. It records a measurement that would not have kept
 until then. Nothing had arrived on either side, and question 2 already has half
 its answer: the export route could not deliver at all. That is now fixed on
-this machine only, owner's decision — see *The export cache fix runs locally
-only — push it once the Citrine test is read and the light build's cost is
-settled*, below, and `PROJECT.md §7` for the measurements. So from 2026-09-23 the
-local build is **not** unaided and the deployed one still is; question 6 compares
-a fixed pipeline with an unfixed one. The same look found *A CDN's `Age` is
-never counted against `max-age`, so a cached copy can be kept for up to twice the
-declared window* and *A drop-table change the fingerprint sees can be built from
-the old body, and then not fetched again*. Both bear on how soon either side
-sees DE's drop table, so to learn when **DE** updated it, read its
-`Last-Modified` directly. Plague Star left as predicted in both payloads:
+this machine only, owner's decision, together with a drop-table defect found
+while planning the comparison. See *Two cache fixes run locally only — push them
+once the Citrine test is read and the light build's cost is settled*, below, and
+`PROJECT.md §7` for the measurements. So from 2026-09-23 the local build is
+**not** unaided and the deployed one still is: question 6 compares a fixed
+pipeline with an unfixed one. The same look found *A CDN's `Age` is never counted
+against `max-age`, so a cached copy can be kept for up to twice the declared
+window*, still open on both sides. It delays when either side sees DE's drop
+table, so to learn when **DE** updated it, read its `Last-Modified` directly. Plague Star left as predicted in both payloads:
 `bounties.events` kept its key and lost `activation`, `expiry`, `tag` and `fee`.
 
 **Then:** write each real flaw up as its own `###` entry, with its evidence, and
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
-### The export cache fix runs locally only — push it once the Citrine test is read and the light build's cost is settled
+### Two cache fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
 
-**Fixed 2026-09-23 and deliberately not pushed — owner's decision.** DE's export
-manifests had been frozen since 27 August: the cache checked a year-long window
-against the file name, when that window belongs to a hashed URL. The defect,
-the release-day measurements and the fix are in `PROJECT.md §7`, *A freshness
-window belongs to the URL it was declared for*. The local scheduled build runs
-the fix from this working tree. CI builds `main` from GitHub and does not have
-it, so the two can be compared while DE's drop table catches up.
+**Fixed 2026-09-23 and deliberately not pushed — owner's decision.** Two
+defects, each with its own `PROJECT.md §7` entry:
+
+- **DE's export manifests had been frozen since 27 August.** The cache checked a
+  year-long window against the file name, when that window belongs to a hashed
+  URL. See *A freshness window belongs to the URL it was declared for*.
+- **A drop-table change the fingerprint saw could be built from the old body**
+  and then not fetched again for days. See *A body is not fresh once its HEAD
+  has seen a newer version*.
+
+The local scheduled build runs both fixes from this working tree. CI builds
+`main` from GitHub and has neither, so the two sides can be compared while DE's
+drop table catches up. Both sides still carry *A CDN's `Age` is never counted
+against `max-age`*, below, so neither will ask DE's drop table again before
+09:12Z on the 24th.
 
 **Before it is pushed:**
 
@@ -245,45 +252,21 @@ it, so the two can be compared while DE's drop table catches up.
    manifests' compressed size has not been measured. Options include a light
    build saving the cache when a manifest changed, or leaving manifests to the
    full build. Not designed.
-3. **The first network build after the fix asks every windowed source once**,
-   because a cache from before the fix has no `.url` recorded. On CI that is the
+3. **The first network build after the fixes asks every windowed source once**,
+   because a cache from before them has no `.url` recorded. On CI that is the
    first full build after the push. Expected and harmless, but it shows up in
    the logs as a burst.
+4. **Check that DE's GET and HEAD agree on `Last-Modified`** for the drop table,
+   by comparing `official_droptables.gz.lastmod` with `head_droptables` after a
+   real build. If they ever differ while nothing has changed, the body would be
+   refused on every network build, and that is the one way the second fix could
+   over-ask.
 
 **On the deployed side, still unfixed, predicted and not yet seen:** when the
 wiki route brings Citrine in, its parts will come from WFCD's list or the
 drop-table fallback instead of DE's recipes. That turns `parts: only the items
 DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
 catch.
-
-### A drop-table change the fingerprint sees can be built from the old body, and then not fetched again
-
-**Found 2026-09-23 by reading the code, while planning to watch for DE's drop
-table. Not yet seen to fail.** `--if-changed` notices the drop table through
-`head_droptables`, a HEAD. The body is `official_droptables`, a separate key with
-its own 24-hour window. When the HEAD shows a new `Last-Modified`, the build goes
-to the network, but `fetch` serves the body from its own window if that has not
-run out. The build then saves the **new** signature. Every later run matches it
-and rebuilds from cache, so the new table waits until something else moves the
-signature after the body's window has expired.
-
-**Today's numbers, on this machine.** The body was fetched at 15:12Z on the 23rd,
-so its window runs to 15:12Z on the 24th. The HEAD will not be asked again until
-09:12Z on the 24th (*A CDN's `Age` is never counted against `max-age`*, below).
-An update DE publish today would therefore be noticed at 09:12Z tomorrow and
-built from the old body. The first network build after the export cache fix
-asks the body once regardless, because no `.url` is recorded for it yet, so the
-first occurrence may be masked.
-
-**The daily full build has a milder form, from reading and not measured.** It
-has no fingerprint, but it fetches the body at about the same minute every day.
-Whether yesterday's 24-hour window has expired is then a matter of seconds, and
-a run that lands a second early keeps yesterday's copy for another day.
-
-**Shape of a fix, not designed:** once the fingerprint says a document has moved,
-its body's window no longer applies, because the server has just told us, through
-`Last-Modified`, that what we hold is old. For example, keep the body's
-`Last-Modified` beside it and refuse the window when the HEAD disagrees.
 
 ### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
 

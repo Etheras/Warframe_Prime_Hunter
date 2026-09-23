@@ -8754,6 +8754,44 @@ b'the 27 August manifest'"*, which is release day reproduced, and passes with th
 fix. A real build with the fix is the local-against-deployed comparison, and
 that is still to come.
 
+### A body is not fresh once its HEAD has seen a newer version
+
+**Fixed 2026-09-23 and committed locally only**, under the same owner's decision
+as the entry above. It was found by reading the code while planning to watch for
+Citrine's relics, and has not been seen to fail.
+
+**The defect.** The drop table is watched through two keys: `head_droptables`,
+the HEAD the `--if-changed` fingerprint reads, and `official_droptables`, the
+body. Each has its own 24-hour window. When the HEAD showed a new
+`Last-Modified`, the build went to the network, but `fetch` served the body from
+its own window if that had not run out. The build then saved the **new**
+signature, so every later run matched it and rebuilt from cache. The new table
+waited until something unrelated moved the signature after the body's window
+had expired, and on a quiet week that is days.
+
+**The rule now.** `acquire_drops` in `build_data.py` passes `fetch` the
+`Last-Modified` its HEAD saw, and `fetch` keeps the body's own `Last-Modified`
+beside it (`.lastmod`). A positive disagreement between the two means the body's
+window no longer applies, because the server has just said what we hold is old.
+**Only a positive disagreement counts.** A body with nothing recorded keeps its
+window, so a server that stops sending the header cannot turn this into a
+request on every run. An offline build asks no HEAD at all.
+
+**The same shape, and why it is a different fix from the URL one.** Both are a
+window applied to something other than what it was declared for: there, a URL
+the window never covered; here, a version the server has since replaced. The
+URL fix cannot see this one, because the drop table's URL never changes.
+
+**Verified.** The test fails with the version check removed (*"got b'the June
+table'"*) and with the call site not passing the version. **The call-site half
+caught a real bug in the fix's first draft.** `acquire_drops` had a local named
+`sources`, which shadowed the module, so the new line raised. The function's own
+`except Exception` then fell back to the WFCD mirror without a word. The first
+run of the test really did fetch the mirror from the internet, about ten
+requests. The local is now `drops`, and the test stops the mirror path as well,
+so it cannot reach the network whatever the code does. Not yet verified: a real
+build against a real change in DE's drop table.
+
 ---
 
 ## 8. Gotchas discovered while building

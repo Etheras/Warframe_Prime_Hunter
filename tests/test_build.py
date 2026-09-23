@@ -2925,6 +2925,118 @@ def test_a_window_covers_only_the_url_it_came_with() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version() -> None:
+    """
+    The drop table is watched through two keys: the HEAD the `--if-changed`
+    fingerprint reads, and the body, each with its own 24-hour window. A HEAD
+    showing a new `Last-Modified` sent the build to the network, the body came
+    out of its own window anyway, and the build saved the new signature over the
+    old table — so nothing fetched it again until some other change moved the
+    signature. Found by reading the code on 2026-09-23; `PROJECT.md §7`.
+
+    Two halves, because either alone passes while the defect stands: `fetch`
+    must refuse a window the caller says is outdated, and `acquire_drops` must
+    actually say so.
+    """
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-lastmod-")
+    url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
+    doc = os.path.join(tmp, "droptables.html")
+    key = "official_droptables"
+    day = "public, max-age=86400"
+    real_cache = sources.CACHE_DIR
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        path = sources.cache_path(key)
+        with open(doc, "wb") as fh:
+            fh.write(b"the June table")
+        was = os.path.getmtime(doc)
+
+        sources.fetch(url(doc), key, last_modified="whatever the HEAD said")
+        sources.write_maxage(path, day)
+        held = sources.read_lastmod(path)
+        check_true("head version: the body's own Last-Modified is kept", bool(held))
+
+        # file:// dates the body by its mtime, so a rewrite put back to the same
+        # mtime is "unchanged" as far as Last-Modified can tell.
+        with open(doc, "wb") as fh:
+            fh.write(b"the table DE published today")
+        os.utime(doc, (was, was))
+        check("head version: the same version keeps its window",
+              sources.fetch(url(doc), key, last_modified=held), b"the June table")
+        check("head version: and so does a caller who passes none",
+              sources.fetch(url(doc), key), b"the June table")
+
+        check("head version: a newer one the HEAD saw is fetched",
+              sources.fetch(url(doc), key, last_modified="Thu, 24 Sep 2026 09:00:00 GMT"),
+              b"the table DE published today",
+              "the body came out of its own window over a HEAD that said it was old")
+
+        # Only a positive disagreement counts: a body with nothing recorded keeps
+        # its window, or a server that stopped sending the header would be asked
+        # on every run.
+        sources.write_maxage(path, day)
+        os.remove(sources.lastmod_path(path))
+        with open(doc, "wb") as fh:
+            fh.write(b"not asked for")
+        check("head version: nothing recorded is not a disagreement",
+              sources.fetch(url(doc), key, last_modified="Fri, 25 Sep 2026 09:00:00 GMT"),
+              b"the table DE published today")
+        check("head version: nothing about any of it is stale",
+              (list(sources.STALE), list(sources.MISSING)), ([], []))
+    finally:
+        sources.CACHE_DIR = real_cache
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # The call site. `fetch` is stopped with a BaseException so the drop path's
+    # `except Exception` cannot swallow it and wander off to the mirror - and the
+    # mirror is stopped too, because that is exactly what happened on the first
+    # run of this test: a local named `sources` in `acquire_drops` shadowed the
+    # module, the new line raised, and the real mirror was fetched from the
+    # internet. A test must not be able to do that whatever the code does.
+    class Stop(BaseException):
+        pass
+
+    asked, heads = {}, []
+
+    def fake_fetch(url, key, *a, **k):
+        asked.update(url=url, key=key, **k)
+        raise Stop
+
+    def no_mirror(url, key, *a, **k):
+        asked.setdefault("mirror", key)
+        raise Stop
+
+    def fake_head(url, key, readonly=False):
+        heads.append(key)
+        return {"last-modified": "Thu, 24 Sep 2026 09:00:00 GMT"}
+
+    real_fetch, real_json, real_head = build_data.fetch, build_data.fetch_json, sources.head_cached
+    try:
+        build_data.fetch, build_data.fetch_json, sources.head_cached = (
+            fake_fetch, no_mirror, fake_head)
+        try:
+            build_data.acquire_drops(False, "official", False)
+        except Stop:
+            pass
+        check("head version: the build hands fetch the version its HEAD saw",
+              (asked.get("key"), asked.get("last_modified"), asked.get("mirror")),
+              ("official_droptables", "Thu, 24 Sep 2026 09:00:00 GMT", None))
+        asked.clear()
+        heads.clear()
+        try:
+            build_data.acquire_drops(True, "official", False)
+        except Stop:
+            pass
+        check("head version: an offline build asks no HEAD for it",
+              (heads, asked.get("last_modified")), ([], None))
+    finally:
+        build_data.fetch, build_data.fetch_json, sources.head_cached = (
+            real_fetch, real_json, real_head)
+
+
 def test_an_impossible_304_is_treated_as_stale() -> None:
     """
     A `304` says the server has confirmed what we hold is current, and `fetch`
@@ -5680,6 +5792,7 @@ def main() -> int:
                          test_a_source_cannot_send_more_than_its_ceiling,
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_a_window_covers_only_the_url_it_came_with,
+                         test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_what_the_build_writes_is_what_the_site_ships,

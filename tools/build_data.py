@@ -93,13 +93,23 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
     if prefer != "mirror":
         try:
             log("drops: warframe.com/droptables (official)")
-            page = fetch(OFFICIAL_DROPTABLES, "official_droptables", offline).decode("utf-8", "replace")
-            contents, sources, aya = official.parse_droptables(page)
-            if len(contents) >= 200 and len(sources) >= 10:
-                return (contents, normalise_sources(sources), "official", aya,
+            # The version the fingerprint's HEAD saw. Without it the body is
+            # served from its own 24-hour window even when that HEAD has just
+            # said there is a newer one, and the build records the new signature
+            # over the old table - see `lastmod_path` in sources.py. No HEAD on
+            # an offline build, which asks nobody anything.
+            seen = None if offline else sources.head_cached(
+                OFFICIAL_DROPTABLES, "head_droptables").get("last-modified")
+            page = fetch(OFFICIAL_DROPTABLES, "official_droptables", offline,
+                         last_modified=seen).decode("utf-8", "replace")
+            # `drops`, not `sources`: that name is the module, and a local of the
+            # same name makes the line above raise - silently, into the mirror.
+            contents, drops, aya = official.parse_droptables(page)
+            if len(contents) >= 200 and len(drops) >= 10:
+                return (contents, normalise_sources(drops), "official", aya,
                         official.bounty_rotation_pools(page))
             log(f"! official drop table parsed thin ({len(contents)} relics, "
-                f"{len(sources)} farmable) - falling back to the mirror")
+                f"{len(drops)} farmable) - falling back to the mirror")
         except Exception as exc:
             log(f"! official drop table unavailable ({exc}) - falling back to the mirror")
 

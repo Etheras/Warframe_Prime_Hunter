@@ -399,6 +399,41 @@ def write_url(path: str, url: str) -> None:
         pass
 
 
+# The `Last-Modified` a cached body arrived with — kept only for a caller that
+# passes `last_modified` to `fetch`, which is the drop table.
+#
+# The drop table is watched through two keys: `head_droptables`, the HEAD the
+# `--if-changed` fingerprint reads, and `official_droptables`, the body, each
+# with its own 24-hour window. Until 2026-09-23 a HEAD showing a new version sent
+# the build to the network, `fetch` served the body from its own window anyway,
+# and the build saved the *new* signature — so every later run matched it and
+# rebuilt from cache, and the new table waited for some unrelated change to move
+# the signature again. `PROJECT.md §7`, *A body is not fresh once its HEAD has
+# seen a newer version*.
+
+def lastmod_path(path: str) -> str:
+    return path + ".lastmod"
+
+
+def read_lastmod(path: str) -> str | None:
+    try:
+        with open(lastmod_path(path), encoding="utf-8") as fh:
+            return fh.read().strip() or None
+    except OSError:
+        return None
+
+
+def write_lastmod(path: str, value: str | None) -> None:
+    try:
+        if value:
+            with open(lastmod_path(path), "w", encoding="utf-8") as fh:
+                fh.write(value.strip())
+        elif os.path.exists(lastmod_path(path)):
+            os.remove(lastmod_path(path))
+    except OSError:
+        pass
+
+
 def still_fresh(path: str, url=None) -> bool:
     """Is the cached copy still inside the window the source declared?
 
@@ -469,9 +504,17 @@ def stale_if_older(key: str, path: str, max_age: float | None) -> None:
 
 def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
           optional: bool = False, max_age: float | None = None,
-          readonly: bool = False, chosen_maxage: float | None = None):
+          readonly: bool = False, chosen_maxage: float | None = None,
+          last_modified: str | None = None):
     """
     GET with a small on-disk cache so reruns and --offline are cheap.
+
+    `last_modified` is the version the caller has just seen for this document,
+    from a HEAD. When the cached body arrived with a **different** one, its
+    window no longer applies, because the server has just said what we hold is
+    old. Only a positive disagreement counts: a body with no recorded
+    `Last-Modified` keeps its window, so a server that stops sending one cannot
+    turn this into asking on every run.
 
     `readonly` reads the cache but never writes it — no body, no `.etag`, no
     `.maxage`, and no entry in `STALE` or `MISSING`. It exists for one caller:
@@ -522,8 +565,11 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     # Inside the window the source itself declared, so do not ask again. This is
     # the whole of "Ask no more often than the source says to" — the drop table
     # says `max-age=86400` and was being asked every ten minutes. The window
-    # covers the URL it was declared for, and no other: see `url_path`.
-    if still_fresh(path, urls):
+    # covers the URL it was declared for, and no other: see `url_path`. And it
+    # covers the version it was declared for: see `lastmod_path`.
+    held = read_lastmod(path)
+    outdated = bool(last_modified and held and held != last_modified.strip())
+    if still_fresh(path, urls) and not outdated:
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
@@ -577,6 +623,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                         raw = limits.gunzip_capped(raw, ceiling, key)
                     tag = resp.headers.get("ETag")
                     freshness = resp.headers.get("Cache-Control")
+                    modified = resp.headers.get("Last-Modified")
                 if readonly:
                     return raw            # answered, and deliberately not kept
                 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -585,6 +632,8 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 write_etag(path, tag)
                 write_maxage(path, freshness, chosen_maxage)
                 write_url(path, one)
+                if last_modified is not None:
+                    write_lastmod(path, modified)
                 return raw
             except limits.Refused as exc:
                 # Both refusals, and both the same answer. Too large is not an
@@ -610,6 +659,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                         # What we hold is current for *this* URL too, so the
                         # window applies to it from here on.
                         write_url(path, one)
+                        if last_modified is not None:
+                            write_lastmod(path, exc.headers.get("Last-Modified")
+                                          or last_modified)
                     with gzip.open(path, "rb") as fh:
                         return fh.read()
                 last_err = exc
