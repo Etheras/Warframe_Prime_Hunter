@@ -259,6 +259,19 @@ whatever they were on 27 Aug. For Citrine, that leaves the wiki's Prime page,
 WFCD's item data and DE's drop table as the only way in. At the 15:12Z build
 none of them listed it, and the wiki page was last edited on 10 Sep.
 
+**What it would have delivered, measured the same day at 15:40Z.** DE's current
+manifests were run through `collect_prime_items` and `prime_part_specs` in a
+scratch process, not the build. They give all three items with the categories
+the Citrine entry expects: Citrine Prime `Suits` → Warframe, Steflos Prime
+`LongGuns` → Primary, and Corufell Prime `Melee` → Melee, so *a new weapon class
+disappears* did not fire. None of the six accessories came through. Each item
+has four parts, every quantity is 1, and every Ducat value matches its part's
+relic rarity. `ExportRecipes` and `ExportRelicArcane` changed on 21 Sep at
+21:06Z, two days before release; the items themselves only arrived at 14:13:57Z.
+`ExportRelicArcane`, which we do not read, already names the eleven new relics
+and their contents. Where those relics drop is only in the drop table, which had
+not changed by 15:12Z. The wiki's Prime page was still unedited at 15:41Z.
+
 **Predicted, not yet seen:** when the wiki route does bring Citrine in, its parts
 will come from WFCD's list or the drop-table fallback instead of DE's recipes.
 That turns `parts: only the items DE do not publish fall back` red, for a reason
