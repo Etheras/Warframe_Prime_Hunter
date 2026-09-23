@@ -2856,6 +2856,75 @@ def test_a_source_is_not_asked_inside_its_own_window() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_window_covers_only_the_url_it_came_with() -> None:
+    """
+    A `max-age` is declared for a URL, and a cache key is not a URL. DE's export
+    manifests are fetched as `ExportWarframes_en.json!<content hash>` and kept
+    under a key with no hash in it, and each hashed URL rightly carries a window
+    of about a year. Checking the window before the URL kept every manifest as it
+    was on 27 August: on 2026-09-23 DE listed Citrine Prime at 14:13Z, the index
+    moved at 15:03Z, and the 15:12Z build went to the network and still read the
+    old copy. `TODO.md` has the measurements.
+
+    file:// throughout, so nobody's server answers. It sends no Cache-Control,
+    so DE's header is written by hand after each fetch that needs one.
+    """
+    import sources
+    tmp = tempfile.mkdtemp(prefix="primehunter-url-")
+    url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
+    old_doc = os.path.join(tmp, "old.json")
+    new_doc = os.path.join(tmp, "new.json")
+    key = "export_ExportWarframes_en.json"
+    year = "public, max-age=31532444"          # what DE sent on 2026-09-23
+    real_cache = sources.CACHE_DIR
+    stale, missing = list(sources.STALE), list(sources.MISSING)
+    try:
+        sources.CACHE_DIR = os.path.join(tmp, "cache")
+        path = sources.cache_path(key)
+        with open(old_doc, "wb") as fh:
+            fh.write(b"the 27 August manifest")
+        with open(new_doc, "wb") as fh:
+            fh.write(b"the manifest that lists Citrine Prime")
+
+        sources.fetch(url(old_doc), key)
+        sources.write_maxage(path, year)
+
+        # The window still holds for the URL it was declared for: a hashed URL
+        # cannot change, so the build must not ask for it again.
+        with open(old_doc, "wb") as fh:
+            fh.write(b"changed behind a URL that promised it would not")
+        check("url window: the same URL is not re-asked inside its window",
+              sources.fetch(url(old_doc), key), b"the 27 August manifest")
+
+        check("url window: a new URL under the same key is asked for",
+              sources.fetch(url(new_doc), key), b"the manifest that lists Citrine Prime",
+              "a year-long window on the old hash kept every export at 27 August")
+        check("url window: and the window now belongs to the new URL",
+              sources.read_url(path), url(new_doc))
+
+        # A cache written before `.url` existed is asked once, not trusted blind.
+        sources.write_maxage(path, year)
+        os.remove(sources.url_path(path))
+        with open(new_doc, "wb") as fh:
+            fh.write(b"a hotfixed manifest")
+        check("url window: a copy with no recorded URL is asked for once",
+              sources.fetch(url(new_doc), key), b"a hotfixed manifest")
+
+        # Several hosts publishing one document share one window, which is what
+        # the export index's two hosts rely on.
+        sources.write_maxage(path, year)
+        check_true("url window: any host in the list counts",
+                   sources.still_fresh(path, ["https://elsewhere.invalid/x", url(new_doc)]))
+        check_true("url window: a host outside it does not",
+                   not sources.still_fresh(path, "https://elsewhere.invalid/x"))
+        check("url window: nothing about any of it is stale",
+              (list(sources.STALE), list(sources.MISSING)), ([], []))
+    finally:
+        sources.CACHE_DIR = real_cache
+        sources.STALE[:], sources.MISSING[:] = stale, missing
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_an_impossible_304_is_treated_as_stale() -> None:
     """
     A `304` says the server has confirmed what we hold is current, and `fetch`
@@ -5610,6 +5679,7 @@ def main() -> int:
                          test_a_blocked_host_is_routed_around,
                          test_a_source_cannot_send_more_than_its_ceiling,
                          test_a_source_is_not_asked_inside_its_own_window,
+                         test_a_window_covers_only_the_url_it_came_with,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_what_the_build_writes_is_what_the_site_ships,

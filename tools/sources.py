@@ -365,17 +365,61 @@ def write_maxage(path: str, header: str | None, chosen: float | None = None) -> 
         pass
 
 
-def still_fresh(path: str) -> bool:
+# The URL a cached body came from, beside it like the other two sidecars.
+#
+# A window is declared for **a URL**, not for a cache key, and the two differ
+# whenever the URL carries a version. DE's export manifests are the case:
+# `acquire_export` asks for `ExportWarframes_en.json!<content hash>` and keeps
+# the answer under `export_ExportWarframes_en.json`. DE rightly give each hashed
+# URL a `max-age` of about a year, since it can never change - and until
+# 2026-09-23 `still_fresh` checked that window before looking at the URL, so a
+# new manifest under a new hash was never asked for. Every export stayed as it
+# was on 27 August, and Citrine Prime, listed by DE at 14:13Z on release day,
+# could not reach the build by the route that exists to catch it first.
+# `TODO.md` has the measurements; `PROJECT.md §7`, *A freshness window belongs
+# to the URL it was declared for*, has the decision.
+
+def url_path(path: str) -> str:
+    return path + ".url"
+
+
+def read_url(path: str) -> str | None:
+    try:
+        with open(url_path(path), encoding="utf-8") as fh:
+            return fh.read().strip() or None
+    except OSError:
+        return None
+
+
+def write_url(path: str, url: str) -> None:
+    try:
+        with open(url_path(path), "w", encoding="utf-8") as fh:
+            fh.write(url)
+    except OSError:
+        pass
+
+
+def still_fresh(path: str, url=None) -> bool:
     """Is the cached copy still inside the window the source declared?
 
     False whenever anything is missing or unreadable — a lost sidecar costs one
     request, and asking is always the safe direction.
+
+    `url` is what the caller is about to ask for, as one URL or several hosts
+    publishing the same document. When given, the window only counts if the body
+    came from one of them. A cache written before the `.url` sidecar existed has
+    none, so it is asked once and recorded. `head_cached` passes nothing: its
+    URL is a constant and cannot drift from its key.
     """
     if not os.path.exists(path):
         return False
     window = read_maxage(path)
     if not window:
         return False
+    if url is not None:
+        wanted = [url] if isinstance(url, str) else list(url)
+        if read_url(path) not in wanted:
+            return False
     try:
         return (time.time() - os.path.getmtime(path)) < window
     except OSError:
@@ -473,14 +517,16 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
+    urls = [url] if isinstance(url, str) else list(url)
+
     # Inside the window the source itself declared, so do not ask again. This is
     # the whole of "Ask no more often than the source says to" — the drop table
-    # says `max-age=86400` and was being asked every ten minutes.
-    if still_fresh(path):
+    # says `max-age=86400` and was being asked every ten minutes. The window
+    # covers the URL it was declared for, and no other: see `url_path`.
+    if still_fresh(path, urls):
         with gzip.open(path, "rb") as fh:
             return fh.read()
 
-    urls = [url] if isinstance(url, str) else list(url)
     last_err = None
     prior = read_etag(path)
     ceiling = limits.cap_for(key)
@@ -538,6 +584,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     fh.write(raw)
                 write_etag(path, tag)
                 write_maxage(path, freshness, chosen_maxage)
+                write_url(path, one)
                 return raw
             except limits.Refused as exc:
                 # Both refusals, and both the same answer. Too large is not an
@@ -560,6 +607,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     # about the build.
                     if not readonly:
                         stale_if_older(key, path, max_age)
+                        # What we hold is current for *this* URL too, so the
+                        # window applies to it from here on.
+                        write_url(path, one)
                     with gzip.open(path, "rb") as fh:
                         return fh.read()
                 last_err = exc

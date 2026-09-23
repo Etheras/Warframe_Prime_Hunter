@@ -329,6 +329,7 @@ sends `Retry-After`, and there is no usage policy in the WFCD READMEs or on
 | `api.warframe.com/cdn/worldState.php` | `max-age` counting down from 60 | regenerated once a minute, built to be polled |
 | `www.warframe.com/droptables` | `max-age=86400` | about daily |
 | `content.warframe.com/PublicExport/index_en.txt.lzma` | `no-cache` + `ETag` | always revalidate, and it answers 304 |
+| `content.warframe.com/PublicExport/Manifest/<file>!<hash>` | `max-age` of about a year | the URL is content-addressed, so it can never change — the window belongs to that URL, not to the file name (§7, *A freshness window belongs to the URL it was declared for*) |
 | `api.warframestat.us/items` | `max-age=120` | |
 | `drops.warframestat.us/data/*` | `max-age=600` | |
 
@@ -3297,6 +3298,15 @@ sweep ran.
 this manifest carries the reward lists without them. Worth a look for what it
 says about vaulting, not as a replacement for a source that is already first
 party.
+
+**It knows one thing first, measured 2026-09-23.** It named Citrine Prime's
+eleven relics and their contents on 21 Sep at 21:06Z, two days before release.
+At 15:12Z on release day DE's drop table had none of them. It carries rarity,
+and odds follow from rarity and refinement, so the missing-odds objection is
+weaker than it reads above. It still cannot say **where** a relic drops. So what
+it would buy is a window in which a new Prime's relics are known and nothing is
+farmable yet. That window is exactly as long as DE take to update the drop
+table, which is the thing the Citrine test is waiting to measure. Undecided.
 
 **What DE do not publish at all**, which is why the other two tiers exist and are
 not going away: `vaulted`, `vaultDate`, `releaseDate` and `tradable` appear in no
@@ -8687,6 +8697,62 @@ about pointers, not about vocabulary.
 passes by finding nothing — the one failure it cannot report. So it also asserts
 it still matched at least a dozen real pointers. Verified by breaking a live
 pointer and watching only the intended check go red.
+
+### A freshness window belongs to the URL it was declared for
+
+**Fixed 2026-09-23, Citrine Prime's release day, and committed locally only.**
+The owner chose to run the fix on this machine and keep it off CI until the
+Citrine test has been read, so the local build and the deployed one can be
+compared while DE's drop table catches up. `TODO.md` carries what is left before
+it is pushed.
+
+**The defect.** `fetch` checked `still_fresh(path)` before it looked at the URL.
+A `max-age` is declared for a URL, and a cache key is not one. DE's export
+manifests are where the difference bites: `acquire_export` in `build_data.py`
+asks for `ExportWarframes_en.json!<content hash>` and keeps the answer under
+`export_ExportWarframes_en.json`. DE rightly give each hashed URL a window of
+about a year. So a manifest published under a new hash was never asked for, and
+all seven stayed as they were on 27 August.
+
+**Measured before the fix, on release day:**
+
+- DE's `ExportWarframes_en.json` at the index's current hash had
+  `Last-Modified: 14:13:57Z` and listed Citrine Prime. The cached copy dated
+  from 27 Aug and did not.
+- DE's index moved at 15:03:01Z. The 15:12Z local build saw it and went to the
+  network: `wiki_prime`, `api_items` and `official_droptables` were rewritten,
+  while `export_ExportWarframes`, `…Weapons` and `…Recipes` stayed at 27 Aug.
+- Run through `collect_prime_items` and `prime_part_specs` by hand, DE's current
+  manifests give all three items in the categories expected (Citrine Prime
+  Warframe, Steflos Prime Primary, Corufell Prime Melee), none of the six
+  accessories, and four parts each with quantities and Ducats that match the
+  relic rarities. So the export route had the whole answer at 14:13Z, and the
+  wiki's Prime page had still not been edited at 15:41Z.
+
+**The rule now.** The cache keeps the URL each body came from, in a `.url`
+sidecar beside `.etag` and `.maxage`, and a window counts only for that URL. A
+list of hosts publishing the same document shares one window. A 304 from a new
+URL records that URL too, since the server has just confirmed what we hold.
+`head_cached` in `sources.py` passes no URL, because its URL is a constant.
+
+**What it does not change.** DE's year-long window is still honoured, for the
+URL it came with. That is correct for a content-addressed URL, and asking for
+one again would be exactly the over-asking hard rule 11 exists to stop.
+
+**Why a sidecar rather than the hash in the key.** Putting the hash in the key
+also works, but `limits.cap_for` reads ceilings by exact key name, and every old
+hash would leave a file behind to prune. The sidecar keeps the key and leaves
+nothing to prune.
+
+**The one-time cost.** A cache written before the sidecar existed has no URL
+recorded, so on its first network build every key with a window is asked once
+more and then recorded. That is the same answer `still_fresh` already gives a
+lost `.maxage`: asking is the safe direction.
+
+**Verified, and what is not.** The test fails against the old check with *"got
+b'the 27 August manifest'"*, which is release day reproduced, and passes with the
+fix. A real build with the fix is the local-against-deployed comparison, and
+that is still to come.
 
 ---
 

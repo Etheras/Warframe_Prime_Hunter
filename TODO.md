@@ -206,83 +206,84 @@ to fail yet:**
 **Read early, read-only, on 2026-09-23 at about 15:15Z, at the owner's request.**
 This does not replace the 24th. It records a measurement that would not have kept
 until then. Nothing had arrived on either side, and question 2 already has half
-its answer: the export route cannot deliver at all — see *DE's export manifests
-have been frozen since 27 August — the cache is keyed by file name, and the hash
-is in the URL*, below. The same look found *A CDN's `Age` is never counted
-against `max-age`, so a cached copy can be kept for up to twice the declared
-window*. Plague Star left as predicted in both payloads: `bounties.events` kept
-its key and lost `activation`, `expiry`, `tag` and `fee`.
+its answer: the export route could not deliver at all. That is now fixed on
+this machine only, owner's decision — see *The export cache fix runs locally
+only — push it once the Citrine test is read and the light build's cost is
+settled*, below, and `PROJECT.md §7` for the measurements. So from 2026-09-23 the
+local build is **not** unaided and the deployed one still is; question 6 compares
+a fixed pipeline with an unfixed one. The same look found *A CDN's `Age` is
+never counted against `max-age`, so a cached copy can be kept for up to twice the
+declared window* and *A drop-table change the fingerprint sees can be built from
+the old body, and then not fetched again*. Both bear on how soon either side
+sees DE's drop table, so to learn when **DE** updated it, read its
+`Last-Modified` directly. Plague Star left as predicted in both payloads:
+`bounties.events` kept its key and lost `activation`, `expiry`, `tag` and `fee`.
 
 **Then:** write each real flaw up as its own `###` entry, with its evidence, and
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
-### DE's export manifests have been frozen since 27 August — the cache is keyed by file name, and the hash is in the URL
+### The export cache fix runs locally only — push it once the Citrine test is read and the light build's cost is settled
 
-**Found 2026-09-23, reading the Citrine test early, and it is why the export
-route could not deliver Citrine.** `acquire_export` asks for
-`ExportWarframes_en.json!<tag>` — the tag is DE's content hash from the export
-index — but caches the answer under `export_ExportWarframes_en.json`, which has
-no tag in it. DE answer a content-addressed URL with a `max-age` of about a year
-(`31532444` today; the sidecars on disk hold 30.2 to 30.9 million seconds). And
-`fetch` asks `still_fresh(path)` before it looks at the URL at all. So when DE
-publish a manifest under a new tag, the build returns the old copy without
-asking, and it keeps doing that until the old copy's year runs out. Nothing else
-clears these files: `prune_cache` touches only `wiki_*`.
+**Fixed 2026-09-23 and deliberately not pushed — owner's decision.** DE's export
+manifests had been frozen since 27 August: the cache checked a year-long window
+against the file name, when that window belongs to a hashed URL. The defect,
+the release-day measurements and the fix are in `PROJECT.md §7`, *A freshness
+window belongs to the URL it was declared for*. The local scheduled build runs
+the fix from this working tree. CI builds `main` from GitHub and does not have
+it, so the two can be compared while DE's drop table catches up.
 
-`PROJECT.md §7` has the premise right: *"the URL changes when the picture does,
-so it never needs revalidating"*. The window belongs to the URL, and the cache
-stores it against the file name.
+**Before it is pushed:**
 
-**Measured on 2026-09-23:**
+1. **The Citrine reading on the 24th**, which is the comparison this split
+   exists for.
+2. **The light CI build would re-download changed manifests on every run.** It
+   restores the cache read-only and never saves one. So once DE's index moves,
+   every light run until the next full build finds the new hashes missing and
+   asks for them again. With a light run every ten minutes, that could be a
+   hundred-odd downloads of files DE said to keep for a year. The seven
+   manifests' compressed size has not been measured. Options include a light
+   build saving the cache when a manifest changed, or leaving manifests to the
+   full build. Not designed.
+3. **The first network build after the fix asks every windowed source once**,
+   because a cache from before the fix has no `.url` recorded. On CI that is the
+   first full build after the push. Expected and harmless, but it shows up in
+   the logs as a burst.
 
-- DE's `ExportWarframes_en.json` at the index's current tag,
-  `00_95pW0dXReM0fA8aj7iX4oA`, was fetched once by hand into the scratchpad, not
-  the cache. It has `Last-Modified: 14:13:57Z` and lists **Citrine Prime**. The
-  cached copy dates from 27 Aug, has no Citrine Prime, and is 232,131 bytes
-  against 236,669.
-- DE's index changed between the 15:02Z and 15:12Z local builds. The signature
-  went from `d1c035aba2cf0ea1` to `123ada756ed96350`, and the index's own ETag
-  dates it to 15:03:01Z. So the 15:12Z build went to the network: `wiki_prime`,
-  `api_items` and `official_droptables` were all rewritten at that moment, but
-  `export_ExportWarframes`, `…Weapons` and `…Recipes` stayed at 27 Aug.
-- **CI has the same freeze, as far as can be seen from here.** `actions/cache`
-  restores mtimes. The `PROJECT.md §7` audit says so, and the same run logs its
-  restored worldstate as "11433 min old". So a restored export copy counts as
-  fresh by its own sidecar. The 15:07Z full run published at 15:08:19Z without
-  Citrine. What its restored cache actually held was not inspected.
+**On the deployed side, still unfixed, predicted and not yet seen:** when the
+wiki route brings Citrine in, its parts will come from WFCD's list or the
+drop-table fallback instead of DE's recipes. That turns `parts: only the items
+DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
+catch.
 
-**It costs every DE manifest, not only Citrine.** New Primes by the export route
-(`isNew`), DE's parts, quantities and Ducats (`ExportRecipes`), artwork paths
-(`ExportManifest`), and node levels and names (`ExportRegions`) are all still
-whatever they were on 27 Aug. For Citrine, that leaves the wiki's Prime page,
-WFCD's item data and DE's drop table as the only way in. At the 15:12Z build
-none of them listed it, and the wiki page was last edited on 10 Sep.
+### A drop-table change the fingerprint sees can be built from the old body, and then not fetched again
 
-**What it would have delivered, measured the same day at 15:40Z.** DE's current
-manifests were run through `collect_prime_items` and `prime_part_specs` in a
-scratch process, not the build. They give all three items with the categories
-the Citrine entry expects: Citrine Prime `Suits` → Warframe, Steflos Prime
-`LongGuns` → Primary, and Corufell Prime `Melee` → Melee, so *a new weapon class
-disappears* did not fire. None of the six accessories came through. Each item
-has four parts, every quantity is 1, and every Ducat value matches its part's
-relic rarity. `ExportRecipes` and `ExportRelicArcane` changed on 21 Sep at
-21:06Z, two days before release; the items themselves only arrived at 14:13:57Z.
-`ExportRelicArcane`, which we do not read, already names the eleven new relics
-and their contents. Where those relics drop is only in the drop table, which had
-not changed by 15:12Z. The wiki's Prime page was still unedited at 15:41Z.
+**Found 2026-09-23 by reading the code, while planning to watch for DE's drop
+table. Not yet seen to fail.** `--if-changed` notices the drop table through
+`head_droptables`, a HEAD. The body is `official_droptables`, a separate key with
+its own 24-hour window. When the HEAD shows a new `Last-Modified`, the build goes
+to the network, but `fetch` serves the body from its own window if that has not
+run out. The build then saves the **new** signature. Every later run matches it
+and rebuilds from cache, so the new table waits until something else moves the
+signature after the body's window has expired.
 
-**Predicted, not yet seen:** when the wiki route does bring Citrine in, its parts
-will come from WFCD's list or the drop-table fallback instead of DE's recipes.
-That turns `parts: only the items DE do not publish fall back` red, for a reason
-the Kavasa pin was never meant to catch.
+**Today's numbers, on this machine.** The body was fetched at 15:12Z on the 23rd,
+so its window runs to 15:12Z on the 24th. The HEAD will not be asked again until
+09:12Z on the 24th (*A CDN's `Age` is never counted against `max-age`*, below).
+An update DE publish today would therefore be noticed at 09:12Z tomorrow and
+built from the old body. The first network build after the export cache fix
+asks the body once regardless, because no `.url` is recorded for it yet, so the
+first occurrence may be masked.
 
-**Shape of a fix, not designed:** make freshness follow the URL. Put the tag in
-the cache key, or keep the requested URL beside the body and count a mismatch as
-not fresh. DE's year-long window is still honoured, because it is correct for
-the URL it came with. **Left alone until the Citrine test has been read on the
-24th — owner's decision, 2026-09-23**, because fixing it in the middle of the
-test changes what the test measures.
+**The daily full build has a milder form, from reading and not measured.** It
+has no fingerprint, but it fetches the body at about the same minute every day.
+Whether yesterday's 24-hour window has expired is then a matter of seconds, and
+a run that lands a second early keeps yesterday's copy for another day.
+
+**Shape of a fix, not designed:** once the fingerprint says a document has moved,
+its body's window no longer applies, because the server has just told us, through
+`Last-Modified`, that what we hold is old. For example, keep the body's
+`Last-Modified` beside it and refuse the window when the HEAD disagrees.
 
 ### A CDN's `Age` is never counted against `max-age`, so a cached copy can be kept for up to twice the declared window
 
