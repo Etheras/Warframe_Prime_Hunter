@@ -341,10 +341,38 @@ reads wrong yet. The missing Ducats drop out of the spare-value tie-break, and
 the missing picture falls back to the glyph. Both last only until WFCD index the
 item, but that gap is exactly the window the export route exists to cover.
 
+**Where WFCD's copy comes from, and why it is the slowest source there is.**
+Measured 2026-09-24 from WFCD's own repositories, after the owner spotted
+Citrine on `drops.warframestat.us` while the item API still lacked it.
+
+- **Two WFCD products, two clocks.** `drops.warframestat.us` is
+  `warframe-drop-data`, which is *"parsed from Digital Extremes official drop
+  data website"*. Its `info.json` records DE's change at 15:13:21Z and WFCD's
+  rebuild at 18:51Z on the 23rd. It adds nothing we do not already read
+  first-hand, 3.5 hours earlier. `api.warframestat.us/items`, which this join
+  reads, is `warframe-status` serving the `@wfcd/items` package baked into its
+  Docker image.
+- **So a new Prime waits on two steps after DE.** First `warframe-items` has to
+  add it: Citrine first appears in v1.1276.0, released 04:08Z on the 24th,
+  fourteen hours after DE. Then `warframe-status` has to redeploy: its last
+  release was 13:23Z on the 22nd. The API refills its cache every four hours,
+  but only from the package already installed. An unconditional request at
+  06:50Z on the 24th (Cloudflare `MISS`, same ETag, identical body) confirmed
+  the request is right and the answer simply lacks Citrine.
+- **Watch the next `warframe-status` release.** v1.1276.0 also moved every
+  item's `components` to references (`{uniqueName, itemCount}`) into a separate
+  `Components` catalog (PR #992). The package expands them by default
+  (`resolveComponents: true`, *"compat with the pre-catalog shape"*), and
+  `warframe-status` builds its cache with `new Items({ i18n, i18nOnObject })`,
+  so the API should keep `name` and `drops`. This join reads exactly those two
+  fields for every Prime, so confirm them on the first API answer that carries
+  Citrine.
+
 **Shape of a fix, not designed:** take the relic link from the drop table's own
 relic contents, which `parts_from_droptables` already reads, and keep DE's count
-and Ducats. Take the texture from the export entry's `uniqueName` when there is
-no WFCD record.
+and Ducats. The drop table had Citrine's relics at 15:13Z, and WFCD's item API
+still did not at 06:50Z the next morning. Take the texture from the export
+entry's `uniqueName` when there is no WFCD record.
 
 ### The refresh task still runs every ten minutes, and `PROJECT.md §4` still argues for it
 
