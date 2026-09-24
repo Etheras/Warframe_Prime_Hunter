@@ -421,7 +421,11 @@ const BOUNTY_DATA = {
           family: "standard", rotations: "AB" },
       },
       events: {
-        "Level 15 - 25 Plague Star": {
+        /* The key the build ships: DE's table is labelled 15-25 (the Basic
+           run), and the build renames it to the Advanced run it represents -
+           same stage table plus the Hemocytes, which spawn only on Advanced and
+           Steel Path. `EVENT_ENEMY_FOLDS` in build_data.py. */
+        "Level 55 - 65 Plague Star": {
           event: "Plague Star",
           activation: "2026-08-01T00:00:00Z", expiry: "2026-08-20T00:00:00Z",
         },
@@ -906,7 +910,7 @@ test("a bounty that does not publish the live letter is averaged, and says so", 
 
 test("a single-table bounty has nothing to wait for", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });
-  const live = ROT.liveRotation("Level 15 - 25 Plague Star");   // not in groups at all
+  const live = ROT.liveRotation("Level 55 - 65 Plague Star");   // not in groups at all
   const r = ROT.runValue({ A: 2, B: 0, C: 0, none: 0 }, "Bounty", false, live);
   assert.equal(r.total, 2);
   assert.equal(r.bounty.unknown, false, "one table is not an unknown rotation");
@@ -922,9 +926,9 @@ test("a bounty run is as many draws as the build says, and one when it says noth
   const rot = { A: 0.1, B: 0, C: 0, none: 0 };
   const alt = { A: 0.1, B: 0, C: 0, none: 0 };
   const one = ROT.runValue(rot, "Bounty", false,
-                           ROT.liveRotation("Level 15 - 25 Plague Star"), alt);
+                           ROT.liveRotation("Level 55 - 65 Plague Star"), alt);
   const four = ROT.runValue(rot, "Bounty", false,
-                            { ...ROT.liveRotation("Level 15 - 25 Plague Star"), draws: 4 }, alt);
+                            { ...ROT.liveRotation("Level 55 - 65 Plague Star"), draws: 4 }, alt);
   assert.ok(Math.abs(four.total - 4 * one.total) < 1e-12, "four draws are worth four times one");
   assert.ok(Math.abs(four.count - 4 * one.count) < 1e-12, "and hand over four times the relics");
   assert.ok(Math.abs(four.any - (1 - Math.pow(0.9, 4))) < 1e-12,
@@ -1021,7 +1025,7 @@ test("a trader's window answers here-or-not and says when, from one reading", ()
 
 test("a limited-time bounty counts as an event node only while it is not running", () => {
   const ROT = loadRotation({ data: BOUNTY_DATA });          // 2026-08-11, Plague Star live
-  const star = { kind: "bounty", node: "Level 15 - 25 Plague Star", planet: "Cetus (Plains of Eidolon)" };
+  const star = { kind: "bounty", node: "Level 55 - 65 Plague Star", planet: "Cetus (Plains of Eidolon)" };
   const ghoul = { kind: "bounty", node: "Level 15 - 25 Ghoul Bounty", planet: "Cetus (Plains of Eidolon)" };
   assert.equal(ROT.isEventNode(star), false, "running: in the ranking by default");
   assert.equal(ROT.isEventNode(ghoul), true, "no window at all: not on the board");
@@ -1103,7 +1107,12 @@ test("the Profit-Taker heist asks for standing, and says so", () => {
   const labels = (node) => ROT.demandsOf({ kind: "bounty", node }).map((d) => d.label);
   assert.deepEqual(plain(labels("Level 40 - 60 PROFIT-TAKER - PHASE 1")), ["Old Mate"]);
   assert.deepEqual(plain(labels("Level 50 - 60 PROFIT-TAKER - PHASE 4")), ["Old Mate"]);
-  assert.deepEqual(plain(labels("Level 15 - 25 Plague Star")), [],
+  /* An ordinary board bounty, and a real one. This read Plague Star until
+     2026-09-24, but the row the build ships is the Advanced run, which does
+     ask for something extra - an Eidolon Phylaxis and an Infested Catalyst,
+     carried as the event's `fee` rather than as a demand - so naming it here
+     would have said the opposite of what the planner shows. */
+  assert.deepEqual(plain(labels("Level 30 - 40 Isolation Vault")), [],
                    "an ordinary board bounty asks for nothing extra");
   assert.match(ROT.demandsOf({ node: "Level 40 - 60 PROFIT-TAKER - PHASE 1" })[0].tip,
                /Rank 5/, "the tip has to name the rank, not just imply a gate");

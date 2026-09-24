@@ -1289,30 +1289,6 @@ the next full run was clean. Both earlier theories were fixed by then, so this i
 the recurrence the paragraph above was waiting for: the suspect is timing under
 load, and that test is where to start.
 
-### The `.mjs` fixtures still spell the Plague Star node the way the build stopped spelling it
-
-**Found 2026-09-17, while checking whether anything depended on the live event.**
-`tests/test_assets.mjs` builds its bounty fixture with
-`"Level 15 - 25 Plague Star"` as a `meta.bounties.events` key, and four tests read
-it back under that name. Since the fold of 2026-09-15 the build emits that key as
-`Level 55 - 65 Plague Star` and never the 15–25 one — `test_build.py` asserts as
-much against the real table, *"nothing still carries the 15-25 name it is folded
-out of"*.
-
-**Nothing is broken and no test is weakened**: the fixture is self-consistent, the
-name is arbitrary to what those four assert (`isEventNode`, `liveRotation`,
-`demandsOf`), and 15–25 is still DE's own label — the input the rename consumes,
-which is why `EVENT_ENEMY_FOLDS` and three checks in `test_build.py` keep it
-deliberately. The cost is only that a fixture reads as a specimen of payload
-shape, so the next person to copy one out of it copies a key the build cannot
-produce.
-
-**Two ways to settle it, and they are not equal.** Renaming the fixture key makes
-it match what ships, and loses nothing because no test there is about the name.
-Leaving it and saying so in a comment keeps the fixture as a record of the older
-shape, which nothing else needs. **Not decided** — it is cosmetic, and the file is
-also the one place the old shape is still written down.
-
 ### The rest of the player facts the header could hold
 
 **The Mastery Rank field itself shipped on 2026-08-26** — the reasoning is in

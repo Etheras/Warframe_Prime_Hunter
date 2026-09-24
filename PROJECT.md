@@ -8331,6 +8331,15 @@ model counted one draw per bounty run, at each relic's best stage, while chargin
 every stage — see *A bounty run counts every stage it pays* below. The Hemocyte
 term was exact either way.
 
+**Three bounties, one row, re-checked on 2026-09-24 against the wiki's patch
+notes.** DE offer three: Basic (15–25, no fee), Advanced (55–65, an Eidolon
+Phylaxis and an Infested Catalyst, Hemocytes), and Steel Path (100–110, a table
+DE do not publish). The row is the Advanced run, and its fee and name agree with
+that. The `.mjs` fixtures, which still spelled the Basic label DE's table
+carries, were moved to the shipped key. One assertion there had used Plague Star
+as *"an ordinary board bounty asks for nothing extra"*. That is true of Basic and
+false of the row the build ships, so it now names an Isolation Vault instead.
+
 ### A test left two rows in the published feed log on every full CI build
 
 **Found 2026-09-15**, by matching the deployed log against the runs that wrote
