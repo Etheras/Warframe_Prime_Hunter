@@ -222,7 +222,7 @@ from you would be wrong. The field is there to *tell* you things.
 The first of those is your **Void Trace cap**, which is `(rank × 50) + 100` —
 750 at MR13, 1600 at MR30. Hover the field and it tells you your cap, how many
 Radiants that buys, and the rank's name. That cap is the ceiling the planner's
-**Capped Void Traces** switch is about, which is why it is stated here rather
+**Void Traces** switch is about, which is why it is stated here rather
 than under the switch: a cap belongs to the rank that sets it. Nothing here is
 decided for you — the field tells you your number and leaves the switch alone.
 
@@ -238,8 +238,8 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 
 - **Search box** at the top — type a Prime, a part, or a relic name. Press `/` to jump to it.
 - **Category** in the sidebar — Warframe, Primary, Secondary, Melee, and so on.
-- **Sort** in the sidebar — a **Group by category** tick and three orders. The
-  page remembers both:
+- **Sort** in the sidebar — a **Categories** switch (*Grouped* or *One list*)
+  and three orders. The page remembers both:
 
 | | Order |
 |---|---|
@@ -247,10 +247,9 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 | **Parts remaining** | Fewest parts still to find first — what you are closest to finishing |
 | **Name (A–Z)** | Alphabetical, the same order as the mastery list on your in-game profile |
 
-  Leave **Group by category** ticked and each of those runs inside Warframe,
-  Primary, Secondary and so on, with a progress count on every heading. Untick
-  it and the whole catalogue is one list. Ticked, on release date, is the
-  default.
+  On *Grouped*, each of those runs inside Warframe, Primary, Secondary and so
+  on, with a progress count on every heading. On *One list*, the whole
+  catalogue is sorted together. *Grouped*, on release date, is the default.
 
   To look one Prime up, use the search box rather than the sort — it matches
   parts and relic names too.
@@ -266,8 +265,9 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 | **Vaulted (V)** | Not obtainable except by trading with other players |
 | **Founder exclusive** | Excalibur, Lato and Skana Prime. Never coming back — kept at the bottom for that reason |
 
-Want to see only what you can actually get today? Untick **Vaulted** and
-**Founder exclusive**.
+Every one of these is a switch that reads *Shown* or *Hidden*. Want to see only
+what you can actually get today? Switch **Vaulted** and **Founder exclusive** to
+*Hidden*.
 
 ### Marking what you own
 
@@ -287,8 +287,8 @@ actually hold the parts you're missing.
 The bar above the grid, beside the result count, shows your overall progress, and
 each category heading shows its own count.
 
-**To hide everything you already own:** untick **Show collected** in the sidebar.
-(Unticking **Show not collected** does the opposite — handy for reviewing your
+**To hide everything you already own:** switch **Collected** to *Hidden* in the
+sidebar. (Hiding **Not collected** does the opposite — handy for reviewing your
 collection.)
 
 Three buttons apply to **everything currently on screen**, so you can filter to a
@@ -315,7 +315,8 @@ Click any card. A panel slides in from the right with:
    or gold — and each row beneath it by how rare that part is inside that relic;
    hover the rarity for the odds at every refinement and what they cost in Void
    Traces. A part shaded across two colours is rarer in some relics than in
-   others. **Hide collected** and **Hide vaulted** trim the list down.
+   others. **Collected parts** and **Vaulted relics** are hidden by default to
+   keep the list short; switch either to *Shown* to see them.
 
 Vaulted Primes show their relics too, greyed out — useful when you're looking to
 trade for a specific one.
@@ -355,21 +356,21 @@ bottlenecks, and a single number covering both answered neither:
 Neither list knows anything about the other's question, which is the point.
 
 **How to crack them narrows.** Above it sit a tier strip — `All · Lith · Meso ·
-Neo · Axi`, each with its count — and a checkbox for each kind of errand on the
+Neo · Axi`, each with its count — and a *Shown / Hidden* switch for each kind of errand on the
 list: **Varzia**, for the relics she sells for Aya, **Baro**, for the relics
 Baro Ki'Teer is selling for Ducats *while he is actually on a relay*, and
 **Trade**, for relics belonging to Primes with no way in at all. A tier with
-nothing in it gets no tab, and an errand you do not have gets no box — so
-**Baro's box is there for the two days a fortnight he is, and gone the rest of
+nothing in it gets no tab, and an errand you do not have gets no switch — so
+**Baro's switch is there for the two days a fortnight he is, and gone the rest of
 the time**, along with the *from Baro* label on his relic. Nothing records that
 he had it; the moment he leaves, that relic reads as a trade again, and a tab
 left open across his departure is right without a reload. Every count answers to the other
-controls, so unticking **Trade** lowers the tier counts too and each tab always
+controls, so hiding **Trade** lowers the tier counts too and each tab always
 claims exactly what pressing it shows. They only narrow what is on screen — the
 surviving rows keep the order and the figures they already had — and nothing is
 remembered between visits, because this is a question about the evening rather
 than about what you collect. With every Prime on the farm list that is 757 rows;
-unticking **Trade** leaves 40, and a tier tab leaves about ten.
+hiding **Trade** leaves 40, and a tier tab leaves about ten.
 
 Two relics at one place can pay only the same parts of your list, and then the
 weaker one is not really a second chance at anything — it clears a part the
@@ -524,26 +525,29 @@ listed yet. That is release lag on their side, and it corrects itself.
 
 ### The rest of the sidebar
 
-Under **Assumptions**, besides *How far you run*:
+Under **Assumptions**, four switches. Each one says what it is set to, in a word,
+inside the switch itself:
 
-- **4-man premade** — a full squad cracking the same relic sees four rewards and
-  keeps the best, so every chance shown improves. Leave it off for solo or public
-  runs. It does one thing beyond the display: it unlocks Disruption's rotation A,
-  which is only reachable by a squad deliberately letting conduits fall to a
-  schedule.
-- **Cache hunting** — off by default. Missions paid by finding caches rather
-  than by finishing; today that is Railjack's. A relic that drops nowhere else is
-  listed anyway, marked *only route*. Railjack itself, Aya and running events
-  are always counted, so they have no switch.
+- **Squad** — *Solo* or *Premade*. A premade squad cracking the same relic sees
+  four rewards and keeps the best, so every chance shown improves. Leave it on
+  *Solo* for solo or public runs. It does one thing beyond the display: it
+  unlocks Disruption's rotation A, which is only reachable by a squad
+  deliberately letting conduits fall to a schedule.
+- **Cache hunting** — *Skip* by default, or *Hunt*. Missions paid by finding
+  caches rather than by finishing; today that is Railjack's. A relic that drops
+  nowhere else is listed anyway, marked *only route*. Railjack itself, Aya and
+  running events are always counted, so they have no switch.
+- **Steel Path fissures** — *Ignore* by default, or *Count*. A Steel Path
+  fissure is on the second star chart, so running the ordinary node does not
+  earn it.
+- **Void Traces** — *Room* by default, or *Capped*. With room to spare, a node
+  that hands a relic over already Radiant scores higher; at the cap that saving
+  is not real, so the bonus comes off.
 
 And **Effort — optional**, covered above.
 
-The same *How far you run* and *4-man premade* controls appear on the collection
-page under **Advanced options**, and they are the same setting — change either and
-both pages follow. (One gap: the collection page's copy of *How far you run* has
-not been given the *Stay for the fissure bonus* option, so choosing that in the
-planner leaves the collection page's box blank. It is written up in
-[`TODO.md`](TODO.md).)
+The same **Squad** switch appears on the collection page under **Advanced
+options**, and it is the same setting — change either and both pages follow.
 
 ### Materials
 

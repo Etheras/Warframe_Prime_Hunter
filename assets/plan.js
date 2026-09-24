@@ -342,7 +342,7 @@
   /* The Void Trace cap is derived from the Mastery Rank, and it is stated on
      the rank badge's own tooltip rather than under this switch. It had a line
      there for one revision and the line was the wrong length for the job: the
-     switch already names both its ends — *room to spare* and *at the cap* — so
+     switch already names both its states — *Room* and *Capped* — so
      a sentence beneath it explaining the cap was restating the control it sat
      under.
      A cap belongs to the rank, not to the switch, and the badge is where a
@@ -1899,9 +1899,9 @@
         ? `<label class="mini-check" data-tip="${esc(
             "Varzia sells these for Aya at Maroo's Bazaar — they do not drop, so\n" +
             "they have nowhere to send you under Where to go.\n\n" +
-            "Untick to see only what you can farm this evening.")}">` +
+            "Hide them to see only what you can farm this evening.")}">` +
           `<input type="checkbox" id="p-varzia"${showVarzia ? ' checked="checked"' : ""} />` +
-          `<span class="box"></span><span class="lbl">Varzia` +
+          `<span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl">Varzia` +
           `<span class="n">${counts.varziaCount}</span></span></label>`
         : "") +
       /* Baro sits between Varzia and Trade because that is the order of how
@@ -1914,7 +1914,7 @@
             "under Where to go.\n\n" +
             "He leaves in two days and this control goes with him.")}">` +
           `<input type="checkbox" id="p-baro"${showBaro ? ' checked="checked"' : ""} />` +
-          `<span class="box"></span><span class="lbl">Baro` +
+          `<span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl">Baro` +
           `<span class="n">${counts.baroCount}</span></span></label>`
         : "") +
       /* The one that actually shortens the list, which was not obvious until it
@@ -1928,9 +1928,9 @@
             "Relics for Primes with no way in at all — vaulted, not on Varzia's\n" +
             "shelf, no Baro or quest route. Another player has to trade you one,\n" +
             "and the refinement beside each is what to take it to.\n\n" +
-            "Untick to leave only what you can go and get.")}">` +
+            "Hide them to leave only what you can go and get.")}">` +
           `<input type="checkbox" id="p-trade"${showTrade ? ' checked="checked"' : ""} />` +
-          `<span class="box"></span><span class="lbl">Trade` +
+          `<span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl">Trade` +
           `<span class="n">${counts.tradeCount}</span></span></label>`
         : "");
   }

@@ -1060,7 +1060,7 @@
      which every rank can be, so there is no unreachable side and nothing left
      to warn about. `traceCapped` in particular had to go rather than be kept
      around - it meant "this rank's ceiling is below 500", and beside a control
-     called *Capped Void Traces* it would read as "this reader is capped". */
+     whose on state reads *Capped* it would read as "this reader is capped". */
 
   /* What the box shows, which above 30 is NOT what is stored. The rank keeps
      counting as one integer - 31, 32 - and the label beside the box carries the

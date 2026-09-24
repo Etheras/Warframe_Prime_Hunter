@@ -407,16 +407,17 @@ page_test("banking a part keeps the focus on the button that was clicked", async
   const subject = await pickCard(page, 2);
   await page.locator(`[data-id="${subject.id}"]`).click();
 
-  /* *Hide collected* is on by default since 2026-08-27, which removes a part
-     from the list the moment it is banked — so the button that was pressed is
-     legitimately gone and cannot hold anything. Turned off here so the original
+  /* Collected parts are hidden by default since 2026-08-27, which removes a
+     part from the list the moment it is banked — so the button that was pressed
+     is legitimately gone and cannot hold anything. Shown here so the original
      guarantee is tested exactly as written; the default's own behaviour is
      asserted below, because "the part vanished" must still not mean "the
      keyboard was thrown back to the top of the page".
 
-     `#hideOwned` lives in the drawer rather than the sidebar, so it exists only
-     once a card is open — which is why this is set here and not on load. */
-  const setHideOwned = (on) => setCheck(page, "#hideOwned", on);
+     `#showOwned` lives in the drawer rather than the sidebar, so it exists only
+     once a card is open — which is why this is set here and not on load. It
+     reads *Shown* when on since 2026-09-24, the inverse of the saved setting. */
+  const setHideOwned = (on) => setCheck(page, "#showOwned", !on);
   await setHideOwned(false);
 
   const own = page.locator("#drawerBody .part-own");
@@ -573,8 +574,8 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
 
   /* And the card says where a built weapon actually comes from. Scoped to the
      part it belongs to rather than taking the first `.relic-none` on the card:
-     every relic that drops an Aklex part is vaulted, `Hide vaulted` in the
-     drawer is on by default since 2026-08-27, and the Blueprint's "every relic
+     every relic that drops an Aklex part is vaulted, the drawer hides vaulted
+     relics by default since 2026-08-27, and the Blueprint's "every relic
      is vaulted" note now sits above this one. Both are correct; only the
      selector was picking by position. */
     const note = await page.locator("#drawerBody .part")
@@ -586,7 +587,7 @@ page_test("an akimbo asks for two of its sub-weapon, and can be given one", asyn
 
 page_test("a part keeps a rarity colour when every relic under it is hidden", async () => {
   /* The case this is about is the ordinary one rather than an edge: 95% of
-     relics are vaulted, and `Hide vaulted` in the drawer is on by default, so
+     relics are vaulted, and the drawer hides vaulted relics by default, so
      most parts show no relic row at all — and the relic rows were where every
      rarity colour on this page lived. The band on the part head is what is left
      saying whether a spare is a bronze or a gold.
@@ -613,7 +614,7 @@ page_test("a part keeps a rarity colour when every relic under it is hidden", as
   await page.locator(`[data-id="${subject.id}"]`).click();
   // Stated rather than inherited, even though it is the default: this test is
   // about what survives the hiding, so the hiding has to be its own assertion.
-  await setCheck(page, "#hideVaulted", true);
+  await setCheck(page, "#showVaulted", false);
 
   const rows = page.locator("#drawerBody .part");
   assert.equal(await rows.count(), subject.parts,
@@ -749,7 +750,7 @@ page_test("a filter setting survives a reload", async () => {
   const { page } = await open("/index.html");
   const box = page.locator("#f-vaulted");
   const before = await box.isChecked();
-  // the input is styled out of sight behind its own .box span, so the label is
+  // the input is styled out of sight behind its own .pill span, so the label is
   // the click target - for Playwright and for anyone using the page
   await page.locator("label.check:has(#f-vaulted)").click();
   await page.reload({ waitUntil: "load" });
@@ -4093,61 +4094,84 @@ page_test("the ranking can be seen whole, not just its top eight", async () => {
   assert.deepEqual(errors, []);
 });
 
-page_test("the Void Traces switch names both its ends and puts off on the left", async () => {
-  /* It is a two-state question, not an include-X one, so it is a switch rather
-     than a checkbox — and both ends are labelled so the answer never depends on
-     reading a colour.
+/* Every checkbox on both pages is a pill with its state written inside it since
+   2026-09-24, owner's decision — `STYLE.md §6`. What a reader relies on is that
+   the word in the pill is the state the box is in, so that is what is asserted:
+   the pill's `::after` content, which is the word itself and is not animated,
+   rather than a colour or a knob position, which are mid-transition in a pane
+   that composites no frames. `content` resolves `attr()` to the string, so this
+   reads exactly what is painted. */
+async function pillWords(page, scope) {
+  return page.evaluate((scope) =>
+    [...document.querySelectorAll(`${scope} label input[type=checkbox]`)].map((box) => {
+      const pill = box.nextElementSibling;
+      const isPill = !!(pill && pill.classList.contains("pill"));
+      const lbl = isPill ? pill.parentNode.querySelector(".lbl") : null;
+      return {
+        id: box.id || null,
+        isPill,
+        off: isPill ? pill.dataset.off : null,
+        on: isPill ? pill.dataset.on : null,
+        says: isPill ? getComputedStyle(pill, "::after").content.replace(/^"|"$/g, "") : null,
+        checked: box.checked,
+        labelFirst: isPill && lbl
+          ? Number(getComputedStyle(lbl).order) < Number(getComputedStyle(pill).order)
+          : false,
+      };
+    }), scope);
+}
 
-     Asserted on `matches(selector)` rather than on computed colour. A switch is
-     mostly CSS transitions and the Browser pane does not composite a hidden tab,
-     so getComputedStyle hands back a colour frozen part-way through the fade no
-     matter how long you wait. matches() reads the cascade, which is what the rule
-     actually says. */
-  const { page, errors } = await open("/plan.html");
+function assertPills(rows, where) {
+  assert.ok(rows.length, `${where}: no checkbox found at all, so this proves nothing`);
+  for (const r of rows) {
+    const name = r.id || "(unnamed)";
+    assert.ok(r.isPill, `${where}: #${name} is a checkbox with no pill beside it`);
+    assert.ok(r.off && r.on && r.off !== r.on,
+              `${where}: #${name} has to name both of its states, and differently`);
+    assert.equal(r.says, r.checked ? r.on : r.off,
+                 `${where}: #${name} says "${r.says}" while it is ${r.checked ? "on" : "off"}`);
+    assert.ok(r.labelFirst, `${where}: #${name} puts its pill before its label`);
+  }
+}
 
-  const box = page.locator("#p-capped");
-  assert.equal(await box.isChecked(), false,
-               "not capped is the default — the state the Radiant bonus lives on");
+page_test("every checkbox is a pill that says the state it is in", async () => {
+  const { page, errors } = await open("/index.html");
+  assert.equal(await page.locator(".box").count(), 0, "a tick box survived the switch");
+  assertPills(await pillWords(page, "#sidebar"), "collection sidebar");
 
-  /* Off left, on right, the usual way round since 2026-09-05. It was reversed
-     before that, when the on state was `under 500` and sat on the left; the
-     switch it served is gone and the knob follows the convention now. */
-  const ends = await page.evaluate(() =>
-    [...document.querySelectorAll(".check-switch .switch-group > *")]
-      .map((el) => ({ cls: el.className, text: el.textContent.trim() })));
-  assert.equal(ends.length, 3, "left label, track, right label");
-  assert.match(ends[0].text, /room to spare/, "the off state is the LEFT end");
-  assert.ok(/switch$/.test(ends[1].cls), "the track sits between the two words");
-  assert.match(ends[2].text, /at the cap/, "and the on state is the right end");
+  const subject = await pickCard(page, 2);
+  await page.locator(`[data-id="${subject.id}"]`).click();
+  const drawer = await pillWords(page, "#drawerBody");
+  assertPills(drawer, "collection drawer");
+  /* The drawer's two are the ones whose sense was flipped: they were *Hide
+     collected* / *Hide vaulted*, ticked meaning hidden, and read *Shown* when on
+     now like everything else. The saved settings kept their old sense, so a
+     wrong inversion shows up here as a default that reads the wrong word. */
+  assert.deepEqual(drawer.map((r) => [r.id, r.says]),
+                   [["showOwned", "Hidden"], ["showVaulted", "Hidden"]],
+                   "both drawer lists ship hidden, and must say so");
 
-  const state = () => page.evaluate(() => {
-    const q = (s) => document.querySelector(s);
-    return {
-      onLit: q(".end-on").matches(".check input:checked ~ .switch-group .end-on"),
-      offLit: q(".end-off")
-        .matches(".check input:not(:checked) ~ .switch-group .end-off"),
-      knobRight: q(".switch-knob")
-        .matches(".check input:checked ~ .switch-group .switch-knob"),
-    };
-  });
+  const plan = await open("/plan.html");
+  assertPills(await pillWords(plan.page, ".plan-list"), "planner assumptions");
+  assert.equal(await plan.page.locator(".box").count(), 0);
 
-  const off = await state();
-  assert.deepEqual(off, { onLit: false, offLit: true, knobRight: false },
-                   "room to spare lights the left word and rests the knob left");
+  /* One switch driven end to end, through its label as a reader would. The
+     Void Traces one because its off state is the one the Radiant bonus lives on,
+     so a default that moved would move a ranking. */
+  const capped = plan.page.locator("#p-capped");
+  assert.equal(await capped.isChecked(), false, "not capped is the default");
+  const says = () => plan.page.evaluate(() =>
+    getComputedStyle(document.querySelector("#p-capped + .pill"), "::after")
+      .content.replace(/^"|"$/g, ""));
+  assert.equal(await says(), "Room");
+  await plan.page.locator("label:has(#p-capped)").click();
+  assert.equal(await capped.isChecked(), true);
+  assert.equal(await says(), "Capped", "the word follows the box");
+  await plan.page.locator("label:has(#p-capped)").click();
+  assert.equal(await says(), "Room", "and it toggles back");
 
-  await page.locator("label:has(#p-capped)").click();
-  assert.equal(await box.isChecked(), true);
-  const on = await state();
-  assert.deepEqual(on, { onLit: true, offLit: false, knobRight: true },
-                   "at the cap lights the right word and sends the knob right");
-
-  // the real input still drives it, so keyboard and assistive tech work
-  assert.equal(await page.locator(".check-switch input[type=checkbox]").count(), 1,
-               "the switch has to be a real checkbox underneath, not a div");
-
-  await page.locator("label:has(#p-capped)").click();
-  assert.equal(await box.isChecked(), false, "and it toggles back");
   assert.deepEqual(errors, []);
+  assert.deepEqual(plan.errors, []);
 });
 
 page_test("the collection drawer can show more than its eight best places", async () => {
@@ -5028,20 +5052,20 @@ page_test("the drawer hides vaulted relics by default, and says so rather than s
      answers itself — which is what this asserts, because a silently empty part
      is the failure this default could otherwise introduce. */
   const { page, errors } = await open("/index.html");
-  /* *Vaulted* is a sidebar default and `#hideVaulted` is a drawer default, and
-     this test is about the second one. So the first is ticked on outright — the
-     named subject has to be on screen before its drawer can be opened — and
-     `#hideVaulted` is deliberately left exactly as it ships, because it is what
+  /* *Vaulted* is a sidebar default and `#showVaulted` is a drawer default, and
+     this test is about the second one. So the first is switched on outright —
+     the named subject has to be on screen before its drawer can be opened — and
+     `#showVaulted` is deliberately left exactly as it ships, because it is what
      is being asserted. A test about a default is the one kind that should fail
      when that default moves; that is its whole job. */
   await setCheck(page, "#f-vaulted", true);
   await page.locator('[data-id="warframe-ash-prime"]').click();
-  assert.equal(await page.locator("#hideVaulted").isChecked(), true,
+  assert.equal(await page.locator("#showVaulted").isChecked(), false,
                "the default moved, and a saved choice still wins over it");
   const note = await page.locator("#drawerBody .relic-none").first().innerText();
   assert.match(note, /vaulted/i,
                "every relic here is vaulted, so the part must say so rather than look empty");
-  assert.match(note, /Hide vaulted/,
+  assert.match(note, /Vaulted relics/,
                "and name the switch that would show them");
   assert.deepEqual(errors, []);
 });

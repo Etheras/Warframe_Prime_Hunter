@@ -31,7 +31,7 @@ both. Judge a change by whether it serves that shared dataset well.
 |---|---|
 | Show / hide **vaulted** Primes | Sidebar → *Availability → Vaulted (V)* |
 | Categories (Warframe, Primary, Secondary, Melee, …) | Sidebar → *Category* |
-| Hide collected items | Sidebar → *Collection → Show collected* (untick to hide) |
+| Hide collected items | Sidebar → *Collection → Collected* (switch to *Hidden*) |
 | **Prime Resurgence (R)** filter | Sidebar → *Availability → Prime Resurgence (R)* |
 | **Where to farm the relics** for a Prime | Click any card → *Best places to farm its relics* |
 | See what is about to be **vaulted** | `VAULTING SOON` badge on the two oldest farmable releases |
@@ -9173,6 +9173,54 @@ record. The page tests that toggled the old boxes were rewritten, not deleted:
 the forced-in rule moved to cache hunting on the same subject (Nyx Prime, whose
 every live route is a Railjack cache), and the silences that were reached by
 switching Aya off are now reached by a payload with no Aya.
+
+### Every checkbox is a pill that says its state
+
+**Owner's decision, 2026-09-24**, chosen from a mockup against the live
+dataset: every checkbox on both pages becomes a pill switch after codeshack's
+*Toggles with Text (CSS Only)*, in the site's colours, with a short label on
+the left and the state written **inside** the pill — no text above it. The
+words were the owner's choice too: *Hidden / Shown* on every filter, *One list
+/ Grouped* for *Categories*, and on the planner *Solo / Premade*, *Skip /
+Hunt*, *Ignore / Count*, *Room / Capped*. `STYLE.md §6` has the component and
+the table.
+
+**It reverses a rule rather than extending one.** `STYLE.md §6` said *a
+checkbox for include this, a switch for which of two*, and *do not spread the
+switch to the include-X boxes* — one shape per kind of question, so the shape
+told you what was asked. The owner chose one shape for everything; the word in
+the pill now does what the shape did. That rule is marked superseded where it
+lived.
+
+**The drawer's two were flipped, and nothing saved had to move.** *Hide
+collected* and *Hide vaulted* were the only boxes on the site where ticked
+meant *removed*. With gold meaning *shown* everywhere else that would have
+read backwards, so they are *Collected parts* and *Vaulted relics* now, ids
+`#showOwned` / `#showVaulted`. The stored settings keep their `hide…` sense and
+are inverted at the one line where they meet the control — a migration would
+have been a second place to get the inversion right, and inverting twice is
+exactly the mistake `migrateCapped` was built to test for. Two mutations were
+run: rendering the box un-inverted fails the default test, and dropping the
+inversion from the handler fails the focus test, which reaches the drawer's
+*Shown* state by clicking it.
+
+**The Void Traces switch lost its two-ended layout and kept its meaning.** It
+was the one `check-switch` with *room to spare* and *at the cap* either side of
+a track; it is an ordinary pill reading *Room* or *Capped* now, still default
+off, still the side the Radiant bonus lives on.
+
+**Tested on the word, not the look.** The page test reads each pill's
+`::after` content, which resolves `attr()` to the painted string and is not
+animated, and asserts it matches the box on every checkbox in the collection
+sidebar, the drawer and the planner. It also checks that no `.box` survives
+and that each label is ordered before its pill. A colour or a knob position
+read in the Browser pane is caught mid-transition, which is why the previous
+switch test used `matches()`.
+
+**One stale passage went with it.** README's *The rest of the sidebar*
+still described *How far you run*, removed on 2026-08-24, and a gap in the
+collection page's copy of it. It was rewritten around the four switches that
+exist.
 
 ---
 

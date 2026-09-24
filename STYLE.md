@@ -27,7 +27,7 @@ was the first attempt and the chips vanished into the gradient.
 above**: the chips live on the relic rows inside it, which are a different
 surface, so nothing is asked to read a chip against its own gradient. It is
 there because the relic rows are precisely what is missing when it is wanted —
-95% of relics are vaulted, `Hide vaulted` is on by default, and without it the
+95% of relics are vaulted, the drawer hides them by default, and without it the
 usual part shows no rarity anywhere on screen.
 
 **Rarity is a band, not always a word.** A part can be Uncommon in one relic and
@@ -338,8 +338,8 @@ condensed view; it must not be the only route to it.
   box be typed into — and what lets the label become `LR` past rank 30 while the
   stored value stays one integer. A field whose text you must retype to change its
   units is a field nobody edits twice.
-- **A control that names its own ends needs no paragraph explaining them.** The
-  Void Trace switch is labelled *room to spare* / *at the cap*; a line beneath it saying
+- **A control that names its own states needs no paragraph explaining them.** The
+  Void Traces switch reads *Room* / *Capped*; a line beneath it saying
   *"At MR 9 your Void Trace cap is 550 — 5 Radiants at 100 traces each"* was
   restating the control it sat under, and it went the day it shipped. Where a
   derived fact genuinely belongs is with **the thing it is derived from** — the
@@ -369,48 +369,79 @@ condensed view; it must not be the only route to it.
 
 ---
 
-**A checkbox for *include this*, a switch for *which of two*.** Four of the
-planner's assumptions are include-X questions and a tick reads correctly as "yes,
-count it". *Capped Void Traces* is not that shape — it asks which of two ordinary
-situations you are in, and neither is a fault. That gets a pill switch, and
-**both ends are labelled**: `room to spare` and `at the cap` sit either side of
-the track, the knob says which one is chosen, and the live end is the bright one.
-Nothing depends on reading a colour.
+**Every checkbox is a pill with its state written inside it.** Owner's decision,
+2026-09-24, after codeshack's *Toggles with Text (CSS Only)* in this site's
+colours. A short label on the left says what the control is; the pill on the
+right says, in one word, what it is set to — nothing sits above it. Off is the
+dark track with the knob on the **left** and the word to its right; on is the
+gold track with the knob on the **right** and the word to its left. The words
+come from the pill's own `data-off` / `data-on` through `attr()`, so it is still
+CSS only and the real `<input>` underneath still carries keyboard and assistive
+tech.
 
-**Off is the left end and on is the right, the usual way round.** This said the
-opposite until 2026-09-05: the switch used to ask *Short on Void Traces?* with
-`under 500` on the **left** as the *on* state, reversing the convention, and the
-note here defended that as safe because both ends carry a word. It was safe, and
-it stopped being worth it the moment the question changed — the switch now reads
-as a plain on/off pill ("capped: yes or no"), so it behaves like one. The older
-rule still holds where it applies: a reversed knob is only ever defensible on a
-switch whose ends are labelled, never on a bare track.
+| Where | Label | Off | On |
+|---|---|---|---|
+| every filter, both pages, drawer and errands included | what it filters | Hidden | Shown |
+| collection *Sort* | Categories | One list | Grouped |
+| both pages | Squad | Solo | Premade |
+| planner | Cache hunting | Skip | Hunt |
+| planner | Steel Path fissures | Ignore | Count |
+| planner | Void Traces | Room | Capped |
 
-Gold, like every other control here, so it borrows no new meaning. Gold marks
-*this toggle is on*, which is a state and not an approval — here it means "you
-are at the cap", which is neither good nor bad. A reference sketch used teal and
-red; §1 reserves red for *something here is wrong*, and being capped is not an
-error.
+**The word is the state, never the action** — *Shown*, not *Show*. A pill that
+reads *Show* is ambiguous about whether it is describing the screen or offering
+to change it, and a reader cannot tell which without pressing it.
 
-**Do not spread the switch to the include-X boxes.** One control shape per kind of
-question is the point; two shapes chosen at random is what this section exists to
-prevent.
+**Gold means shown on every filter, which is why the drawer's two were flipped.**
+They were *Hide collected* and *Hide vaulted*, ticked meaning hidden — the one
+place on the site where the lit state removed something. They read *Collected
+parts* / *Vaulted relics* now, Hidden or Shown like everything else. The saved
+settings kept their `hide…` sense and are inverted at the single line where they
+meet the control, so no stored state had to move.
+
+**Supersedes 2026-09-24 the rule that stood here: *a checkbox for include this, a
+switch for which of two*, and *do not spread the switch to the include-X boxes*.**
+The point of that rule was one control shape per kind of question, so that the
+shape told you what was being asked. The owner chose one shape for every
+question instead, and the word inside the pill now does the telling: an
+include-X pill says *Hidden / Shown*, a which-of-two pill names its two
+situations. Nothing depends on reading a shape or a colour. What the old rule
+still gets right is that **both states are labelled on a two-situation control**
+— which is now true of every control, not just one.
+
+**Off is the left end and on is the right, everywhere.** The Void Trace switch
+had it reversed until 2026-09-05, when it asked *Short on Void Traces?* with the
+*on* state on the left. A reversed knob is only ever defensible on a switch whose
+states are written on it, never on a bare track — and there is no reason left to
+use one.
+
+Gold, like every other control here, so the pill borrows no new meaning. Gold
+marks *this toggle is on*, which is a state and not an approval — on *Void
+Traces* it means "you are at the cap", which is neither good nor bad. A
+reference sketch used teal and red; §1 reserves red for *something here is
+wrong*, and being capped is not an error.
+
+**The label comes first on screen and after the pill in the DOM.**
+`input:checked + .pill` needs the pill straight after the input, so `order`
+moves the label in front. That makes every label a `.lbl` span: a bare text node
+is an anonymous flex item at order 0 and lands wherever the pill is not.
 
 **A worked example of that rule, added 2026-09-01.** *How to crack them* carries
 two kinds of narrowing at once and they take two shapes. Which relic **tier** to
 show is a choice between four, so it is a strip of tabs with the chosen one gold.
 Whether to include an **errand** — Varzia's shelf, or the relics only a trade can
-get — is an include-X question each time, so each is a `.mini-check`. Putting the
+get — is an include-X question each time, so each is a `.mini-check`, the
+same pill at heading size. Putting the
 errands into the tab strip would have read as five tiers, one of which is a
 person.
 
 Both obey *only offer a control for something in front of you*: a tier with no
-relics gets no tab, and an errand nobody's list has gets no box.
+relics gets no tab, and an errand nobody's list has gets no switch.
 
 **The counts are what make them worth reading — `Lith 10`, `Trade 717` — and the
 rule for them took two goes.** A facet's count **ignores its own control and
 obeys every other one**. Counting the whole list regardless is the obvious first
-answer and it is wrong: unticking `Trade 717` left the tier tabs claiming 195
+answer and it is wrong: hiding `Trade 717` left the tier tabs claiming 195
 Lith relics over a list holding ten. Counting only what is currently shown is the
 obvious second answer and it is also wrong: a tab would report on itself, so
 `Lith` would read the same number whatever else you pressed.
@@ -419,7 +450,7 @@ Two corollaries, and they are what keep the strip still under the reader's hand:
 
 - **What a control counts and whether it exists are separate questions.** The set
   of controls comes from the unfiltered list, so pressing one never makes another
-  appear or vanish. A tier emptied by a checkbox reads `0` and greys out.
+  appear or vanish. A tier emptied by a switch reads `0` and greys out.
 - **Never disable the control that is currently chosen**, however empty it has
   become — that is the reader's way back, and greying it out strands them in
   front of an empty list with no explanation they can act on.
@@ -430,12 +461,15 @@ the heading to zero width and spilled its text down the page while the strip
 overflowed sideways. It does not show at desktop width, which is exactly why it
 is written down here.
 
-**Verifying one of these is awkward and worth knowing about.** A switch is mostly
+**Verifying one of these is awkward and worth knowing about.** A pill is mostly
 CSS transitions, and the Browser pane does not composite a hidden tab — so
-`getComputedStyle` returns a colour frozen part-way through the transition, no
-matter how long you wait. Assert on `element.matches(selector)` for each state
-instead: that reads the cascade rather than the animation, and it is what the
-rule actually says.
+`getComputedStyle` returns a colour or a knob position frozen part-way through
+the transition, no matter how long you wait. Read the **word** instead:
+`getComputedStyle(pill, "::after").content` resolves `attr()` to the string that
+is painted, and `content` is not animated, so it is the state exactly. For
+anything else, `element.matches("input:checked + .pill")` reads the cascade
+rather than the animation. The page test *every checkbox is a pill that says the
+state it is in* does the first, on both pages.
 
 ---
 

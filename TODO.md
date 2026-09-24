@@ -117,17 +117,15 @@ network build. Check once this machine next asks the HEAD, at 09:12Z on
 `official_droptables.gz.lastmod` (15:13:21Z) with the `last-modified` in
 `head_droptables`.
 
-### Every checkbox a pill switch, with short words at each end instead of a label above
+### The errand switches on *How to crack them* do not sit well as pills
 
-**Owner's request, 2026-09-24:** make all the checkboxes pill switches, and
-change the pill switch itself so that it has no text above it, only more
-accurate, minimal text to the left and right. The one existing switch,
-*Capped Void Traces* (`check-switch` in `plan.html`), already has ends, *room to
-spare* and *at the cap*, but keeps a label above them. **Read `STYLE.md` first**,
-§6 for the controls and §8 before debugging. The collection page's `.check`
-boxes and the planner's are the same component, so this is both pages. Each
-switch needs its two end words chosen, and those should be put to the owner as
-a list before anything is restyled.
+**Owner, 2026-09-24**, on seeing the pills shipped: *Varzia* and *Trade* (and
+*Baro*, the same control while he is on a relay) do not look good as pill
+switches. Kept as they are for now; the owner means to rework that part of the
+UI later. They share the heading's line with the tier tabs (`.tier-tabs
+.mini-check` in `styles.css`), so a label, its count and a pill all compete
+with the tabs for one row. **Ask the owner what they want before restyling** —
+this is a look that was judged on screen, not a defect with one right answer.
 
 ### Confirm WFCD's component shape when `warframe-status` next releases
 
@@ -1314,16 +1312,24 @@ checked against each other.
 Proxima, and an unknown level sorting last is the correct behaviour — a made-up one
 would silently distort the tie-break that levels exist to serve.
 
-### Event nodes cannot be tied to their event **[settled]**
+### Event nodes cannot be tied to their event **[settled — overturned 2026-09-24]**
 
-DE's drop table says only `Event: <planet>/<node>`, never which event, and the live
-worldstate does not link an event back to a drop-table node. The node only exists on
-the star chart while that event is running.
+**Overturned by the owner's decision to retire *Include event nodes*.** Kept
+because the half about DE is still true and stops the search being repeated:
+DE's drop table says only `Event: <planet>/<node>`, and DE's worldstate `Goals`
+name a live event but give its node as an id (`EventNode8`) that no DE manifest
+resolves.
 
-**So event nodes are excluded from the ranking entirely**, with an opt-in checkbox for
-when you know one is live. Without a first-party mapping there is nothing better to
-do: showing them by default sends you to missions you cannot find. Revisit only if DE
-publishes the link.
+It said the answer was to exclude event nodes and offer an opt-in checkbox until
+**DE** published the link. What changed is that the link was found one step
+along the chain every live feed already uses: WFCD's events feed names the node.
+The build ships `meta.eventNodes` from it, and an `Event:` row is ranked exactly
+while a running event names its node. PROJECT.md §7, *Three planner switches
+retired, and cache hunting is the one left*, has the measurement and the one
+thing not yet seen — a relic-dropping event running.
+
+The same shape as the Resurgence entry above: *"DE do not publish it"* was true,
+and was read as *"nobody does"*.
 
 ### Relic inventory **[settled]** — do not re-propose without a better input method
 
@@ -1343,8 +1349,9 @@ Raised by an outside review as *"Radiant or Intact is all a recruiting-chat squa
 can agree on"*, and **declined by the owner on 2026-08-25**: the public-radshare
 case is a niche this app will not model. Do not re-propose it.
 
-The review itself misread the existing option. The box is **4-man premade** and says
-so; a coordinated group can run any refinement, and it already unlocks Disruption's
+The review itself misread the existing option. It was a box called **4-man
+premade**, and is a **Squad** switch reading *Solo* or *Premade* since 2026-09-24;
+either way it says so. A coordinated group can run any refinement, and it already unlocks Disruption's
 rotation A, which needs the squad to under-defend conduits on a schedule.
 Restricting it to Intact and Radiant would make it describe something it does not
 claim to be.

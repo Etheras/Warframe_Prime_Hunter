@@ -82,27 +82,23 @@
     </div>
     <label class="check">
       <input type="checkbox" id="p-squad" />
-      <span class="box"></span>
-      <span class="lbl" data-tip="Four players opening the same relic each see a reward and keep the best, so a chance p becomes 1 - (1 - p)^4. Also unlocks Disruption rotation A. Leave off for solo or public runs.">4-man premade</span>
+      <span class="pill" data-off="Solo" data-on="Premade"></span>
+      <span class="lbl" data-tip="Premade: four players opening the same relic each see a reward and keep the best, so a chance p becomes 1 - (1 - p)^4. Also unlocks Disruption rotation A.&#10;&#10;Solo covers solo and public runs.">Squad</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-caches" />
-      <span class="box"></span>
-      <span class="lbl" data-tip="Missions paid by finding caches rather than by finishing — on Railjack, a Point of Interest and an Abandoned Derelict Cache. Off by default. A relic that drops nowhere else is listed anyway, marked.&#10;&#10;Railjack, Aya and running events are always counted, so they have no switch.">Cache hunting</span>
+      <span class="pill" data-off="Skip" data-on="Hunt"></span>
+      <span class="lbl" data-tip="Missions paid by finding caches rather than by finishing — on Railjack, a Point of Interest and an Abandoned Derelict Cache. Skipped by default. A relic that drops nowhere else is listed anyway, marked.&#10;&#10;Railjack, Aya and running events are always counted, so they have no switch.">Cache hunting</span>
     </label>
     <label class="check">
       <input type="checkbox" id="p-steel" />
-      <span class="box"></span>
-      <span class="lbl" data-tip="A Steel Path fissure is on the second star chart — running the ordinary node doesn't count. Off by default; switch on if you farm the Steel Path.">Include Steel Path fissures</span>
+      <span class="pill" data-off="Ignore" data-on="Count"></span>
+      <span class="lbl" data-tip="A Steel Path fissure is on the second star chart — running the ordinary node doesn't count. Ignored by default; count them if you farm the Steel Path.">Steel Path fissures</span>
     </label>
-    <label class="check check-switch">
+    <label class="check">
       <input type="checkbox" id="p-capped" />
-      <span class="lbl" data-tip="Your trace cap is (MR × 50) + 100, and a Radiant costs 100.&#10;&#10;Off: you have room, so a node that hands the relic over already Radiant scores 25% higher.&#10;On: you're at the cap, so that saving isn't real and the bonus comes off.">Capped Void Traces</span>
-      <span class="switch-group">
-        <span class="switch-end end-off">room to spare</span>
-        <span class="switch" aria-hidden="true"><span class="switch-knob"></span></span>
-        <span class="switch-end end-on">at the cap</span>
-      </span>
+      <span class="pill" data-off="Room" data-on="Capped"></span>
+      <span class="lbl" data-tip="Your trace cap is (MR × 50) + 100, and a Radiant costs 100.&#10;&#10;Room: you have room to spare, so a node that hands the relic over already Radiant scores 25% higher.&#10;Capped: you're at the cap, so that saving isn't real and the bonus comes off.">Void Traces</span>
     </label>
 
     <details class="advanced gap-lg">

@@ -237,7 +237,7 @@
        farmed — listing it first thing buries the handful you can actually go and
        get under the many you cannot. Safe to default on because the empty case
        already answers itself: a part whose every relic is vaulted says so and
-       names the checkbox to untick.
+       names the switch that shows them.
 
        Only the default moves. A saved value is still restored, so anybody who
        has already chosen keeps their choice. */
@@ -1112,12 +1112,12 @@
           <h3>Parts &amp; the relics that drop them</h3>
           <span class="sec-toggles">
             <label class="mini-check" data-tip="Parts you already own.">
-              <input type="checkbox" id="hideOwned" ${state.hideOwnedParts ? "checked" : ""}>
-              <span class="box"></span>Hide collected${ownedCount ? ` (${ownedCount})` : ""}
+              <input type="checkbox" id="showOwned" ${state.hideOwnedParts ? "" : "checked"}>
+              <span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl" id="ownedLbl">Collected parts${ownedCount ? ` (${ownedCount})` : ""}</span>
             </label>
             <label class="mini-check" data-tip="Vaulted relics can't be farmed — only traded for.">
-              <input type="checkbox" id="hideVaulted" ${state.hideVaultedRelics ? "checked" : ""}>
-              <span class="box"></span>Hide vaulted${hidden ? ` (${hidden})` : ""}
+              <input type="checkbox" id="showVaulted" ${state.hideVaultedRelics ? "" : "checked"}>
+              <span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl">Vaulted relics${hidden ? ` (${hidden})` : ""}</span>
             </label>
           </span>
         </div>
@@ -1203,7 +1203,7 @@
           }, build ${need}, then count them here.</div>`;
         } else if (!list.length) {
           html += `<div class="relic-none">Every relic for this part is vaulted —
-            untick <b>Hide vaulted</b> to see which ones to trade for.</div>`;
+            switch <b>Vaulted relics</b> to Shown to see which ones to trade for.</div>`;
         }
 
         list.forEach((r) => {
@@ -1247,8 +1247,8 @@
         html += `</div>`;
       });
       if (!shownParts.length) {
-        html += `<p class="hint">Every part is collected. Untick <b>Hide collected</b>
-          to see their relics again.</p>`;
+        html += `<p class="hint">Every part is collected. Switch <b>Collected parts</b>
+          to Shown to see their relics again.</p>`;
       }
       html += `</section>`;
     }
@@ -1287,12 +1287,16 @@
       });
     }
 
-    [["#hideVaulted", "hideVaultedRelics"], ["#hideOwned", "hideOwnedParts"]]
+    /* The switches read *Shown* when on, like every other pill on the page,
+       while the saved settings keep their original sense (`hide…`). Inverted
+       here, at the one place they meet, so no saved state had to move.
+       Owner's decision, 2026-09-24: gold means shown everywhere. */
+    [["#showVaulted", "hideVaultedRelics"], ["#showOwned", "hideOwnedParts"]]
       .forEach(([sel, key]) => {
         const el = $(sel);
         if (!el) return;
         el.addEventListener("change", (e) => {
-          state[key] = e.target.checked;
+          state[key] = !e.target.checked;
           saveFilters();
           const keep = drawer.scrollTop;
           openItem(it.id);
@@ -1329,8 +1333,8 @@
         const row = btn.closest(".part");
         if (row) row.classList.toggle("part-done", full);
 
-        /* The one part of this section that is not local: with *Hide collected*
-           on, a part that just filled up has to leave. Rebuilding the section is
+        /* The one part of this section that is not local: with *Collected
+           parts* hidden, a part that just filled up has to leave. Rebuilding the section is
            the honest way to do that, and the focus is going with the row it sat
            on either way, so put it somewhere sensible rather than nowhere. */
         if (full && state.hideOwnedParts && row) {
@@ -1341,16 +1345,15 @@
           if (move) move.focus();
           else if (section && !section.querySelector(".part")) {
             section.insertAdjacentHTML("beforeend",
-              `<p class="hint">Every part is collected. Untick <b>Hide collected</b>
-                to see their relics again.</p>`);
+              `<p class="hint">Every part is collected. Switch <b>Collected parts</b>
+                to Shown to see their relics again.</p>`);
           }
         }
 
-        const owned = $("#hideOwned");
-        const label = owned && owned.parentNode && owned.parentNode.lastChild;
-        if (label && label.nodeType === 3) {
+        const label = $("#ownedLbl");
+        if (label) {
           const n = it.parts.filter((x) => haveOf(it.id, x.name) >= needOf(x)).length;
-          label.textContent = `Hide collected${n ? ` (${n})` : ""}`;
+          label.textContent = `Collected parts${n ? ` (${n})` : ""}`;
         }
 
         const box = $("#dSpots");
@@ -1480,7 +1483,7 @@
   $("#catList").innerHTML = DATA.categories.map((c) => `
     <label class="check">
       <input type="checkbox" data-cat="${esc(c.name)}" ${state.cats.has(c.name) ? "checked" : ""}>
-      <span class="box"></span><span class="lbl">${esc(c.name)}</span>
+      <span class="pill" data-off="Hidden" data-on="Shown"></span><span class="lbl">${esc(c.name)}</span>
       <span class="cnt" data-cat-count="${esc(c.name)}">${c.count}</span>
     </label>`).join("");
 
