@@ -239,6 +239,15 @@ the time.
   WFCD have not indexed yet loses DE's own parts, Ducats and artwork*, below.
 - **Question 5:** no artwork on any of the three, same entry. No `plat` either,
   which is a supported state.
+- **Question 6, read at 06:52Z on the 24th:** the deployed payload still had
+  167 items and 763 relics, no Citrine, and Xaku, Trumna and Quassus Prime still
+  farmable. That is the pre-Citrine drop table, 15.5 hours after DE changed it.
+  **WFCD are not the cause.** The runner reaches `www.warframe.com` and
+  `content.warframe.com` (both 200 in CI's own probe), and the deployed build
+  reads items and relics from DE exactly as the local one does. What holds it
+  back is the cache windows, which are fixed locally only. From WFCD the
+  deployed side takes the live feeds (the worldstate, because DE 403 the runner)
+  and, like the local side, each part's relic link.
 - **Question 7:** against this local payload, three built-payload checks were
   red and every code test passed.
   - `parts: every one agrees with DE's own manifests` and `platinum: every
