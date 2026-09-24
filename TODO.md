@@ -335,6 +335,42 @@ drop-table fallback instead of DE's recipes. That turns `parts: only the items
 DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
 catch.
 
+### WFCD's worldstate can go stale behind a 200, and the deployed site takes it as fresh
+
+**Found 2026-09-24 at 07:13Z**, while looking at the owner's idea of watching
+WFCD's `/heartbeat` and `/pc` for outages when the data does not refresh.
+Measured between 07:13Z and 07:15Z:
+
+- **DE's worldstate:** `Time` 47 seconds old, current.
+- **WFCD's `/pc`:** `timestamp` 05:43:48Z, about 90 minutes old, served as a
+  Cloudflare `HIT` under `max-age=120`.
+- **WFCD's `/pc/fissures`, the build's `FISSURES`:** 33 fissures, **every one
+  already expired**. The earliest had expired at 05:49Z.
+- **WFCD's `/heartbeat`:** `200 {"message":"Success"}` throughout.
+- **The deployed payload built at 07:12Z:** `meta.feeds` says `proxy` for all
+  four feeds, `meta.stale` is empty, and there are no fissures at all. Nothing
+  told the reader.
+
+**Why.** `from_chain` in `build_data.py` takes any non-empty answer from WFCD as
+good. The content-age judgement, `WORLDSTATE_MAX_AGE` against DE's `Time`,
+exists only on DE's side. The deployed build takes all four live feeds from WFCD
+because DE 403 the runner, so the site the owner uses depends entirely on WFCD's
+freshness, and nothing checks it. *Zero fissures is normal* is exactly what
+hides it. The page's own live poll reads WFCD's fissures directly, so it gets
+the same stale list.
+
+**`/heartbeat` is not the signal.** It says the app answers, not that its data
+moves: it said *Success* through this whole outage. The signal is `/pc`'s
+`timestamp`. That is the same content-age question the build already asks of DE,
+with the same 15-minute ceiling, and it costs one request of about 28 KB
+compressed, inside WFCD's own `max-age=120`.
+
+**Shape, not designed:** judge WFCD's answer by `/pc`'s `timestamp`. Past the
+ceiling, treat it as a miss and fall through to our own cached copy, and flag it
+stale with a reason the banner can state, for example *"WFCD's copy is 90
+minutes old"*. The feed log could record WFCD's age per build, to measure how
+often this happens. Not yet known: how long this outage lasted.
+
 ### Confirm WFCD's component shape when `warframe-status` next releases
 
 **Found 2026-09-24.** `warframe-items` v1.1276.0 moved every item's `components`
