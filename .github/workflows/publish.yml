@@ -318,17 +318,18 @@ jobs:
       # Skana Prime as merely vaulted while every local run stayed green: the
       # check that fails on all three at once existed, and never saw this file.
       #
-      # WARN-ONLY until the Citrine Prime test is read on 2026-09-24 (TODO.md).
-      # Some of these checks assert upstream data a brand-new Prime cannot meet
-      # on day one - DE's recipe for it, a warframe.market price on every reward
-      # row - so a blocking gate would stop the very release that test watches.
-      # After it, drop the `|| echo` so a failure blocks the deploy, with new
-      # Primes exempt from whatever that day showed they trip. No `if:` on
-      # purpose: the light build publishes too, and from a cache.
+      # BLOCKING since 2026-09-24, owner's decision: a failed check fails the run
+      # and nothing is deployed. It was warn-only until the Citrine Prime release
+      # had been watched, and that day showed exactly one check a brand-new Prime
+      # cannot meet: a warframe.market price on every reward row, which the market
+      # simply has not listed yet. warframe.market coverage therefore warns
+      # instead of failing, inside the suite (`warn_unless`), and appears here as
+      # a `::warning::` on the run. Everything else blocks. Nothing may be
+      # appended to swallow the exit code - `|| echo`, `|| true` or
+      # `continue-on-error` - and a test says so. No `if:` on purpose: the light
+      # build publishes too, and from a cache.
       - name: Check the payload about to be published
-        run: |
-          python tests/test_build.py --payload \
-            || echo "::warning::the built-payload checks failed on the payload being published - see this step's log"
+        run: python tests/test_build.py --payload
 
       - name: Assemble the site
         run: |

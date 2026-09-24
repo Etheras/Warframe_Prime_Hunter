@@ -8257,15 +8257,17 @@ change**, so a check that only ever reads a local payload cannot see one.
   on `success()`, so a failed full build leaves the last good cache in place, and
   light builds whose fingerprint has not moved keep publishing from it. A block
   stalls the updates that needed a fresh fetch; it does not freeze the site.
-- **But warn-only until the Citrine Prime test is read on 2026-09-24.** Some
-  checks in the group assert upstream data a brand-new Prime cannot satisfy on
-  day one — DE's recipe for it, a warframe.market price on every reward row — and
-  a gate that blocked on the 23rd would stop the very release that test exists to
-  watch. So the step ends in `|| echo "::warning::…"` for now.
+- **But warn-only until the Citrine Prime test is read on 2026-09-24.**
+  **Superseded 2026-09-24** — see *The payload gate blocks, and warframe.market
+  coverage only warns*. Some checks in the group assert upstream data a brand-new
+  Prime cannot satisfy on day one — DE's recipe for it, a warframe.market price
+  on every reward row — and a gate that blocked on the 23rd would stop the very
+  release that test exists to watch. So the step ended in `|| echo
+  "::warning::…"` until then.
 - **New Primes will be exempt once it blocks**, defined from what the 23rd
-  actually trips rather than from a prediction. Deliberately not added yet: while
-  the gate only warns, an exemption blocks nothing and would only hide the
-  warnings that day is meant to produce. `TODO.md` holds that and the switch.
+  actually trips rather than from a prediction. **Superseded 2026-09-24**: no
+  new-Prime exemption was needed. See *The payload gate blocks, and
+  warframe.market coverage only warns*.
 - **The wiki page is not re-read more often.** It sends `max-age=0` and no ETag,
   so every ask is a full ~56 KB download, and a fresher copy only finds a markup
   change sooner — it cannot prevent one.
@@ -8959,6 +8961,42 @@ against the inline first version and is identical. Its test covers a missing
 WFCD record, WFCD's drops being kept, a partly covered item and a part in
 neither source, and it goes red with the table ignored. The artwork test goes
 red with the export key ignored.
+
+### The payload gate blocks, and warframe.market coverage only warns
+
+**Decided by the owner on 2026-09-24**, once the Citrine Prime release had been
+watched. It replaces the warn-only period in *The published payload is checked
+after the build*.
+
+**What the release showed.** Against a payload carrying the three new Primes,
+exactly one built-payload check fails for a reason that is not a defect:
+`platinum: every Prime-part reward row carries plat`, because warframe.market
+had not listed the new parts yet. The other one predicted to trip, the Kavasa
+pin on DE's recipes, did not. Once a part's relics come from DE's drop table,
+the new Primes carry DE's recipes from the first build (*A part's relics come
+from DE's drop table when WFCD have not indexed it*).
+
+**The rule.** The step no longer swallows its exit code, so a failed check fails
+the run and nothing is deployed. The two warframe.market coverage checks warn
+instead of failing, **for every Prime rather than only new ones**. They are
+`warn_unless` in the suite, and appear on CI as a `::warning::` annotation on
+the run. A missing price is already a supported state everywhere the page reads
+one, so there was nothing for a definition of "new" to protect. The alternative
+put to the owner, exempting only Primes with no release date or one under 14
+days old, would still have blocked a deploy over a market-side gap on an older
+Prime.
+
+**Everything else blocks, including the two checks that are not release lag.**
+`wiki coverage:` fires on a name or section the build cannot place, which is a
+real gap. `bounties: … the three shapes DE actually ships` would now stop the
+deploy if DE changed a bounty's length, and being told is the point. A block
+does not freeze the site: the cache is saved only on success, so the next light
+build publishes from the last good one.
+
+**Verified.** The gate test now also asserts that nothing in the step can
+swallow the exit code (no `||`, no `continue-on-error`). It goes red with the
+old `|| echo` restored. Against the Citrine payload, the payload group ends with
+one warning, the Platinum reward rows, and exit code 0.
 
 ---
 

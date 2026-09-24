@@ -93,6 +93,27 @@ def check_true(name: str, cond, why: str = "") -> None:
     check(name, bool(cond), True, why)
 
 
+# A finding the owner has decided must be SEEN but must never stop a deploy.
+# Owner's decision, 2026-09-24, when the payload gate was made to block: every
+# built-payload check blocks except warframe.market coverage, because a Prime
+# released today cannot have a market price yet, and a missing price is already
+# a supported state everywhere the page reads one. On CI it becomes a
+# `::warning::` annotation on the run, which is where somebody looks.
+WARNINGS: list[tuple[str, str]] = []
+
+
+def warn_unless(name: str, got, want, why: str = "") -> None:
+    global PASSED
+    if got == want:
+        PASSED += 1
+        print(f"  ok   {name}")
+        return
+    WARNINGS.append((name, f"got {got!r}, wanted {want!r}" + (f"\n       {why}" if why else "")))
+    print(f"  warn {name}: got {got!r}, wanted {want!r}")
+    if os.environ.get("GITHUB_ACTIONS"):
+        print(f"::warning::{name} - {why or 'see the log'}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # parsers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1035,18 +1056,24 @@ def test_platinum_joins_on_des_own_paths_not_on_names() -> None:
     # Named rather than counted, for the same reason the parts test above names
     # its one fallback: a threshold passes quietly while a whole category rots.
     # The only acceptable misses are Primes warframe.market do not list at all,
-    # which is release lag on their side and nothing to fix here.
-    check_true("platinum: every part the market lists carries a price",
-               len(unpriced) <= 4,
-               f"{len(unpriced)} parts have no price: {unpriced[:8]}")
+    # which is release lag on their side and nothing to fix here. Warns rather
+    # than fails, owner's decision 2026-09-24 - see `warn_unless`.
+    warn_unless("platinum: every part the market lists carries a price",
+                len(unpriced) <= 4, True,
+                f"{len(unpriced)} parts have no price: {unpriced[:8]}")
 
     rows = [r for rel in payload["relics"].values() for r in rel["rewards"]]
     prime_rows = [r for r in rows if "Forma" not in r["item"]]
     for field in ("ducats", "plat"):
         missing = sorted({r["item"] for r in prime_rows if not r.get(field)})
-        check(f"platinum: every Prime-part reward row carries {field}",
-              missing, [],
-              "this is the join that read 20% low before normalise_part")
+        # Ducats are DE's own constant and a miss is a broken join, so that one
+        # blocks. Platinum only warns: on 2026-09-23 it was the one check a
+        # brand-new Prime tripped, because warframe.market had not listed its
+        # parts yet.
+        (check if field == "ducats" else warn_unless)(
+            f"platinum: every Prime-part reward row carries {field}",
+            missing, [],
+            "this is the join that read 20% low before normalise_part")
     # Forma is the one reward that must NOT carry a value. It is in almost every
     # relic and is worth no ducats, so pricing it at 0 would drag every relic's
     # average down by however much Forma happens to occupy - a claim that is not
@@ -4892,6 +4919,14 @@ def test_the_published_payload_is_checked_after_it_is_built() -> None:
     check_true("payload gate: on both paths, not only the full build",
                bool(step) and not re.search(r"(?m)^\s*if:", step),
                "the light build publishes too, and from a cache - the case that hid this")
+    # Blocking since 2026-09-24, owner's decision. Anything that swallows the
+    # exit code turns it back into the warn-only gate it was during the Citrine
+    # release, silently - so it is asserted rather than trusted. Comments are
+    # stripped first, because the step's own comment names the forbidden forms.
+    code = "\n".join(ln for ln in step.splitlines() if not ln.strip().startswith("#"))
+    check("payload gate: and a failure blocks the deploy",
+          re.findall(r"\|\||continue-on-error:\s*true", code), [],
+          "a gate whose exit code is swallowed publishes whatever it finds")
 
 
 def test_the_full_build_matches_a_schedule_that_exists() -> None:
@@ -6086,12 +6121,16 @@ def main() -> int:
                 traceback.print_exc(limit=3)
 
     print("\n" + "-" * 60)
+    # Warnings are listed however the run ends, and never change its exit code.
+    warned = f", {len(WARNINGS)} warned" if WARNINGS else ""
+    for name, why in WARNINGS:
+        print(f"  warn {name}\n    {why}\n")
     if FAILURES:
-        print(f"{PASSED} passed, {len(FAILURES)} FAILED\n")
+        print(f"{PASSED} passed, {len(FAILURES)} FAILED{warned}\n")
         for name, why in FAILURES:
             print(f"  {name}\n    {why}\n")
         return 1
-    print(f"{PASSED} passed")
+    print(f"{PASSED} passed{warned}")
 
     # There is deliberately no check that the documentation agrees with this
     # number, because the documentation no longer states one. It used to: the

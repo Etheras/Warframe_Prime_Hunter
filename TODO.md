@@ -1471,31 +1471,6 @@ read the rank, because both cost a measurement to find:
   dropped for whichever page runs second in the single-file build. Anything that
   needs a repaint on a rank change needs a subscriber list, not a callback.
 
-### The payload gate only warns — make it block after Citrine, with new Primes exempt
-
-**Owner's decision, 2026-09-11** (`PROJECT.md §7`, *The published payload is
-checked after the build*). The built-payload group now runs on CI after the build
-as *Check the payload about to be published*, and ends in `|| echo "::warning::…"`,
-so a failure annotates the run and publishes anyway. Warn-only is deliberate and
-temporary: some of its checks are expected to trip on a brand-new Prime (the
-Citrine Prime entry above), and a gate that blocked on the 23rd would stop the
-release that test exists to watch.
-
-Still to do, on or after 2026-09-24:
-
-1. **Drop the `|| echo`**, so a failure fails the run and blocks the deploy.
-2. **Exempt a Prime in its first days** from whatever the 23rd showed actually
-   trips. Predicted: `parts: only the items DE do not publish fall back` (a Prime
-   can arrive before its recipe is in our copy of DE's export) and `platinum:
-   every Prime-part reward row carries plat` (no misses allowed, and
-   warframe.market is read at most daily). **"New" is not defined yet**: `isNew`
-   is only set when DE's export lists an item before the wiki does, so it may
-   never be true for Citrine.
-3. **Decide the two that are not release lag.** `wiki coverage:` fires on a name
-   or section the build cannot place — a real gap, so exempting it would hide a
-   flaw rather than a delay. `bounties: … the three shapes DE actually ships`
-   asserts exactly `[3, 4, 5]`, so a change DE make to bounty length would block
-   the site.
 
 ## Settled — answered, kept so the answer is not lost
 
