@@ -2639,7 +2639,7 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
   await page.reload({ waitUntil: "load" });
 
   const row = page.locator("#planNodes .spot").filter({ hasText: "(Caches)" }).first();
-  assert.ok(await row.count() > 0, "a Caches node has to be rankable with Cache hunting on");
+  assert.ok(await row.count() > 0, "a Caches node has to be rankable with Caches counted");
   assert.match(await row.locator(".spot-meta").innerText(), /halved/,
                "a score moved by a judgement has to say so on the row");
 
@@ -2666,7 +2666,7 @@ page_test("cache hunting is forced in when it is the only route, and says so", a
 
      Owner's decision, 2026-08-25: force them in and mark them. Written for
      *Include Railjack*; since 2026-09-24 Railjack is always ranked and the
-     switch is *Cache hunting*, so the same rule gates the caches instead - and
+     switch is *Caches*, so the same rule gates the caches instead - and
      Nyx Prime's routes are all caches (the test above asserts it from the data). */
   const { page, errors } = await open("/plan.html");
   /* Named outright rather than found with isRailjack. Picking the subject with
@@ -4107,7 +4107,18 @@ async function pillWords(page, scope) {
       const pill = box.nextElementSibling;
       const isPill = !!(pill && pill.classList.contains("pill"));
       const lbl = isPill ? pill.parentNode.querySelector(".lbl") : null;
+      /* Lines the label's own text runs to, counted from the line boxes a Range
+         over it reports. A label carrying an `em` (Baro's window) is two lines
+         on purpose and says so in its markup, so it is not counted. */
+      let lines = 1;
+      if (lbl && !lbl.querySelector("em")) {
+        const range = document.createRange();
+        range.selectNodeContents(lbl);
+        lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+      }
       return {
+        text: lbl ? lbl.textContent.trim() : null,
+        lines,
         id: box.id || null,
         isPill,
         off: isPill ? pill.dataset.off : null,
@@ -4131,6 +4142,11 @@ function assertPills(rows, where) {
     assert.equal(r.says, r.checked ? r.on : r.off,
                  `${where}: #${name} says "${r.says}" while it is ${r.checked ? "on" : "off"}`);
     assert.ok(r.labelFirst, `${where}: #${name} puts its pill before its label`);
+    /* The owner's objection to the first cut, 2026-09-24: a 78px pill left the
+       sidebar's labels 86px and *Prime Resurgence* broke in two. Asserted on
+       every label so a wider pill, a longer word or a new label brings it back
+       as a failure rather than as a screenshot. */
+    assert.equal(r.lines, 1, `${where}: "${r.text}" wraps onto ${r.lines} lines beside its pill`);
   }
 }
 
@@ -4490,7 +4506,7 @@ page_test("a minute saved for a mission type off the list stops costing the list
      every saved key, so one value for a type with nothing ranked flipped the
      whole list to per-minute and became the assumed cost of every visible type.
 
-     `Caches` is the subject because *Cache hunting* is the one switch left that
+     `Caches` is the subject because the *Caches* switch is the one left that
      takes a mission type off the list, and it is a control the reader owns - so
      the "not on the list" state is reachable without inventing a mission type.
      This was `Skirmish` under *Include Railjack* until 2026-09-24, when Railjack
@@ -4535,7 +4551,7 @@ page_test("a minute saved for a mission type off the list stops costing the list
 
   await page.locator(".advanced > summary").click();
   assert.ok((await modeRows()).includes("Caches"),
-            "with Cache hunting on, Caches has to be one of the rows — otherwise there " +
+            "with Caches counted, Caches has to be one of the rows — otherwise there " +
             "is no way to reach the state this test is about");
 
   // give it a number, then take away the switch that puts it on the list
@@ -4549,7 +4565,7 @@ page_test("a minute saved for a mission type off the list stops costing the list
 
   const rows = await modeRows();
   assert.ok(rows.length > 0, "there still has to be a form to look at");
-  assert.ok(!rows.includes("Caches"), "Cache hunting off takes Caches off the list");
+  assert.ok(!rows.includes("Caches"), "Caches on Ignore takes Caches off the list");
 
   const after = await state();
   assert.equal(after.rowsWithValue, 0, "nothing on screen carries a number");

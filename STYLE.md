@@ -384,9 +384,21 @@ tech.
 | every filter, both pages, drawer and errands included | what it filters | Hidden | Shown |
 | collection *Sort* | Categories | One list | Grouped |
 | both pages | Squad | Solo | Premade |
-| planner | Cache hunting | Skip | Hunt |
+| planner | Caches | Ignore | Count |
 | planner | Steel Path fissures | Ignore | Count |
 | planner | Void Traces | Room | Capped |
+
+**A label never wraps because of the pill.** The sidebar is 250px, and the pill
+is sized so the longest filter label, *Prime Resurgence*, still fits on one
+line. The owner's objection to the first version was exactly that wrap. The
+budget is written above `.check` in `styles.css`, so measure against it before
+widening the pill, lengthening a word or adding a label. A second line that is
+meant, like Baro's *back in 8 days*, is set as its own block rather than left
+to break wherever the width runs out.
+
+**The word is centred in the space the knob leaves.** Left-aligned, it hugged
+the knob in one state and the rim in the other, so on and off looked shifted
+in opposite directions.
 
 **The word is the state, never the action** — *Shown*, not *Show*. A pill that
 reads *Show* is ambiguous about whether it is describing the screen or offering

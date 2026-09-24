@@ -533,7 +533,7 @@ inside the switch itself:
   *Solo* for solo or public runs. It does one thing beyond the display: it
   unlocks Disruption's rotation A, which is only reachable by a squad
   deliberately letting conduits fall to a schedule.
-- **Cache hunting** — *Skip* by default, or *Hunt*. Missions paid by finding
+- **Caches** — *Ignore* by default, or *Count*. Missions paid by finding
   caches rather than by finishing; today that is Railjack's. A relic that drops
   nowhere else is listed anyway, marked *only route*. Railjack itself, Aya and
   running events are always counted, so they have no switch.

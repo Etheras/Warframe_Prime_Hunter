@@ -203,7 +203,7 @@
     const el = $("#baroWhen");
     if (!el) return;
     const w = baroWindow();
-    el.textContent = w.text ? " — " + w.text : "";
+    el.textContent = w.text || "";
   }
   const state = {
     /* Defaults changed 2026-08-27, at the owner's direction, and they all point

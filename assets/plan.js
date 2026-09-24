@@ -684,7 +684,7 @@
          marked. The switch keeps meaning what it says for everything else:
          this fires only when the alternative is nowhere at all. Owner's
          decision, 2026-08-25, option (ii) of three, written for *Include
-         Railjack*; carried over to *Cache hunting* on 2026-09-24, when Railjack
+         Railjack*; carried over to the *Caches* switch on 2026-09-24, when Railjack
          itself became always ranked. */
       const stranded = !srcs.some((s) => ROT.reachableSource(s, opts));
       srcs.forEach((s) => {
@@ -1614,7 +1614,7 @@
        moment a live event names it, so the message says when, not what to tick. */
     return (blocked.caches
       ? `<p class="nowhere">${places(blocked.caches)} cache hunting.<br>` +
-        `Switch <b>Cache hunting</b> on, on the left, to rank ${
+        `Set <b>Caches</b> to Count, on the left, to rank ${
           blocked.caches === 1 ? "it" : "them"}.</p>` : "") +
       (blocked.event
         ? `<p class="nowhere">${places(blocked.event)} an event node.<br>` +
@@ -2304,14 +2304,14 @@
             "What it is not is more progress — every part it clears\n" +
             "is already covered by something else here.")
           }">${n.overlap.length} overlap${n.overlap.length === 1 ? "" : "s"}</span>` : ""}${
-          /* Shown despite *Cache hunting* being off, because for this relic
+          /* Shown despite *Caches* being on Ignore, because for this relic
              there is nowhere else. Amber for the same reason `.est` is amber:
              the app made a call the reader did not. */
           n.onlyRoute ? ` · <span class="est" data-tip="${esc(
-            "Listed even though Cache hunting is off: every current source for\n" +
-            "what you want here is a cache-hunting mission, so leaving it out\n" +
-            "would leave you nowhere at all.\n\n" +
-            "Switch Cache hunting on, on the left, to see the rest of them too.")
+            "Listed even though Caches is set to Ignore: every current source\n" +
+            "for what you want here is a cache-hunting mission, so leaving it\n" +
+            "out would leave you nowhere at all.\n\n" +
+            "Set Caches to Count, on the left, to see the rest of them too.")
           }">only route</span>` : ""}${
           /* A borrowed number stays visible even after the corner was cut back:
              a guess you can see beats a guess you cannot. */

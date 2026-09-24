@@ -9181,9 +9181,28 @@ dataset: every checkbox on both pages becomes a pill switch after codeshack's
 *Toggles with Text (CSS Only)*, in the site's colours, with a short label on
 the left and the state written **inside** the pill — no text above it. The
 words were the owner's choice too: *Hidden / Shown* on every filter, *One list
-/ Grouped* for *Categories*, and on the planner *Solo / Premade*, *Skip /
-Hunt*, *Ignore / Count*, *Room / Capped*. `STYLE.md §6` has the component and
-the table.
+/ Grouped* for *Categories*, and on the planner *Solo / Premade*, *Ignore /
+Count* twice, *Room / Capped*. `STYLE.md §6` has the component and the table.
+
+**Revised the same day, after the owner saw it live on a 1080p screen.**
+Three things, all measured in the browser rather than eyeballed:
+
+- **The pills were too wide, and they wrapped labels.** At 78px a filter label
+  had 86px of the 250px sidebar, so *Prime Resurgence* (107px) and *Founder
+  exclusive* (106px) broke onto two lines. The pill is 64px now, 20px tall
+  with a 14px knob and 10.5px type, and the count's gap is 4px rather than
+  10. That leaves the label 110px. Baro's *back in 8 days* (174px with his
+  name) can never share a line, so it is a deliberate second line now rather
+  than a wrap that broke wherever the width ran out. The arithmetic is in the
+  comment above `.check` in `styles.css`.
+- **The words sat off-centre in opposite directions.** A word left-aligned in
+  a `min-width` pill hugged the knob when off and the rim when on.
+  `justify-content:center` centres each word in the space the knob leaves.
+- ***Cache hunting* became *Caches*, reading *Ignore / Count***, the owner's
+  choice from three. *Cache hunting* did not say what the switch does. The new
+  words match *Steel Path fissures* on the row below, so the two
+  include-or-not switches read alike. The stored key stays `caches`, so no
+  saved state moved.
 
 **It reverses a rule rather than extending one.** `STYLE.md §6` said *a
 checkbox for include this, a switch for which of two*, and *do not spread the

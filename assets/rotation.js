@@ -833,7 +833,7 @@
      one, two and three caches found - but only Railjack's cache tables carry
      relics, so today every row this matches is Proxima. The mode is the test,
      not the ship: owner's decision, 2026-09-24, when the *Include Railjack*
-     switch became *Cache hunting*. Railjack itself is always ranked now. */
+     switch became the *Caches* switch. Railjack itself is always ranked now. */
   const isCacheHunt = (s) => s.mode === "Caches";
 
   /* What a node asks of you before you can play it at all. Neither is a
