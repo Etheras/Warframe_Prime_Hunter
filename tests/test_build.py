@@ -1184,6 +1184,33 @@ def test_the_scheduled_task_can_actually_be_registered() -> None:
               "so the task will sit idle until it arrives - a repeating trigger "
               "takes -Time as a phase, not as a first run")
 
+        # Starting it now must not move the phase. The script used to pull a
+        # future -Time back by a day, which keeps the phase only for an interval
+        # that divides a day; at the 150-minute default it shifted the grid by
+        # ninety minutes, so a task phased three minutes after a bounty turnover
+        # ran an hour after each one (found 2026-09-24 from NextRunTime).
+        # `23:59` is in the future at every instant of the day bar one, so this
+        # pull-back is exercised whenever the suite runs.
+        phased = run("-Time", "23:59")
+        check("schedule: a future -Time registers", phased.returncode, 0,
+              (phased.stderr or phased.stdout)[-400:])
+        start = boundary().partition("|")[0]
+        try:
+            # Measured to TODAY's 23:59, the time -Time names - not to the next
+            # 23:59 after the start, which the first draft of this used and which
+            # a start pulled back exactly one day satisfies trivially. Caught by
+            # restoring the one-day pull-back and watching this stay green.
+            began = datetime.datetime.fromisoformat(start)
+            wanted = datetime.datetime.now(began.tzinfo).replace(
+                hour=23, minute=59, second=0, microsecond=0)
+            gap = int((wanted - began).total_seconds() // 60)
+        except ValueError:
+            gap = -1
+        check("schedule: and the grid still lands on the -Time it was given",
+              gap % every if gap >= 0 else gap, 0,
+              f"start {start!r} is {gap} minutes before 23:59, not a whole number "
+              f"of {every}-minute intervals, so every run is off the phase asked for")
+
         # The owner's word for the console window this used to open was
         # "disaster" - 144 times a day, taking focus each time.
         #

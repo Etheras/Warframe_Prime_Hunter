@@ -661,16 +661,17 @@ on purpose. Digital Extremes rebuild the live world state once a minute, so a
 check that ran exactly on a turnover would usually be reading the state from just
 before it. A few minutes past clears that with room to spare, and costs nothing.
 
-While the page is open it re-reads the fissure list every two minutes, from this
-site and nowhere else, so a tab you left open in the morning is still right after
-lunch without a reload.
+While the page is open it re-reads the fissure list every two minutes, from
+WFCD's live feed (`api.warframestat.us`), and falls back to this site's own copy
+when WFCD cannot be reached. So a tab you left open in the morning is still right
+after lunch without a reload.
 
 **On a laptop it now runs on battery too.** Windows' own default for a scheduled
 task is to skip it whenever the machine is unplugged, and to kill it if the
 charger comes out mid-run — which would have made the promise above quietly
 false for anyone not at a desk. The task overrides both. What it costs on
-battery is four conditional requests and about a second and a half of CPU, six
-times an hour.
+battery is a few conditional requests and about a second and a half of CPU,
+about ten times a day.
 
 Only the scheduling is Windows-specific — the build itself runs anywhere.
 

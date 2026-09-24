@@ -4,35 +4,30 @@
     Register (or remove) a Windows Scheduled Task that keeps this site's data current.
 
 .DESCRIPTION
-    The task runs  build_data.py --if-changed  every ten minutes. That call is cheap
+    The task runs  build_data.py --if-changed  every 150 minutes. That call is cheap
     when nothing has moved: it fetches DE's ~500-byte export index, sends one HEAD to
-    the drop table, reads the trader window and the current fissures, then rebuilds
-    from the local cache. Measured end to end on a warm cache: 1.7 seconds. A full
-    download only happens when an upstream actually changed, and every fetch is
-    conditional, so a repeat run costs four header exchanges and almost no body.
+    the drop table, reads the trader window and WFCD's item data, then rebuilds from
+    the local cache. Measured end to end on a warm cache: 1.7 seconds. A full
+    download only happens when an upstream actually changed, and every fetch honours
+    its source's own window and is conditional, so a repeat run costs a few header
+    exchanges and almost no body.
 
-    Ten minutes, rather than hourly, because of the one source with an hour to live.
-    Void Fissures move every hour or two and the pages only ever show ones that have
-    not expired, so the badges are exactly as current as this task. The rest of the
-    data moves a few times a year and does not care.
+    150 minutes because that is the bounty rotation: all three boards turn over
+    together on that clock. It was ten minutes until 2026-09-24, for the Void
+    Fissures, a reason that expired on 2026-09-08 when the page began polling
+    WFCD's live fissure list itself every two minutes. Nothing left in the payload
+    needs finer granularity.
 
-    Ten minutes is also well inside what the source asks for: api.warframestat.us
-    serves the fissure list behind a CDN with Cache-Control: max-age=120, so this
-    polls five times slower than the API's own cache lifetime, and answers a
-    conditional request with 304 and no body when nothing has changed.
-
-    The default -Time is two minutes past the half hour rather than on it, and
-    that offset is load-bearing rather than tidy. Every boundary this dataset
-    names falls on a UTC hour - Prime Resurgence rotations flip at 18:00Z, Baro
-    arrives and leaves at 13:00Z - so a ten-minute grid aligned to :00 reads the
-    live feeds within seconds of every turnover. That is the worst moment to
-    read them: DE regenerate worldState.php about once a minute and their CDN
-    serves whatever it holds, so a read three seconds after a boundary almost
-    always carries a copy stamped before it, and the site then shows the old
-    rotation until the next run ten minutes later. Two minutes past clears that
-    window with roughly 2x margin, at no cost at all - the same cadence, the
-    same number of requests, and a boundary published within about two and a
-    half minutes instead of ten.
+    -Time is the PHASE of the repeating grid, and it is load-bearing rather than
+    tidy: give it a few minutes after a real bounty turnover (the payload's
+    meta.bounties.windowEnd), and every later run lands just after one. Landing ON
+    a boundary is the worst moment to read the live feeds: DE regenerate
+    worldState.php about once a minute and their CDN serves whatever it holds, so
+    a read three seconds after a turnover almost always carries a copy stamped
+    before it, and the site then shows the old rotation until the next run.
+    Two or three minutes past clears that with margin, at no cost at all. A -Time
+    still in the future is moved back by whole intervals, never by a day, so the
+    phase given is the phase kept.
 
     Measured 2026-09-05 against api.warframe.com/cdn/worldState.php, nine
     readings about seventy seconds apart: the document's own Time stamp ran
@@ -42,8 +37,9 @@
     max-age is not the bound on staleness and cannot be used as one; the
     sixty-second regeneration interval is.
 
-    -EveryMinutes 30 or -EveryHours 1 if that is more than you want; the trade is
-    only how fresh the fissures are. Five minutes is the floor, and that is manners
+    -EveryMinutes 30 or -EveryHours 24 if you want it faster or slower; the trade
+    is how soon a DE or WFCD change reaches this machine, and how fresh the
+    fallback fissure list is. Five minutes is the floor, and that is manners
     rather than a technical limit.
 
     No LLM is involved at any point - every source is JSON or a regularly
@@ -66,9 +62,11 @@
 #>
 [CmdletBinding()]
 param(
-    # :32 rather than :30, so the ten-minute grid lands at :02, :12, :22 and so
-    # on instead of on the hour. See .DESCRIPTION - the offset is what keeps a
-    # boundary read off the seconds either side of the turnover it is reading.
+    # The phase of the repeating grid. :32 rather than :30 keeps every run two
+    # minutes off the half hour, and at 150 minutes the grid alternates :32 and
+    # :02, so it never lands on the hour. For the bounty rotation itself, pass a
+    # time a few minutes after a real turnover. See .DESCRIPTION - the offset is
+    # what keeps a boundary read off the seconds either side of the turnover.
     # Whole-hour and half-hour time zones both carry it through to UTC; a
     # quarter-hour zone lands the grid off the hour anyway and neither gains nor
     # loses. Anyone passing -Time explicitly is choosing their own phase.
@@ -368,11 +366,20 @@ if ($DispatchRemote) {
 # re-registering, which is the only thing that shows it: every other property is
 # identical either way.
 #
-# For a repeating trigger `-Time` is a phase, not a first run, so moving it to
-# yesterday keeps the grid on exactly the same minutes and starts it now. The
-# hourly and daily cadences keep their phase too, for the same reason.
+# For a repeating trigger `-Time` is a phase, not a first run, so it is moved
+# back by WHOLE INTERVALS until it is no longer in the future, which starts the
+# grid now and keeps it on exactly the minutes -Time names.
+#
+# It moved back by one day until 2026-09-24, which keeps the phase only for an
+# interval that divides a day - ten minutes, an hour. The default has been 150
+# since 2026-09-09, and 1440 mod 150 is 90, so a day back shifted the whole grid
+# by ninety minutes. Registered with -Time 11:20 just after an 11:17 bounty
+# turnover, the task read back NextRunTime 12:20, and every run landed an hour
+# after a boundary instead of three minutes. That undid the one reason for the
+# phase, which README explains. Found by reading NextRunTime back, which is the
+# only place it shows.
 $firstRun = Get-Date -Date $Time
-if ($firstRun -gt (Get-Date)) { $firstRun = $firstRun.AddDays(-1) }
+while ($firstRun -gt (Get-Date)) { $firstRun = $firstRun.AddMinutes(-$EveryMinutes) }
 
 $trigger = New-ScheduledTaskTrigger -Once -At $firstRun `
     -RepetitionInterval (New-TimeSpan -Minutes $EveryMinutes)
@@ -444,10 +451,10 @@ Register-ScheduledTask -TaskName $TaskName -Action $actions -Trigger $trigger `
 #
 # **If the machine is off at 18:07, `-StartWhenAvailable` runs it on the next
 # boot** rather than skipping to the following day. That is worth stating
-# because the setting does NOT do the same for the ten-minute task above -
+# because the setting does NOT do the same for the repeating task above -
 # missed repetitions are simply missed, measured as two twenty-minute gaps in
 # `data/feed-log.json` on 2026-09-04 - and it does not need to there, since the
-# next repetition is ten minutes away. A once-a-day trigger has no such safety
+# next repetition is at most 150 minutes away. A once-a-day trigger has no such safety
 # net, so this is the setting the whole design leans on.
 $wantDailyFull = $DispatchRemote -and (-not $NoDailyFull)
 if ($wantDailyFull) {

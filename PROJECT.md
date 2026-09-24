@@ -987,14 +987,20 @@ of them is hosted headlessly. Read back rather than grepped out of the script,
 for the same reason the rest of that test exists: registering is the layer that
 can refuse you.
 
-### Install the ten-minute task
+### Install the refresh task
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\schedule.ps1
+powershell -ExecutionPolicy Bypass -File tools\schedule.ps1 -Time 11:20 -DispatchRemote
 ```
 
 Registers a Windows Scheduled Task ("Warframe Prime Hunter data refresh") that runs
-`build_data.py --if-changed` **every ten minutes**. Options: `-EveryMinutes 30`,
+`build_data.py --if-changed` **every 150 minutes**, the bounty rotation (`§7`,
+*The cadence is the bounty rotation*). `-Time` is the phase: give it a time a
+few minutes after a real bounty turnover (the payload's
+`meta.bounties.windowEnd`), and every later run stays just after one. The line
+above is how this machine was registered on 2026-09-24, three minutes after the
+08:17Z turnover. `-DispatchRemote` also dispatches the light CI build after each
+run, and registers the daily full one. Options: `-EveryMinutes 30`,
 `-EveryHours 8`, `-Time 07:30`, `-RunNow`, `-Remove`. `tools/schedule.sh` installs
 the same job into cron on macOS and Linux, with the same defaults — a test compares
 the two, because a default changed on one platform and left alone on the other is
@@ -1002,16 +1008,17 @@ not a visible mistake. The same test reads the interval out of the published
 workflow and out of the page's own poll, so all three move together or the suite
 says so.
 
-**Why ten minutes.** One reason, and it is not "to be current for its own sake":
-
-- The **fissure badges** on the ranked nodes only appear for fissures that have not
-  expired, and a fissure runs an hour or two. They are exactly as fresh as this
-  task. At ten minutes they are as good as live; hourly they were mostly right;
-  daily there are never any.
-- The **"this data is old" banner** the task also exists to prevent gets the same
-  cover for free. It is patient for 14 days, so at anything like this cadence the
-  margin is absurd — which is fine, because the margin was never the binding
-  constraint.
+**It was ten minutes until 2026-09-24, for a reason that had expired.** The
+fissure badges were exactly as fresh as this task, until 2026-09-08, when the
+page began polling WFCD's live fissure list itself every two minutes. `§7`
+recorded the 150-minute default on 2026-09-09, but the task on this machine
+predated it and kept repeating every ten minutes: 144 local builds and 144 CI
+dispatches a day. It was re-registered on 2026-09-24, after the owner asked
+whether the local refresh still served the fissures and it was confirmed that it
+does not: `LIVE_FISSURE_REFRESH_MS` in `shared.js` is two minutes, and the
+build's own list is only the fallback. Re-registering also found the phase bug
+now fixed in `schedule.ps1`: pulling a future `-Time` back by a day shifted a
+150-minute grid by ninety minutes.
 
 **What is actually delivered, measured rather than assumed.** `*/10` asks for 144
 runs a day and **GitHub does not deliver them** — scheduled workflows are best
@@ -1026,20 +1033,13 @@ that machine is awake, **nought or one an hour while it sleeps**, which is
 GitHub's cron on its own. So "144 a day" is now roughly true and is true because
 of the dispatch, not because of the cron.
 
-**Why that is not rude.** The one source polled every run is
-`api.warframestat.us/pc/fissures`, and it is 5× slower than what that endpoint asks
-for: it sits behind a CDN advertising `Cache-Control: max-age=120`, so a
-two-minute-old answer is one it is happy to serve to anyone. Every fetch is
-conditional — measured against the live endpoint, an `If-None-Match` with the stored
-validator returns **304 and zero bytes** — so a run that finds nothing new
-transfers essentially nothing. Five minutes is the floor the script enforces, and
-that is manners rather than a technical limit; nothing in the data changes faster
-than that.
+**Why that is not rude**, even at the old ten minutes. Every fetch honours the
+window its source declares and is conditional, so a run that finds nothing new
+transfers almost nothing. An `If-None-Match` with the stored validator returns
+**304 and zero bytes**, measured against the live endpoint. Five minutes is the
+floor the script enforces, and that is manners rather than a technical limit.
 
 The whole run costs **1.7 seconds** on a warm cache, measured end to end.
-
-The `.DESCRIPTION` block in `tools/schedule.ps1` still calls this the "fissure
-strip", which it stopped being on 2026-08-14 — see `TODO.md`.
 
 ### Why `--if-changed` is cheap
 
@@ -6802,8 +6802,9 @@ what the heaviest source asks for — `www.warframe.com/droptables` declares
 #### What happens if the machine is off at 18:07 — and what is actually known
 
 The owner asked, and it is the right question for a once-a-day job: the
-ten-minute task does not need an answer because its next attempt is ten minutes
-away, and this one's is twenty-four hours away.
+repeating refresh task does not need an answer because its next attempt is at
+most 150 minutes away (ten, when this was written), and this one's is twenty-four
+hours away.
 
 Measured here, on this machine:
 
