@@ -479,7 +479,11 @@
      that carries the old key. Dropping it from this list would mean the restore
      silently discarded the setting; keeping it lets `migrateCapped` below turn
      it into the new one. Delete both once no old backup can plausibly turn up. */
-  const PLAN_OPTIONS = ["squad", "event", "railjack", "steel", "aya",
+  /* `caches` replaced `event`, `railjack` and `aya` on 2026-09-24, owner's
+     decision: Aya is always counted, Railjack always ranked, an event node
+     ranked while a live event names it, and cache hunting is the one switch
+     left. See `RETIRED_PLAN_OPTIONS`. */
+  const PLAN_OPTIONS = ["squad", "caches", "steel",
                         "capped", "traces",
                         "minutes", "runStart", "runEnd",
                         "sort", "formaHave", "formaNeed",
@@ -490,12 +494,19 @@
      absent, so a reader who has since set the switch keeps what they set.
      `capped = !traces` because the sense inverted along with the name: the old
      default was `traces: true`, "tight", which is `capped: false`. */
+  /* Switches that no longer exist, removed from saved state on the way in so
+     they do not ride along in every later save and backup as settings nothing
+     reads. A backup is already covered by `PLAN_OPTIONS`; this is for what a
+     browser saved before 2026-09-24. */
+  const RETIRED_PLAN_OPTIONS = ["event", "railjack", "aya"];
+
   function migrateCapped(o) {
     if (o && typeof o === "object") {
       if (o.capped === undefined && typeof o.traces === "boolean") {
         o.capped = !o.traces;
       }
       delete o.traces;
+      RETIRED_PLAN_OPTIONS.forEach((k) => { delete o[k]; });
     }
     return o;
   }
@@ -709,7 +720,7 @@
   }
 
   window.WFPrimeModel = {
-    REFINEMENTS, TRACE_COST, PLAN_OPTIONS, migrateCapped,
+    REFINEMENTS, TRACE_COST, PLAN_OPTIONS, RETIRED_PLAN_OPTIONS, migrateCapped,
     needOf, rarityOf, partRarity, partRarityClass, refineAdvice, statusOf, bucketsOf,
     relicValue, bestRefinement, sourceValue, parseBackup, unfinishedNote,
     RADIANT_BONUS, radiantMultiplier,

@@ -25,6 +25,7 @@
   const liveRotation = ROT.liveRotation;
   const untilText = ROT.untilText;
   const isRailjack = ROT.isRailjack;
+  const isCacheHunt = ROT.isCacheHunt;
   const isEvent = ROT.isEventNode;
   const bountyEvent = ROT.bountyEvent;
   const eventRunning = ROT.eventRunning;
@@ -121,13 +122,12 @@
        the tick without changing the assumption. Off is still the common case,
        and it is still the state in which a Radiant source scores higher.
        `M.migrateCapped` below carries an old saved `traces` across. */
-    /* `railjack` on by default since 2026-08-27, at the owner's direction. It
-       gates whether Proxima nodes are ranked at all, and six Primes have no
-       route that is not Railjack — with it off the planner silently declines to
-       rank the only places those can be farmed, which is the shape of omission
-       this project has had to fix before. Anyone without a ship unticks it once
-       and the choice is saved. */
-    { squad: false, event: false, railjack: true, aya: true, capped: false,
+    /* `caches` OFF by default, owner's decision 2026-09-24, when *Count Aya
+       drops*, *Include event nodes* and *Include Railjack* were retired: Aya is
+       always counted, Railjack always ranked, an event node ranked while a live
+       event names it. Cache hunting stays opt-in, as Railjack was for its own
+       caches, and a relic that drops nowhere else is listed anyway, marked. */
+    { squad: false, caches: false, capped: false,
       minutes: {}, sort: "rate", tier: null, varzia: true, trade: true },
     M.migrateCapped(load(KEY_PLAN, {})));
 
@@ -671,22 +671,21 @@
        demand badge on the row says which nodes need it; that is the whole of
        what there is to say. */
     const nodes = new Map();
-    const blocked = { railjack: new Set(), event: new Set() };
+    const blocked = { caches: new Set(), event: new Set() };
     relicPlan.forEach((rp, rname) => {
       const srcs = RELICS[rname].sources || [];
       /* ── an opt-in gate in front of your only option ─────────────────
-         Railjack is left out by default because it is a different activity
-         with its own setup. For six Primes it is the ONLY activity: their
-         original relics are vaulted and Railjack has been the sole current
-         source for years. Excluding those is not a filter, it is a dead end —
-         the ranking came back empty and named a switch, which is better than
-         silence but still asks the reader to opt in to the only thing there is.
+         Cache hunting is left out by default: a run is paid by finding caches,
+         not by finishing, and nobody runs a mission for them. For some relics
+         it is the ONLY route. Excluding those is not a filter, it is a dead end.
 
          So a relic with nothing reachable under the switches as set has its
-         Railjack routes let through anyway, and every row built from one is
-         marked. The checkbox keeps meaning what it says for everything else:
+         cache routes let through anyway, and every row built from one is
+         marked. The switch keeps meaning what it says for everything else:
          this fires only when the alternative is nowhere at all. Owner's
-         decision, 2026-08-25 — option (ii) of three. */
+         decision, 2026-08-25, option (ii) of three, written for *Include
+         Railjack*; carried over to *Cache hunting* on 2026-09-24, when Railjack
+         itself became always ranked. */
       const stranded = !srcs.some((s) => ROT.reachableSource(s, opts));
       srcs.forEach((s) => {
         if (notADestination(s)) return;      // quest, or not modelled yet
@@ -695,10 +694,11 @@
         if (!ROT.reachableSource(s, opts)) {
           /* Event nodes are never forced: an event that is not running does not
              exist on the star chart, so there is nothing to send anyone to. A
-             Railjack node is always there — the reader simply has to want it. */
-          if (stranded && isRailjack(s) && !isEvent(s)) onlyRoute = true;
+             cache-hunting node is always there — the reader simply has to want
+             it. */
+          if (stranded && isCacheHunt(s) && !isEvent(s)) onlyRoute = true;
           else {
-            if (isRailjack(s)) blocked.railjack.add(skip);
+            if (isCacheHunt(s) && !isEvent(s)) blocked.caches.add(skip);
             else blocked.event.add(skip);
             return;
           }
@@ -831,7 +831,10 @@
        other three. */
     let ayaValue = 0, ayaRelic = null, ayaRotationLive = false, ayaMissing = 0;
     let ayaTargeting = false;
-    if (opts.aya) {
+    /* Always counted since 2026-09-24, owner's decision: *Count Aya drops*
+       was retired. The 100/30 rule below already says how much it is worth,
+       which is the judgement the switch used to make wholesale. */
+    {
       const expiry = ((DATA.meta || {}).resurgence || {}).expiry;
       const anyOnSale = Object.keys(RELICS).some((n) => RELICS[n].resurgence);
       ayaRotationLive = anyOnSale &&
@@ -888,8 +891,8 @@
     if (ayaValue > 0) {
       const byNode = new Map();
       (DATA.aya || []).forEach((a) => {
-        if (!opts.railjack && isRailjack(a)) return;
-        if (!opts.event && isEvent(a)) return;
+        if (!opts.caches && isCacheHunt(a)) return;
+        if (isEvent(a)) return;
         const key = `${a.planet}|${a.node}|${a.mode}`;
         let n = nodes.get(key);
         if (!n) {
@@ -978,7 +981,7 @@
     const bonus = fissureBonus(relicPlan);
     const now = Date.now();
     const fissureAt = (n) =>
-      ROT.fissuresAt(FISSURES, nodeKey(n), now, opts.railjack, opts.steel)[0] || null;
+      ROT.fissuresAt(FISSURES, nodeKey(n), now, true, opts.steel)[0] || null;
     nodes.forEach((n) => {
       /* `draws` rides on `live` because `live` is what `runValue` hands the
          bounty model; left off when the node's sources say one. */
@@ -1170,7 +1173,7 @@
     return { relicPlan, ranked: folded, places: ranked.length,
              needs, formaShort, ayaValue, ayaRelic, ayaTargeting,
              ayaRotationLive, ayaMissing, perMinute: !!mins,
-             blocked: { railjack: blocked.railjack.size, event: blocked.event.size } };
+             blocked: { caches: blocked.caches.size, event: blocked.event.size } };
   }
 
   /* ── tooltip, same as the collection page ─────────────────────
@@ -1598,26 +1601,25 @@
         for; <i>How to crack them</i> beside this lists which ones, and what to
         refine each to once you have it.</p>`;
     }
-    const off = [];
-    if (blocked.railjack) {
-      off.push([blocked.railjack, "a Railjack mission", "Include Railjack"]);
-    }
-    if (blocked.event) {
-      off.push([blocked.event, "an event node", "Include event nodes"]);
-    }
-    if (!off.length) {
+    if (!blocked.caches && !blocked.event) {
       return `<p class="nowhere">These relics drop, but nowhere you can reach —
         every source is a quest or something the model cannot rank yet.</p>`;
     }
+    const places = (n) => `<b>${n} place${n === 1 ? "" : "s"}</b> ${
+      n === 1 ? "carries" : "carry"} what you want, ${n === 1 ? "and it is" : "all"}`;
     /* Short, and loud. It is the only thing on an otherwise empty heading, and
-       it is entirely actionable: one checkbox away from a full list. Dimming it
-       to match the rest of the page would hide the only thing worth reading. */
-    return off.map(([n, what, box]) =>
-      `<p class="nowhere"><b>${n} place${n === 1 ? "" : "s"}</b> ${
-        n === 1 ? "carries" : "carry"} what you want, ${
-        n === 1 ? "and it is" : "all"} ${what}.<br>` +
-      `Tick <b>${esc(box)}</b> on the left to rank ${n === 1 ? "it" : "them"}.</p>`
-    ).join("");
+       where a switch hides the answer it is one switch away from a full list.
+       Dimming it to match the rest of the page would hide the only thing worth
+       reading. An event node has no switch since 2026-09-24: it is ranked the
+       moment a live event names it, so the message says when, not what to tick. */
+    return (blocked.caches
+      ? `<p class="nowhere">${places(blocked.caches)} cache hunting.<br>` +
+        `Switch <b>Cache hunting</b> on, on the left, to rank ${
+          blocked.caches === 1 ? "it" : "them"}.</p>` : "") +
+      (blocked.event
+        ? `<p class="nowhere">${places(blocked.event)} an event node.<br>` +
+          `${blocked.event === 1 ? "It is" : "They are"} ranked by ${
+            blocked.event === 1 ? "itself" : "themselves"} while the event runs.</p>` : "");
   }
 
   /* ── the effort boxes ─────────────────────────────────────────────
@@ -2170,7 +2172,6 @@
           "one misses, but it is not more progress. Those rows say <em>overlap</em> " +
           "and name the relic."
         : "") +
-      (opts.event ? " Event nodes are included — check the event is actually running." : "") +
       (openRelics === 0 ? " Nothing you want is currently dropping." : "");
 
     /* ── eight, and a way out of eight ────────────────────────────────
@@ -2303,14 +2304,14 @@
             "What it is not is more progress — every part it clears\n" +
             "is already covered by something else here.")
           }">${n.overlap.length} overlap${n.overlap.length === 1 ? "" : "s"}</span>` : ""}${
-          /* Shown despite *Include Railjack* being off, because for this relic
+          /* Shown despite *Cache hunting* being off, because for this relic
              there is nowhere else. Amber for the same reason `.est` is amber:
              the app made a call the reader did not. */
           n.onlyRoute ? ` · <span class="est" data-tip="${esc(
-            "Listed even though Include Railjack is off: every current source for\n" +
-            "what you want here is a Railjack mission, so leaving it out would\n" +
-            "leave you nowhere at all.\n\n" +
-            "Tick Include Railjack on the left to see the rest of them too.")
+            "Listed even though Cache hunting is off: every current source for\n" +
+            "what you want here is a cache-hunting mission, so leaving it out\n" +
+            "would leave you nowhere at all.\n\n" +
+            "Switch Cache hunting on, on the left, to see the rest of them too.")
           }">only route</span>` : ""}${
           /* A borrowed number stays visible even after the corner was cut back:
              a guess you can see beats a guess you cannot. */
@@ -2446,12 +2447,12 @@
 
          Both sides ask `ROT.reachableSource` now, with the same `opts`, so they
          cannot answer differently. The `stranded` rule is repeated here for the
-         same reason: a relic reachable ONLY on Railjack is listed by the loop
-         despite the switch, so it has to be counted as reachable here too. */
+         same reason: a relic reachable ONLY by cache hunting is listed by the
+         loop despite the switch, so it has to be counted as reachable here too. */
       const relicReachable = (rname) => {
         const srcs = (RELICS[rname] || {}).sources || [];
         if (srcs.some((s) => ROT.reachableSource(s, opts))) return true;
-        return srcs.some((s) => !notADestination(s) && isRailjack(s) && !isEvent(s));
+        return srcs.some((s) => !notADestination(s) && isCacheHunt(s) && !isEvent(s));
       };
       const liveRelics = n.item.id
         ? (BY_ID.get(n.item.id).parts.find((p) => p.name === n.part) || { relics: [] })
@@ -2523,7 +2524,7 @@
     const now = Date.now();
     $$(".fissure-slot").forEach((slot) => {
       const live = ROT.fissuresAt(FISSURES, slot.dataset.node, now,
-                                  opts.railjack, opts.steel);
+                                  true, opts.steel);   // Railjack always ranked
       if (!live.length) { slot.innerHTML = ""; return; }
       const f = live[0];
       const tip = "A " + f.tier + " fissure is running here, closing " +
@@ -2776,8 +2777,7 @@
       opts.sort = sortSel.value; save(KEY_PLAN, opts); render();
     });
   }
-  [["p-squad", "squad"], ["p-aya", "aya"], ["p-event", "event"],
-   ["p-railjack", "railjack"], ["p-steel", "steel"],
+  [["p-squad", "squad"], ["p-caches", "caches"], ["p-steel", "steel"],
    ["p-capped", "capped"]].forEach(([id, key]) => {
     const el = $("#" + id);
     el.checked = !!opts[key];

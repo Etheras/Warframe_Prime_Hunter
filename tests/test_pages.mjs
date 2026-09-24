@@ -2398,13 +2398,16 @@ page_test("a card whose relic drops only on Railjack still says where", async ()
   assert.ok(await proximaSpot.count() > 0,
             `${only.relic} drops nowhere but Proxima, so ${only.name}'s card has ` +
             `to offer a Proxima node somewhere in its list`);
-  assert.equal(await proximaSpot.locator(".demand").count(), 1,
-               "a Proxima row must carry a badge - counted rather than read, " +
-               "because innerText on a locator that never appears hangs for " +
+  /* The Railjack badge by name, because a row can carry more than one since
+     2026-09-24: a Railjack *cache* row says CACHES as well. */
+  const railjackBadge = proximaSpot.locator(".demand").filter({ hasText: /railjack/i });
+  assert.equal(await railjackBadge.count(), 1,
+               "a Proxima row must carry a Railjack badge - counted rather than " +
+               "read, because innerText on a locator that never appears hangs for " +
                "thirty seconds instead of failing");
   // innerText, not textContent: the badge is uppercased in CSS, and what the
   // reader sees is the thing worth pinning
-  assert.match(await proximaSpot.locator(".demand").innerText(), /^RAILJACK$/,
+  assert.match(await railjackBadge.innerText(), /^RAILJACK$/,
                "a node that needs a ship has to say so, since for this relic it " +
                "is the only option");
   assert.deepEqual(errors, []);
@@ -2622,7 +2625,7 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
     const it = D.items.find((i) => i.name === "Nyx Prime");
     if (!it) return null;
     localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: true }));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ caches: true }));
     // by mode, never by calling isRailjackCache
     return (it.relics || []).every((r) => {
       const rec = D.relics[r];
@@ -2635,7 +2638,7 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
   await page.reload({ waitUntil: "load" });
 
   const row = page.locator("#planNodes .spot").filter({ hasText: "(Caches)" }).first();
-  assert.ok(await row.count() > 0, "a Caches node has to be rankable with Railjack on");
+  assert.ok(await row.count() > 0, "a Caches node has to be rankable with Cache hunting on");
   assert.match(await row.locator(".spot-meta").innerText(), /halved/,
                "a score moved by a judgement has to say so on the row");
 
@@ -2653,19 +2656,17 @@ page_test("a Railjack cache is scored at half, and the row says so", async () =>
   assert.deepEqual(errors, []);
 });
 
-page_test("Railjack is forced in when it is the only route, and says so", async () => {
+page_test("cache hunting is forced in when it is the only route, and says so", async () => {
   /* The one place the planner could strand you. Nyx Prime's four parts all come
-     from relics that exist only on Proxima, so with Railjack off the page found
-     eight good places and discarded every one. It printed an empty heading at
-     first, then an empty heading that named the switch — better, but an opt-in
-     gate in front of the ONLY option is still a dead end.
+     from relics that drop only in Railjack caches, so with the switch off the
+     page found eight good places and discarded every one. It printed an empty
+     heading at first, then an empty heading that named the switch — better,
+     but an opt-in gate in front of the ONLY option is still a dead end.
 
-     Owner's decision, 2026-08-25: force them in and mark them. So this now
-     asserts the opposite of what it used to. `noNodes` is still there and still
-     right for event nodes and for the day the data changes; it simply cannot
-     fire for Railjack any more, because nothing is left stranded — measured
-     across the whole catalogue, exactly the six documented Primes take this
-     path and no live relic is stranded at all. */
+     Owner's decision, 2026-08-25: force them in and mark them. Written for
+     *Include Railjack*; since 2026-09-24 Railjack is always ranked and the
+     switch is *Cache hunting*, so the same rule gates the caches instead - and
+     Nyx Prime's routes are all caches (the test above asserts it from the data). */
   const { page, errors } = await open("/plan.html");
   /* Named outright rather than found with isRailjack. Picking the subject with
      the code under test makes the case vacuous - break the classifier, find no
@@ -2680,16 +2681,16 @@ page_test("Railjack is forced in when it is the only route, and says so", async 
     const D = window.WFPRIME_DATA;
     const it = D.items.find((i) => i.name === "Nyx Prime");
     if (it) localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify([it.id]));
-    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ railjack: false }));
+    localStorage.setItem("wfprimes.plan.v1", JSON.stringify({ caches: false }));
     return it ? it.name : null;
   });
   assert.ok(stranded, "Nyx Prime is not in the dataset - pick another item that " +
-                      "can only be farmed on Railjack, do not delete the check");
+                      "can only be farmed from caches, do not delete the check");
   await page.reload({ waitUntil: "load" });
 
   const where = page.locator("#planNodes");
-  assert.equal(await page.locator("#p-railjack").isChecked(), false,
-               "Railjack must still be opt-in — this is an exception, not a default");
+  assert.equal(await page.locator("#p-caches").isChecked(), false,
+               "cache hunting must still be opt-in — this is an exception, not a default");
 
   const rows = await where.locator(".spot").count();
   assert.ok(rows > 0,
@@ -2704,7 +2705,7 @@ page_test("Railjack is forced in when it is the only route, and says so", async 
     })));
   for (const m of marks) {
     // textContent, so this is the authored casing — the uppercase is CSS
-    assert.ok(m.demand.some((d) => /railjack/i.test(d)),
+    assert.ok(m.demand.some((d) => /railjack/i.test(d)) && m.demand.some((d) => /caches/i.test(d)),
               `a forced-in row must still say what it demands, got ${m.demand.join(",")}`);
     assert.ok(m.onlyRoute,
               "a row that overrode the reader's switch has to say so on the row");
@@ -2719,8 +2720,8 @@ page_test("Railjack is forced in when it is the only route, and says so", async 
 
   // the native box is hidden behind a styled span, so click the label a real
   // reader would click, not the input
-  await page.locator("label:has(#p-railjack)").click();
-  assert.ok(await page.locator("#p-railjack").isChecked());
+  await page.locator("label:has(#p-caches)").click();
+  assert.ok(await page.locator("#p-caches").isChecked());
   assert.ok(await where.locator(".spot").count() >= rows,
             "ticking the box cannot take places away");
   const stillMarked = await page.evaluate(() =>
@@ -2728,8 +2729,8 @@ page_test("Railjack is forced in when it is the only route, and says so", async 
       .some((e) => /only route/.test(e.textContent)));
   assert.equal(stillMarked, false,
                "with the switch ON nothing is being forced, so the mark must go");
-  assert.equal(await where.locator(".spot").first().locator(".demand").innerText(),
-               "RAILJACK", "and every one of them still says what it needs");
+  assert.deepEqual(await where.locator(".spot").first().locator(".demand").allInnerTexts(),
+                   ["RAILJACK", "CACHES"], "and every one of them still says what it needs");
   assert.deepEqual(errors, []);
 });
 
@@ -4336,26 +4337,29 @@ page_test("an event bounty says what a run costs, and only while it is running",
         new Date(running ? now + 3600e3 : now - 60e3).toISOString()]);
     await page.reload({ waitUntil: "load" });
     await wishFarmable(page, 6);
-    /* *Include event nodes* on in both halves, and that is what makes the
-       second half mean anything. With it off, an event that is not running has
-       no row at all — so an assertion that the fee is absent would pass because
-       the row is gone, not because the guard works. Confirmed: with the guard
-       deleted the test still passed until this line was added. */
-    await setCheck(page, "#p-event", true);
     const more = page.locator("#moreNodes");
     if (await more.count()) await more.click();
-    return page.locator(".rot").evaluateAll((els) =>
-      els.map((e) => e.getAttribute("data-tip") || "").join("\n---\n"));
+    return {
+      tips: await page.locator(".rot").evaluateAll((els) =>
+        els.map((e) => e.getAttribute("data-tip") || "").join("\n---\n")),
+      rows: await page.locator("#planNodes .spot").evaluateAll((els, g) =>
+        els.filter((e) => e.textContent.includes(g)).length, group),
+    };
   };
 
   const live = await plant(true);
-  assert.match(live, /Each run spends Eidolon Phylaxis and Infested Catalyst/,
+  assert.ok(live.rows > 0, `a running ${group} has to be on the list to say anything`);
+  assert.match(live.tips, /Each run spends Eidolon Phylaxis and Infested Catalyst/,
                "a running event bounty has to say what starting it costs");
 
+  /* The other half changed on 2026-09-24, when *Include event nodes* was
+     retired. That switch used to keep an ended event's row on screen, so this
+     asserted the row stayed and the fee went. With no switch, an event that is
+     not running is not ranked at all - there is no run to price - so what is
+     asserted now is that the row is gone, and with it any fee. */
   const over = await plant(false);
-  assert.match(over, /is not running, so this bounty is not on the board/,
-               "the row has to still be on screen, or the next assertion is vacuous");
-  assert.ok(!/Each run spends/.test(over),
+  assert.equal(over.rows, 0, `an ended ${group} must not be ranked, and has no switch to be`);
+  assert.ok(!/Each run spends/.test(over.tips),
             "the price of a run nobody can start is not news");
   assert.deepEqual(errors, []);
 });
@@ -4422,21 +4426,30 @@ page_test("a Prime Resurgence Prime gets a crack list, and is told why there is 
   assert.match(await page.locator("#planRelics .from-varzia").first().innerText(),
                /from Varzia/i, "the badge names where the relic comes from");
 
-  /* **The empty case is now conditional, and the condition is the Aya switch.**
-     Until 2026-09-06 a Resurgence Prime produced an empty ranking whatever the
-     options said, and this test asserted that flatly with the reason "ranking a
-     place to run them would be invented". Half of that was right and half was
-     not: ranking a place to run *these relics* would indeed be invented, but
-     ranking a place to farm the **Aya that buys them** is not — it is the
-     owner's stated rule, where a targeted Aya is worth 100% because one Aya is
-     one relic of your choosing.
+  /* **The empty case is conditional, and since 2026-09-24 the condition is the
+     data, not a switch.** Until 2026-09-06 a Resurgence Prime produced an empty
+     ranking whatever the options said. Half of that was right: ranking a place
+     to run *these relics* would be invented, but ranking a place to farm the
+     **Aya that buys them** is not — the owner's rule, where a targeted Aya is
+     worth 100% because one Aya is one relic of your choosing.
 
-     So the silence is asserted where it is still correct — *Count Aya drops*
-     **off**, which cannot send anyone anywhere — and the message, which is what
-     this test was really protecting, is unchanged and still has to be true. */
-  await setCheck(page, "#p-aya", false);
+     This reached the silence by switching *Count Aya drops* off. That switch was
+     retired on 2026-09-24 and Aya is always counted, so the silence is now
+     reached the only way left: a payload that carries no Aya at all, which is
+     what a build without the Aya table would ship. Planted before load, the way
+     the Baro tests plant `meta.baro`. The message, which is what this test was
+     really protecting, is unchanged and still has to be true. */
+  await page.addInitScript(() => {
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) { if (next) next.aya = []; held = next; },
+    });
+  });
+  await page.reload({ waitUntil: "load" });
   assert.equal(await page.locator("#planNodes .spot").count(), 0,
-               "with Aya not counted there is nothing here at all: these relics do not drop");
+               "with no Aya anywhere there is nothing here at all: these relics do not drop");
   const why = await page.locator("#planNodes .nowhere").innerText();
   assert.match(why, /Prime Resurgence/,
                `the reader has to be told why: ${why}`);
@@ -4453,18 +4466,37 @@ page_test("a minute saved for a mission type off the list stops costing the list
      every saved key, so one value for a type with nothing ranked flipped the
      whole list to per-minute and became the assumed cost of every visible type.
 
-     `Skirmish` is the subject because Railjack is its only home and the switch
-     that removes it is a control the reader owns — so the "not on the list"
-     state is reachable without inventing a mission type. Asserted off the
-     payload rather than assumed: if Skirmish ever ranks with Railjack off, this
-     test says so instead of quietly passing. */
+     `Caches` is the subject because *Cache hunting* is the one switch left that
+     takes a mission type off the list, and it is a control the reader owns - so
+     the "not on the list" state is reachable without inventing a mission type.
+     This was `Skirmish` under *Include Railjack* until 2026-09-24, when Railjack
+     became always ranked.
+
+     The farm list is chosen for it from the payload: Primes with a `Caches`
+     route, every one of whose live relics ALSO drops somewhere that is not a
+     cache. A relic that drops only in caches is forced onto the list whatever
+     the switch says, which would make the "off" state unreachable. Asserted off
+     the page too: if Caches ever ranks with the switch off, this says so. */
   const { page, errors } = await open("/plan.html");
-  await wishFarmable(page);
-  await page.evaluate(() => {
+  const subjects = await page.evaluate(() => {
+    const D = window.WFPRIME_DATA;
+    const live = (r) => D.relics[r] && !D.relics[r].vaulted;
+    const srcs = (r) => (D.relics[r].sources || []).filter((s) => !s.access);
+    const ok = (D.items || []).filter((it) => {
+      const rel = (it.relics || []).filter(live);
+      return rel.length &&
+        rel.some((r) => srcs(r).some((s) => s.mode === "Caches")) &&
+        rel.every((r) => srcs(r).some((s) => s.mode !== "Caches" && !/^Event:/.test(s.planet || "")));
+    }).slice(0, 3).map((it) => it.id);
+    localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(ok));
     const p = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
-    p.railjack = true; p.minutes = {};
+    p.caches = true; p.minutes = {};
     localStorage.setItem("wfprimes.plan.v1", JSON.stringify(p));
+    return ok;
   });
+  assert.ok(subjects.length > 0,
+            "no Prime has a cache route alongside other routes - pick another way to " +
+            "reach the off-the-list state, do not delete the check");
   await page.reload({ waitUntil: "load" });
 
   const modeRows = () => page.evaluate(() =>
@@ -4478,22 +4510,22 @@ page_test("a minute saved for a mission type off the list stops costing the list
   }));
 
   await page.locator(".advanced > summary").click();
-  assert.ok((await modeRows()).includes("Skirmish"),
-            "with Railjack on, Skirmish has to be one of the rows — otherwise there is " +
-            "no way to reach the state this test is about");
+  assert.ok((await modeRows()).includes("Caches"),
+            "with Cache hunting on, Caches has to be one of the rows — otherwise there " +
+            "is no way to reach the state this test is about");
 
   // give it a number, then take away the switch that puts it on the list
   await page.evaluate(() => {
     const p = JSON.parse(localStorage.getItem("wfprimes.plan.v1") || "{}");
-    p.minutes = { Skirmish: 9 }; p.railjack = false;
+    p.minutes = { Caches: 9 }; p.caches = false;
     localStorage.setItem("wfprimes.plan.v1", JSON.stringify(p));
   });
   await page.reload({ waitUntil: "load" });
   await page.locator(".advanced > summary").click();
 
   const rows = await modeRows();
-  assert.ok(rows.length > 2, "there still has to be a form to look at");
-  assert.ok(!rows.includes("Skirmish"), "Railjack off takes Skirmish off the list");
+  assert.ok(rows.length > 0, "there still has to be a form to look at");
+  assert.ok(!rows.includes("Caches"), "Cache hunting off takes Caches off the list");
 
   const after = await state();
   assert.equal(after.rowsWithValue, 0, "nothing on screen carries a number");
@@ -4509,11 +4541,11 @@ page_test("a minute saved for a mission type off the list stops costing the list
 
   // and it is kept, not discarded — the owner's rule — so it counts again
   assert.deepEqual(await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("wfprimes.plan.v1")).minutes), { Skirmish: 9 },
+    JSON.parse(localStorage.getItem("wfprimes.plan.v1")).minutes), { Caches: 9 },
     "the number survives; it is only stopped from counting while it is off the list");
-  await setCheck(page, "#p-railjack", true);
+  await setCheck(page, "#p-caches", true);
   const back = await state();
-  assert.match(back.heading, /per minute/, "and it counts again the moment Skirmish returns");
+  assert.match(back.heading, /per minute/, "and it counts again the moment Caches returns");
   assert.deepEqual(errors, []);
 });
 
@@ -4534,9 +4566,11 @@ page_test("a relic on sale is never described as one you have to trade for", asy
      exactly ONE relic, so the whole plan is that relic and the branch under test
      is the one that fires.
 
-     `Count Aya drops` is switched off throughout. With it on, a Varzia relic on
-     the list now generates Aya nodes (see the test below), and `noNodes` is not
-     reached at all — which is correct, and not what this test is about. */
+     The payload's Aya is emptied throughout. With Aya present, a Varzia relic on
+     the list generates Aya nodes (see the test below), and `noNodes` is not
+     reached at all — which is correct, and not what this test is about. This
+     switched *Count Aya drops* off until that switch was retired on
+     2026-09-24; Aya is always counted now, so the staging does it instead. */
   const { page } = await open("/plan.html");
   const picked = await page.evaluate(() => {
     const D = window.WFPRIME_DATA;
@@ -4567,6 +4601,7 @@ page_test("a relic on sale is never described as one you have to trade for", asy
           if (next.relics[bRelic]) next.relics[bRelic].baro = true;
           if (next.relics[sRelic]) next.relics[sRelic].resurgence = true;
         }
+        if (next) next.aya = [];   // see the comment above: no Aya, so noNodes is reached
         if (next && next.meta) {
           /* Read per load rather than baked in, so the "he has left" case needs
              no second `addInitScript`. Wrapping the property a second time was
@@ -4587,7 +4622,6 @@ page_test("a relic on sale is never described as one you have to trade for", asy
     await page.evaluate((v) =>
       localStorage.setItem("wfprimes.wishlist.v1", JSON.stringify(v)), ids);
     await page.reload({ waitUntil: "load" });
-    await setCheck(page, "#p-aya", false);
     assert.equal(await page.locator("#planNodes .spot").count(), 0,
                  "these relics do not drop, so there must be nothing ranked");
     return page.locator("#planNodes .nowhere").innerText();
@@ -4705,14 +4739,22 @@ page_test("a relic on Varzia's shelf makes the Aya somewhere to go, not just a b
             `runTag has to say the rotations pay Aya and no relic: ` +
             chips.map((c) => c.meta).join(" | "));
 
-  /* And the switch is what makes the difference — with Aya not counted, the
+  /* And the Aya is what makes the difference — with none in the payload, the
      same list has nowhere to send you. This is the half that proves the rows
-     above came from the Aya rather than from anything else. */
-  await setCheck(page, "#p-aya", false);
+     above came from the Aya rather than from anything else. It switched *Count
+     Aya drops* off until that switch was retired on 2026-09-24, so the payload's
+     Aya is emptied instead, before load. */
+  await page.addInitScript(() => {
+    let held;
+    Object.defineProperty(window, "WFPRIME_DATA", {
+      configurable: true,
+      get() { return held; },
+      set(next) { if (next) next.aya = []; held = next; },
+    });
+  });
+  await page.reload({ waitUntil: "load" });
   assert.equal(await spots.count(), 0,
-               "with Count Aya drops off, a Resurgence-only list has nowhere to go");
-  await setCheck(page, "#p-aya", true);
-  assert.ok(await spots.count() > 0, "and switching it back on restores them");
+               "with no Aya anywhere, a Resurgence-only list has nowhere to go");
   assert.deepEqual(errors, []);
 });
 

@@ -434,10 +434,11 @@ It also handles Forma: put in how many you have and how many you want, and a
 shortfall raises the value of relics you were already going to run. It will never
 add a relic just for Forma — you pick that up from the rolls that miss anyway.
 
-**Event nodes are left out by default.** They appear in Digital Extremes' drop
-table permanently, but the node only exists on your star chart while that event
-is actually running — and the table never says which event it is. There's an
-*Include event nodes* checkbox if you know one is live.
+**Event nodes appear only while their event runs.** They sit in Digital Extremes'
+drop table permanently, but the node only exists on your star chart while that
+event is running, and the table never says which event it is. So the site asks
+which events are live and which nodes they use, and ranks an event node exactly
+while one of them names it. There is no switch for it.
 
 ### How long a run costs you — *Effort*
 
@@ -474,8 +475,8 @@ Some missions drop **Aya**, and one Aya buys one relic *of your choosing* from V
 — who stocks whatever Prime Resurgence is currently offering. That makes an Aya drop
 worth more than a random relic, because you choose which one you get.
 
-The planner counts it (**Count Aya drops**, on by default), valuing it at the best
-relic it could actually buy for your list. Nodes that drop it say `aya` at the end of their
+The planner always counts it, valuing it at the best relic it could actually buy
+for your list. Nodes that drop it say `aya` at the end of their
 detail line — hover for the rate. Two things worth knowing:
 
 - It **only raises the value of a node you were already going to run.** It will never
@@ -530,9 +531,10 @@ Under **Assumptions**, besides *How far you run*:
   runs. It does one thing beyond the display: it unlocks Disruption's rotation A,
   which is only reachable by a squad deliberately letting conduits fall to a
   schedule.
-- **Count Aya drops** — on by default; see *Aya* above.
-- **Include event nodes** — off by default; see above.
-- **Include Railjack** — off by default. Five live relics drop nowhere else.
+- **Cache hunting** — off by default. Missions paid by finding caches rather
+  than by finishing; today that is Railjack's. A relic that drops nowhere else is
+  listed anyway, marked *only route*. Railjack itself, Aya and running events
+  are always counted, so they have no switch.
 
 And **Effort — optional**, covered above.
 

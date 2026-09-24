@@ -339,17 +339,31 @@ test("only the planner options we recognise come back", () => {
   /* `runMode` is in this file on purpose: it was a real option until
      2026-08-24, so backups in the wild carry it, and an option that stopped
      existing has to be dropped rather than restored into a setting nothing
-     reads. Same path as `somethingElse` — not named, not kept. */
+     reads. Same path as `somethingElse` — not named, not kept. `aya`, `event`
+     and `railjack` joined it on 2026-09-24, when those switches were retired;
+     `caches` replaced them. */
   const out = M.parseBackup(JSON.stringify({
     collected: [],
-    plan: { squad: true, aya: false, formaNeed: 3, runMode: "aabcaa",
+    plan: { squad: true, aya: false, event: true, railjack: false, caches: true,
+            formaNeed: 3, runMode: "aabcaa",
             minutes: { Defense: 2, Spy: 4.5 },
             somethingElse: "ignored", __proto__: "nope" },
   }), CATALOGUE);
   assert.deepEqual(plain(out.plan),
-                   { squad: true, aya: false, formaNeed: 3,
+                   { squad: true, caches: true, formaNeed: 3,
                      minutes: { Defense: 2, Spy: 4.5 } },
                    "both pages' options survive, and nothing else does");
+});
+
+test("saved state loses the retired switches on the way in", () => {
+  /* A browser that saved before 2026-09-24 still holds `aya`, `event` and
+     `railjack`. `migrateCapped` is the hook both saved state and a restored
+     backup pass through, so it is where they go - otherwise every later save
+     and backup would carry three settings nothing reads. */
+  const M = load();
+  const o = { squad: true, aya: false, event: true, railjack: false, capped: true };
+  assert.deepEqual(plain(M.migrateCapped(o)), { squad: true, capped: true });
+  assert.deepEqual(plain(M.RETIRED_PLAN_OPTIONS), ["event", "railjack", "aya"]);
 });
 
 test("the effort weights are carried by a backup, since they are typed by hand", () => {

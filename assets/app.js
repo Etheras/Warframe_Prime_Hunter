@@ -127,10 +127,10 @@
      model.js because it needs the relic table and the Railjack classifier, and
      model.js deliberately knows about neither.
 
-     It is emphatically NOT the planner's *Include Railjack* checkbox. That one
-     asks whether to rank Railjack nodes at all; this one is a property of an
-     item. The filter's tooltip says so, because the two would otherwise read as
-     the same switch in two places. */
+     It is a property of an item, not a planner setting. The planner had an
+     *Include Railjack* checkbox until 2026-09-24, which asked whether to rank
+     Railjack nodes at all; Railjack is always ranked there now, and this filter
+     was never the same question. */
   /* The rotation model - what one run at a node is actually worth - lives in
      assets/rotation.js, so the collection view and the planner cannot disagree
      about it. Aliased here so the call sites read as they always did. */

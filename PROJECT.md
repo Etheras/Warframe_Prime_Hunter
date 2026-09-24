@@ -2203,7 +2203,9 @@ rotation turns up. This is the first of those.
 the same reason: standing on its own it would send you to a bounty that drops Aya
 and nothing else, ahead of somewhere carrying a part you actually need. The code
 looks the node up and returns if it is not already in the plan, so Aya can raise a
-score but never create one. Default on, with a *Count Aya drops* checkbox. Nodes that drop it get an `aya`
+score but never create one. Default on, with a *Count Aya drops* checkbox
+(**Superseded 2026-09-24**: always counted, no checkbox. See *Three planner
+switches retired, and cache hunting is the one left*). Nodes that drop it get an `aya`
 marker at the end of the meta line, after the relic count — in the same colour as
 everything else on that line, since it is one more fact about the node rather than a
 state or a warning.
@@ -2537,7 +2539,9 @@ the row, its level, planet and demand badges differed too. Both pages pass the
 predicate now.
 
 One difference between them survives and is deliberate: the collection view counts
-**Void Storms** and the planner counts them only when *Include Railjack* is on.
+**Void Storms** and the planner counts them only when *Include Railjack* is on
+(**Superseded 2026-09-24**: the planner always counts them now. See *Three
+planner switches retired, and cache hunting is the one left*).
 That is not the two pages disagreeing about a group — this view never hides
 Railjack, since some live relics drop nowhere else, so a Railjack node the planner
 has excluded is not in its group to be named at all.
@@ -3001,6 +3005,10 @@ an option nobody's answer changes is worse than no option.
 
 ### Railjack is forced in when it is the only route
 
+**Superseded 2026-09-24** — Railjack is always ranked, and this rule now applies
+to cache hunting. See *Three planner switches retired, and cache hunting is the
+one left*.
+
 `Include Railjack` is off by default because Railjack is a different activity
 with its own setup. For **six Primes it is the only activity**: Nyx, Valkyr,
 Cernos, Hikou, Scindo and Venka left the ordinary drop tables and their relics
@@ -3082,6 +3090,10 @@ unchanged — feeding the live fissure list into the score would reorder the ran
 hourly on a fact that expires before anyone acts on it.
 
 ### An empty ranking has to say what emptied it
+
+**Superseded 2026-09-24 in its wording** — the switch it names is now *Cache
+hunting*, and an event node has no switch. See *Three planner switches retired,
+and cache hunting is the one left*.
 
 Put one of those six on the farm list with *Include Railjack* off and the planner
 used to print the *Where to go* heading with nothing under it — while the panel
@@ -3332,7 +3344,7 @@ opening the app for the first time sees the change.
 
 | Control | Was | Now | Why |
 |---|---|---|---|
-| Planner — *Include Railjack* | off | **on** | It gates whether Proxima is ranked at all, and six Primes have no route that is not Railjack. Off, the planner silently declines to rank the only places they can be farmed |
+| Planner — *Include Railjack* (**Superseded 2026-09-24**, switch removed and Railjack always ranked. See *Three planner switches retired, and cache hunting is the one left*) | off | **on** | It gates whether Proxima is ranked at all, and six Primes have no route that is not Railjack. Off, the planner silently declines to rank the only places they can be farmed |
 | Collection — *Founder exclusive* | shown | **hidden** | Three items, unobtainable since 2013 |
 | Collection — *Other sources* | shown | **hidden** | Four items, none of them a relic farm — a quest, an event, a vendor |
 | Collection — *Show collected* | on | **off** | What you already own is the one thing you cannot make progress on |
@@ -6576,7 +6588,10 @@ it had to gate the row rather than merely label it — a badge alone would have 
 honest and still wrong.
 
 **The shape was already in the same function.** `allowStorm` threads through
-`fissuresAt` from `opts.railjack`, so a Void Storm answers to a switch. Steel Path
+`fissuresAt` from `opts.railjack`, so a Void Storm answers to a switch
+(**Superseded 2026-09-24**: the planner passes `true`, since Railjack is always
+ranked. See *Three planner switches retired, and cache hunting is the one
+left*). Steel Path
 answering to nothing was a one-clause asymmetry, and the fix is the symmetric
 clause plus the option that feeds it: `fissuresAt(list, node, now, allowStorm,
 allowHard)`, `opts.steel`, `#p-steel`, defaulting off exactly as Railjack does.
@@ -9109,6 +9124,55 @@ known-undated item correctly. With the flag ignored it reproduces the report
 exactly, with the fresh one last. The page test checks the name order, and the
 option list now includes it. In the real page, release date led the Warframe
 group with Citrine Prime, and Name (A–Z) ran Banshee, Caliban, Citrine, Gyre…
+
+### Three planner switches retired, and cache hunting is the one left
+
+**Owner's decision, 2026-09-24**, in their words: *Count Aya drops* goes and Aya
+is always counted; *Include event nodes* goes, and event nodes are found
+"deterministically"; *Include Railjack* goes, Railjack is always included, and
+in its place a switch for **cache hunting, on all missions, not just Railjack**.
+Anything Railjack-only or cache-only keeps a chip and stays visible whatever the
+switch says.
+
+- **Aya.** The 100/30 rule already decided what Aya is worth, targeted or
+  banked, so the switch was only ever an all-or-nothing override of a judgement
+  the model makes itself.
+- **Railjack.** Always ranked. Its `Railjack` chip still says a node needs a
+  ship, and the collection page's *Railjack only* bucket is a fact about a
+  Prime, never a setting, so it stays.
+- **Cache hunting** is `isCacheHunt` in `rotation.js`: the `(Caches)` mode on
+  any chart. DE file it on the ordinary star chart too, for example
+  Mercury/Terminus paying A, B and C for one, two and three caches, but only
+  Railjack's cache tables carry relics. Measured: every one of the 317
+  cache-hunting rows in the payload is Proxima. Off by default, as Railjack was.
+  Every cache row carries a **Caches** chip. The `stranded` rule of 2026-08-25
+  (*Railjack is forced in when it is the only route*) now applies to caches: a
+  relic with nowhere else is listed anyway and marked *only route*.
+- **Event nodes** follow their event, with no switch. DE's drop table lists
+  them permanently as `Event: Planet/Node` and never names the event. DE's
+  worldstate `Goals` do name a live event, but give its node as an id
+  (`EventNode8`), and DE's region manifest has no row for any `EventNode`.
+  WFCD's events feed names the node: *Razorback Armada* on `Corb`, 2026-09-21 to
+  25, measured. So the build ships `meta.eventNodes`, each live event's nodes by
+  name with its window, and an `Event:` row is ranked exactly while a running
+  event names its node. The match is on node name alone, with a trailing
+  ` (Planet)` dropped. **Not yet seen on a relic-dropping event**: none was
+  running, since Razorback's node drops no relics. The fixture test is the only
+  evidence until one runs. The per-event switches the owner offered as the
+  alternative would have needed a hand-made node-to-event table, which this
+  route avoids.
+
+**Old saved state** still carries `event`, `railjack` and `aya`. They are
+dropped on the way in (`RETIRED_PLAN_OPTIONS`, through `migrateCapped`), and a
+restored backup never takes them, because `PLAN_OPTIONS` no longer names them.
+
+**Verified.** Node tests cover the one switch, the chip, the event rule with
+live, ended and elsewhere events, and the retirement. The event and cache tests
+each go red with their half removed. The build test uses WFCD's own Razorback
+record. The page tests that toggled the old boxes were rewritten, not deleted:
+the forced-in rule moved to cache hunting on the same subject (Nyx Prime, whose
+every live route is a Railjack cache), and the silences that were reached by
+switching Aya off are now reached by a payload with no Aya.
 
 ---
 

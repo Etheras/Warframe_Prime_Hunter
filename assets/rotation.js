@@ -827,6 +827,15 @@
   const CACHE_PENALTY = 0.5;
   const isRailjackCache = (s) => s.mode === "Caches" && isRailjack(s);
 
+  /* Cache hunting, wherever it is: a mission whose rewards come from finding
+     caches rather than from finishing it. DE file those as the `(Caches)` mode on
+     the ordinary star chart too - Mercury/Terminus pays rotation A, B and C for
+     one, two and three caches found - but only Railjack's cache tables carry
+     relics, so today every row this matches is Proxima. The mode is the test,
+     not the ship: owner's decision, 2026-09-24, when the *Include Railjack*
+     switch became *Cache hunting*. Railjack itself is always ranked now. */
+  const isCacheHunt = (s) => s.mode === "Caches";
+
   /* What a node asks of you before you can play it at all. Neither is a
      drawback in the ranking - both are perfectly good farms - but a node named
      "Arva Vector" gives no hint that it needs a ship and a crew, and one named
@@ -856,6 +865,11 @@
       "On the Steel Path, which is a second star chart unlocked",
       "by clearing the first one. Until then the node is not on",
       "your chart at all.",
+    ].join("\n") },
+    caches: { label: "Caches", tip: [
+      "Cache hunting: the rewards come from finding caches, not",
+      "from finishing the mission. On Railjack, one for a Point of",
+      "Interest and one for an Abandoned Derelict Cache.",
     ].join("\n") },
   };
   // DE files all four Faceoff tables under transientRewards, so the node
@@ -914,6 +928,7 @@
   function demandsOf(s) {
     const out = [];
     if (isRailjack(s)) out.push(DEMANDS.railjack);
+    if (isCacheHunt(s)) out.push(DEMANDS.caches);
     if (isPvPvE(s)) out.push(DEMANDS.pvpve);
     if (isHeist(s)) out.push(DEMANDS.heist);
     if (s.kind === "enemy") out.push(enemyDemand(s));
@@ -957,11 +972,17 @@
      turned off. Live on three Lex Prime parts when it was found.
 
      `opts` is the planner's options object; a missing one means no opt-ins, which
-     is what both pages default to. */
+     is what both pages default to.
+
+     **One switch left, since 2026-09-24, owner's decision.** *Include Railjack*
+     and *Include event nodes* are gone: Railjack is always ranked, and an event
+     node is ranked exactly while a live event names it (`eventNodeLive`), which
+     needs no switch because the build can see it. What remains optional is
+     cache hunting, on any chart (`isCacheHunt`). */
   const reachableSource = (s, opts) =>
     !notADestination(s) &&
-    ((opts && opts.railjack) || !isRailjack(s)) &&
-    ((opts && opts.event) || !isEventNode(s));
+    ((opts && opts.caches) || !isCacheHunt(s)) &&
+    !isEventNode(s);
 
   /* ── the Primes you cannot get without a ship ─────────────────────
      Six items are marked "Never Vaulted" by the wiki and vaulted by Digital
@@ -988,16 +1009,36 @@
     return routes.length > 0 && routes.every((from) => from.every(isRailjack));
   }
 
-  /* DE's drop table lists event nodes permanently but never says which event
-     they belong to, and the node only exists in the game while that event is
-     running. Recommending one you cannot reach is worse than leaving it out, so
-     they are excluded by default and can be switched back on.
+  /* DE's drop table lists event nodes permanently, as `Event: Planet/Node`, but
+     never says which event they belong to, and the node only exists in the game
+     while that event is running. Recommending one you cannot reach is worse than
+     leaving it out.
 
-     The limited-time bounties are the same problem with an answer: the
-     worldstate does say whether they are running, so they are excluded only
-     while they are not. An event *enemy* - the Hemocyte, which spawns only in
-     the final stage of Plague Star - rides exactly the same window. */
-  const isEventNode = (s) => /^Event:/i.test(s.planet || "") ||
+     **Deterministic since 2026-09-24, and the switch is gone.** The build ships
+     every live event's nodes by name, with its window (`meta.eventNodes`, from
+     WFCD's events feed, because DE's `Goals` carry a node id like `EventNode8`
+     and DE's region manifest has no row for any of those). An `Event:` row is
+     reachable exactly while a running event names its node. Matched by node
+     name, and without the planet, because WFCD write a bare `Corb` for the
+     Razorback Armada where DE's table writes `Event: Pluto/Corb`, and a
+     trailing ` (Planet)` is dropped from either side.
+
+     Not yet seen on a relic-dropping event: none was running when this was
+     written, and the one that was, Razorback Armada, drops no relics. The test
+     drives it with a fixture.
+
+     The limited-time bounties are the same problem with an answer already: the
+     worldstate says whether they are running, so they are excluded only while
+     they are not. An event *enemy* - the Hemocyte, which spawns only in the
+     final stage of Plague Star - rides exactly the same window. */
+  const nodeName = (n) => String(n || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+  const eventNodeLive = (s) => {
+    const name = nodeName(s.node);
+    return !!name && ((DATA.meta || {}).eventNodes || []).some((e) =>
+      eventRunning(e) && (e.nodes || []).some((n) => nodeName(n) === name));
+  };
+  const isEventNode = (s) =>
+    (/^Event:/i.test(s.planet || "") && !eventNodeLive(s)) ||
     !!(bountyEvent(s) && !eventRunning(bountyEvent(s))) ||
     !!(String(s.access || "").indexOf("event:") === 0 &&
        !eventRunning(eventWindow(String(s.access).slice(6))));
@@ -1050,8 +1091,8 @@
     signature, pickNode,
     fissuresAt, minutesLeft,
     isRailjack, isPvPvE, isSteelPath, isHeist, demandsOf, railjackOnly,
-    isRailjackCache, cachePenalty: CACHE_PENALTY,
-    isEventNode, notADestination, reachableSource,
+    isRailjackCache, cachePenalty: CACHE_PENALTY, isCacheHunt,
+    isEventNode, eventNodeLive, notADestination, reachableSource,
     bountyEvent, eventRunning,
   };
 })();

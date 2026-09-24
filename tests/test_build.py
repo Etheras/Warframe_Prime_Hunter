@@ -3235,6 +3235,37 @@ def test_a_cdn_age_is_spent_out_of_max_age() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_live_event_nodes_are_published_by_name() -> None:
+    """
+    `meta.eventNodes` is how the planner learns which `Event: Planet/Node` rows
+    exist today, with no switch - owner's decision, 2026-09-24. DE's `Goals`
+    give only an id (`EventNode8`) and DE's region manifest names no
+    `EventNode`, so WFCD's events feed supplies the names. The first record is
+    the one WFCD served that morning, verbatim in the fields that matter.
+    """
+    razorback = {"description": "Razorback Armada", "tag": "FriendlyFireTacAlert",
+                 "node": "Corb", "concurrentNodes": [],
+                 "victimNode": "Orcus Relay (Pluto)",
+                 "activation": "2026-09-21T17:07:44.074Z",
+                 "expiry": "2026-09-25T17:04:35.648Z"}
+    check("event nodes: WFCD's record becomes one entry, by node name",
+          build_data.event_nodes_from([razorback]),
+          [{"event": "Razorback Armada", "nodes": ["Corb"],
+            "activation": "2026-09-21T17:07:44.074Z",
+            "expiry": "2026-09-25T17:04:35.648Z"}])
+    wide = dict(razorback, node="Egeria (Ceres)", concurrentNodes=["Varro (Ceres)", ""])
+    check("event nodes: concurrent nodes count too, and blanks do not",
+          build_data.event_nodes_from([wide])[0]["nodes"],
+          ["Egeria (Ceres)", "Varro (Ceres)"])
+    check_true("event nodes: the relay an alert is staged from is not a mission node",
+               "Orcus Relay (Pluto)" not in build_data.event_nodes_from([razorback])[0]["nodes"])
+    check("event nodes: no node, or no window, is no entry",
+          build_data.event_nodes_from([dict(razorback, node=None),
+                                       dict(razorback, expiry=None), "junk", None]), [])
+    check("event nodes: nothing at all is an empty list, not an error",
+          build_data.event_nodes_from(None), [])
+
+
 def test_wfcd_worldstate_is_judged_by_its_age() -> None:
     """
     WFCD's copy of the worldstate is held to the same 15-minute ceiling as DE's.
@@ -6163,6 +6194,7 @@ def main() -> int:
                          test_a_cdn_age_is_spent_out_of_max_age,
                          test_wfcd_item_data_is_part_of_the_fingerprint,
                          test_wfcd_worldstate_is_judged_by_its_age,
+                         test_live_event_nodes_are_published_by_name,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_what_the_build_writes_is_what_the_site_ships,

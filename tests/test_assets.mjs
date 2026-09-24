@@ -1561,23 +1561,57 @@ test("a source is reachable only when nothing the reader set excludes it", () =>
   }
 });
 
-test("the two opt-ins each gate their own kind of source, and only their own", () => {
+test("one switch left: cache hunting gates caches, Railjack is always in", () => {
+  /* Owner's decision, 2026-09-24: *Include Railjack* and *Include event nodes*
+     are gone. Railjack is always ranked; cache hunting, on any chart, is the one
+     opt-in; an event node follows its event (the test below). */
   const ROT = loadRotation();
-  const rj = { planet: "Veil Proxima", node: "Flexa", mode: "Caches" };
+  const skirmish = { planet: "Veil Proxima", node: "Flexa", mode: "Skirmish" };
+  const railCaches = { planet: "Veil Proxima", node: "Flexa", mode: "Caches" };
+  const chartCaches = { planet: "Mercury", node: "Terminus", mode: "Caches" };
+
+  assert.equal(ROT.isRailjack(skirmish), true, "subject check: a Railjack node");
+  assert.equal(ROT.reachableSource(skirmish, {}), true,
+               "Railjack is ranked with no switch at all");
+  assert.equal(ROT.reachableSource(railCaches, {}), false,
+               "Railjack cache hunting waits for the switch");
+  assert.equal(ROT.reachableSource(railCaches, { caches: true }), true);
+  assert.equal(ROT.reachableSource(chartCaches, {}), false,
+               "and so does cache hunting on the ordinary chart - the mode is the test");
+  assert.equal(ROT.reachableSource(chartCaches, { caches: true }), true);
+  assert.equal(ROT.demandsOf(railCaches).map((d) => d.label).join(","), "Railjack,Caches",
+               "a cache row says so, whatever it is on");
+});
+
+test("an event node is ranked exactly while a live event names it", () => {
+  /* No switch since 2026-09-24. The build ships each live event's node names
+     with its window (`meta.eventNodes`, from WFCD's events feed - DE's own
+     `Goals` carry only an id like `EventNode8`). Names are matched without the
+     planet, and a trailing " (Planet)" is dropped: WFCD wrote a bare "Corb"
+     for Razorback Armada. A fixture, because no relic-dropping event was
+     running when this was written. */
+  const now = Date.parse("2026-09-24T12:00:00Z");
+  const at = (h) => new Date(now + h * 3600000).toISOString();
   const ev = { planet: "Event: Saturn", node: "Aegaeon", mode: "Spy" };
+  const meta = (e) => ({ meta: { eventNodes: e } });
 
-  assert.equal(ROT.isRailjack(rj), true, "subject check: this must be a Railjack node");
-  assert.equal(ROT.isEventNode(ev), true, "subject check: this must be an event node");
+  let ROT = loadRotation({ now, data: meta([]) });
+  assert.equal(ROT.isEventNode(ev), true, "no live event: an event node");
+  assert.equal(ROT.reachableSource(ev, { caches: true }), false,
+               "and no switch can let it through");
 
-  assert.equal(ROT.reachableSource(rj, { railjack: false, event: false }), false);
-  assert.equal(ROT.reachableSource(rj, { railjack: true, event: false }), true);
-  assert.equal(ROT.reachableSource(rj, { railjack: false, event: true }), false,
-               "the event box must not let a Railjack node through");
+  ROT = loadRotation({ now, data: meta([
+    { event: "Test Op", nodes: ["Aegaeon (Saturn)"], activation: at(-1), expiry: at(5) }]) });
+  assert.equal(ROT.eventNodeLive(ev), true, "named, and inside its window");
+  assert.equal(ROT.reachableSource(ev, {}), true, "so it is ranked by itself");
 
-  assert.equal(ROT.reachableSource(ev, { railjack: false, event: false }), false);
-  assert.equal(ROT.reachableSource(ev, { railjack: false, event: true }), true);
-  assert.equal(ROT.reachableSource(ev, { railjack: true, event: false }), false,
-               "the Railjack box must not let an event node through");
+  ROT = loadRotation({ now, data: meta([
+    { event: "Test Op", nodes: ["Aegaeon"], activation: at(-9), expiry: at(-1) }]) });
+  assert.equal(ROT.reachableSource(ev, {}), false, "an event that has ended does not count");
+
+  ROT = loadRotation({ now, data: meta([
+    { event: "Razorback Armada", nodes: ["Corb"], activation: at(-1), expiry: at(5) }]) });
+  assert.equal(ROT.reachableSource(ev, {}), false, "a live event elsewhere does not count");
 });
 
 test("the clock stamp moves for anything that re-ranks, and not for a countdown", () => {

@@ -1677,6 +1677,34 @@ def de_outcome(offline: bool, asked: bool, too_old: bool, refused: bool) -> str:
     return "ok"
 
 
+def event_nodes_from(events) -> list[dict]:
+    """Every live event's nodes, by name, with its window: `meta.eventNodes`.
+
+    DE's drop table lists event missions permanently as `Event: Planet/Node` and
+    never says which event runs them, so the planner cannot know from the table
+    whether one exists today. Owner's decision, 2026-09-24: find it out
+    deterministically rather than behind a switch. DE's own `Goals` carry the
+    node as an id (`EventNode8`) and DE's region manifest has no row for any
+    `EventNode`, so the names come from WFCD's events feed, which gives them:
+    measured that day, Razorback Armada on node `Corb`, 2026-09-21 to 25.
+
+    Only `node` and `concurrentNodes` are mission nodes. `victimNode` is the
+    relay an alert is staged from, not a place it sends you.
+    """
+    out = []
+    for e in events or []:
+        if not isinstance(e, dict):
+            continue
+        nodes = [n for n in [e.get("node"), *(e.get("concurrentNodes") or [])]
+                 if isinstance(n, str) and n.strip()]
+        if not nodes or not e.get("expiry"):
+            continue
+        out.append({"event": e.get("description") or e.get("tag") or "an event",
+                    "nodes": nodes, "activation": e.get("activation"),
+                    "expiry": e.get("expiry")})
+    return out
+
+
 # The source keys the page's banner already names, per feed that can come from
 # WFCD. Baro's feed is left out on purpose: the banner has no reader's name for
 # its key, and naming one would withdraw its "everything else is current" line.
@@ -1961,6 +1989,17 @@ def main() -> int:
     else:
         syndicate_missions, world_events = [], []
         log("  bounty boards unavailable - the rotation will read unknown")
+
+    # Event missions by name, for `meta.eventNodes` - see `event_nodes_from`.
+    # WFCD's feed whichever source answered the boards above, because it is the
+    # only one that names the nodes. `args.offline` like the fissures below: a
+    # running event is a question about now, and WFCD's `max-age=120` keeps a
+    # repeat inside one build from asking twice.
+    event_nodes = event_nodes_from(fetch_json(WORLD_EVENTS, "api_events", args.offline,
+                                              critical=False, optional=True) or [])
+    if event_nodes:
+        log("  events: " + "; ".join(f"{e['event']} on {', '.join(e['nodes'])}"
+                                      for e in event_nodes))
 
     # Fetched live even when everything else is coming from the cache, because
     # this is the one source where a cached copy is worth nothing: every entry
@@ -2779,6 +2818,10 @@ def main() -> int:
             # clock says - so without this the planner counts rewards you
             # cannot collect. See build_bounty_meta.
             "bounties": bounties,
+            # Every live event's mission nodes by name, with its window, so the
+            # planner can rank an `Event:` row exactly while its event runs.
+            # See `event_nodes_from`.
+            "eventNodes": event_nodes,
             "refinements": REFINEMENTS,
             "dropSource": drop_source,
             "newCount": len(fresh) if prime_wikitext else 0,
