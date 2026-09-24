@@ -1115,14 +1115,14 @@ const shownProgress = (page) => page.evaluate(() =>
     return { id: el.dataset.id, left: all - got };
   }));
 
-page_test("the sort offers the four combinations, and grouping is what makes headings",
+page_test("the sort offers every combination, and grouping is what makes headings",
           async () => {
   const { page, errors } = await open("/index.html");
 
   const options = await page.locator("#sort option").evaluateAll(
     (els) => els.map((e) => e.value));
-  assert.deepEqual(options, ["release", "parts"],
-                   "the orderings are the two the owner named");
+  assert.deepEqual(options, ["release", "parts", "name"],
+                   "the orderings are the ones the owner named - name added 2026-09-24");
 
   /* Four combinations, and the only thing the checkbox may change is whether
      the grid is broken into categories. Asserted both ways round for each
@@ -1140,6 +1140,21 @@ page_test("the sort offers the four combinations, and grouping is what makes hea
     assert.equal(await page.locator("#grid .cat-heading").count(), 0,
                  `unticked, ${sort} still broke the grid into categories`);
   }
+  assert.deepEqual(errors, []);
+});
+
+page_test("name orders the grid alphabetically, to check masteries against the profile",
+          async () => {
+  /* Kept for one job only: the in-game profile lists what the player has
+     mastered alphabetically, and cross-checking it against this grid is easy
+     only when the grid is in the same order. Owner's request, 2026-09-24. */
+  const { page, errors } = await open("/index.html");
+  await setCheck(page, "#f-group", false);
+  await page.selectOption("#sort", "name");
+  const names = await page.locator("#grid .card[data-id] .card-name").allInnerTexts();
+  assert.ok(names.length > 5, `only ${names.length} cards on screen to order`);
+  assert.deepEqual([...names].sort((a, b) => a.localeCompare(b)), names,
+                   `the grid is not alphabetical: ${names.slice(0, 6).join(", ")}…`);
   assert.deepEqual(errors, []);
 });
 

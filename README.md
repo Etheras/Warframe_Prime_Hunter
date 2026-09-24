@@ -238,13 +238,14 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 
 - **Search box** at the top — type a Prime, a part, or a relic name. Press `/` to jump to it.
 - **Category** in the sidebar — Warframe, Primary, Secondary, Melee, and so on.
-- **Sort** in the sidebar — a **Group by category** tick and two orders, giving
-  four arrangements between them. The page remembers both:
+- **Sort** in the sidebar — a **Group by category** tick and three orders. The
+  page remembers both:
 
 | | Order |
 |---|---|
-| **Release date** | Newest Prime first, so what has come out lately is at the top |
+| **Release date** | Newest Prime first, so what has come out lately is at the top — including one released so recently it has no date yet |
 | **Parts remaining** | Fewest parts still to find first — what you are closest to finishing |
+| **Name (A–Z)** | Alphabetical, the same order as the mastery list on your in-game profile |
 
   Leave **Group by category** ticked and each of those runs inside Warframe,
   Primary, Secondary and so on, with a progress count on every heading. Untick

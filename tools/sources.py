@@ -238,6 +238,30 @@ STATE_FILE = "state.json"  # inside .cache — drives --if-changed
 # a threshold that must agree is a drift generator. `build_data` imports it.
 WORLDSTATE_MAX_AGE = 15 * 60
 
+# WFCD's copy of the worldstate is judged by the same ceiling, from its own
+# `timestamp` - the `Time` of the DE document WFCD last parsed. Since
+# 2026-09-24, when the proxy was found serving a worldstate two hours old behind
+# a 200: every fissure it listed had expired, `/heartbeat` said Success
+# throughout, and the deployed build took all four feeds from it and flagged
+# nothing. `/heartbeat` measures that WFCD answer, not that their data moves,
+# so it is not the signal. This is: 26 bytes, `max-age=120`. `PROJECT.md §7`,
+# *WFCD's worldstate is judged by its age, as DE's is*.
+PROXY_TIMESTAMP = "https://api.warframestat.us/pc/timestamp?language=en"
+
+
+def proxy_worldstate_age(offline: bool = False, readonly: bool = False) -> float | None:
+    """Seconds since the DE worldstate WFCD are serving was generated, or None
+    when WFCD did not say. None is "not known", never "fresh"."""
+    try:
+        stamp = fetch_json(PROXY_TIMESTAMP, "api_timestamp", offline,
+                           critical=False, optional=True, readonly=readonly)
+        if not isinstance(stamp, str):
+            return None
+        at = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - at).total_seconds()
+    except (ValueError, TypeError):
+        return None
+
 # Whether this build may ask Digital Extremes for the worldstate at all.
 #
 # **Not a performance switch — a politeness one, and it is address-shaped.**

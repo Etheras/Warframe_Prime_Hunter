@@ -3235,6 +3235,70 @@ def test_a_cdn_age_is_spent_out_of_max_age() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_wfcd_worldstate_is_judged_by_its_age() -> None:
+    """
+    WFCD's copy of the worldstate is held to the same 15-minute ceiling as DE's.
+    On 2026-09-24 WFCD served a worldstate two hours old behind a 200, and every
+    fissure in it had expired. `/heartbeat` said Success throughout, and the
+    deployed build took all four feeds from it and flagged nothing. `PROJECT.md §7`.
+
+    WFCD is faked: what is asserted is how an age is read and what it marks.
+    """
+    import sources
+    real_json = sources.fetch_json
+    stale, ages = list(sources.STALE), dict(sources.STALE_AGE)
+    try:
+        two_hours = (datetime.datetime.now(datetime.timezone.utc)
+                     - datetime.timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+        sources.fetch_json = lambda *a, **k: two_hours
+        age = sources.proxy_worldstate_age()
+        check_true("wfcd age: read from WFCD's own timestamp",
+                   age is not None and abs(age - 7200) < 60, f"read {age!r}")
+        for answer in (None, "not a date", {"timestamp": two_hours}):
+            sources.fetch_json = lambda *a, _v=answer, **k: _v
+            check("wfcd age: an answer that is not a timestamp is unknown, never fresh",
+                  sources.proxy_worldstate_age(), None)
+
+        every = {"vaultTrader": "proxy", "bounties": "proxy",
+                 "fissures": "proxy", "voidTrader": "proxy"}
+        sources.STALE[:] = []
+        sources.STALE_AGE.clear()
+        marked = build_data.flag_stale_proxy(every, 7558)
+        check("wfcd age: two hours old marks every feed WFCD answered",
+              sorted(marked), ["api_events", "api_fissures",
+                               "api_syndicatemissions", "api_vaulttrader"])
+        check_true("wfcd age: dated from WFCD's stamp, not from the build",
+                   abs(time.time() - sources.STALE_AGE["api_fissures"] - 7558) < 60)
+        check("wfcd age: and Baro's feed, which the banner cannot name, is left out",
+              "api_voidtrader" in sources.STALE, False)
+
+        sources.STALE[:] = []
+        check("wfcd age: a copy inside the ceiling marks nothing",
+              build_data.flag_stale_proxy(every, 30), [])
+        check("wfcd age: an unknown age marks nothing",
+              build_data.flag_stale_proxy(every, None), [])
+        check("wfcd age: only the feeds WFCD actually answered",
+              build_data.flag_stale_proxy(dict(every, fissures="worldstate",
+                                               vaultTrader="cache", bounties="worldstate"),
+                                          7558), [])
+    finally:
+        sources.fetch_json = real_json
+        sources.STALE[:] = stale
+        sources.STALE_AGE.clear()
+        sources.STALE_AGE.update(ages)
+
+    # Every key it marks has to be one the page's banner names in the reader's
+    # words, or the banner prints "some live data" and withdraws its
+    # "everything else is current" line for a stall that touched only these.
+    feeds = re.search(r"const FEEDS = \{(.*?)\};", read_text(
+        os.path.join(ROOT, "assets", "shared.js")), re.S)
+    named = set(re.findall(r"(api_\w+)\s*:", feeds.group(1))) if feeds else set()
+    flagged = {k for keys in build_data.PROXY_STALE_KEYS.values() for k in keys}
+    check("wfcd age: every key it can mark is one the banner names",
+          sorted(flagged - named), [],
+          "an unnamed key turns the banner's message vague and alarming")
+
+
 def test_wfcd_item_data_is_part_of_the_fingerprint() -> None:
     """
     WFCD's item record is what DE's parts, Ducats and artwork join through, and
@@ -6053,6 +6117,7 @@ def main() -> int:
                          test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version,
                          test_a_cdn_age_is_spent_out_of_max_age,
                          test_wfcd_item_data_is_part_of_the_fingerprint,
+                         test_wfcd_worldstate_is_judged_by_its_age,
                          test_an_impossible_304_is_treated_as_stale,
                          test_artwork_prefers_digital_extremes,
                          test_what_the_build_writes_is_what_the_site_ships,

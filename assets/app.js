@@ -344,17 +344,11 @@
     return true;
   }
 
-  /* Newest first, and an undated item sorts last rather than first. Both sorts
-     that read a date go through here so the two cannot come to disagree about
-     where it lands. The date is an ISO day string, which compares correctly as
-     text, and `releaseDate` is genuinely `null` for one item rather than absent
-     - Kavasa Prime Collar, which the item API returns no date for. Left as a
-     comparison of two dates it would lead every ascending half. */
-  const byRelease = (a, b) => {
-    const ra = a.releaseDate || "", rb = b.releaseDate || "";
-    if (!ra !== !rb) return ra ? -1 : 1;
-    return rb.localeCompare(ra);
-  };
+  /* Newest first: a Prime WFCD have not indexed yet, then dated ones, then the
+     one they know but never dated. Shared with the planner's part search, so
+     the two cannot come to disagree - see `byRelease` in shared.js for why a
+     missing date is not always "oldest". */
+  const byRelease = S.byRelease;
 
   /* How many parts of this Prime are still to find. `partsDone` counts the ones
      whose quantity is met, so this is the complement and not a second count -
@@ -369,18 +363,25 @@
      they are not on screen at all, since `showCollected` opens off. */
   const byPartsLeft = (a, b) => partsLeft(a) - partsLeft(b);
 
-  /* Two orderings, and the category grouping is a separate switch rather than
-     four combinations spelled out. Owner's choice, 2026-09-09: a third ordering
-     would otherwise mean two more dropdown lines, and every one of them would
-     have to be worded to say whether it grouped.
+  /* Three orderings, and the category grouping is a separate switch rather than
+     every combination spelled out. Owner's choice, 2026-09-09: otherwise each
+     ordering would mean two dropdown lines, each worded to say whether it
+     grouped.
 
-     Both fall through to release and then to name, so the order is total and a
-     redraw cannot shuffle equal rows. Release before name for the same reason
-     the old default did it: "what came out lately that I do not have" is a
-     question an alphabet cannot answer. */
+     Release and parts fall through to release and then to name, so the order is
+     total and a redraw cannot shuffle equal rows. Release before name for the
+     same reason the old default did it: "what came out lately that I do not
+     have" is a question an alphabet cannot answer.
+
+     `name` is kept ONLY to make it easy to cross-check masteries against the
+     player's in-game profile, which lists what they have mastered
+     alphabetically. Owner's request, 2026-09-24. It answers no question of its
+     own about what to farm, so it is not a candidate for a default, and it
+     should not be removed as redundant. */
   const SORTS = {
     release: (a, b) => byRelease(a, b) || a.name.localeCompare(b.name),
     parts: (a, b) => byPartsLeft(a, b) || byRelease(a, b) || a.name.localeCompare(b.name),
+    name: (a, b) => a.name.localeCompare(b.name),
   };
 
   /* Category first, then whichever ordering is chosen. Composed rather than

@@ -1193,9 +1193,31 @@
     return { read, paint };
   }
 
+  /* ── newest first ───────────────────────────────────────────────
+     One ordering by release, for both pages, so the collection grid and the
+     planner's part search cannot come to disagree about what is new.
+
+     Three kinds of item, in this order:
+       1. `unindexed` - a Prime WFCD's item data does not list yet. DE publish
+          no release dates, so a brand-new Prime has none, and "no date" read as
+          "oldest" put the newest Prime in the game last: Citrine Prime, on the
+          morning after its release (owner's report, 2026-09-24). Nothing dated
+          can be newer than something WFCD have not caught up with.
+       2. dated, newest first. ISO day strings compare correctly as text.
+       3. undated but known to WFCD - Kavasa Prime Collar, the one item they
+          give no date for. Last, so it cannot lead every list.
+     Ties are left to the caller, which breaks them by name. */
+  const RELEASE_UNINDEXED = "9999-12-31";
+  const releaseKey = (it) => (it && (it.releaseDate || (it.unindexed ? RELEASE_UNINDEXED : ""))) || "";
+  const byRelease = (a, b) => {
+    const ra = releaseKey(a), rb = releaseKey(b);
+    if (!ra !== !rb) return ra ? -1 : 1;
+    return rb < ra ? -1 : rb > ra ? 1 : 0;
+  };
+
   window.WFPrimeShared = {
     esc, count, $, $$, KEYS, load, save, showTip, staleBanner, staleNotice,
-    wireFileBackup, squadOdds, listWords,
+    wireFileBackup, squadOdds, listWords, releaseKey, byRelease,
     watchFissures, FISSURE_REFRESH_MS, backupPayload,
     /* Exported so the suite can drive the allowlist and the ordering against
        real upstream rows without a browser — this is the one piece of the live

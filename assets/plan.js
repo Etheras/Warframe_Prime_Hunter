@@ -2619,9 +2619,11 @@
   })));
 
   /* Newest first, because a part you are holding is far more likely to be from
-     something recent than from a 2015 release, and alphabetical for the one
-     item DE publish no release date for (Kavasa Prime Collar). */
-  const releasedAt = (it) => it.releaseDate || "";
+     something recent than from a 2015 release. The key is shared with the
+     collection grid: a Prime WFCD have not indexed yet sorts as the newest, and
+     the one item they know but never dated (Kavasa Prime Collar) sorts after
+     every dated one, alphabetically. See `byRelease` in shared.js. */
+  const releasedAt = S.releaseKey;
 
   /* How many different Primes a query may span before it is not a search.
      Ten, the same number of rows the list shows: if the answer cannot be put on

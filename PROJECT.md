@@ -1647,6 +1647,7 @@ whether it earns its place.
   categories: [{ name, count }],
   items: [{
     id, name, category, type, image, wikiUrl, masteryReq, releaseDate, isNew,
+    unindexed?,   // only when WFCD's item data has no record yet - see §7
     flags: { vaulted, resurgence, permanent, baro, special, founder, farmable },
     parts:  [{ name, itemCount, relics: [{ relic, rarity, chances, farmable }] }],
     relics: ["Lith V11", …],
@@ -8178,9 +8179,11 @@ term in front of whichever comparator is chosen, so the grouped and ungrouped
 forms of a sort cannot drift apart.
 
 **Name and Availability were dropped**, on the owner's decision when asked.
-Name's job is looking one Prime up and the search box does that better, matching
-parts and relic names as well. Availability is still visible as badges and as
-the sidebar's own filters.
+**Superseded 2026-09-24 for Name** — See *Name (A–Z) is back, for one job, and
+the newest Prime sorts first even undated*. Name's job was taken to be looking
+one Prime up, and the search box does that better, matching parts and relic
+names as well. Availability is still visible as badges and as the sidebar's own
+filters.
 
 **`Parts remaining` is ascending — closest to finished first** — because that is
 the question it is asked. Fully complete items therefore lead, which sounds
@@ -8258,7 +8261,7 @@ change**, so a check that only ever reads a local payload cannot see one.
   light builds whose fingerprint has not moved keep publishing from it. A block
   stalls the updates that needed a fresh fetch; it does not freeze the site.
 - **But warn-only until the Citrine Prime test is read on 2026-09-24.**
-  **Superseded 2026-09-24** — see *The payload gate blocks, and warframe.market
+  **Superseded 2026-09-24** — See *The payload gate blocks, and warframe.market
   coverage only warns*. Some checks in the group assert upstream data a brand-new
   Prime cannot satisfy on day one — DE's recipe for it, a warframe.market price
   on every reward row — and a gate that blocked on the 23rd would stop the very
@@ -8997,6 +9000,91 @@ build publishes from the last good one.
 swallow the exit code (no `||`, no `continue-on-error`). It goes red with the
 old `|| echo` restored. Against the Citrine payload, the payload group ends with
 one warning, the Platinum reward rows, and exit code 0.
+
+### WFCD's worldstate is judged by its age, as DE's is
+
+**Built 2026-09-24 at the owner's request**, after they suggested watching
+WFCD's `/heartbeat` and `/pc` for outages when the data did not refresh.
+
+**Found live, while looking.** At 07:13Z DE's worldstate was 47 seconds old.
+WFCD's `/pc` `timestamp` read 05:43:48Z, **90 minutes old**, every one of the
+33 fissures on `/pc/fissures` had already expired, and `/heartbeat` answered
+`{"message":"Success"}` throughout. The deployed build at 07:12Z took all four
+live feeds from WFCD, published no fissures at all, and flagged nothing:
+`meta.stale` was empty. `from_chain` took any non-empty answer as good, and
+content age was judged only on DE's side, against `Time`. The deployed site
+takes every live feed from WFCD, because DE refuse the runner, and zero
+fissures is documented as normal, which is exactly what hid it.
+
+**`/heartbeat` is not the signal.** It says the app answers, not that its data
+moves. The signal is WFCD's own stamp of the DE document they last parsed, and
+`/pc/timestamp` serves just that: 26 bytes, `max-age=120`.
+
+**The rule.** Whenever any feed came from WFCD, `proxy_worldstate_age` in
+`sources.py` reads that stamp, and `flag_stale_proxy` in `build_data.py` holds
+it to the same `WORLDSTATE_MAX_AGE` of 15 minutes as DE's `Time`. Past the
+ceiling, each feed WFCD answered is added to `meta.stale` under the key the
+page's banner already names, dated from WFCD's stamp. The banner then reads
+*"Void Fissures, bounty rotations and Prime Resurgence could not be refreshed,
+so those are from a copy made 2 hours ago. The catalogue, relics and drop tables
+are current."* That was rendered by `shared.js` itself from a real build during
+the outage. The feed log records `wfcdAge` per build, so a day of it says how
+often WFCD stall, not only how often DE refuse.
+
+**It does not fall back to our cached copy, although that was proposed.** On
+the runner that copy is DE's own worldstate from whenever DE last answered, and
+the push build's log read it as 12,410 minutes old, which is worse than WFCD's
+two hours by a factor of a hundred. WFCD's stale copy is still the best answer
+to hand. What was missing was honesty about it, not a better source. Baro's
+feed is not flagged: the banner has no reader's name for its key, and his window
+is compared against the reader's clock.
+
+**Verified.** The test fakes WFCD's answer and checks that the age is read from
+the stamp, that anything but a timestamp is unknown and never fresh, that the
+right keys are flagged, dated from the stamp, and only for feeds WFCD answered,
+and that every key it can flag is one the banner names. It goes red with the
+ceiling removed. End to end, a `--no-first-party` build during the outage
+flagged all four keys with `staleSince` 05:43:48Z and logged `wfcdAge: 7722`.
+
+### Name (A–Z) is back, for one job, and the newest Prime sorts first even undated
+
+**Both at the owner's request, 2026-09-24.**
+
+**Name (A–Z) is kept only to cross-check masteries against the player's in-game
+profile**, which lists what they have mastered alphabetically. That is a job the
+search box cannot do, and it is why the 2026-09-09 decision to drop Name no
+longer holds for it. The reason is recorded where the ordering is defined
+(`SORTS` in `app.js`), not on the control, by the owner's choice. It answers no
+question about what to farm, so it is not a candidate for the default, and it is
+not to be removed as redundant. The grouping switch still applies to it, which
+is why a third ordering costs one dropdown line rather than two.
+
+**The newest Prime was sorting last, and the reason was the source of the
+date.** Sorted by release date, Citrine Prime, released the day before, came
+after every other Warframe. `releaseDate` comes only from WFCD's item record,
+because DE publish none, and WFCD had not indexed Citrine yet. So it had no
+date, and the rule *"an undated item sorts last"* sent it to the bottom. That
+rule was written for Kavasa Prime Collar, which WFCD know and never date.
+
+**Now three kinds, in this order**, in one comparator both pages share
+(`byRelease` and `releaseKey` in `shared.js`):
+
+1. A Prime WFCD have **not indexed**: newest, since nothing dated can be newer.
+2. Dated Primes, newest first.
+3. Undated but known to WFCD, meaning Kavasa: last.
+
+The build marks the first kind explicitly, with `unindexed: true` only on items
+WFCD's item data has no record of. That is exactly the three new Primes today,
+checked against the payload. It is not inferred from a missing `type`, which
+happens to coincide today and is not what the field means. `isNew` was not
+enough on its own. It clears when the wiki lists the Prime, and WFCD can take
+days longer to date it, which would have sent it back to the bottom in between.
+
+**Verified.** The Node test orders a synthetic unindexed, recent, old and
+known-undated item correctly. With the flag ignored it reproduces the report
+exactly, with the fresh one last. The page test checks the name order, and the
+option list now includes it. In the real page, release date led the Warframe
+group with Citrine Prime, and Name (A–Z) ran Banshee, Caliban, Citrine, Gyre…
 
 ---
 

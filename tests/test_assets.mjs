@@ -1661,3 +1661,25 @@ test("a Steel Path fissure is not the ordinary node's fissure", () => {
   assert.deepEqual(ROT.fissuresAt([hard], HERE, now, true, false), [],
                    "a node carrying only a Steel Path fissure must not be marked");
 });
+
+// ── newest first ───────────────────────────────────────────────────────────
+
+test("a Prime WFCD have not indexed yet is the newest, not the oldest", () => {
+  /* Owner's report, 2026-09-24: sorted by release date, Citrine Prime - released
+     the day before - came last. DE publish no release dates, WFCD had not
+     indexed it, and "no date" was read as "oldest". Named after what each item
+     is, not after a real Prime, because the rule is the subject. */
+  const { S } = loadShared();
+  const fresh = { name: "Fresh", releaseDate: null, unindexed: true };
+  const recent = { name: "Recent", releaseDate: "2026-06-25" };
+  const old = { name: "Old", releaseDate: "2015-03-18" };
+  const knownUndated = { name: "Known undated", releaseDate: null };   // Kavasa's shape
+  const order = [old, knownUndated, recent, fresh].sort(S.byRelease).map((it) => it.name);
+  assert.deepEqual(order, ["Fresh", "Recent", "Old", "Known undated"]);
+
+  // The planner's part search uses the key, and its own comparator treats an
+  // empty key as undated - so the same three kinds come out in the same order.
+  assert.ok(S.releaseKey(fresh) > S.releaseKey(recent), "unindexed outranks any date");
+  assert.equal(S.releaseKey(knownUndated), "", "undated but known is still undated");
+  assert.equal(S.releaseKey(null), "", "a missing item has no key rather than a throw");
+});

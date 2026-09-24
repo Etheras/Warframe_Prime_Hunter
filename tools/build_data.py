@@ -1677,6 +1677,46 @@ def de_outcome(offline: bool, asked: bool, too_old: bool, refused: bool) -> str:
     return "ok"
 
 
+# The source keys the page's banner already names, per feed that can come from
+# WFCD. Baro's feed is left out on purpose: the banner has no reader's name for
+# its key, and naming one would withdraw its "everything else is current" line.
+# His window is compared against the reader's clock anyway.
+PROXY_STALE_KEYS = {
+    "vaultTrader": ("api_vaulttrader",),
+    "bounties": ("api_syndicatemissions", "api_events"),
+    "fissures": ("api_fissures",),
+}
+
+
+def flag_stale_proxy(feed_source: dict, age: float | None) -> list[str]:
+    """Mark the feeds WFCD answered as stale when WFCD's own worldstate is older
+    than DE's is allowed to be. Returns the keys it marked.
+
+    Found 2026-09-24: the proxy served a worldstate two hours old behind a 200,
+    and `from_chain` takes any non-empty answer as good, so the deployed build
+    shipped every feed from it, no fissures at all, and an empty `meta.stale`.
+
+    **It does not fall back to our cached copy**, although that was the first
+    idea. On the runner that copy is DE's own worldstate from whenever DE last
+    answered, measured at 12,410 minutes old on 2026-09-24. So WFCD's two hours
+    is still the best answer to hand. What was missing was honesty, not a better
+    source: the banner now says how old WFCD's copy is, from WFCD's own stamp.
+    `PROJECT.md §7`, *WFCD's worldstate is judged by its age, as DE's is*.
+    """
+    if age is None or age <= WORLDSTATE_MAX_AGE:
+        return []
+    marked = []
+    for feed, keys in PROXY_STALE_KEYS.items():
+        if feed_source.get(feed) != "proxy":
+            continue
+        for key in keys:
+            if key not in STALE:
+                STALE.append(key)
+            STALE_AGE[key] = time.time() - age
+            marked.append(key)
+    return marked
+
+
 def from_chain(what, de_fresh, proxy, de_cached):
     """
     One live feed, from the best source that answers.
@@ -2041,6 +2081,19 @@ def main() -> int:
     # that exists to prevent it.
     log("  feeds: " + ", ".join(f"{k} from {v}" for k, v in sorted(feed_source.items())))
 
+    # Judge WFCD by its own stamp whenever it answered, exactly as DE are judged
+    # by `Time` above. `args.offline` rather than `off`, like the fissure feed:
+    # this is a question about WFCD right now, not about our cache.
+    wfcd_age = None
+    wfcd_stale: list[str] = []
+    if "proxy" in feed_source.values():
+        wfcd_age = sources.proxy_worldstate_age(args.offline)
+        wfcd_stale = flag_stale_proxy(feed_source, wfcd_age)
+        if wfcd_stale:
+            log(f"~ proxy: WFCD's worldstate is {int(wfcd_age // 60)} min old, past the "
+                f"{WORLDSTATE_MAX_AGE // 60} min it can be and still be live — its "
+                f"feeds are shipped, and flagged stale: {', '.join(wfcd_stale)}")
+
     # ── the rolling record ────────────────────────────────────────────
     # `meta.feeds` says what happened on THIS build and is overwritten by the
     # next one, so it answers "is the site on first-party data right now" and
@@ -2062,6 +2115,9 @@ def main() -> int:
         "de": outcome,
         "used": dict(sorted(feed_source.items())),
         "full": not args.if_changed,
+        # How old WFCD's worldstate was, when WFCD answered anything, so a day of
+        # this log says how often their copy stalls, not only how often DE refuse.
+        **({"wfcdAge": int(wfcd_age)} if wfcd_age is not None else {}),
     })
     tally = collections.Counter(r.get("de") for r in feed_log)
     log(f"  feed log: {len(feed_log)} build(s) in {FEED_LOG_HOURS}h — "
@@ -2070,7 +2126,9 @@ def main() -> int:
         while "de_worldstate" in STALE:
             STALE.remove("de_worldstate")
         STALE_AGE.pop("de_worldstate", None)
-        log("  worldstate: DE refused, the proxy answered — the feeds are current")
+        log("  worldstate: DE refused, the proxy answered — "
+            + ("but WFCD's copy is stale, as flagged above" if wfcd_stale
+               else "the feeds are current"))
 
     relic_contents, relic_sources, drop_source, aya_sources, rotation_pools = \
         acquire_drops(off, args.source, args.verbose)
@@ -2467,6 +2525,14 @@ def main() -> int:
             "tradable": (api or {}).get("tradable"),
             "releaseDate": (api or {}).get("releaseDate"),
             "vaultDate": (api or {}).get("vaultDate"),
+            # Present, and true, only while WFCD's item data has no record of
+            # this Prime at all - which is what leaves `releaseDate` empty on a
+            # brand-new one, since DE publish no release dates. The sorts read it
+            # as "newer than anything dated", where a missing date alone would
+            # put the newest Prime last: Citrine Prime, on the morning after its
+            # release. Kavasa Prime Collar is undated for a different reason (WFCD
+            # know it and give no date), so it does not get this.
+            **({"unindexed": True} if api is None else {}),
             "flags": {
                 # api "vaulted" is game data; the wiki marker is the fallback
                 "vaulted": bool((api or {}).get("vaulted", wf["vaulted"])),
