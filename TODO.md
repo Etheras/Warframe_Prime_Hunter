@@ -317,6 +317,46 @@ entry:
    A HEAD persistently ahead of what the GET returns would re-download the body
    on every network build.
 
+### Retire three planner checkboxes, and generalise Railjack into "don't count caches"
+
+**Owner's request, 2026-09-24:** *"Try to get rid of Count Aya Drops, Include
+event nodes and Include Railjack checkboxes. For Railjack (and a more
+generalized checkbox) would be to not calculate caches."*
+
+What each does today, from `plan.html`'s tooltips and `PLAN_OPTIONS` in
+`model.js`:
+
+- **Count Aya drops** (`p-aya`, on by default): Aya is counted in full when
+  Varzia stocks a relic on the list, and at 30% otherwise.
+- **Include event nodes** (`p-event`, off): event nodes whose event DE's drop
+  table does not name. A running event bounty the build can see already appears
+  without it.
+- **Include Railjack** (`p-railjack`, off): Railjack is its own activity. A
+  relic that drops nowhere else is shown anyway.
+
+**Questions to settle before building:**
+
+1. With each switch gone, which fixed behaviour does it become? For example,
+   Aya always counted, event nodes only when the build can see them running.
+2. **"Not calculate caches"**: in the model, `Caches` is the Railjack mission
+   type (`FIXED_LENGTH` in `rotation.js`: 38 live nodes, all Proxima, paying two
+   cache rewards). Does the new switch mean exactly those, or cache-style
+   objectives more broadly?
+3. Stored planner state (`wfprimes.plan.v1`) carries these keys, so a removed
+   option needs a migration rather than a silent leftover.
+
+### Every checkbox a pill switch, with short words at each end instead of a label above
+
+**Owner's request, 2026-09-24:** make all the checkboxes pill switches, and
+change the pill switch itself so that it has no text above it, only more
+accurate, minimal text to the left and right. The one existing switch,
+*Capped Void Traces* (`check-switch` in `plan.html`), already has ends, *room to
+spare* and *at the cap*, but keeps a label above them. **Read `STYLE.md` first**,
+§6 for the controls and §8 before debugging. The collection page's `.check`
+boxes and the planner's are the same component, so this is both pages. Each
+switch needs its two end words chosen, and those should be put to the owner as
+a list before anything is restyled.
+
 ### Confirm WFCD's component shape when `warframe-status` next releases
 
 **Found 2026-09-24.** `warframe-items` v1.1276.0 moved every item's `components`
