@@ -204,11 +204,13 @@ jobs:
             prime-sources-
             vorframe-sources-
 
-      # The ten-minute run reads the cache and never writes one. `actions/cache`
-      # saves at the end of any job whose key missed, and this key never hits by
-      # construction — so leaving the step above in charge would have stored a
-      # fresh copy of .cache 144 times a day, evicting everything else the repo
-      # keeps. Restore-only is the whole difference.
+      # The light run reads the cache and does not write one on the way out.
+      # `actions/cache` saves at the end of any job whose key missed, and this
+      # key never hits by construction — so leaving the step above in charge
+      # would have stored a fresh copy of .cache on every run, evicting
+      # everything else the repo keeps. Restore-only is the whole difference.
+      # The one exception is explicit and conditional: *Keep the new DE
+      # manifests for the next light build*, below, when DE's export moved.
       - name: Restore source cache (read-only)
         if: env.FULL != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -263,6 +265,22 @@ jobs:
         if: env.FULL == 'true'
         run: python tools/build_data.py
 
+      # Which DE export the restored cache was built against, so the light build
+      # below can be told apart from one that moved to a new export. See *Keep
+      # the new DE manifests for the next light build*.
+      - name: Note which DE export the restored cache holds
+        id: export_before
+        if: env.FULL != 'true'
+        run: |
+          python - >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          try:
+              sig = json.load(open(".cache/state.json")).get("signature") or {}
+          except (OSError, ValueError):
+              sig = {}
+          print("index=" + (sig.get("exportIndex") or ""))
+          PY
+
       # The ten-minute path. `--if-changed` fingerprints the upstreams that move
       # slowly — DE's ~500-byte export index, one HEAD to the drop table, the
       # trader window — and rebuilds from the restored cache when none of them
@@ -285,6 +303,37 @@ jobs:
       - name: Refresh the fissure list and rebuild from cache
         if: env.FULL != 'true'
         run: python tools/build_data.py --if-changed --no-first-party
+
+      # Saved once, and only when this light build moved to a new DE export.
+      # Since 2026-09-24 a changed manifest is fetched under its new content hash
+      # (`PROJECT.md §7`, *A freshness window belongs to the URL it was declared
+      # for*). The light build restores the cache read-only, so without this every
+      # light run until the next full build found the new hashes missing and
+      # downloaded the same manifests again: up to ~780 KB a run of files DE
+      # said to keep for a year. Once per export change is a few saves a week,
+      # not the 144 a day that made the restore read-only in the first place.
+      - name: Note which DE export the light build ended on
+        id: export_after
+        if: env.FULL != 'true'
+        run: |
+          python - >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          try:
+              sig = json.load(open(".cache/state.json")).get("signature") or {}
+          except (OSError, ValueError):
+              sig = {}
+          print("index=" + (sig.get("exportIndex") or ""))
+          PY
+
+      - name: Keep the new DE manifests for the next light build
+        if: >-
+          env.FULL != 'true'
+          && steps.export_after.outputs.index != ''
+          && steps.export_after.outputs.index != steps.export_before.outputs.index
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache
+          key: prime-sources-${{ github.run_id }}
 
       - name: Sanity-check the result
         run: |

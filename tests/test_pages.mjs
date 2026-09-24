@@ -816,14 +816,23 @@ page_test("the default sort groups by category and leads with the newest", async
                    "the groups run in the payload's category order");
 
   const dates = await page.evaluate((ids) => {
-    const byId = new Map(window.WFPRIME_DATA.items.map((i) => [i.id, i.releaseDate]));
-    return ids.map((row) => row.map((id) => byId.get(id) || null));
+    const byId = new Map(window.WFPRIME_DATA.items.map((i) => [i.id, i]));
+    return ids.map((row) => row.map((id) => {
+      const it = byId.get(id);
+      return it.releaseDate || (it.unindexed ? "unindexed" : null);
+    }));
   }, blocks.map((b) => b.ids));
 
+  /* Three kinds, in this order (`byRelease` in shared.js): a Prime WFCD have not
+     indexed yet, then dated ones newest first, then the one they know but never
+     dated. Until 2026-09-24 "undated" was a single kind and went last, which put
+     Citrine Prime, the newest Prime in the game, at the bottom of its group. */
   dates.forEach((row, i) => {
-    const seen = row.filter((d) => d !== null);
-    assert.deepEqual(row.slice(0, seen.length), seen,
-                     `${blocks[i].cat}: an undated item must sort last, not first`);
+    const fresh = row.filter((d) => d === "unindexed");
+    const seen = row.filter((d) => d !== null && d !== "unindexed");
+    const undated = row.filter((d) => d === null);
+    assert.deepEqual(row, [...fresh, ...seen, ...undated],
+                     `${blocks[i].cat}: not unindexed first, then dated, then undated`);
     assert.deepEqual(seen, [...seen].sort().reverse(),
                      `${blocks[i].cat} is not newest-first on screen`);
   });

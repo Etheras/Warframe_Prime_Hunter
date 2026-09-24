@@ -4993,6 +4993,51 @@ def test_the_published_payload_is_checked_after_it_is_built() -> None:
           "a gate whose exit code is swallowed publishes whatever it finds")
 
 
+def test_a_light_build_keeps_new_manifests_only_when_the_export_moved() -> None:
+    """
+    Since 2026-09-24 a changed DE manifest is fetched under its new content hash,
+    and the light build restores the cache read-only. Without a save, every
+    light run until the next full build found the new hashes missing and
+    downloaded the same manifests again: up to ~780 KB a run, of files DE said
+    to keep for a year. So the light build saves the cache once, when DE's
+    export moved, and never otherwise, which is what kept it read-only.
+
+    Structural, like the payload gate's own test, because the property is the
+    workflow's shape: what is compared, in what order, and under which `if:`.
+    """
+    workflow = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(workflow):
+        print("  skip light-build cache save (no workflow checked out)")
+        return
+    yml = read_text(workflow)
+
+    def step(name: str) -> str:
+        at = yml.find(f"- name: {name}")
+        return yml[at:yml.find("\n      - ", at + 1)] if at >= 0 else ""
+
+    before = yml.find("id: export_before")
+    light = yml.find("run: python tools/build_data.py --if-changed")
+    after = yml.find("id: export_after")
+    check_true("light cache: the export is read before the light build and after it",
+               0 <= before < light < after,
+               "the comparison only means something if it brackets the build")
+
+    save = step("Keep the new DE manifests for the next light build")
+    check_true("light cache: a save step exists", bool(save))
+    cond = re.search(r"if:\s*>-?\s*\n((?:\s{10}.*\n)+)|if:\s*(.+)", save)
+    text = " ".join((cond.group(1) or cond.group(2)).split()) if cond else ""
+    check_true("light cache: it saves only on the light path, and only when the export moved",
+               "FULL != 'true'" in text and "export_after" in text
+               and "export_before" in text and "!=" in text,
+               f"condition read as {text!r}; an unconditional save stores .cache every run")
+
+    restore_sha = re.search(r"actions/cache/restore@([0-9a-f]{40})", yml)
+    save_sha = re.search(r"actions/cache/save@([0-9a-f]{40})", save)
+    check_true("light cache: pinned to the same commit as the restore",
+               bool(restore_sha and save_sha) and restore_sha.group(1) == save_sha.group(1),
+               "two versions of one action is one more thing to drift")
+
+
 def test_the_full_build_matches_a_schedule_that_exists() -> None:
     """
     `FULL` decides whether a scheduled run rebuilds everything or takes the light
@@ -6155,6 +6200,7 @@ def main() -> int:
                          test_serving_a_page_never_writes_the_builders_cache,
                          test_the_ci_probe_asks_about_the_source_that_refuses,
                          test_the_published_payload_is_checked_after_it_is_built,
+                         test_a_light_build_keeps_new_manifests_only_when_the_export_moved,
                          test_the_full_build_matches_a_schedule_that_exists,
                          test_no_workflow_expression_is_pasted_into_a_shell,
                          test_our_invented_buckets_each_still_behave_as_one_thing,

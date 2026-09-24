@@ -86,236 +86,36 @@ part's button leaves the list and the counter has nowhere to wrap. Correcting a
 mis-click there still means opening the item on the collection page — a property
 of a worklist, not of the click, and worth deciding on its own merits.
 
-### Citrine Prime ships unattended on 2026-09-23 — on the 24th, find what the pipeline missed
+### Two availability oddities left by Citrine day
 
-**Set by the owner on 2026-09-10.** The pipeline has never been watched meeting
-a brand-new Prime, and the owner wants the first time to be unaided, so that
-every flaw surfaces on its own instead of being papered over by hand. The goal
-behind it: **the next Prime Access should need nobody's hand at all.** Citrine
-Prime Access opens on **2026-09-23**
-([DE's announcement](https://www.warframe.com/en/news/citrine-prime-access)).
+**Seen on 2026-09-23 and 24, on the first builds with Citrine's drop table.**
+The rest of what that release taught is in `PROJECT.md §7`, from *A freshness
+window belongs to the URL it was declared for* onwards.
 
-**Do nothing on the 23rd.** No hand-dispatched run, no local build, no alias
-added in advance. If a push lands that day for unrelated reasons, write down its
-time — a push is a full build, and it blurs which mechanism delivered the items.
+- **Akbronco Prime is marked never vaulted, but has no relic route.** Its
+  `permanent` flag is the wiki's `(P)`, *Never Vaulted*, and that did not
+  change. What changed is that DE's drop table of 15:13:21Z stopped dropping
+  every relic carrying its Blueprint or its Link (Lith A12 was among the fifteen
+  that went). So `farmable` went false, and the changelog listed it as vaulted.
+  Bronco Prime, its other ingredient, is still farmable. Check in game whether
+  those two parts moved to relics not yet in DE's table, or whether the wiki's
+  marker is now wrong. If it is the marker, it belongs under *Should be fixed on
+  the wiki, not here*.
+- **Xaku, Trumna and Quassus Prime read `farmable: false` and `vaulted:
+  false`.** `vaulted` comes from WFCD's item record, which lags DE. Check what
+  the page shows for that combination, since neither the vaulted badge nor a
+  farm route applies to it.
 
-**What should appear, and what should not:**
+### Confirm DE's GET and HEAD agree on the drop table's `Last-Modified`
 
-| Item | Expected |
-|---|---|
-| Citrine Prime | Warframe |
-| Steflos Prime | Primary — announced as a shotgun |
-| Corufell Prime | announced only as a "heavy weapon": Melee if a heavy blade, Archgun if an arch-gun. Both are already mapped on both routes |
-| Sphatika Prime Syandana, Alumeti Prime Sugatra, Prismatic Gem Prime Decoration, Spinele Prime Facial Accessory / Earpiece / Oculus | **absent** — Prime Access only, so bought rather than earned (hard rule 10), and cut by `NON_RELIC_CATEGORIES` |
-
-**What runs unattended**, read from Task Scheduler on 2026-09-10. The first two
-need this PC switched on, so record whether it was:
-
-- *Warframe Prime Hunter data refresh*, every ten minutes: a local
-  `build_data.py --if-changed`, then `gh workflow run publish.yml -f full=false`.
-- *… (daily full rebuild)*, 18:07 local: `gh workflow run publish.yml -f full=true`.
-- GitHub's own crons in `publish.yml`, which delivered about one tick in fifteen
-  when measured — the comment in `tools/schedule.ps1` has the figures.
-
-**Baselines, from the local build of 2026-09-10 18:02Z**, so a change on the 24th
-can be attributed:
-
-- `vaultSoon` flags the two oldest farmable releases: **Xaku Prime, Trumna Prime,
-  Quassus Prime** (2024-11-13) and **Lavos Prime, Cedo Prime, Dual Zoren Prime**
-  (2025-02-12). If the cadence comment beside `vaultSoon` in `build_data.py` is right — each
-  Prime Access vaults the release from seven earlier — the first three go on the
-  23rd.
-- No item has `isNew`. Every part has an `itemCount`. Four parts have no `ducats`.
-- **Plague Star also ends on the 23rd**, at 14:00Z — so rows that vanish that day
-  have two possible causes. What separates them: **the event leaving changes
-  nothing in the payload's items or relics at all.** DE list all three event
-  bounties in their drop table year-round, so `relic_sources` keeps the Plague
-  Star rows and no `farmableRelics`, `flags.farmable` or relic `sources` list
-  moves. **The Ghoul Purge is the proof rather than the prediction**: it is not
-  running now, and both Ghoul bounties still carry their relics in today's build.
-  The whole expected delta is two things — `meta.bounties.events` **keeps** its
-  `Level 55 - 65 Plague Star` key and loses `activation`, `expiry`, `tag` and
-  `fee`, ending up the shape the Ghoul rows have today (it is built from
-  `EVENT_BOUNTIES`, so the key cannot disappear); and the node leaves the ranked
-  list unless *include event nodes* is ticked. **So an item that loses a farmable
-  relic on the 24th is Citrine-day vaulting, and never the event.** For scale,
-  measured 2026-09-17: 27 relics carry a Plague Star source, none exclusively —
-  DE's 26 plus `Meso K8`, which reaches the node only through the Hemocyte fold.
-
-**On the 24th, answer these — the deployed site first, because it is the one the
-owner uses:**
-
-```bash
-curl -s https://etheras.github.io/Warframe_Prime_Hunter/data/prime-data.js | python -c "import json,sys;r=sys.stdin.read();d=json.loads(r[r.index('{'):r.rindex('}')+1]);[print(i['name'],i['category'],i['isNew'],bool(i.get('image')),i['farmableRelics'],[(p['name'],p['itemCount'],p.get('ducats'),p.get('plat')) for p in i['parts']]) for i in d['items'] if any(w in i['name'] for w in ('Citrine','Steflos','Corufell','Sphatika','Alumeti','Prismatic','Spinele'))]"
-```
-
-1. **Did all three arrive, in the right category, with none of the six
-   accessories — and when?** `gh run list` and `data/feed-log.json` say which run
-   carried them first (light or full; dispatch, cron or push) and how long after
-   release.
-2. **By which route?** `isNew: true` means DE's Public Export listed the item
-   before the wiki page did — it is `fromExport`, in `build_data.py`. Did the wiki route take over
-   later, and after how long?
-3. **Are the parts right?** Names, quantities and Ducats against the wiki, and
-   against the baseline above.
-4. **Relics.** Are the new relics in `relics` with sources, is `farmableRelics`
-   non-empty, and did the Primes vaulted that day go vaulted in the same build?
-   Check against the `vaultSoon` baseline.
-5. **Artwork and Platinum.** A picture, or the glyph fallback? When did `plat`
-   appear? A missing `plat` is a supported state, so record the delay, not a
-   defect.
-6. **Local against deployed.** This machine reaches DE and the runner often does
-   not — *Digital Extremes 403 the GitHub runner*, below. If the local
-   `data/prime-data.json` carried them hours before the deployed one, that gap is
-   the measurement.
-7. **Run `python tests/test_build.py`** and record every red check. The likely
-   candidates are `parts: only the items DE do not publish fall back` and the two
-   `wiki coverage:` checks. Those fire if the wiki files Corufell under a section
-   we do not know, or if a name needs `NAME_ALIASES`.
-   **Read CI's own answer first.** Since 2026-09-11 every run ends with *Check the
-   payload about to be published* — the same checks, against the payload that
-   actually shipped — and it only warns until this entry has been read. Its
-   `::warning::` on the runs of the 23rd is the deployed half of this question,
-   and *The payload gate only warns* (below) is waiting on the answer.
-
-**Suspected weak spots, from reading the code on 2026-09-10 — none of them seen
-to fail yet:**
-
-- **Delivery depends on DE answering the runner.** A light remote build only
-  downloads when its fingerprint moves, and the fingerprint is DE's export hash
-  plus the drop-table headers. If DE refuse the runner, the release may wait for
-  the 18:07 full dispatch, or for the routes that do not depend on DE (the wiki
-  page, WFCD's item data, the drop-table mirror) to catch up. If the lag turns
-  out real, one candidate is to have the local `--if-changed` run, which does
-  reach DE, dispatch `full=true` when it sees the export hash move. Not designed.
-- **Parts from the drop-table fallback carry no quantity and no Ducats.**
-  `catalogue.parts_from_droptables` builds `itemCount: None` with no `ducats`
-  key, and `needOf` in `model.js` reads a missing quantity
-  as 1, so a part that needs two would read as needing one. This only bites if
-  DE's recipes and WFCD's list both miss the item.
-- **A new weapon class disappears from the export route without a word.**
-  `collect_prime_items` (in `official.py`) skips any `productCategory` missing
-  from `PRODUCT_CATEGORY`, with no log line. Only the wiki route's category check
-  would notice.
-- **The Kavasa pin cannot tell "too new" from "broken".** The check `parts: only
-  the items DE do not publish fall back` expects exactly `["Kavasa Prime Collar"]`,
-  so a build that catches a Prime before DE's recipes arrive fails it. The owner
-  chose on 2026-09-11 to exempt new Primes once the payload gate blocks; what
-  "new" means is that entry's open question (*The payload gate only warns*).
-
-**Read early, read-only, on 2026-09-23 at about 15:15Z, at the owner's request.**
-This does not replace the 24th. It records a measurement that would not have kept
-until then. Nothing had arrived on either side, and question 2 already has half
-its answer: the export route could not deliver at all. That is now fixed on
-this machine only, owner's decision, together with the related defects found
-that afternoon and the next morning. All of it was pushed at 07:24Z on the
-24th. See *After the Citrine-day push: stop the light CI build re-downloading
-changed manifests, and confirm DE's GET and HEAD agree*, below, and
-`PROJECT.md §7` for the measurements. So from 2026-09-23 the local build is
-**not** unaided and the deployed one still is: question 6 compares a fixed
-pipeline with an unfixed one. The deployed side still ignores a CDN's `Age`, so
-to learn when **DE** updated the drop table, read its `Last-Modified` directly:
-it was 15:13:21Z. Plague Star left as predicted in both payloads:
-`bounties.events` kept its key and lost `activation`, `expiry`, `tag` and `fee`.
-
-**What the fixed local build showed at 16:03Z on the 23rd**, after one network
-build run by hand at the owner's request. The deployed site had none of this at
-the time.
-
-- **Questions 1 and 2:** all three arrived by the export route, `isNew: true`, in
-  the expected categories, with none of the accessories. The wiki's Prime page
-  still did not list them.
-- **When DE's sources moved:** export files at 14:13:57Z, export index at
-  15:03:01Z, drop table at 15:13:21Z. That is 76 seconds after the 15:12Z local
-  build had fetched the old table.
-- **Question 4:** eleven new relics dropping, so all three items are farmable
-  with four relics each. Fifteen relics stopped dropping. The changelog reads
-  *Vaulted (4): Akbronco Prime, Quassus Prime, Trumna Prime, Xaku Prime*. So the
-  cadence comment's three went, plus **Akbronco Prime, which nobody predicted**
-  and whose flags now read `permanent` rather than vaulted.
-- **Xaku, Trumna and Quassus read `farmable: false` with `vaulted: false`.** The
-  `vaulted` flag comes from sources that have not caught up. How the page
-  presents that combination is worth a look on the 24th.
-- **Question 3:** all twelve parts had no quantity and no Ducats, because the
-  relic link came only from WFCD's item record, which did not list them.
-  **Fixed locally on the 24th**: the local payload now carries DE's counts and
-  Ducats. See `PROJECT.md §7`, *A part's relics come from DE's drop table when
-  WFCD have not indexed it*.
-- **Question 5:** no artwork on any of the three, for the same reason and fixed
-  in the same change. No `plat` either, which is a supported state.
-- **Question 6, read at 06:52Z on the 24th:** the deployed payload still had
-  167 items and 763 relics, no Citrine, and Xaku, Trumna and Quassus Prime still
-  farmable. That is the pre-Citrine drop table, 15.5 hours after DE changed it.
-  **WFCD are not the cause.** The runner reaches `www.warframe.com` and
-  `content.warframe.com` (both 200 in CI's own probe), and the deployed build
-  reads items and relics from DE exactly as the local one does. What holds it
-  back is the cache windows, which are fixed locally only. From WFCD the
-  deployed side takes the live feeds (the worldstate, because DE 403 the runner)
-  and each part's relic link. The local side has taken the relic link from DE's
-  table since the 24th whenever WFCD lack it.
-- **Question 7:** against this local payload, three built-payload checks were
-  red and every code test passed.
-  - `parts: every one agrees with DE's own manifests` and `platinum: every
-    Prime-part reward row carries ducats` were both the parts flaw in question
-    3. Both have been green against the local payload since that fix on the
-    24th, which leaves the next check as the only red one.
-  - `platinum: every Prime-part reward row carries plat` failed because
-    warframe.market has not listed the parts yet. The docs call a missing `plat`
-    a supported state, so **this check cannot pass on release day for any new
-    Prime**. It is the same shape as the Kavasa pin, and the payload gate will
-    need the same exemption.
-  - The Kavasa pin itself, `parts: only the items DE do not publish fall back`,
-    stayed green, because these parts fell back to the drop table and not to
-    WFCD's list.
-
-**Then:** write each real flaw up as its own `###` entry, with its evidence, and
-the owner decides which get fixed. Delete this entry once that is done: the
-observation belongs in those entries, not here.
-
-### After the Citrine-day push: stop the light CI build re-downloading changed manifests, and confirm DE's GET and HEAD agree
-
-**The fixes were made on 2026-09-23 and 24, run locally first by the owner's
-decision, and pushed at 07:24Z on the 24th.** Each has its own `PROJECT.md §7`
-entry:
-
-- **DE's export manifests had been frozen since 27 August.** The cache checked a
-  year-long window against the file name, when that window belongs to a hashed
-  URL. See *A freshness window belongs to the URL it was declared for*.
-- **A drop-table change the fingerprint saw could be built from the old body**
-  and then not fetched again for days. See *A body is not fresh once its HEAD
-  has seen a newer version*.
-- **A CDN's `Age` was never counted**, which held the drop table's HEAD 17.7
-  hours past DE's window on release day. See *A CDN's `Age` counts against
-  `max-age`*.
-- **WFCD's item data was not fingerprinted**, so nothing noticed WFCD catching
-  up after a patch. See *WFCD's item data is part of the fingerprint*. This one
-  and the `Age` fix were chosen instead of moving the build time, which the
-  owner had asked about.
-- **A part's relic link and an item's artwork came only from WFCD's item
-  record**, which lagged DE by fourteen hours and more, so a new Prime shipped
-  with no quantities, no Ducats and no picture. See *A part's relics come from
-  DE's drop table when WFCD have not indexed it*.
-
-**Still open after the push:**
-
-1. **The light CI build re-downloads changed manifests on every run.** It
-   restores the cache read-only and never saves one. So once DE's export index
-   moves, every light run until the next full build finds the new hashes missing
-   and asks for them again. With a light run every ten minutes, that could be a
-   hundred-odd downloads of files DE said to keep for a year. For scale, the
-   seven manifests as cached, gzipped: `ExportManifest` 473 KB, `Resources`
-   111 KB, `Weapons` 85 KB, `Recipes` 59 KB, `Warframes` 45 KB, `Regions` 5 KB,
-   `Sentinels` 3 KB, so up to about 780 KB a run when all change. Options include
-   a light build saving the cache when the export index moved, or leaving
-   manifests to the full build. Not designed. The first full build after the
-   push also re-asks every windowed source once, because the restored cache has
-   no `.url` recorded. That is expected and harmless.
-2. **Check that DE's GET and HEAD agree on `Last-Modified`** once this machine
-   next asks the HEAD, at 09:12Z on the 24th. Compare
-   `official_droptables.gz.lastmod` (15:13:21Z) with `head_droptables`. Only a
-   HEAD *later* than the body refuses the window, so a lagging HEAD is harmless.
-   A HEAD persistently ahead of what the GET returns would re-download the body
-   on every network build.
+**Left over from the Citrine-day fixes** (`PROJECT.md §7`, *A body is not fresh
+once its HEAD has seen a newer version*). Only a HEAD whose date is *later* than
+the body's refuses the body's window, so a lagging HEAD is harmless. But a HEAD
+persistently ahead of what the GET returns would re-download the body on every
+network build. Check once this machine next asks the HEAD, at 09:12Z on
+2026-09-24 or on the first network build after it: compare
+`official_droptables.gz.lastmod` (15:13:21Z) with the `last-modified` in
+`head_droptables`.
 
 ### Retire three planner checkboxes, and generalise Railjack into "don't count caches"
 

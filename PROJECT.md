@@ -4986,6 +4986,13 @@ releases earlier, on the same day, which holds for all 41 vaulted Warframes in t
 current data. The flag is computed from the farmable non-permanent Warframes and
 then applied by release date, so the weapons that shipped alongside are caught too.
 
+**The cadence held on Citrine Prime's release, 2026-09-23**, the first release
+this project watched. `vaultSoon` had flagged Xaku, Trumna and Quassus Prime as
+the oldest farmable batch. DE's drop table of 15:13:21Z that day stopped
+dropping their relics, and the next build's changelog read *Vaulted: Xaku Prime,
+Trumna Prime, Quassus Prime*, along with Akbronco Prime, which no cadence
+predicted (`TODO.md`).
+
 ### Two security findings examined and declined
 
 An outside review of 2026-08-26 filed ten findings; eight are in `TODO.md` in
@@ -8163,6 +8170,12 @@ paragraph stands and was re-measured 2026-09-17: DE's drop table still carries a
 single `Level 15 - 25 Plague Star` block holding 26 distinct relics, and their
 worldstate still publishes the same three job bands.
 
+**The event ended on 2026-09-23 at 14:00Z exactly as baselined.** Nothing in the
+payload's items or relics moved because of it. `meta.bounties.events` kept its
+`Level 55 - 65 Plague Star` key and lost `activation`, `expiry`, `tag` and
+`fee`, the shape the Ghoul rows have out of season. So every relic that stopped
+dropping that day was Citrine's vaulting, not the event.
+
 ### The sort splits into a grouping switch and an ordering, and gains a third bulk button
 
 **Owner's request, 2026-09-09.** The collection page's Sort was one `<select>`
@@ -8774,6 +8787,17 @@ lost `.maxage`: asking is the safe direction.
 b'the 27 August manifest'"*, which is release day reproduced, and passes with the
 fix. A real build with the fix is the local-against-deployed comparison, and
 that is still to come.
+
+**Its one cost, on the light CI build, and how that is contained.** The light
+build restores the cache read-only. So after DE's export moved, every light run
+until the next full build found the new hashes missing and downloaded the same
+manifests again: up to ~780 KB a run, gzipped, when all seven change. Since
+2026-09-24 the workflow reads the export signature from `.cache/state.json`
+before and after the light build, and saves the cache once, only when it moved
+(*Keep the new DE manifests for the next light build*). That is a few saves a
+week against the 144 a day that made the restore read-only in the first place.
+A structural test holds the condition, the before/after order and the pinned
+commit, and goes red with the comparison removed.
 
 ### A body is not fresh once its HEAD has seen a newer version
 
