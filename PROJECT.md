@@ -8706,11 +8706,11 @@ pointer and watching only the intended check go red.
 
 ### A freshness window belongs to the URL it was declared for
 
-**Fixed 2026-09-23, Citrine Prime's release day, and committed locally only.**
-The owner chose to run the fix on this machine and keep it off CI until the
-Citrine test has been read, so the local build and the deployed one can be
-compared while DE's drop table catches up. `TODO.md` carries what is left before
-it is pushed.
+**Fixed 2026-09-23, Citrine Prime's release day, and pushed 2026-09-24 at
+07:24Z.** The owner chose to run it on this machine first and keep it off CI
+while DE's drop table caught up, so the local build and the deployed one could
+be compared. The four entries below were held and pushed with it. `TODO.md`
+carries what is left after the push.
 
 **The defect.** `fetch` checked `still_fresh(path)` before it looked at the URL.
 A `max-age` is declared for a URL, and a cache key is not one. DE's export
@@ -8762,9 +8762,9 @@ that is still to come.
 
 ### A body is not fresh once its HEAD has seen a newer version
 
-**Fixed 2026-09-23 and committed locally only**, under the same owner's decision
-as the entry above. It was found by reading the code while planning to watch for
-Citrine's relics, and has not been seen to fail.
+**Fixed 2026-09-23 and pushed with the entry above.** It was found by reading
+the code while planning to watch for Citrine's relics, and has not been seen to
+fail.
 
 **The defect.** The drop table is watched through two keys: `head_droptables`,
 the HEAD the `--if-changed` fingerprint reads, and `official_droptables`, the
@@ -8818,8 +8818,8 @@ build against a real change in DE's drop table.
 
 ### A CDN's `Age` counts against `max-age`
 
-**Fixed 2026-09-23 and committed locally only**, with the two entries above and
-at the owner's choice. The owner had asked whether to move the build time so
+**Fixed 2026-09-23 and pushed with the two entries above**, at the owner's
+choice. The owner had asked whether to move the build time so
 that DE and WFCD would have updated first. This, with *WFCD's item data is part
 of the fingerprint* below, was chosen instead. The reason: every delay on
 release day traced to a defect, and none to the hour.
@@ -8861,8 +8861,8 @@ Removing the subtraction, or either caller's `age=`, turns its own check red.
 
 ### WFCD's item data is part of the fingerprint
 
-**Added 2026-09-23 and committed locally only**, the other half of the owner's
-choice above.
+**Added 2026-09-23 and pushed with the entries above**, the other half of the
+owner's choice above.
 
 **Why.** WFCD's item record is what DE's parts, Ducats and artwork joined
 through. Since the next day they take DE's own data when WFCD lack it (*A part's
@@ -8893,8 +8893,8 @@ left out on no answer. Switching the block off turns it red.
 
 ### A part's relics come from DE's drop table when WFCD have not indexed it
 
-**Fixed 2026-09-24 and committed locally only**, at the owner's direction and
-under the same hold as the four entries above.
+**Fixed 2026-09-24 at the owner's direction, and pushed with the four entries
+above** at 07:24Z the same morning.
 
 **The defect, seen on the first local build that reached Citrine.** All twelve
 Citrine, Steflos and Corufell parts shipped with no quantity and no Ducats, and

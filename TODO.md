@@ -208,9 +208,9 @@ This does not replace the 24th. It records a measurement that would not have kep
 until then. Nothing had arrived on either side, and question 2 already has half
 its answer: the export route could not deliver at all. That is now fixed on
 this machine only, owner's decision, together with the related defects found
-that afternoon and the next morning. See *The Citrine-day fixes run locally
-only — push them once the Citrine test is read and the light build's cost is
-settled*, below, and
+that afternoon and the next morning. All of it was pushed at 07:24Z on the
+24th. See *After the Citrine-day push: stop the light CI build re-downloading
+changed manifests, and confirm DE's GET and HEAD agree*, below, and
 `PROJECT.md §7` for the measurements. So from 2026-09-23 the local build is
 **not** unaided and the deployed one still is: question 6 compares a fixed
 pipeline with an unfixed one. The deployed side still ignores a CDN's `Age`, so
@@ -272,10 +272,11 @@ the time.
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
-### The Citrine-day fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
+### After the Citrine-day push: stop the light CI build re-downloading changed manifests, and confirm DE's GET and HEAD agree
 
-**Made 2026-09-23 and 24, and deliberately not pushed — owner's decision.** Each
-has its own `PROJECT.md §7` entry:
+**The fixes were made on 2026-09-23 and 24, run locally first by the owner's
+decision, and pushed at 07:24Z on the 24th.** Each has its own `PROJECT.md §7`
+entry:
 
 - **DE's export manifests had been frozen since 27 August.** The cache checked a
   year-long window against the file name, when that window belongs to a hashed
@@ -295,45 +296,26 @@ has its own `PROJECT.md §7` entry:
   with no quantities, no Ducats and no picture. See *A part's relics come from
   DE's drop table when WFCD have not indexed it*.
 
-The local scheduled build runs all of them from this working tree. CI builds
-`main` from GitHub and has none of them, so the two sides can be compared.
+**Still open after the push:**
 
-**Two things will look odd locally and are expected.** The `Age` fix only
-applies to windows written after it, so the drop-table HEAD fetched at 09:12Z on
-the 23rd keeps its full day and is next asked at 09:12Z on the 24th. And the
-first ten-minute run after the WFCD fix is a network build, because the saved
-signature has no `itemsApi` key yet. How promptly WFCD are caught also depends
-on the cadence: ten minutes today, 150 if *The refresh task still runs every ten
-minutes* is settled towards the default.
-
-**Before it is pushed:**
-
-1. **The Citrine reading on the 24th**, which is the comparison this split
-   exists for.
-2. **The light CI build would re-download changed manifests on every run.** It
-   restores the cache read-only and never saves one. So once DE's index moves,
-   every light run until the next full build finds the new hashes missing and
-   asks for them again. With a light run every ten minutes, that could be a
-   hundred-odd downloads of files DE said to keep for a year. The seven
-   manifests' compressed size has not been measured. Options include a light
-   build saving the cache when a manifest changed, or leaving manifests to the
-   full build. Not designed.
-3. **The first network build after the fixes asks every windowed source once**,
-   because a cache from before them has no `.url` recorded. On CI that is the
-   first full build after the push. Expected and harmless, but it shows up in
-   the logs as a burst.
-4. **Check that DE's GET and HEAD agree on `Last-Modified`** once the HEAD is
-   next asked, at 09:12Z on the 24th. Compare `official_droptables.gz.lastmod`
-   (15:13:21Z) with `head_droptables`. Only a HEAD *later* than the body refuses
-   the window, so a HEAD that lags is harmless. A HEAD that is persistently
-   ahead of what the GET returns would still re-download the body on every
-   network build.
-
-**On the deployed side, still unfixed, predicted and not yet seen:** when the
-wiki route brings Citrine in, its parts will come from WFCD's list or the
-drop-table fallback instead of DE's recipes. That turns `parts: only the items
-DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
-catch.
+1. **The light CI build re-downloads changed manifests on every run.** It
+   restores the cache read-only and never saves one. So once DE's export index
+   moves, every light run until the next full build finds the new hashes missing
+   and asks for them again. With a light run every ten minutes, that could be a
+   hundred-odd downloads of files DE said to keep for a year. For scale, the
+   seven manifests as cached, gzipped: `ExportManifest` 473 KB, `Resources`
+   111 KB, `Weapons` 85 KB, `Recipes` 59 KB, `Warframes` 45 KB, `Regions` 5 KB,
+   `Sentinels` 3 KB, so up to about 780 KB a run when all change. Options include
+   a light build saving the cache when the export index moved, or leaving
+   manifests to the full build. Not designed. The first full build after the
+   push also re-asks every windowed source once, because the restored cache has
+   no `.url` recorded. That is expected and harmless.
+2. **Check that DE's GET and HEAD agree on `Last-Modified`** once this machine
+   next asks the HEAD, at 09:12Z on the 24th. Compare
+   `official_droptables.gz.lastmod` (15:13:21Z) with `head_droptables`. Only a
+   HEAD *later* than the body refuses the window, so a lagging HEAD is harmless.
+   A HEAD persistently ahead of what the GET returns would re-download the body
+   on every network build.
 
 ### WFCD's worldstate can go stale behind a 200, and the deployed site takes it as fresh
 
