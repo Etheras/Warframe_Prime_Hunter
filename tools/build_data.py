@@ -126,7 +126,39 @@ def acquire_drops(offline: bool, prefer: str, verbose: bool):
             "mirror", [], {})
 
 
-def image_for(api: dict | None, textures: dict) -> str | None:
+def relic_links(spec: list[dict], wfcd_components: list[dict], name: str,
+                relic_contents: dict) -> dict[str, list[dict]]:
+    """Which relics each of DE's recipe parts drops from, keyed by part name.
+
+    WFCD's item record where it lists any drops for the part — exactly as
+    before, so a Prime WFCD have indexed is unchanged by this. Otherwise DE's
+    own drop table, in the same `location` shape, so the caller cannot tell
+    the two apart.
+
+    Until 2026-09-24 WFCD were the only source. On Citrine Prime's release day
+    DE's table had the new relics at 15:13Z while WFCD's item API still lacked
+    them the next morning — it waits on `warframe-items` and then on a
+    `warframe-status` redeploy — and every DE-recipe part was dropped for want
+    of a relic link, falling through to `parts_from_droptables` with no count
+    and no Ducats. `PROJECT.md §7`, *A part's relics come from DE's drop table
+    when WFCD have not indexed it*.
+    """
+    links: dict[str, list[dict]] = {}
+    for comp in wfcd_components:
+        links.setdefault(normalise_part(comp.get("name")), comp.get("drops") or [])
+    missing = [normalise_part(p["name"]) for p in spec
+               if not links.get(normalise_part(p["name"]))]
+    if missing:
+        # The whole table is walked only when a part needs it, which on a
+        # normal build is none of them.
+        table = {t["name"]: t["relics"] for t in parts_from_droptables(name, relic_contents)}
+        for part in missing:
+            links[part] = [{"location": f"{r['relic']} Relic", "rarity": r.get("rarity")}
+                           for r in table.get(part, [])]
+    return links
+
+
+def image_for(api: dict | None, textures: dict, unique: str | None = None) -> str | None:
     """Where this item's picture lives — Digital Extremes first, WFCD if not.
 
     First party is preferred wherever one exists, and here one does: DE's
@@ -140,8 +172,13 @@ def image_for(api: dict | None, textures: dict) -> str | None:
     covers a build where DE's export index could not be read, which is a real
     failure this project has already seen from a GitHub runner. Both paths write
     a whole URL, so nothing downstream has to know which one answered.
+
+    `unique` is DE's own `uniqueName` for the item, from the export, and is used
+    only when WFCD's record has none. The key was only ever read off WFCD's
+    record, so a Prime WFCD had not indexed had no picture even though DE's
+    manifest held one: Citrine Prime, on its release day and the morning after.
     """
-    unique = (api or {}).get("uniqueName")
+    unique = (api or {}).get("uniqueName") or unique
     tex = textures.get(unique) if unique else None
     if tex:
         return DE_TEXTURES + tex
@@ -2082,6 +2119,10 @@ def main() -> int:
             "  publish an explicitly incomplete build."
         )
 
+    # DE's own key for every Prime in the export, so a picture can be found for
+    # one WFCD's item record does not list yet - see `image_for`.
+    export_unique = {norm(p["name"]): p.get("uniqueName") for p in export_primes}
+
     # Primes DE already ships that the wiki page has not listed yet
     known = {norm(c["name"]) for c in catalog}
     fresh = [p for p in export_primes if norm(p["name"]) not in known]
@@ -2257,15 +2298,12 @@ def main() -> int:
             # the drop table says "Chassis Blueprint" where the API says
             # "Chassis", and a third spelling from DE has to meet the same fate
             # rather than route around it.
-            drops_by_part = {}
-            for comp in wfcd_components:
-                drops_by_part.setdefault(normalise_part(comp.get("name")),
-                                         comp.get("drops") or [])
+            links = relic_links(spec, wfcd_components, name, relic_contents)
             components = [{
                 "name": p["name"],
                 "itemCount": p["itemCount"],
                 "ducats": p["ducats"],
-                "drops": drops_by_part.get(normalise_part(p["name"]), []),
+                "drops": links.get(normalise_part(p["name"]), []),
                 # DE's own paths for this part, carried only as far as the
                 # warframe.market join below and never emitted. `price_for`
                 # tries both, because a Warframe component trades as its
@@ -2409,7 +2447,7 @@ def main() -> int:
 
 
         wf = entry["wikiFlags"]
-        image = image_for(api, textures)
+        image = image_for(api, textures, export_unique.get(norm(name)))
         base_id = slugify(f"{entry['category']}-{name}")
         item_id = base_id
         n = 2

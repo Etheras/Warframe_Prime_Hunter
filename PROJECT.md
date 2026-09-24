@@ -8864,9 +8864,11 @@ Removing the subtraction, or either caller's `age=`, turns its own check red.
 **Added 2026-09-23 and committed locally only**, the other half of the owner's
 choice above.
 
-**Why.** WFCD's item record is what DE's parts, Ducats and artwork join through
-(`TODO.md`, *A Prime WFCD have not indexed yet loses DE's own parts, Ducats and
-artwork*). It was not in the `--if-changed` fingerprint, so when WFCD caught up
+**Why.** WFCD's item record is what DE's parts, Ducats and artwork joined
+through. Since the next day they take DE's own data when WFCD lack it (*A part's
+relics come from DE's drop table when WFCD have not indexed it*, below), but
+WFCD's record still carries fields DE do not publish, such as vault state and
+release dates. It was not in the `--if-changed` fingerprint, so when WFCD caught up
 after a patch nothing noticed until DE moved again or the daily full build ran.
 On release day DE had published everything by 15:13Z, and WFCD still had not
 listed Citrine at 16:16Z.
@@ -8888,6 +8890,65 @@ signature has no `itemsApi` key yet.
 **Verified.** The test asserts the key is present, stays put for an unchanged
 answer, moves when a Prime is added, is asked read-only from `serve.py`, and is
 left out on no answer. Switching the block off turns it red.
+
+### A part's relics come from DE's drop table when WFCD have not indexed it
+
+**Fixed 2026-09-24 and committed locally only**, at the owner's direction and
+under the same hold as the four entries above.
+
+**The defect, seen on the first local build that reached Citrine.** All twelve
+Citrine, Steflos and Corufell parts shipped with no quantity and no Ducats, and
+none of the three items had a picture, although DE's manifests held all of it.
+DE's recipe supplies each part's name, count and Ducats, but the relic link
+(`drops`) was borrowed only from the matching component in WFCD's item record.
+With no WFCD record every part had no `drops`, the parts loop's `if not
+rel_map: continue` dropped all four, and the item fell through to
+`parts_from_droptables`, which knows no quantities or Ducats. `image_for`
+likewise found the texture only through WFCD's `uniqueName`.
+
+**Why WFCD's record is the slowest source there is**, measured from WFCD's own
+repositories after the owner spotted Citrine on `drops.warframestat.us` while the
+item API still lacked it:
+
+- **Two WFCD products, two clocks.** `drops.warframestat.us` is
+  `warframe-drop-data`, *"parsed from Digital Extremes official drop data
+  website"*. Its `info.json` records DE's change at 15:13:21Z and WFCD's rebuild
+  at 18:51Z on the 23rd, so it adds nothing the build does not already read
+  first-hand, hours earlier. `api.warframestat.us/items` is `warframe-status`
+  serving the `@wfcd/items` package baked into its Docker image.
+- **A new Prime waits on two steps after DE.** First `warframe-items` has to add
+  it: Citrine first appears in v1.1276.0, 04:08Z on the 24th, fourteen hours
+  after DE. Then `warframe-status` has to redeploy, and its last release was
+  13:23Z on the 22nd. The API refills its cache every four hours, but only from
+  the package already installed. An unconditional request at 06:50Z on the 24th
+  (Cloudflare `MISS`, same ETag, identical body) confirmed the request is right
+  and the answer simply lacks Citrine.
+
+**The rule now.** `relic_links` in `build_data.py` keeps WFCD's `drops` for any
+part WFCD list them for, exactly as before. For a part WFCD have nothing for, it
+takes the relics from DE's drop table, in the same `location` shape, so the rest
+of the join cannot tell the two apart. The table is walked only when some part
+needs it, which on a normal build is none. `image_for` takes DE's own
+`uniqueName` from the export when WFCD's record has none.
+
+**It also makes WFCD's component-catalog change harmless to the relic link.**
+v1.1276.0 moved every item's `components` to bare references
+(`{uniqueName, itemCount}`) into a separate catalog (PR #992). The package
+expands them by default, and `warframe-status` keeps that default, so the API
+should not change. If it ever does serve references, `relic_links` finds no
+named WFCD part and every part takes DE's table. Checked by feeding it a
+refs-only component list: no error, and DE's relics come back. What would still
+depend on WFCD's shape is the one item with no DE recipe, Kavasa Prime Collar,
+which reads WFCD's component names directly.
+
+**Verified.** The local payload before and after was compared item by item:
+**none of the 167 existing items changed**, and the three new ones gained DE's
+quantities and Ducats, their relics with the same chance tables as an
+established Prime, and DE's artwork. The refactor into `relic_links` was diffed
+against the inline first version and is identical. Its test covers a missing
+WFCD record, WFCD's drops being kept, a partly covered item and a part in
+neither source, and it goes red with the table ignored. The artwork test goes
+red with the export key ignored.
 
 ---
 

@@ -207,9 +207,10 @@ to fail yet:**
 This does not replace the 24th. It records a measurement that would not have kept
 until then. Nothing had arrived on either side, and question 2 already has half
 its answer: the export route could not deliver at all. That is now fixed on
-this machine only, owner's decision, together with three related defects found
-the same afternoon. See *Four fixes run locally only — push them once the
-Citrine test is read and the light build's cost is settled*, below, and
+this machine only, owner's decision, together with the related defects found
+that afternoon and the next morning. See *The Citrine-day fixes run locally
+only — push them once the Citrine test is read and the light build's cost is
+settled*, below, and
 `PROJECT.md §7` for the measurements. So from 2026-09-23 the local build is
 **not** unaided and the deployed one still is: question 6 compares a fixed
 pipeline with an unfixed one. The deployed side still ignores a CDN's `Age`, so
@@ -235,10 +236,13 @@ the time.
 - **Xaku, Trumna and Quassus read `farmable: false` with `vaulted: false`.** The
   `vaulted` flag comes from sources that have not caught up. How the page
   presents that combination is worth a look on the 24th.
-- **Question 3:** all twelve parts had no quantity and no Ducats. See *A Prime
-  WFCD have not indexed yet loses DE's own parts, Ducats and artwork*, below.
-- **Question 5:** no artwork on any of the three, same entry. No `plat` either,
-  which is a supported state.
+- **Question 3:** all twelve parts had no quantity and no Ducats, because the
+  relic link came only from WFCD's item record, which did not list them.
+  **Fixed locally on the 24th**: the local payload now carries DE's counts and
+  Ducats. See `PROJECT.md §7`, *A part's relics come from DE's drop table when
+  WFCD have not indexed it*.
+- **Question 5:** no artwork on any of the three, for the same reason and fixed
+  in the same change. No `plat` either, which is a supported state.
 - **Question 6, read at 06:52Z on the 24th:** the deployed payload still had
   167 items and 763 relics, no Citrine, and Xaku, Trumna and Quassus Prime still
   farmable. That is the pre-Citrine drop table, 15.5 hours after DE changed it.
@@ -247,11 +251,14 @@ the time.
   reads items and relics from DE exactly as the local one does. What holds it
   back is the cache windows, which are fixed locally only. From WFCD the
   deployed side takes the live feeds (the worldstate, because DE 403 the runner)
-  and, like the local side, each part's relic link.
+  and each part's relic link. The local side has taken the relic link from DE's
+  table since the 24th whenever WFCD lack it.
 - **Question 7:** against this local payload, three built-payload checks were
   red and every code test passed.
   - `parts: every one agrees with DE's own manifests` and `platinum: every
-    Prime-part reward row carries ducats` are both the parts flaw above.
+    Prime-part reward row carries ducats` were both the parts flaw in question
+    3. Both have been green against the local payload since that fix on the
+    24th, which leaves the next check as the only red one.
   - `platinum: every Prime-part reward row carries plat` failed because
     warframe.market has not listed the parts yet. The docs call a missing `plat`
     a supported state, so **this check cannot pass on release day for any new
@@ -265,10 +272,10 @@ the time.
 the owner decides which get fixed. Delete this entry once that is done: the
 observation belongs in those entries, not here.
 
-### Four fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
+### The Citrine-day fixes run locally only — push them once the Citrine test is read and the light build's cost is settled
 
-**Made 2026-09-23 and deliberately not pushed — owner's decision.** Each has its
-own `PROJECT.md §7` entry:
+**Made 2026-09-23 and 24, and deliberately not pushed — owner's decision.** Each
+has its own `PROJECT.md §7` entry:
 
 - **DE's export manifests had been frozen since 27 August.** The cache checked a
   year-long window against the file name, when that window belongs to a hashed
@@ -280,12 +287,16 @@ own `PROJECT.md §7` entry:
   hours past DE's window on release day. See *A CDN's `Age` counts against
   `max-age`*.
 - **WFCD's item data was not fingerprinted**, so nothing noticed WFCD catching
-  up after a patch. See *WFCD's item data is part of the fingerprint*. The last
-  two were chosen instead of moving the build time, which the owner had asked
-  about.
+  up after a patch. See *WFCD's item data is part of the fingerprint*. This one
+  and the `Age` fix were chosen instead of moving the build time, which the
+  owner had asked about.
+- **A part's relic link and an item's artwork came only from WFCD's item
+  record**, which lagged DE by fourteen hours and more, so a new Prime shipped
+  with no quantities, no Ducats and no picture. See *A part's relics come from
+  DE's drop table when WFCD have not indexed it*.
 
-The local scheduled build runs all four from this working tree. CI builds `main`
-from GitHub and has none of them, so the two sides can be compared.
+The local scheduled build runs all of them from this working tree. CI builds
+`main` from GitHub and has none of them, so the two sides can be compared.
 
 **Two things will look odd locally and are expected.** The `Age` fix only
 applies to windows written after it, so the drop-table HEAD fetched at 09:12Z on
@@ -324,64 +335,21 @@ drop-table fallback instead of DE's recipes. That turns `parts: only the items
 DE do not publish fall back` red, for a reason the Kavasa pin was never meant to
 catch.
 
-### A Prime WFCD have not indexed yet loses DE's own parts, Ducats and artwork
+### Confirm WFCD's component shape when `warframe-status` next releases
 
-**Seen 2026-09-23 at 16:03Z, on the first local build that reached Citrine by
-the export route.** All twelve Citrine, Steflos and Corufell parts shipped with
-`itemCount: None` and no `ducats`, and none of the three items had a picture.
-DE's own manifests had all of it at the time: run through `prime_part_specs`
-they give four parts per item with counts and Ducats (`PROJECT.md §7`, *A
-freshness window belongs to the URL it was declared for*), and `ExportManifest`
-carries the textures.
+**Found 2026-09-24.** `warframe-items` v1.1276.0 moved every item's `components`
+to bare references into a separate catalog (PR #992). `api.warframestat.us` is
+expected to keep serving the expanded shape: the package expands references by
+default, and `warframe-status` keeps that default. Nothing has been served in
+the new version yet, because `warframe-status` has not released since 13:23Z on
+2026-09-22. On its first release, read one item's `components` from the API and
+check they still carry `name` and `drops`.
 
-**Why, from the code.** Both joins go through WFCD's item record, which does not
-list Citrine yet. In the parts loop of `build_data.py`, DE's spec supplies the
-name, count and Ducats, but the relic link (`drops`) is borrowed from the
-matching WFCD component. With no WFCD record every part has no `drops`, `if not
-rel_map: continue` drops all four, and the item falls through to
-`parts_from_droptables`, which knows no quantities or Ducats. That confirms the
-Citrine entry's suspected weak spot *parts from the drop-table fallback carry no
-quantity and no Ducats*. `image_for` likewise looks the texture up by the WFCD
-record's `uniqueName`, although the export entry carries DE's own
-(`/Lotus/Powersuits/Geode/CitrinePrime`).
-
-**How much it matters.** Every quantity happens to be 1 this time, so nothing
-reads wrong yet. The missing Ducats drop out of the spare-value tie-break, and
-the missing picture falls back to the glyph. Both last only until WFCD index the
-item, but that gap is exactly the window the export route exists to cover.
-
-**Where WFCD's copy comes from, and why it is the slowest source there is.**
-Measured 2026-09-24 from WFCD's own repositories, after the owner spotted
-Citrine on `drops.warframestat.us` while the item API still lacked it.
-
-- **Two WFCD products, two clocks.** `drops.warframestat.us` is
-  `warframe-drop-data`, which is *"parsed from Digital Extremes official drop
-  data website"*. Its `info.json` records DE's change at 15:13:21Z and WFCD's
-  rebuild at 18:51Z on the 23rd. It adds nothing we do not already read
-  first-hand, 3.5 hours earlier. `api.warframestat.us/items`, which this join
-  reads, is `warframe-status` serving the `@wfcd/items` package baked into its
-  Docker image.
-- **So a new Prime waits on two steps after DE.** First `warframe-items` has to
-  add it: Citrine first appears in v1.1276.0, released 04:08Z on the 24th,
-  fourteen hours after DE. Then `warframe-status` has to redeploy: its last
-  release was 13:23Z on the 22nd. The API refills its cache every four hours,
-  but only from the package already installed. An unconditional request at
-  06:50Z on the 24th (Cloudflare `MISS`, same ETag, identical body) confirmed
-  the request is right and the answer simply lacks Citrine.
-- **Watch the next `warframe-status` release.** v1.1276.0 also moved every
-  item's `components` to references (`{uniqueName, itemCount}`) into a separate
-  `Components` catalog (PR #992). The package expands them by default
-  (`resolveComponents: true`, *"compat with the pre-catalog shape"*), and
-  `warframe-status` builds its cache with `new Items({ i18n, i18nOnObject })`,
-  so the API should keep `name` and `drops`. This join reads exactly those two
-  fields for every Prime, so confirm them on the first API answer that carries
-  Citrine.
-
-**Shape of a fix, not designed:** take the relic link from the drop table's own
-relic contents, which `parts_from_droptables` already reads, and keep DE's count
-and Ducats. The drop table had Citrine's relics at 15:13Z, and WFCD's item API
-still did not at 06:50Z the next morning. Take the texture from the export
-entry's `uniqueName` when there is no WFCD record.
+**What is at stake is small now.** The relic link falls back to DE's drop table
+for any part WFCD do not name (`PROJECT.md §7`, *A part's relics come from DE's
+drop table when WFCD have not indexed it*, checked with a refs-only input). What
+would still break is **Kavasa Prime Collar**, the one item with no DE recipe,
+which reads WFCD's component names directly.
 
 ### The refresh task still runs every ten minutes, and `PROJECT.md §4` still argues for it
 

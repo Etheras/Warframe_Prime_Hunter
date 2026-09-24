@@ -2765,6 +2765,50 @@ def test_baro_sells_relics_read_off_his_own_manifest() -> None:
           "None is what makes from_chain try the next step")
 
 
+def test_a_part_relic_link_comes_from_des_table_when_wfcd_lack_it() -> None:
+    """
+    DE's recipe gives each part its count and Ducats, and the relic link came
+    only from WFCD's item record. On Citrine Prime's release day DE's drop table
+    had the relics at 15:13Z while WFCD's item API still lacked them the next
+    morning, so every part was dropped and the item fell through to parts with
+    no count and no Ducats. `PROJECT.md §7`.
+
+    Synthetic inputs rather than the payload: the subject is the rule, so it is
+    named here instead of being picked out of whatever the build holds.
+    """
+    table = {
+        "Neo C11": {"rewards": {"Citrine Prime Chassis Blueprint": {"rarity": "Common"},
+                                "Ash Prime Chassis Blueprint": {"rarity": "Uncommon"}}},
+        "Meso C11": {"rewards": {"Citrine Prime Blueprint": {"rarity": "Rare"}}},
+        "Lith Z1": {"rewards": {"Ash Prime Blueprint": {"rarity": "Common"}}},
+    }
+    spec = [{"name": "Blueprint"}, {"name": "Chassis"}]
+
+    links = build_data.relic_links(spec, [], "Citrine Prime", table)
+    check("relic link: with no WFCD record, every part takes DE's table",
+          {k: [d["location"] for d in v] for k, v in links.items()},
+          {"Blueprint": ["Meso C11 Relic"], "Chassis": ["Neo C11 Relic"]})
+    check("relic link: in the shape the rest of the join reads",
+          [relics.relic_key(d["location"]) for d in links["Chassis"]], ["Neo C11"])
+
+    wfcd = [{"name": "Blueprint", "drops": [{"location": "Axi Q1 Relic", "rarity": "Rare"}]},
+            {"name": "Chassis", "drops": [{"location": "Lith Q2 Relic", "rarity": "Common"}]}]
+    check("relic link: a part WFCD list keeps WFCD's drops exactly",
+          build_data.relic_links(spec, wfcd, "Ash Prime", table),
+          {"Blueprint": wfcd[0]["drops"], "Chassis": wfcd[1]["drops"]},
+          "a Prime WFCD have indexed must be unchanged by this")
+
+    partial = [{"name": "Blueprint", "drops": []},
+               {"name": "Chassis", "drops": [{"location": "Lith Q2 Relic"}]}]
+    got = build_data.relic_links(spec, partial, "Ash Prime", table)
+    check("relic link: only the part WFCD have nothing for is filled from the table",
+          ({k: [d["location"] for d in v] for k, v in got.items()}),
+          {"Blueprint": ["Lith Z1 Relic"], "Chassis": ["Lith Q2 Relic"]})
+    check("relic link: a part in neither is an empty list, not an error",
+          build_data.relic_links([{"name": "Systems"}], [], "Citrine Prime", table),
+          {"Systems": []})
+
+
 def test_artwork_prefers_digital_extremes() -> None:
     """
     Artwork is first party since 2026-08-27. DE's `ExportManifest.json` gives a
@@ -2791,6 +2835,17 @@ def test_artwork_prefers_digital_extremes() -> None:
           build_data.image_for({}, {}), None)
     check("artwork: and a missing item record does not raise",
           build_data.image_for(None, {}), None)
+
+    # A Prime WFCD have not indexed yet: DE's own key, from the export, finds the
+    # picture DE's manifest already holds. Citrine Prime had none for this
+    # reason on its release day and the morning after.
+    citrine = "/Lotus/Powersuits/Geode/CitrinePrime"
+    ctex = "/Lotus/Interface/Icons/StoreIcons/Primes/CitrinePrime.png!00_x"
+    check("artwork: with no WFCD record, DE's own key from the export is used",
+          build_data.image_for(None, {citrine: ctex}, citrine), DE_TEXTURES + ctex)
+    check("artwork: but WFCD's key still wins when there is one",
+          build_data.image_for(api, {api["uniqueName"]: tex, citrine: ctex}, citrine),
+          DE_TEXTURES + tex)
 
     # Both shapes reduce to the same local file, which is why an existing
     # assets/img/ folder survives the switch instead of re-downloading.
@@ -5919,7 +5974,8 @@ def main() -> int:
     groups = [
         ("parsers", [test_rarity_from_intact, test_split_rate, test_normalise_part,
                      test_relic_key, test_parse_prime_page]),
-        ("join", [test_normalise_sources, test_no_source_cap]),
+        ("join", [test_normalise_sources, test_no_source_cap,
+                  test_a_part_relic_link_comes_from_des_table_when_wfcd_lack_it]),
         ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
