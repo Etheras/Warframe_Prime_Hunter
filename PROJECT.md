@@ -8854,6 +8854,15 @@ one-time re-ask fetched the body because no `.url` was recorded for it yet. The
 HEAD had not moved, so without that the fingerprint would not have noticed
 before 09:12Z on the 24th.
 
+**GET and HEAD agree on the date, measured once the HEAD was next asked.**
+The worry left open was a HEAD persistently *ahead* of what the GET returns,
+which under the rule above would re-download the body on every network build.
+The HEAD asked at 15:50:04Z on 2026-09-24 reported `Last-Modified: Wed, 23 Sep
+2026 15:13:21 GMT`, byte for byte the date recorded beside the body. One
+sample, on DE's own origin (the `digitaloceanspaces.com` bucket behind
+`www.warframe.com`). It shows the two can agree. It does not prove they
+always will.
+
 **The same shape, and why it is a different fix from the URL one.** Both are a
 window applied to something other than what it was declared for: there, a URL
 the window never covered; here, a version the server has since replaced. The

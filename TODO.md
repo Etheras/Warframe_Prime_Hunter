@@ -106,17 +106,6 @@ window belongs to the URL it was declared for* onwards.
   the page shows for that combination, since neither the vaulted badge nor a
   farm route applies to it.
 
-### Confirm DE's GET and HEAD agree on the drop table's `Last-Modified`
-
-**Left over from the Citrine-day fixes** (`PROJECT.md §7`, *A body is not fresh
-once its HEAD has seen a newer version*). Only a HEAD whose date is *later* than
-the body's refuses the body's window, so a lagging HEAD is harmless. But a HEAD
-persistently ahead of what the GET returns would re-download the body on every
-network build. Check once this machine next asks the HEAD, at 09:12Z on
-2026-09-24 or on the first network build after it: compare
-`official_droptables.gz.lastmod` (15:13:21Z) with the `last-modified` in
-`head_droptables`.
-
 ### The errand switches on *How to crack them* do not sit well as pills
 
 **Owner, 2026-09-24**, on seeing the pills shipped: *Varzia* and *Trade* (and
