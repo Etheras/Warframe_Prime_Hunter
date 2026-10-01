@@ -2581,8 +2581,16 @@ def main() -> int:
             # know it and give no date), so it does not get this.
             **({"unindexed": True} if api is None else {}),
             "flags": {
-                # api "vaulted" is game data; the wiki marker is the fallback
-                "vaulted": bool((api or {}).get("vaulted", wf["vaulted"])),
+                # DE's drop table: vaulted when none of its relics drops
+                # anywhere, which is `farmable` from the other side, so the two
+                # cannot disagree. WFCD's flag, then the wiki's (V), only for a
+                # Prime with no relic parts, where the table has nothing to say.
+                # Until 2026-10-02 WFCD's flag decided for every Prime, and was
+                # wrong both ways: Xaku, Trumna and Quassus read not vaulted with
+                # nothing dropping, and six Railjack-only Primes read vaulted
+                # with every part dropping. `PROJECT.md §7`.
+                "vaulted": (not farmable_relics) if item_relics
+                           else bool((api or {}).get("vaulted", wf["vaulted"])),
                 "resurgence": name in resurgence,
                 "permanent": wf["permanent"],
                 "baro": wf["baro"],

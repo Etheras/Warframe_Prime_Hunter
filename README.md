@@ -262,7 +262,7 @@ it over for you. There is no upper limit, because the wiki does not publish one.
 | **Prime Resurgence (R)** | Buyable from Varzia right now, with Aya |
 | **Baro Ki'Teer (B)** | Sold by the Void Trader when he visits |
 | **Other sources** | Not from relics at all — a quest, an event, a special vendor. Open one and it tells you exactly where |
-| **Vaulted (V)** | Not obtainable except by trading with other players |
+| **Vaulted (V)** | None of its relics drops anywhere, by DE's own drop tables — not obtainable except by trading with other players |
 | **Founder exclusive** | Excalibur, Lato and Skana Prime. Never coming back — kept at the bottom for that reason |
 
 Every one of these is a switch that reads *Shown* or *Hidden*. Want to see only

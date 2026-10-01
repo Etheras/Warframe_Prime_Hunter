@@ -4545,14 +4545,16 @@ exists, while a missing node list is wrong data rather than a missing nicety.
 | enemy levels | DE Public Export | **yes** |
 | existence of a brand-new Prime | DE Public Export | **yes** |
 | `resurgence` | live worldstate — DE, then WFCD, then our cache | **yes**, with a proxied fallback |
-| `vaulted` | WFCD's `vaulted`, wiki `(V)` as fallback | no |
+| `vaulted` | DE drop tables — none of its relics drops (since 2026-10-02; WFCD's `vaulted`, then wiki `(V)`, only for the 7 Primes with no relic parts) | **yes** |
 | category | wiki page sections | no |
 | `permanent` `baro` `special` `founder` | wiki markers only | **no — editorial** |
 | artwork | DE's `ExportManifest.json` → `content.warframe.com`, WFCD CDN as fallback | **yes** since 2026-08-27 |
 
-`farmable` is the one availability fact derived entirely from official data,
-which is why the UI leans on it and why the vault/Baro/special/Founder markers
-are treated as annotation rather than truth.
+`farmable` and `vaulted` are the availability facts derived entirely from
+official data — the same fact from two sides since 2026-10-02 — which is why the
+UI leans on them and why the Baro/special/Founder markers are treated as
+annotation rather than truth. See *A Prime is vaulted when none of its relics
+drops*.
 
 ### One store, because two copies drifted twice
 
@@ -9394,6 +9396,40 @@ to its 131,072 declared, Baro arriving — and all are fetched. End to end over
 cached copy and says `STALE`, and an empty copy lets a large answer through.
 Two mutations went red: `fetch` ignoring the held copy, and the empty exemption
 removed. The 75% headroom canary is gone with the table it checked.
+
+### A Prime is vaulted when none of its relics drops
+
+**Owner's decision, 2026-10-02**, from a menu with the recommendation first,
+after asking why Xaku did not appear vaulted.
+
+**Why it did not.** A card wears `FARMABLE` when a relic for it drops, and
+otherwise `VAULTED` only when `flags.vaulted` is true — and that flag was WFCD's.
+Xaku, Trumna and Quassus Prime had no relic dropping anywhere and WFCD's
+`vaulted: false`, so their cards wore **no availability badge at all**, while
+the *Vaulted* filter did list them: its bucket is the absence of every other
+source, not the flag.
+
+**WFCD's flag was wrong both ways**, measured 2026-10-01 against DE's drop
+table: those three said not vaulted with nothing dropping, and Nyx, Valkyr,
+Cernos, Hikou, Scindo and Venka Prime said vaulted with every part dropping —
+the six the wiki marks permanent, whose relics drop only on Railjack. That half
+showed nothing wrong on screen, because `FARMABLE` and `RAILJACK ONLY` win. The
+wiki's `(V)` was right on Xaku and missing on Trumna and Quassus. Why WFCD's
+flag is wrong was not investigated; that it is, is measured.
+
+**The rule now.** A Prime with relic parts is vaulted exactly when none of its
+relics drops — `farmable` from the other side, from the same table, so the two
+cannot disagree. WFCD's flag, then the wiki's `(V)`, decide only for the seven
+with no relic parts (Excalibur, Lato and Skana; Gotva, Sagek, Galariak and War),
+where the table has nothing to say. Resurgence Primes stay vaulted, as before:
+Varzia sells their relics, nothing drops them.
+
+**Verified.** Exactly the nine flags moved, in the predicted directions, and
+nothing else. On the served page the three cards wear `VAULTED` and Nyx and
+Valkyr still read `FARMABLE` and `RAILJACK ONLY`, with no console errors. The
+payload check reads each Prime's own relics against the relic table rather than
+against `farmable`, so it does not check the build against itself; it went red
+on all nine with WFCD's flag put back.
 
 ---
 

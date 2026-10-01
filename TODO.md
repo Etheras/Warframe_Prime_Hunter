@@ -86,23 +86,6 @@ part's button leaves the list and the counter has nowhere to wrap. Correcting a
 mis-click there still means opening the item on the collection page — a property
 of a worklist, not of the click, and worth deciding on its own merits.
 
-### Xaku, Trumna and Quassus Prime read neither vaulted nor farmable
-
-**Seen on 2026-09-23 and 24, on the first builds with Citrine's drop table.**
-The rest of what that release taught is in `PROJECT.md §7`, from *A freshness
-window belongs to the URL it was declared for* onwards.
-
-All three read `farmable: false` and `vaulted: false`. `vaulted` comes from
-WFCD's item record, which lags DE. Check what the page shows for that
-combination, since neither the vaulted badge nor a farm route applies to it.
-**Still so on 2026-10-01** with a fresh item database and DE's relic links
-added to every part, so it is neither of the two causes fixed that day.
-
-The entry's other half, Akbronco Prime reading not farmable, was answered on
-2026-10-01: its parts had moved to relics DE published and WFCD never linked.
-`PROJECT.md §7`, *A part's relics are DE's drop table and WFCD's record
-together*.
-
 ### The errand switches on *How to crack them* do not sit well as pills
 
 **Owner, 2026-09-24**, on seeing the pills shipped: *Varzia* and *Trade* (and
@@ -1415,10 +1398,17 @@ status comes from the live worldstate instead. Nothing here needs changing even 
 the wiki is fixed, since the worldstate is simply a better source, but the page is
 misleading anyone reading it directly.
 
-### `(V)` vaulted markers are trusted less than the item API
+### Trumna and Quassus Prime carry no `(V)` marker
 
-Where the two disagree, the API's `vaulted` field wins. Worth spot-checking which is
-actually right before deciding whether this is a wiki problem or one of ours.
+On the [Prime](https://wiki.warframe.com/w/Prime) page as read 2026-10-02, both
+are listed without `(V)`, while DE's drop table has none of their relics
+dropping — 22 and 18 relics, every one vaulted. Xaku Prime, released with them,
+does carry it.
+**Local workaround:** none needed. `vaulted` comes from DE's drop table for any
+Prime with relic parts since 2026-10-02 (`PROJECT.md §7`, *A Prime is vaulted
+when none of its relics drops*), so the marker is read only for the seven with
+none. This entry replaced one asking whether the wiki's `(V)` or WFCD's flag was
+right; measured, neither was throughout, and the drop table was.
 
 ### The wiki contradicts itself about Isolation Vault rotations
 

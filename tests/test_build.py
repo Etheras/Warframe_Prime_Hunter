@@ -542,6 +542,16 @@ def test_built_payload() -> None:
                and not (i.get("flags") or {}).get("special")]
     check("payload: partless items are all Founder/Baro/special", orphans, [])
 
+    # Vaulted is DE's drop table since 2026-10-02: a Prime with relic parts is
+    # vaulted exactly when none of its relics drops. Read off each item's own
+    # relics against the relic table, not off `farmable`, so this does not
+    # check the build against itself.
+    wrong = [i["name"] for i in D["items"] if i.get("relics")
+             and i["flags"]["vaulted"] != all(D["relics"][r]["vaulted"]
+                                              for r in i["relics"])]
+    check("payload: a Prime is vaulted exactly when none of its relics drops",
+          wrong, [], "WFCD's flag said Xaku was not vaulted with nothing dropping")
+
     # Aya is a currency, not a relic, and used to be discarded by the parser
     aya = D.get("aya")
     check_true("payload: Aya drop rows present", isinstance(aya, list) and len(aya) > 10,

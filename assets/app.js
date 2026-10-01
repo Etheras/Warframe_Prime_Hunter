@@ -441,11 +441,13 @@
     if (it.vaultSoon) out.push("vaultsoon");
     /* "Never vaulted" and "Railjack only" are the same wiki marker seen from
        two sides, and only one of them can be said to someone with no ship. Six
-       Primes carry the marker *and* DE's vaulted flag, because their relics
-       left the star chart for Railjack instead of for the vault - the badge
-       says which of the two you are looking at rather than flattening both into
-       "its relics keep dropping indefinitely". Worked out from the drop table
-       in rotation.js, not from the markers. */
+       Primes carry the marker with every relic dropping only on Railjack nodes
+       - their relics left the star chart for Railjack instead of for the vault
+       (WFCD's flag called them vaulted, which is why `vaulted` has come from
+       DE's drop table since 2026-10-02). The badge says which of the two you
+       are looking at rather than flattening both into "its relics keep
+       dropping indefinitely". Worked out from the drop table in rotation.js,
+       not from the markers. */
     if (f.permanent) out.push(ROT.railjackOnly(it, RELICS) ? "railjack" : "perm");
     /* Two Baro badges, because `flags.baro` answers a different question from
        the one a reader asks looking at a card.
