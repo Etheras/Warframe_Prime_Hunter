@@ -3025,9 +3025,16 @@ page_test("a ranked node says when it is a fissure, and stops saying so", async 
       { node: n, tier: "Axi", mode: "Defense", ends: at(-90), hard: false, storm: false });
   }, [node, mins]);
 
+  /* Followed by its node from here on, not by being first. The rerender
+     toggles the squad, which can reorder the top of the list: on 2026-10-01
+     Akbronco Prime became farmable, became this test's subject, and the toggle
+     put Mithra above Ur — so `first` was a different row from the one the
+     fissure was planted on, and the badge was asserted somewhere it never was. */
+  const row = rowFor(page, key);
+
   await plant(key, 90);
   await rerender();
-  const badge = first.locator(".tag.fissure");
+  const badge = row.locator(".tag.fissure");
   assert.equal(await badge.count(), 1, `${key} is a fissure and the row does not say so`);
   const said = await badge.innerText();
   assert.match(said, /NEO/i, "the tier decides which relic to bring, so it is on the badge");
@@ -3036,7 +3043,8 @@ page_test("a ranked node says when it is a fissure, and stops saying so", async 
 
   await plant(key, -1);
   await rerender();
-  assert.equal(await first.locator(".tag.fissure").count(), 0,
+  assert.equal(await row.count(), 1, `${key} left the list, so no badge proves nothing`);
+  assert.equal(await row.locator(".tag.fissure").count(), 0,
                "with it expired the row must stop claiming a fissure entirely");
   assert.deepEqual(errors, []);
 });

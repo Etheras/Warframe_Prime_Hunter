@@ -86,25 +86,22 @@ part's button leaves the list and the counter has nowhere to wrap. Correcting a
 mis-click there still means opening the item on the collection page — a property
 of a worklist, not of the click, and worth deciding on its own merits.
 
-### Two availability oddities left by Citrine day
+### Xaku, Trumna and Quassus Prime read neither vaulted nor farmable
 
 **Seen on 2026-09-23 and 24, on the first builds with Citrine's drop table.**
 The rest of what that release taught is in `PROJECT.md §7`, from *A freshness
 window belongs to the URL it was declared for* onwards.
 
-- **Akbronco Prime is marked never vaulted, but has no relic route.** Its
-  `permanent` flag is the wiki's `(P)`, *Never Vaulted*, and that did not
-  change. What changed is that DE's drop table of 15:13:21Z stopped dropping
-  every relic carrying its Blueprint or its Link (Lith A12 was among the fifteen
-  that went). So `farmable` went false, and the changelog listed it as vaulted.
-  Bronco Prime, its other ingredient, is still farmable. Check in game whether
-  those two parts moved to relics not yet in DE's table, or whether the wiki's
-  marker is now wrong. If it is the marker, it belongs under *Should be fixed on
-  the wiki, not here*.
-- **Xaku, Trumna and Quassus Prime read `farmable: false` and `vaulted:
-  false`.** `vaulted` comes from WFCD's item record, which lags DE. Check what
-  the page shows for that combination, since neither the vaulted badge nor a
-  farm route applies to it.
+All three read `farmable: false` and `vaulted: false`. `vaulted` comes from
+WFCD's item record, which lags DE. Check what the page shows for that
+combination, since neither the vaulted badge nor a farm route applies to it.
+**Still so on 2026-10-01** with a fresh item database and DE's relic links
+added to every part, so it is neither of the two causes fixed that day.
+
+The entry's other half, Akbronco Prime reading not farmable, was answered on
+2026-10-01: its parts had moved to relics DE published and WFCD never linked.
+`PROJECT.md §7`, *A part's relics are DE's drop table and WFCD's record
+together*.
 
 ### The errand switches on *How to crack them* do not sit well as pills
 
@@ -126,11 +123,33 @@ the new version yet, because `warframe-status` has not released since 13:23Z on
 2026-09-22. On its first release, read one item's `components` from the API and
 check they still carry `name` and `drops`.
 
-**What is at stake is small now.** The relic link falls back to DE's drop table
-for any part WFCD do not name (`PROJECT.md §7`, *A part's relics come from DE's
-drop table when WFCD have not indexed it*, checked with a refs-only input). What
+**v3.2.28 (2026-09-27) does not count.** Its `package-lock.json` still locks
+`@wfcd/items` 1.1275.85, before the change, so this waits on a release that
+locks 1.1276.0 or later. Read on 2026-10-01, when the API's components did
+still carry `name` and `drops`.
+
+**What is at stake is small now.** The relic link takes DE's drop table for
+every part, and any part WFCD do not name gets DE's relics alone (`PROJECT.md
+§7`, *A part's relics are DE's drop table and WFCD's record together*; the
+refs-only input was checked under the rule before it). What
 would still break is **Kavasa Prime Collar**, the one item with no DE recipe,
 which reads WFCD's component names directly.
+
+### A source that outgrows its ceiling in one step goes stale and fails nothing
+
+**Found 2026-10-01.** WFCD's item list went from 16.7 MB to past its 33,000 KB
+ceiling and every build for about twenty days refused it and reused the copy of
+2026-09-11. The 75% headroom canary in `test_build.py` measures the **cached**
+copy, and a refused body is never cached, so it read 49% throughout. The only
+signal was the *Sanity-check the result* step's `::warning::`, on every run,
+which nobody is emailed about. `PROJECT.md §7`, *Every source has a ceiling, and
+going over it is an ordinary failed fetch*, has the canary's history.
+
+What would close it, for the owner to choose: record a refusal where the canary
+can read it (a `.cache/<name>.refused` holding the size that was refused), or
+have the payload gate fail when `meta.stale` names a catalogue source for longer
+than some number of days. The live feeds go stale for ordinary reasons and
+would need leaving out of the second.
 
 ### Not work
 

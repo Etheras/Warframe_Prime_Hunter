@@ -130,31 +130,39 @@ def relic_links(spec: list[dict], wfcd_components: list[dict], name: str,
                 relic_contents: dict) -> dict[str, list[dict]]:
     """Which relics each of DE's recipe parts drops from, keyed by part name.
 
-    WFCD's item record where it lists any drops for the part — exactly as
-    before, so a Prime WFCD have indexed is unchanged by this. Otherwise DE's
-    own drop table, in the same `location` shape, so the caller cannot tell
-    the two apart.
+    WFCD's item record first, exactly as it lists them, and then every relic
+    DE's own drop table names for the part that WFCD's record does not, in the
+    same `location` shape, so the caller cannot tell the two apart.
 
     Until 2026-09-24 WFCD were the only source. On Citrine Prime's release day
     DE's table had the new relics at 15:13Z while WFCD's item API still lacked
     them the next morning — it waits on `warframe-items` and then on a
     `warframe-status` redeploy — and every DE-recipe part was dropped for want
     of a relic link, falling through to `parts_from_droptables` with no count
-    and no Ducats. `PROJECT.md §7`, *A part's relics come from DE's drop table
-    when WFCD have not indexed it*.
+    and no Ducats.
+
+    Until 2026-10-01 DE's table was read only for a part WFCD named no relic
+    for at all, which mends a Prime WFCD have never indexed and not one they
+    indexed long ago and DE have since put in new relics. Varzia's rotation
+    that day sold six relics for Primes WFCD knew years ago, none of the six
+    reached the payload, and the deploy was blocked. Measured the same day
+    against WFCD's current copy: 129 links across 38 Primes missing, 15 of the
+    relics dropping right now, and no link WFCD hold that DE's table lacks.
+    `PROJECT.md §7`, *A part's relics are DE's drop table and WFCD's record
+    together*.
     """
     links: dict[str, list[dict]] = {}
     for comp in wfcd_components:
-        links.setdefault(normalise_part(comp.get("name")), comp.get("drops") or [])
-    missing = [normalise_part(p["name"]) for p in spec
-               if not links.get(normalise_part(p["name"]))]
-    if missing:
-        # The whole table is walked only when a part needs it, which on a
-        # normal build is none of them.
-        table = {t["name"]: t["relics"] for t in parts_from_droptables(name, relic_contents)}
-        for part in missing:
-            links[part] = [{"location": f"{r['relic']} Relic", "rarity": r.get("rarity")}
-                           for r in table.get(part, [])]
+        # A copy, so adding DE's rows never writes into WFCD's record.
+        links.setdefault(normalise_part(comp.get("name")), list(comp.get("drops") or []))
+    table = {t["name"]: t["relics"] for t in parts_from_droptables(name, relic_contents)}
+    for p in spec:
+        have = links.setdefault(normalise_part(p["name"]), [])
+        # WFCD list each refinement as its own row; one relic is one key.
+        held = {relic_key(d.get("location") or "") for d in have}
+        have.extend({"location": f"{r['relic']} Relic", "rarity": r.get("rarity")}
+                    for r in table.get(normalise_part(p["name"]), [])
+                    if r["relic"] not in held)
     return links
 
 

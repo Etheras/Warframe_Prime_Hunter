@@ -5679,6 +5679,14 @@ runner rather than a stale build in production: the ceiling policy needs to know
 which sources vary, and the 75% canary is the assertion that made the difference
 between finding out now and finding out from a build that had quietly gone stale.
 
+**It has a blind spot, found 2026-10-01: a source that jumps past its ceiling in
+one step.** The canary measures the cached copy, and a refused body is never
+cached, so it went on reading the old 16.7 MB item list at half its ceiling
+while every build for about twenty days refused a 38.5 MB one and reused that
+copy. The only signal was a `::warning::` on each CI run. *A part's relics are
+DE's drop table and WFCD's record together* has the fix to that ceiling, and
+`TODO.md` has the gap.
+
 ### The planner's search marks parts collected, and adds no Primes at all
 
 **Shipped 2026-09-02**, and the owner's answer was larger than the question
@@ -8959,6 +8967,10 @@ left out on no answer. Switching the block off turns it red.
 **Fixed 2026-09-24 at the owner's direction, and pushed with the four entries
 above** at 07:24Z the same morning.
 
+**Superseded 2026-10-01** for *the rule now* below: DE's table is read for every
+part, not only for one WFCD name no relic for. See *A part's relics are DE's
+drop table and WFCD's record together*.
+
 **The defect, seen on the first local build that reached Citrine.** All twelve
 Citrine, Steflos and Corufell parts shipped with no quantity and no Ducats, and
 none of the three items had a picture, although DE's manifests held all of it.
@@ -9249,6 +9261,65 @@ switch test used `matches()`.
 still described *How far you run*, removed on 2026-08-24, and a gap in the
 collection page's copy of it. It was rewritten around the four switches that
 exist.
+
+### A part's relics are DE's drop table and WFCD's record together
+
+**Owner's decision, 2026-10-01**, taken when the first builds after Varzia's
+rotation went red.
+
+**The defect.** Her rotation turned over at 18:00Z and her shelf was read
+correctly — Axi A23, Lith B12, Meso I3, Meso V16, Neo O4, Neo P11 — yet no
+relic in the payload carried `resurgence`, so `payload: relics flag what Aya can
+buy` failed and the gate held the deploy, as it is meant to. DE's drop table had
+all six, contents and all. A relic is emitted only when some part links to it,
+and `relic_links` read DE's table only for a part WFCD named no relic for at
+all. The eight Primes on the shelf were indexed by WFCD long ago, so every part
+had WFCD's list, and WFCD's list did not have the new relics.
+
+**It was much wider than Varzia**, measured against DE's table that evening:
+129 part→relic links missing across 38 Primes, 27 relics, 15 of them dropping
+at the time. Four of those — Lith L8, Meso K9, Neo K10, Neo V13 — were absent
+from the payload altogether, so the planner never ranked them, and Akbronco
+Prime read not farmable when its Blueprint drops from Meso V17 and its Link from
+Lith L8. That answers the Akbronco half of the `TODO.md` entry on Citrine day's
+oddities: the parts moved to relics DE had published and WFCD had not linked.
+Measured the other way too: **no part had a WFCD link that DE's table lacked.**
+
+**Not WFCD's staleness, though that was real too.** The item database had been
+refused on every build for about twenty days (below), but a fresh copy fetched
+the same evening linked none of the 27 either. Measured: WFCD's record lags
+DE's relic links, not only DE's new Primes. Why it lags was not investigated.
+
+**The rule now.** `relic_links` keeps WFCD's `drops` first and unchanged —
+copied, never written into — then adds every relic DE's table names for the
+part that WFCD's list does not, de-duplicated on `relic_key` because WFCD list
+each refinement as its own row. The table is walked for every item now rather
+than only when a part needs it; the offline build went from 0.61 s to 0.82 s.
+
+**Verified** on the payload before and after, item by item: 129 links added,
+none lost, no part's count, Ducats or chance table changed, no item added or
+removed. Relics went 774 → 790 and dropping relics in the payload 30 → 34 of
+35; the 35th is Requiem ETERNA, which pays no Prime part. The six shelf relics
+are flagged, and Akbronco's `farmable` is the only flag that moved. The test
+goes red on each of three mutations — the old fill-only-when-empty rule, no
+de-duplication, and writing into WFCD's list.
+
+**A page test changed with it.** *A ranked node says when it is a fissure* read
+the top row's node, planted a fissure there, re-rendered by toggling the squad,
+and then asserted on whichever row was first *afterwards*. Akbronco becoming
+farmable made it `wishFarmable`'s subject, and on its list the toggle put Mithra
+above Ur, so the badge was looked for on a row it was never planted on. It now
+follows the node with `rowFor`, and asserts the row is still listed before
+asserting its badge has gone, so that half cannot pass on an empty locator.
+
+**The item database's ceiling, in the same commit.** `api_items` expanded to
+38,454,059 bytes against a 33,000 KB ceiling and was refused on every build
+since about 2026-09-11, each reusing the copy from that date with nothing
+louder than a CI warning. Raised to 75,000 KB, twice the new figure, under the
+doubling rule of *Every source has a ceiling, and going over it is an ordinary
+failed fetch*. The headroom canary could not
+see it, because it measures the cached copy and a refused body is never cached;
+`TODO.md` has that gap.
 
 ---
 

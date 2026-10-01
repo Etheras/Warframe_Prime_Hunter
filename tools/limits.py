@@ -106,7 +106,13 @@ MAX_EXPANDED = {
     # now nests each part's own components (1.1 MB of that field became 6.9 MB),
     # and the build reads only the top-level list (build_data.py `components`).
     # The headroom canary in test_build.py caught it at 78% of the old 21,000 KB.
-    "api_items":                      33_000 * KB,   # 16,674,344 (2026-09-11)
+    #
+    # And again 2026-10-01, 2.3x in three weeks: 7.4 MB of it is the nested
+    # components and 25.4 MB the top-level parts' `drops`. It passed 33,000 KB
+    # in one step, which the canary cannot see - it measures the cached copy,
+    # and a refused body is never cached - so every build reused the 09-11 copy
+    # for about twenty days with nothing louder than a CI warning.
+    "api_items":                      75_000 * KB,   # 38,454,059 (2026-10-01)
     "official_droptables":             9_000 * KB,   #  4,419,528
     "export_ExportManifest.json":      7_600 * KB,   #  3,780,187
     "drops_relics.json":               4_800 * KB,   #  2,385,503

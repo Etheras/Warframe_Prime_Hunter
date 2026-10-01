@@ -2819,13 +2819,18 @@ def test_baro_sells_relics_read_off_his_own_manifest() -> None:
           "None is what makes from_chain try the next step")
 
 
-def test_a_part_relic_link_comes_from_des_table_when_wfcd_lack_it() -> None:
+def test_a_part_relic_link_is_des_table_and_wfcds_record_together() -> None:
     """
     DE's recipe gives each part its count and Ducats, and the relic link came
     only from WFCD's item record. On Citrine Prime's release day DE's drop table
     had the relics at 15:13Z while WFCD's item API still lacked them the next
     morning, so every part was dropped and the item fell through to parts with
-    no count and no Ducats. `PROJECT.md §7`.
+    no count and no Ducats.
+
+    The first fix read DE's table only for a part WFCD had nothing for, and
+    Varzia's rotation on 2026-10-01 found the hole in that: six new relics for
+    Primes WFCD indexed long ago, none of which reached the payload. So a part
+    WFCD do list gains DE's relics too. `PROJECT.md §7`.
 
     Synthetic inputs rather than the payload: the subject is the rule, so it is
     named here instead of being picked out of whatever the build holds.
@@ -2847,17 +2852,32 @@ def test_a_part_relic_link_comes_from_des_table_when_wfcd_lack_it() -> None:
 
     wfcd = [{"name": "Blueprint", "drops": [{"location": "Axi Q1 Relic", "rarity": "Rare"}]},
             {"name": "Chassis", "drops": [{"location": "Lith Q2 Relic", "rarity": "Common"}]}]
-    check("relic link: a part WFCD list keeps WFCD's drops exactly",
-          build_data.relic_links(spec, wfcd, "Ash Prime", table),
-          {"Blueprint": wfcd[0]["drops"], "Chassis": wfcd[1]["drops"]},
-          "a Prime WFCD have indexed must be unchanged by this")
+    got = build_data.relic_links(spec, wfcd, "Ash Prime", table)
+    check("relic link: a part WFCD list keeps WFCD's drops, first and unchanged",
+          [got["Blueprint"][0], got["Chassis"][0]], [wfcd[0]["drops"][0], wfcd[1]["drops"][0]])
+    check("relic link: and gains every relic DE's table names that WFCD's does not",
+          {k: [d["location"] for d in v] for k, v in got.items()},
+          {"Blueprint": ["Axi Q1 Relic", "Lith Z1 Relic"],
+           "Chassis": ["Lith Q2 Relic", "Neo C11 Relic"]},
+          "Varzia's 2026-10-01 relics were all for Primes WFCD indexed long ago")
+    check("relic link: without writing into WFCD's record",
+          [len(c["drops"]) for c in wfcd], [1, 1])
+
+    # WFCD list every refinement as its own row, so one relic arrives several
+    # times under several spellings and must still count as one.
+    refined = [{"name": "Blueprint", "drops": [{"location": "Lith Z1 Relic"},
+                                               {"location": "Lith Z1 Relic (Radiant)"}]}]
+    check("relic link: a relic both sources name is not listed twice",
+          [d["location"] for d in
+           build_data.relic_links([{"name": "Blueprint"}], refined, "Ash Prime", table)["Blueprint"]],
+          ["Lith Z1 Relic", "Lith Z1 Relic (Radiant)"])
 
     partial = [{"name": "Blueprint", "drops": []},
                {"name": "Chassis", "drops": [{"location": "Lith Q2 Relic"}]}]
     got = build_data.relic_links(spec, partial, "Ash Prime", table)
-    check("relic link: only the part WFCD have nothing for is filled from the table",
+    check("relic link: a part WFCD have nothing for is filled from the table",
           ({k: [d["location"] for d in v] for k, v in got.items()}),
-          {"Blueprint": ["Lith Z1 Relic"], "Chassis": ["Lith Q2 Relic"]})
+          {"Blueprint": ["Lith Z1 Relic"], "Chassis": ["Lith Q2 Relic", "Neo C11 Relic"]})
     check("relic link: a part in neither is an empty list, not an error",
           build_data.relic_links([{"name": "Systems"}], [], "Citrine Prime", table),
           {"Systems": []})
@@ -6177,7 +6197,7 @@ def main() -> int:
         ("parsers", [test_rarity_from_intact, test_split_rate, test_normalise_part,
                      test_relic_key, test_parse_prime_page]),
         ("join", [test_normalise_sources, test_no_source_cap,
-                  test_a_part_relic_link_comes_from_des_table_when_wfcd_lack_it]),
+                  test_a_part_relic_link_is_des_table_and_wfcds_record_together]),
         ("bounties", [test_bounty_rotation_pools, test_derive_bounty_rotation,
                       test_bounty_family_split, test_live_event_bounties,
                       test_only_fissures_worth_going_to_are_shipped]),
