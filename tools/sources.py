@@ -26,6 +26,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zlib
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -78,8 +79,11 @@ VOID_TRADER = "https://api.warframestat.us/pc/voidTrader?language=en"
 # so "check the code, not the note about the code" would have sent a reader to
 # the wrong authority.
 #
-# `api_events` is also the feed whose ceiling this project got wrong; see
-# `tools/limits.py`, where WFCD's 8.7x expansion of DE's raw goals is measured.
+# `api_events` is a feed of bounty tables more than of events: WFCD expand each
+# goal's `Jobs` into whole bounties with their rewards, measured at 8.7x DE's
+# raw goal on 2026-09-09 (Ghoul Purge, 1,706 -> 14,897 bytes). So its size
+# tracks how many job-bearing events overlap, which is what a fixed ceiling got
+# wrong for a week; the five-times rule in `tools/limits.py` does not need it.
 SYNDICATE_MISSIONS = "https://api.warframestat.us/pc/syndicateMissions?language=en"
 WORLD_EVENTS = "https://api.warframestat.us/pc/events?language=en"
 # Where relics can be cracked right now. Every entry carries its own expiry,
@@ -298,6 +302,39 @@ def log(msg: str) -> None:
 def cache_path(key: str) -> str:
     safe = re.sub(r"[^A-Za-z0-9_.-]", "_", key)[:120]
     return os.path.join(CACHE_DIR, safe + ".gz")
+
+
+# A body with nothing in it, which is no baseline to multiply.
+EMPTY_BODIES = {b"", b"[]", b"{}", b"null"}
+
+
+def held_size(path: str) -> int | None:
+    """
+    How large the copy held at `path` is once expanded - the baseline its next
+    download may be `limits.GROWTH` times. None when there is nothing to compare
+    with: no copy, one that cannot be read, or one with nothing in it, which is
+    the owner's exemption for a file that is empty or all framing. Those get
+    `limits.BACKSTOP`.
+
+    Counted by reading it rather than taken from the gzip trailer's size field:
+    that field is exactly what a damaged file gets wrong, and a wrong baseline
+    is the one thing this must not have. It is only asked when a download is
+    actually about to happen.
+    """
+    if not os.path.exists(path):
+        return None
+    size, head = 0, b""
+    try:
+        with gzip.open(path, "rb") as fh:
+            for piece in iter(lambda: fh.read(1 << 20), b""):
+                if not size:
+                    head = piece[:64]
+                size += len(piece)
+    except (OSError, EOFError, zlib.error):
+        return None
+    if size <= len(head) and head.strip() in EMPTY_BODIES:
+        return None
+    return size
 
 
 # The validator that came with a cached body, beside the body rather than in a
@@ -631,7 +668,9 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
 
     last_err = None
     prior = read_etag(path)
-    ceiling = limits.cap_for(key)
+    # Five times what is held, never under a megabyte, and the backstop when
+    # nothing is held to compare with - tools/limits.py has the rule.
+    ceiling = limits.cap_for(held_size(path))
     # Hosts that have given a definitive answer, and so are not asked again on
     # this call. Two things land here and they are the same judgement:
     #
@@ -672,8 +711,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     # Both bounded by what this key is allowed to be. The read
                     # stops mid-transfer and the gunzip stops mid-stream, so
                     # neither an enormous body nor a small one that expands to
-                    # an enormous one is ever held whole. tools/limits.py has
-                    # the ceilings and what they were measured against.
+                    # an enormous one is ever held whole.
                     raw = limits.read_capped(resp, ceiling, key)
                     if resp.headers.get("Content-Encoding") == "gzip":
                         raw = limits.gunzip_capped(raw, ceiling, key)

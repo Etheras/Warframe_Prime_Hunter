@@ -5584,6 +5584,11 @@ documentation pushes — not the ten-minute one.
 
 ### Every source has a ceiling, and going over it is an ordinary failed fetch
 
+**Superseded 2026-10-01** for its numbers and its canary: a number per source at
+twice what it measured, and the 75% headroom test, are both gone. The caps, the
+early stop and the failed-fetch path below all stand. See *A download may be
+five times the copy it replaces*.
+
 **Shipped 2026-09-01.** Every remote read in the pipeline took whatever the other
 end sent: `resp.read()` with no maximum, `gzip.decompress` over the whole body,
 and the result written straight into `.cache/`. Four sites, and the export index
@@ -6445,7 +6450,9 @@ was ever able to notice.
 since `37a4f77`, raised in the same session that wrote the comment. The figure is
 read from `cap_for` now and the comment says what it used to claim, because a
 number in prose beside the code that computes it is a number that will be wrong
-again.
+again. **Superseded 2026-10-01** for that half of the test: there is no
+per-source figure to read, and it exercises the five-times rule instead. See *A
+download may be five times the copy it replaces*.
 
 ### The refresh can be driven from this machine, because GitHub's schedule is not a schedule
 
@@ -7798,6 +7805,11 @@ rather than the largest body seen — the same correction `api_syndicatemissions
 needed — and still below `de_worldstate`, which carries every one of these goals
 raw and is strictly the larger document.
 
+**Superseded 2026-10-01** for the number, and for the advice above to read a
+refusal as "raise the number": no feed has one now, and a refusal means a body
+over five times the copy held. See *A download may be five times the copy it
+replaces*.
+
 **The lesson is about the failure mode, not the number.** `limits.Refused` falls
 through to the cached copy and logs nothing anyone reads, so this would have
 presented as the events feed quietly not moving, during the only two-week window
@@ -8174,7 +8186,9 @@ bands and Ghoul Purge 14,893 with two. That is **18.8% of the new ceiling and
 112% of the old one** — so the projection was not merely prudent, it was low,
 and the pre-2026-09-09 ceiling would be refusing this feed right now, silently,
 for the entire fortnight. The `Content-Length` was honest and the response was
-not chunked, so the refusal would have been at the header.
+not chunked, so the refusal would have been at the header. (**Superseded
+2026-10-01** for the ceiling: the feed has no number of its own now. See *A
+download may be five times the copy it replaces*.)
 
 **What it gates, measured:** `Level 15 - 25 Plague Star` is the only tier the
 drop tables carry, and it holds **26 distinct relics**, more than any other
@@ -8797,9 +8811,11 @@ URL it came with. That is correct for a content-addressed URL, and asking for
 one again would be exactly the over-asking hard rule 11 exists to stop.
 
 **Why a sidecar rather than the hash in the key.** Putting the hash in the key
-also works, but `limits.cap_for` reads ceilings by exact key name, and every old
+also works, but `limits.cap_for` read ceilings by exact key name, and every old
 hash would leave a file behind to prune. The sidecar keeps the key and leaves
-nothing to prune.
+nothing to prune. (Since 2026-10-01 the ceiling is five times the copy held
+under the same key, so a new key would instead start with no baseline at all —
+the same argument, from the other side.)
 
 **The one-time cost.** A cache written before the sidecar existed has no URL
 recorded, so on its first network build every key with a window is asked once
@@ -9320,6 +9336,64 @@ doubling rule of *Every source has a ceiling, and going over it is an ordinary
 failed fetch*. The headroom canary could not
 see it, because it measures the cached copy and a refused body is never cached;
 `TODO.md` has that gap.
+
+**Superseded 2026-10-01**, hours later, for that ceiling: there is no number per
+source any more. See *A download may be five times the copy it replaces*.
+
+### A download may be five times the copy it replaces
+
+**Owner's rule, 2026-10-01**, given the same evening the item list was found to
+have outgrown its ceiling, and replacing the table that ceiling was in. In the
+owner's words, it is *"a limit for a maliciously huge download, but doesn't
+throttle actual gameplay"* — in a game whose arsenal only grows.
+
+**Why the table went.** Each source had its own number at about twice what it
+measured. That cost a measurement by hand every time a source grew, and in the
+month it stood it had to be raised four times: the syndicate feed at 87% on its
+first CI run, the events feed after it refused a body the day before the one
+event it was for, and the item list twice — at 78% on 2026-09-11, then after
+twenty days of refusals nobody saw. Every one of those was the game, or a third
+party's shape, growing; none was the hostile body the ceilings exist for.
+
+**The rule**, `limits.cap_for` with the size `sources.held_size` reads off the
+cached copy:
+
+- **Five times the copy held**, measured expanded.
+- **Never under 1 MB.** The owner's first wording exempted empty files; a floor
+  does that generically, because "empty" is rarely zero bytes — Baro's manifest
+  is 279 bytes while he is away and 6,219 on a visit, 22x — and every live feed
+  sits far below it (the raw worldstate is the largest, ~200 KB), so their
+  swings with game state never meet the rule.
+- **256 MB where nothing is held to compare with**: no copy (a fresh clone, a
+  cold CI cache, a manifest DE add), one that cannot be read, or one that is
+  empty or all framing (`""`, `[]`, `{}`, `null`) — the owner's exemption, kept
+  literally so a copy with nothing in it never becomes a 1 MB baseline for a
+  source that is really 38 MB.
+
+Chosen by the owner from a menu, each with a recommendation: the backstop over
+keeping the table for first downloads, and the floor over a per-source test of
+emptiness. **Artwork and the feed log keep their fixed caps**, also chosen: each
+is fetched only when nothing is held, so the rule would only ever apply its
+backstop, and 167 images at 256 MB each is no guard at all. `decode_index` takes
+the floor, because what is cached is the compressed index rather than the
+decoded one, so there is nothing of the same kind to multiply.
+
+**What it costs, said plainly.** A source that genuinely grows more than five
+times in one step is refused on every build, because a refused body never
+becomes the next baseline — the same silence the table had, at a much rarer
+threshold. The largest jump on record is the item list's 2.3x. `TODO.md` has
+how such a refusal would be noticed.
+
+**Measured against the real cache**: the 38.5 MB item list gives a ceiling of
+192 MB, the drop table 22 MB, and every live feed the 1 MB floor; reading the
+largest copy to measure it takes 18 ms, and it is read only when a download is
+actually about to happen. The test replays every jump between two copies this
+file records — the item list twice, the syndicate feed's 1.9x, the events feed
+to its 131,072 declared, Baro arriving — and all are fetched. End to end over
+`file://`: 4.7x growth is fetched, a jump past five times falls back to the
+cached copy and says `STALE`, and an empty copy lets a large answer through.
+Two mutations went red: `fetch` ignoring the held copy, and the empty exemption
+removed. The 75% headroom canary is gone with the table it checked.
 
 ---
 

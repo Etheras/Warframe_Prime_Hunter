@@ -12,29 +12,38 @@ gateway, an error page served with the wrong type, a decompression bomb from a
 host that has itself been compromised - landing on an unattended scheduled
 build, where the cost is memory, disk, or a run that never finishes.
 
-Two decisions are in the numbers rather than in the code, both taken from
-figures measured across `.cache/` on 2026-09-01:
+**A download may be five times the copy it replaces** - the owner's rule since
+2026-10-01, and `cap_for` below. It is a guard against a maliciously or
+brokenly huge body, not against a game that keeps growing: nobody measures a
+source by hand, and the allowance grows with the source. Two edges complete it:
 
-  * **A number per source.** The spread across the 23 sources is 21,000x, from
-    a 490-byte export index to a 10.4 MB item list. One limit that fits all of
-    them fits none of them.
-  * **An absolute cap on what is written out, never a ratio.** The worst
-    expansion ratio measured here is 21.9x and the largest expansion is 10.4 MB,
-    so a ratio guard is useless on its own - 40x is unremarkable and a real bomb
-    is 1000x. Only the absolute number stops the case in the finding.
+  * **A floor of 1 MB**, so a small or empty copy is never the baseline that
+    throttles the next one. Baro's manifest is 279 bytes while he is away and
+    6,219 on a visit - 22x - and every live feed's size moves with what is
+    running in the game. The largest of them, the raw worldstate, is ~200 KB.
+  * **A 256 MB backstop where there is nothing to compare with** - no copy
+    held (a fresh clone, a cold CI cache, a manifest DE add), or one that is
+    empty. The largest real source is the item list at 38.5 MB.
+
+Until then each source had its own number at roughly twice what it measured,
+and that table failed in exactly the way the rule above cannot: a source
+outgrew its ceiling (the item list went 16.7 MB -> 38.5 MB in three weeks, 2.3x)
+and every build refused it for about twenty days. `PROJECT.md §7`, *A download
+may be five times the copy it replaces*, has the rest.
+
+The cap is on what is written out, never on the compression ratio. A ratio
+guard is useless on its own - 21.9x is the worst expansion measured here and
+unremarkable, and a real bomb is 1000x - so the absolute number is what stops
+it, checked as it expands.
 
 **Refusing is a failed fetch, not a crash.** `sources.fetch` already has a
 well-worn answer for one: try the next host, then fall back to the cached copy
 and record it in `meta.stale`. Oversize takes that path rather than inventing a
-new one, so a ceiling set too tightly costs a stale build and a loud log line
-instead of a broken build. That is the property that makes tightening these
-numbers safe.
-
-The ceilings are roughly **twice** what each source measured, at the owner's
-direction (2026-09-01). Twice is deliberately less headroom than the three times
-`TODO.md` proposed: it is close enough to today's figures to actually catch a
-runaway, and the graceful failure above is what pays for the tightness. One
-source is worth watching because of it - see `de_worldstate` below.
+new one, so a refusal costs a stale build and a loud log line instead of a
+broken build. The cost of the five-times rule is the mirror of that: a source
+that genuinely grows more than five times in one step is refused on every
+build, because a refused body never becomes the next baseline. `TODO.md` has
+how that would be noticed.
 """
 
 from __future__ import annotations
@@ -75,129 +84,24 @@ class Malformed(Refused):
     """
 
 
-# What each source may expand to, keyed by its `.cache` name. The comment on
-# each line is what it actually measured — 2026-09-01 for most of them, and the
-# date is given on any row added since. The ceiling is **at least** that
-# doubled, so the drift between the two is reviewable without re-measuring.
-#
-# *At least*, not exactly: this said "doubled and rounded up" until 2026-09-04
-# and the table has never followed it. Measured across every row, the nine
-# catalogue sources sit at 2.0x to 2.2x, which is what that sentence described —
-# but `api_fissures` is 4.5x, `api_vaulttrader` 4.1x, `api_events` 10.9x and
-# `export_index` 8.4x. Those are deliberate and the reason is two paragraphs
-# down: a live feed's size moves with game state, so one sample of it is not a
-# measurement. The header and that note disagreed, and the header was the one
-# that was wrong.
+# What a download may expand to, from the size of the copy it replaces. The
+# header has the rule and why; these are its three numbers, and none of them is
+# a measurement of any source.
 #
 # The transfer is held to the same number. For a gzip response that compares a
 # compressed body against an expanded ceiling, which is loose in our favour and
 # never the wrong way round: a body that already exceeds the expanded limit
 # while still compressed cannot possibly expand to less.
-MAX_EXPANDED = {
-    # warframe.market, both measured 2026-09-08 against the live endpoints.
-    # Catalogue-shaped rather than live-feed-shaped: the item list grows when DE
-    # release something and the price table has one row per tradeable item, so
-    # neither moves with what is running in the game. Doubled, like the rest of
-    # this half of the table, rather than given the extra room the live feeds
-    # get for the reason written above them.
-    "wm_items":                        3_200 * KB,   #  1,614,035 (3,840 items)
-    "wm_ducats":                       1_100 * KB,   #    520,195 (742 rows)
-    # api_items re-measured 2026-09-11, up 60% from 10,443,694: WFCD's item data
-    # now nests each part's own components (1.1 MB of that field became 6.9 MB),
-    # and the build reads only the top-level list (build_data.py `components`).
-    # The headroom canary in test_build.py caught it at 78% of the old 21,000 KB.
-    #
-    # And again 2026-10-01, 2.3x in three weeks: 7.4 MB of it is the nested
-    # components and 25.4 MB the top-level parts' `drops`. It passed 33,000 KB
-    # in one step, which the canary cannot see - it measures the cached copy,
-    # and a refused body is never cached - so every build reused the 09-11 copy
-    # for about twenty days with nothing louder than a CI warning.
-    "api_items":                      75_000 * KB,   # 38,454,059 (2026-10-01)
-    "official_droptables":             9_000 * KB,   #  4,419,528
-    "export_ExportManifest.json":      7_600 * KB,   #  3,780,187
-    "drops_relics.json":               4_800 * KB,   #  2,385,503
-    "export_ExportRecipes_en.json":    2_600 * KB,   #  1,293,754
-    "drops_missionRewards.json":       2_200 * KB,   #  1,084,088
-    "export_ExportResources_en.json":  2_000 * KB,   #  1,002,658
-    "export_ExportWeapons_en.json":    1_250 * KB,   #    610,189
-    "export_ExportWarframes_en.json":    500 * KB,   #    232,131
-    # ── the live feeds, which are measured differently and were got wrong ──
-    #
-    # These carry whatever is running in the game right now, so their size moves
-    # with game state rather than with the size of the catalogue. **One sample
-    # of one of these is not a measurement of it.** Set at twice a single local
-    # sample on 2026-09-01, `api_syndicatemissions` reached 87% of its ceiling on
-    # the very next CI run - 114,415 against the 61,126 measured here, 1.9x
-    # between two samples taken hours apart, because a different set of bounties
-    # was live.
-    #
-    # So these are twice the LARGEST figure seen, not twice the local one, and
-    # they keep extra room besides. `api_events` gets the most of all in
-    # proportion: it was sampled with no limited-time event running at all, which
-    # is the smallest it is ever going to be.
-    "de_worldstate":                     384 * KB,   # 130,253 local; carries events
-    "api_syndicatemissions":             256 * KB,   #  61,126 local, 114,415 on CI
-    "api_fissures":                       48 * KB,   #  11,029 with 17 fissures live
-    "api_vaulttrader":                    32 * KB,   #   7,947
-    # Baro's manifest, measured 2026-09-04 during an actual visit: 41 rows,
-    # 6,219 bytes. It is `[]` twelve days in fourteen, so the measured figure is
-    # the busy case and not the usual one — which is the opposite of `api_events`
-    # below and the reason both get room well past double.
-    "api_voidtrader":                     32 * KB,   #   6,219 with 41 rows (2026-09-04)
-    # `api_events` is not a feed of events; it is a feed of *bounty tables*, and
-    # that is what the 32 KB below missed for a week.
-    #
-    # WFCD expand each goal's `Jobs` into whole bounty objects with their reward
-    # tables. Measured 2026-09-09 on the same instant of the same event: Ghoul
-    # Purge is **1,706 bytes** in DE's raw worldstate and **14,897** in WFCD's
-    # `/pc/events` — **8.7x**. So one job-bearing event costs ~15 KB on its own,
-    # and the feed's size tracks how many of those are live, not how many events
-    # there are.
-    #
-    # Three events were running that day at 16,564 bytes total — already 50.5%
-    # of the old 32,768 ceiling, with Operation Plague Star (a fourth, and
-    # job-bearing) due to open the same day. That projects to ~31.5 KB, or 96%,
-    # which is not a margin. It also explains the `Content-Length: 131,072`
-    # refusal recorded on 2026-09-08 and filed as "did not reproduce": it
-    # reproduces whenever enough job-bearing events overlap, and the fallback is
-    # silent, so the events feed would simply have stopped moving during the one
-    # two-week window there was anything to capture.
-    #
-    # 192 KB is set from the largest figure ever *declared* by the server
-    # (131,072) with room past it, not from the largest body seen — the same
-    # correction `api_syndicatemissions` needed. It stays below `de_worldstate`
-    # above, which carries every one of these goals raw and so is strictly the
-    # larger document.
-    "api_events":                        192 * KB,   #  16,564 with 3 events, one
-                                                     #  of them 14,897 (2026-09-09);
-                                                     #  131,072 declared once
-    # ── and the rest, whose size tracks the catalogue ──
-    "wiki_prime":                        128 * KB,   #     56,157
-    "export_ExportRegions_en.json":      100 * KB,   #     49,501
-    "export_ExportSentinels_en.json":     32 * KB,   #     11,675
-    "head_droptables":                     4 * KB,   #        959
-    "export_index":                        4 * KB,   #        490
-}
-
-# Anything whose exact name is not above. The two families that grow on their
-# own are the per-Prime wiki pages (`wiki_Gotva_Prime`, largest measured 6,293)
-# and any manifest Digital Extremes add to the export index; both get the
-# family's ceiling rather than the fallback, which is what stops a new member
-# arriving unbounded. Checked longest-prefix-first so `wiki_prime` above still
-# wins over `wiki_`.
-MAX_EXPANDED_FAMILY = (
-    ("export_", 2_000 * KB),
-    ("drops_",  4_800 * KB),
-    ("api_",      256 * KB),          # a live feed; see the note above
-    ("wiki_",      16 * KB),
-    ("head_",       4 * KB),
-)
-
-MAX_EXPANDED_DEFAULT = 2_000 * KB
+GROWTH = 5                    # times the copy held
+FLOOR = 1 * MB                # never less than this, whatever was held
+BACKSTOP = 256 * MB           # when nothing is held to compare with
 
 # Artwork wants two ceilings rather than one, because 167 responses of 2 MB
-# each is the failure a per-image cap alone waves through. Measured the same
-# day: 167 files, 8.75 MB in total, largest 121,031, median 47,638.
+# each is the failure a per-image cap alone waves through. Measured 2026-09-01:
+# 167 files, 8.75 MB in total, largest 121,031, median 47,638. Fixed numbers
+# rather than the five-times rule, by the owner's choice on 2026-10-01: an
+# image is fetched only when none is held, so there is never a copy to compare
+# with, and the per-run budget is what a per-image backstop cannot be.
 MAX_IMAGE_BYTES = 256 * KB          # largest measured 121,031
 MAX_IMAGE_TOTAL = 18_000 * KB       # 8.75 MB measured across all 167
 
@@ -206,17 +110,19 @@ MAX_IMAGE_TOTAL = 18_000 * KB       # 8.75 MB measured across all 167
 # holds today, because it is new and today's copy is three rows: 24 hours at the
 # ten-minute cadence is 144 rows of ~138 bytes, call it 20 KB, plus a row for
 # every push that also triggered a build. 48 KB is about twice a busy day.
+# Fixed for the image budget's reason: it is fetched only when none is held.
 MAX_FEED_LOG = 48 * KB
 
 
-def cap_for(key: str) -> int:
-    """The ceiling for one cache key: exact name, then family, then fallback."""
-    if key in MAX_EXPANDED:
-        return MAX_EXPANDED[key]
-    for prefix, cap in MAX_EXPANDED_FAMILY:
-        if key.startswith(prefix):
-            return cap
-    return MAX_EXPANDED_DEFAULT
+def cap_for(held: int | None) -> int:
+    """
+    The ceiling for a download, from the size of the copy it would replace:
+    five times that, never under the floor, and the backstop when `held` is
+    None - nothing held, or nothing in it (`sources.held_size` decides which).
+    """
+    if held is None:
+        return BACKSTOP
+    return max(GROWTH * held, FLOOR)
 
 
 def read_capped(resp, limit: int, what: str) -> bytes:

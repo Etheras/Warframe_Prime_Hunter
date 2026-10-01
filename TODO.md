@@ -135,21 +135,25 @@ refs-only input was checked under the rule before it). What
 would still break is **Kavasa Prime Collar**, the one item with no DE recipe,
 which reads WFCD's component names directly.
 
-### A source that outgrows its ceiling in one step goes stale and fails nothing
+### A refused download goes stale on every build and fails nothing
 
-**Found 2026-10-01.** WFCD's item list went from 16.7 MB to past its 33,000 KB
-ceiling and every build for about twenty days refused it and reused the copy of
-2026-09-11. The 75% headroom canary in `test_build.py` measures the **cached**
-copy, and a refused body is never cached, so it read 49% throughout. The only
-signal was the *Sanity-check the result* step's `::warning::`, on every run,
-which nobody is emailed about. `PROJECT.md §7`, *Every source has a ceiling, and
-going over it is an ordinary failed fetch*, has the canary's history.
+**Found 2026-10-01.** WFCD's item list went past its fixed ceiling and every
+build for about twenty days refused it and reused the copy of 2026-09-11. The
+only signal was the *Sanity-check the result* step's `::warning::`, on every
+run, which nobody is emailed about.
 
-What would close it, for the owner to choose: record a refusal where the canary
-can read it (a `.cache/<name>.refused` holding the size that was refused), or
-have the payload gate fail when `meta.stale` names a catalogue source for longer
-than some number of days. The live feeds go stale for ordinary reasons and
-would need leaving out of the second.
+**Rarer since the same day, not gone.** The ceiling is now five times the copy
+held (`PROJECT.md §7`, *A download may be five times the copy it replaces*), so
+a refusal takes a jump over 5x in one step — the largest on record is 2.3x. But
+a refused body still never becomes the next baseline, so a real jump that size
+would be refused on every build just as quietly, and the headroom canary that
+was meant to warn early went with the table.
+
+What would close it, for the owner to choose: have the payload gate fail when
+`meta.stale` names a catalogue source for longer than some number of days (the
+live feeds go stale for ordinary reasons and would be left out), or record a
+refusal beside the cache (a `.cache/<name>.refused` holding the refused size)
+and have the build say so louder than a warning.
 
 ### Not work
 

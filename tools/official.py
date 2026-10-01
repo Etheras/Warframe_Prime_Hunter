@@ -387,8 +387,12 @@ def decode_index(blob: bytes) -> dict[str, str]:
     how large the output should be, which is why the ceiling below is not
     optional: this is a ~500-byte input, decoded twice, with the one field that
     would otherwise bound it deliberately overwritten with 0xff.
+
+    The floor, rather than the five-times rule: what is held is the compressed
+    blob, not the decoded index, so there is nothing of the same kind to
+    multiply. A decoded index is about a kilobyte; a megabyte stops a bomb.
     """
-    ceiling = limits.cap_for("export_index")
+    ceiling = limits.FLOOR
     try:
         raw = limits.unlzma_capped(blob, ceiling, "export_index")
     except lzma.LZMAError:

@@ -1453,14 +1453,16 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     page with the wrong type, a decompression bomb from a host that has itself
     been compromised - landing on an unattended scheduled build.
 
-    Three properties, and the middle one is the whole point: refusing has to be
+    Three properties, and the last one is the whole point: refusing has to be
     an ordinary *failed fetch*, because that is the path this pipeline already
-    handles well. A ceiling set too tightly should then cost a stale build and a
-    loud line, never a broken one.
+    handles well. A refusal should then cost a stale build and a loud line,
+    never a broken one.
 
       1. the decompressors stop mid-stream rather than after expanding it all
-      2. an oversized response falls through to the cached copy and says STALE
-      3. every source in `.cache` is inside its own ceiling, comfortably
+      2. the ceiling is five times the copy held, with a floor and a backstop -
+         the owner's rule since 2026-10-01, which replaced a measured number
+         per source after one of them outgrew its own for twenty days
+      3. an oversized response falls through to the cached copy and says STALE
 
     The bomb is built here rather than committed: a file that expands to 64 MB
     is not something to keep in a repository, and `gzip.compress` makes one in
@@ -1577,7 +1579,53 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
           limits.unlzma_capped(lzmalib.compress(index, format=lzmalib.FORMAT_ALONE),
                                4 * limits.KB, "export_index"), index)
 
-    # ---- 2. end to end: oversize is a failed fetch --------------------------
+    # ---- 2. the rule: five times the copy held ------------------------------
+    #
+    # The owner's three numbers, written out rather than read back from
+    # `limits`, so changing one is a decision this test makes somebody take.
+    check("ceiling: nothing held to compare with is the 256 MB backstop",
+          limits.cap_for(None), 256 * limits.MB)
+    check("ceiling: a small copy is never the baseline that throttles the next",
+          limits.cap_for(279), 1 * limits.MB,
+          "Baro's manifest is 279 bytes while he is away and 6,219 on a visit")
+    check("ceiling: above the floor it is five times the copy held",
+          limits.cap_for(38_454_059), 192_270_295)
+
+    # Every jump between two copies this project has written down, each of
+    # which the fixed table either refused or nearly did. All must pass now:
+    # the rule exists to stop a malicious download, not a game that grows.
+    seen = [("api_items, 2026-09-11 -> 2026-10-01", 16_674_344, 38_454_059),
+            ("api_items, 2026-09-01 -> 2026-09-11", 10_443_694, 16_674_344),
+            ("api_syndicatemissions, local -> CI", 61_126, 114_415),
+            ("api_events, three events -> 131,072 declared", 16_564, 131_072),
+            ("api_voidtrader, away -> a visit", 279, 6_219)]
+    check("ceiling: every growth on record would have been fetched",
+          [what for what, held, new in seen if new > limits.cap_for(held)], [])
+
+    # What counts as held. Empty or all framing is the owner's exemption, and
+    # gets the backstop rather than a floor computed from nothing.
+    tmp = tempfile.mkdtemp(prefix="primehunter-ceiling-")
+    try:
+        def held(body):
+            path = os.path.join(tmp, "held.gz")
+            with gziplib.open(path, "wb") as fh:
+                fh.write(body)
+            return sources.held_size(path)
+        check("ceiling: a held copy is measured expanded", held(b"x" * 70_000), 70_000)
+        check("ceiling: an empty or framing-only copy holds nothing",
+              [held(b) for b in (b"", b"[]", b" {} \n", b"null")], [None] * 4)
+        check("ceiling: Baro away is not empty, and gets the floor instead",
+              held(b'{"active":false,"inventory":[]}'), 31)
+        with open(os.path.join(tmp, "held.gz"), "wb") as fh:
+            fh.write(b"\x1f\x8b not a whole gzip stream")
+        check("ceiling: an unreadable copy holds nothing, rather than a guess",
+              sources.held_size(os.path.join(tmp, "held.gz")), None)
+        check("ceiling: and no copy at all holds nothing",
+              sources.held_size(os.path.join(tmp, "absent.gz")), None)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # ---- 3. end to end: oversize is a failed fetch --------------------------
     #
     # file:// throughout, like the blocked-host test above: the question is what
     # `fetch` does with a body it will not accept, and that needs nobody's
@@ -1587,45 +1635,56 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     url = lambda p: "file:///" + p.replace(os.sep, "/").lstrip("/")   # noqa: E731
     doc = os.path.join(tmp, "feed.json")
     real_cache = sources.CACHE_DIR
+    real_backstop = limits.BACKSTOP
     stale, missing = list(sources.STALE), list(sources.MISSING)
+
+    def answer(body):
+        with open(doc, "wb") as fh:
+            fh.write(body)
+
     try:
         sources.CACHE_DIR = os.path.join(tmp, "cache")
-        # `api_events` has the smallest ceiling of any live feed. The number is
-        # read from `cap_for` rather than written here: this comment said 8 KB
-        # until 2026-09-03, and had said it since `37a4f77` raised the ceiling to
-        # 32 KB in the same session that wrote it.
-        cap = limits.cap_for("api_events")
-        with open(doc, "wb") as fh:
-            fh.write(b"a small honest answer")
-        check("ceiling: a body inside the ceiling is fetched normally",
-              sources.fetch(url(doc), "api_events"), b"a small honest answer")
+        first, grown = b"a" * 300_000, b"b" * 1_400_000
+        answer(first)
+        check("ceiling: a first download is fetched normally",
+              sources.fetch(url(doc), "api_events") == first, True)
+        answer(grown)
+        check("ceiling: growth inside five times is fetched normally",
+              sources.fetch(url(doc), "api_events") == grown, True,
+              "1.4 MB after 300 KB is 4.7x, which a game that grows is allowed")
         check("ceiling: and nothing about it is stale",
               (list(sources.STALE), list(sources.MISSING)), ([], []))
 
-        # the same source, now answering with far more than it is allowed
-        with open(doc, "wb") as fh:
-            fh.write(b"z" * (cap * 4))
-        # Truncated for the *message*, not for the assertion: the cached body is
-        # 21 bytes, so [:64] of a correct answer is the whole of it and any
-        # wrong answer still differs. Without this a regression prints 32 KB of
-        # 'z' into the run, which is how a failure stops being readable.
+        # the same source, now answering with more than five times what it was
+        answer(b"z" * (5 * len(grown) + 1))
         got = sources.fetch(url(doc), "api_events")
-        check("ceiling: an oversized answer falls back to the cached copy",
-              got[:64] if got else got, b"a small honest answer",
+        # Compared as a boolean and a length rather than as bytes, so a failure
+        # prints a number instead of seven megabytes of 'z'.
+        check("ceiling: a jump past five times falls back to the cached copy",
+              (got == grown, len(got) if got else got), (True, len(grown)),
               "it must not return the oversized body, and must not be fatal")
         check("ceiling: and the build is told the data is stale",
               sources.STALE, ["api_events"],
               "silently reusing yesterday's copy is how this stays invisible")
+        check("ceiling: the oversized body never reached the cache",
+              sources.held_size(sources.cache_path("api_events")), len(grown),
+              "the cache is what the next build measures against, and reads")
 
-        cached = os.path.join(sources.CACHE_DIR, "api_events.gz")
-        with gziplib.open(cached, "rb") as fh:
-            check("ceiling: the oversized body never reached the cache",
-                  fh.read()[:64], b"a small honest answer",
-                  "the cache is what the next offline build reads")
+        # An empty copy is no baseline: the next answer is held to the
+        # backstop, not to five times nothing.
+        sources.STALE[:] = []
+        answer(b"[]")
+        sources.fetch(url(doc), "api_voidtrader")
+        answer(b"v" * (2 * limits.MB))
+        check("ceiling: after an empty copy, a large answer is fetched",
+              len(sources.fetch(url(doc), "api_voidtrader") or b""), 2 * limits.MB)
 
         # cold - nothing to fall back on - is fatal, exactly like any other
-        # source that cannot be fetched. Oversize invents no new outcome.
+        # source that cannot be fetched. Oversize invents no new outcome. The
+        # backstop is lowered for this alone, because a body past 256 MB is not
+        # something to write to a test's disk.
         sources.STALE[:], sources.MISSING[:] = [], []
+        limits.BACKSTOP = 1 * limits.MB
         try:
             sources.fetch(url(doc), "api_fissures", critical=True)
             check_true("ceiling: oversized and uncached is fatal, as any cold "
@@ -1634,33 +1693,10 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
             check_true("ceiling: oversized and uncached is fatal, as any cold "
                        "failure is", True)
     finally:
+        limits.BACKSTOP = real_backstop
         sources.CACHE_DIR = real_cache
         sources.STALE[:], sources.MISSING[:] = stale, missing
         shutil.rmtree(tmp, ignore_errors=True)
-
-    # ---- 3. the ceilings still fit the real data ---------------------------
-    #
-    # The canary. These are roughly twice what each source measured on
-    # 2026-09-01, which is deliberately little headroom, so this is what tells
-    # somebody a source has grown *before* a build starts going stale over it.
-    cache = os.path.join(ROOT, ".cache")
-    if not os.path.isdir(cache):
-        print("  skip ceiling headroom (no cache yet)")
-        return
-    tight = []
-    for name in sorted(os.listdir(cache)):
-        if not name.endswith(".gz"):
-            continue
-        key = name[:-len(".gz")]
-        with gziplib.open(os.path.join(cache, name), "rb") as fh:
-            size = len(fh.read())
-        room = size / limits.cap_for(key)
-        if room > 0.75:
-            tight.append(f"{key} at {room:.0%} of its ceiling ({size:,})")
-    check("ceiling: every cached source still fits well inside its own", tight, [],
-          "raise the number in tools/limits.py, and move its measured comment "
-          "with it - a source at 100% goes stale rather than wrong, but it "
-          "goes stale every single build")
 
 
 def test_what_the_build_writes_is_what_the_site_ships() -> None:
