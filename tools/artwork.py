@@ -23,7 +23,8 @@ import os
 import re
 import urllib.request
 
-from sources import DE_TEXTURES, IMG_CDN, ROOT, UA, log
+from sources import (DE_TEXTURES, IMG_CDN, ROOT, UA, log, record_refusal,
+                     response_facts)
 
 import limits  # sibling module; sources put tools/ on the path above
 
@@ -174,6 +175,7 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
             oversize += 1
             continue
 
+        answered = None
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=60) as r:
@@ -181,6 +183,7 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
                 # left of the run's. Nothing is written until the whole body has
                 # been read inside the limit, so an oversized response costs
                 # bandwidth and never disk.
+                answered = response_facts(r)
                 blob = limits.read_capped(
                     r, min(limits.MAX_IMAGE_BYTES, budget), fname)
             if not blob:
@@ -196,6 +199,10 @@ def cache_images(items: list, offline: bool, verify: bool = False) -> int:
             # A partial run is already the designed behaviour here - the
             # rewiring pass below only repoints what actually landed, so the
             # site keeps the remote URL for this one rather than a broken image.
+            # An image over its size is kept as evidence and fails the run, as
+            # any source's is (`sources.REFUSED`).
+            if isinstance(e, limits.TooLarge):
+                record_refusal(f"image {fname}", url, e, answered=answered)
             oversize += 1
             log(f"  image refused: {fname} ({e})")
         except Exception as e:                            # noqa: BLE001

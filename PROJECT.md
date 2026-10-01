@@ -5692,7 +5692,8 @@ cached, so it went on reading the old 16.7 MB item list at half its ceiling
 while every build for about twenty days refused a 38.5 MB one and reused that
 copy. The only signal was a `::warning::` on each CI run. *A part's relics are
 DE's drop table and WFCD's record together* has the fix to that ceiling, and
-`TODO.md` has the gap.
+*A download refused for its size fails the run, after the deploy* closes the
+gap.
 
 ### The planner's search marks parts collected, and adds no Primes at all
 
@@ -9337,7 +9338,8 @@ louder than a CI warning. Raised to 75,000 KB, twice the new figure, under the
 doubling rule of *Every source has a ceiling, and going over it is an ordinary
 failed fetch*. The headroom canary could not
 see it, because it measures the cached copy and a refused body is never cached;
-`TODO.md` has that gap.
+*A download refused for its size fails the run, after the deploy* closes that
+gap.
 
 **Superseded 2026-10-01**, hours later, for that ceiling: there is no number per
 source any more. See *A download may be five times the copy it replaces*.
@@ -9383,8 +9385,10 @@ decoded one, so there is nothing of the same kind to multiply.
 **What it costs, said plainly.** A source that genuinely grows more than five
 times in one step is refused on every build, because a refused body never
 becomes the next baseline — the same silence the table had, at a much rarer
-threshold. The largest jump on record is the item list's 2.3x. `TODO.md` has
-how such a refusal would be noticed.
+threshold. The largest jump on record is the item list's 2.3x. **Superseded
+2026-10-02** for the silence: a size refusal now fails the run once the site has
+published, and `--accept-growth` lets a genuine jump through once. See *A
+download refused for its size fails the run, after the deploy*.
 
 **Measured against the real cache**: the 38.5 MB item list gives a ceiling of
 192 MB, the drop table 22 MB, and every live feed the 1 MB floor; reading the
@@ -9430,6 +9434,65 @@ Valkyr still read `FARMABLE` and `RAILJACK ONLY`, with no console errors. The
 payload check reads each Prime's own relics against the relic table rather than
 against `farmable`, so it does not check the build against itself; it went red
 on all nine with WFCD's flag put back.
+
+### A download refused for its size fails the run, after the deploy
+
+**Owner's decision, 2026-10-02**, from a menu: *"a size refusal should be a sign
+of a malicious attempt, should be loud"* — fail the run, keep the site live, and
+*"make sure we have information on the fetch if it fails, as it will be
+critical for troubleshooting."* It closes the gap the item list fell through
+for twenty days, when the only signal was a `::warning::` nobody is emailed.
+
+**What happens.** The build is unchanged up to the refusal: the body is refused
+mid-transfer or mid-expansion, the cached copy is used, `meta.stale` says so,
+and the site publishes. Then *Name any refused download* turns each into an
+error annotation and a step-summary row, and the `alarm` job — after `build` and
+`deploy`, `always()` — fails the run. A job of its own because a failing step
+inside `build` would stop the deploy, which buys nothing: the refused body
+reached nothing. Every run fails until the source shrinks back or a person who
+has read the record dispatches with `accept_growth`.
+
+**What is kept**, since the body never is: the source and URL, the time, where
+it was caught (`declared`, `transfer` or `expanded`), the bytes seen against the
+limit, the copy the limit came from and the ratio, the HTTP status, **every
+response header**, and the first 256 bytes three ways — printable, hex, and,
+for a gzip body cut on the wire, decoded as far as it goes. Printed at the end
+of the build step, and written to `data/refused.json`, which is never published
+(*Assemble the site* and `serve.py` both copy named files only) and is removed
+by the next build that refuses nothing. Images and the feed log are recorded
+the same way. A truncated or undecodable body (`Malformed`) is a broken
+transfer, not a large one, and stays an ordinary failed fetch.
+
+**The sample cannot speak for itself.** The runner obeys `::` at the start of a
+line *after leading spaces*, and the head of a hostile body is where an attacker
+would put `::add-mask::` or a forged `::error::`. So every value goes through
+`sources.printable` — printable ASCII on one line — and every printed line
+starts with a label of ours. Measured, not assumed: with the filter removed,
+the test's hostile head printed two lines the runner would have obeyed.
+
+**Two things found by running it for real.** A refused body was downloaded
+**twice a build** — three times on 2026-10-01's CI runs — because the build
+reads the item list again for its fingerprint and `fetch` only remembered a
+refusal within one call. `SENT_TOO_MUCH` now remembers it for the build. And the
+first sample was compressed bytes, which says nothing to a person; hence the
+decoded start.
+
+**The way past it.** `accept_growth` on a dispatched run, or `--accept-growth`
+locally, names sources held to the 256 MB backstop for that run. It forces a
+full run, because only a full run saves the cache — a light run would accept
+the body and the next light run would refuse it again from the unchanged
+baseline.
+The value reaches the shell as a quoted variable, never pasted in.
+
+**Verified** locally, end to end through the real build: the cached item list
+was set aside and replaced by a 14-byte stand-in, and the build refused WFCD's
+answer at 1,114,112 bytes against the 1 MB floor (79,579x), asked once, printed
+the record — Cloudflare's headers, `CF-RAY` among them, and the decoded start of
+the JSON — and wrote the file; restoring the cache and rebuilding removed it.
+Three mutations went red: the sample unfiltered, `fetch` not recording, and the
+build-wide memory removed. **The `alarm` job itself has not fired on a runner**:
+nothing has been refused since it was added, so its half is checked by reading
+the workflow, not by watching it fail.
 
 ---
 

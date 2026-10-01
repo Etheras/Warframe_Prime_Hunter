@@ -304,6 +304,82 @@ def cache_path(key: str) -> str:
     return os.path.join(CACHE_DIR, safe + ".gz")
 
 
+# ── a refused download is evidence ──────────────────────────────────────────
+# Since 2026-10-02 a body over its size ceiling fails the run - the owner's
+# decision: more than five times the copy held is not a game growing, it is a
+# sign of attack - and the body itself is never kept. So everything known about
+# the response is kept instead, here, and `build_data.report_refusals` prints it
+# and writes it beside the data. A truncated or undecodable body (`Malformed`)
+# is a broken transfer, not a large one, and stays an ordinary failed fetch.
+REFUSED: list[dict] = []
+
+# Sources whose growth the owner has accepted for this one run, from
+# `--accept-growth`: held to the backstop instead of five times the copy.
+ACCEPT_GROWTH: set[str] = set()
+
+# (source, url) pairs that sent too much earlier in this build, so they are not
+# asked again by it. `fetch` already stopped re-asking within one call; the
+# build reads some sources twice - the item list again for the fingerprint - so
+# a refused body was downloaded twice a build, three times on 2026-10-01's CI
+# runs. The same host sends the same body. Kept only for a build: a prober in
+# `serve.py` runs for days, and would never ask again.
+SENT_TOO_MUCH: set[tuple[str, str]] = set()
+
+
+def printable(raw, limit: int = 400) -> str:
+    """
+    Untrusted bytes made safe to print on one line of a CI log: printable ASCII
+    only, anything else a dot. A refused body is exactly the input that might
+    carry a terminal escape, or a newline followed by `::` - a GitHub workflow
+    command, which the runner obeys at the start of any line. One line with no
+    control characters can do neither, and every line it is printed on starts
+    with a label of ours.
+    """
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8", "replace")
+    return "".join(chr(b) if 32 <= b < 127 else "." for b in bytes(raw[:limit]))
+
+
+def response_facts(resp) -> dict:
+    """What the server said about a response, read before its body is."""
+    headers = getattr(resp, "headers", None)
+    pairs = headers.items() if headers is not None else []
+    return {"status": getattr(resp, "status", None),
+            "headers": [[printable(k, 100), printable(v)] for k, v in pairs]}
+
+
+def record_refusal(source: str, url: str, exc, *, held: int | None = None,
+                   answered: dict | None = None) -> dict:
+    """Keep what is known about a body refused for its size; see `REFUSED`."""
+    seen = getattr(exc, "seen", None)
+    head = getattr(exc, "head", b"") or b""
+    # A body cut on the wire is still compressed, which says nothing to a
+    # person. The start of a gzip stream decodes on its own, so do that too.
+    decoded = None
+    if head[:2] == b"\x1f\x8b":
+        try:
+            decoded = printable(zlib.decompressobj(16 + zlib.MAX_WBITS)
+                                .decompress(head, limits.SAMPLE))
+        except zlib.error:
+            decoded = None
+    row = {
+        "source": printable(source, 200),
+        "url": printable(url, 2000),
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "stage": getattr(exc, "stage", None),
+        "seen": seen,
+        "limit": getattr(exc, "limit", None),
+        "held": held,
+        "ratio": round(seen / held, 1) if held and seen else None,
+        **(answered or {"status": None, "headers": []}),
+        "head": printable(head),
+        "headHex": head.hex(),
+        **({"headDecoded": decoded} if decoded else {}),
+    }
+    REFUSED.append(row)
+    return row
+
+
 # A body with nothing in it, which is no baseline to multiply.
 EMPTY_BODIES = {b"", b"[]", b"{}", b"null"}
 
@@ -670,7 +746,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     prior = read_etag(path)
     # Five times what is held, never under a megabyte, and the backstop when
     # nothing is held to compare with - tools/limits.py has the rule.
-    ceiling = limits.cap_for(held_size(path))
+    held = held_size(path)
+    ceiling = limits.cap_for(held)
+    if key in ACCEPT_GROWTH:
+        ceiling = limits.BACKSTOP
+        log(f"~ {key}: growth accepted for this run (--accept-growth) - held to "
+            f"the {limits.BACKSTOP:,} byte backstop only")
     # Hosts that have given a definitive answer, and so are not asked again on
     # this call. Two things land here and they are the same judgement:
     #
@@ -693,10 +774,15 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
     # Other hosts publishing the same document are still tried, which is the
     # case this loop was built for.
     refused = set()
+    if key not in ACCEPT_GROWTH:
+        refused = {one for one in urls if (key, one) in SENT_TOO_MUCH}
+        if refused:
+            last_err = "refused for its size earlier in this build, not asked again"
     for attempt in range(3):
         for one in urls:
             if one in refused:
                 continue
+            answered = None
             try:
                 headers = {"User-Agent": UA, "Accept-Encoding": "gzip"}
                 # Ask only for what we do not already hold. The fissure list is
@@ -712,6 +798,7 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                     # stops mid-transfer and the gunzip stops mid-stream, so
                     # neither an enormous body nor a small one that expands to
                     # an enormous one is ever held whole.
+                    answered = response_facts(resp)
                     raw = limits.read_capped(resp, ceiling, key)
                     if resp.headers.get("Content-Encoding") == "gzip":
                         raw = limits.gunzip_capped(raw, ceiling, key)
@@ -736,6 +823,12 @@ def fetch(url: str, key: str, offline: bool = False, critical: bool = True,
                 # a body that did not decode whole is not one to keep. Either
                 # way it is a failed fetch, which this function already knows
                 # how to answer: next host, then the cached copy, then STALE.
+                # Too large is also kept as evidence, and fails the run once it
+                # has published - see `REFUSED`. Not for a prober: a page being
+                # served is not the build, and nothing would ever read it.
+                if isinstance(exc, limits.TooLarge) and not readonly:
+                    record_refusal(key, one, exc, held=held, answered=answered)
+                    SENT_TOO_MUCH.add((key, one))
                 log(f"! {exc} - refused, falling through")
                 refused.add(one)
                 last_err = exc

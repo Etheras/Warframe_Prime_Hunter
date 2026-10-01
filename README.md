@@ -883,6 +883,15 @@ Pages needs a **public** repo on the free plan.
 republishes the site — so it stays up to date whether or not your PC is switched on,
 and the data still never enters the repository.
 
+**If a run fails on its `alarm` job, read before acting.** It means a source sent
+more than five times what it sent last time, which the build treats as a possible
+attack: the body was refused, the site published from the previous copy, and the
+run failed so that GitHub emails you. The end of the build step's log holds the
+whole record — the URL, the status, every response header, the sizes and the
+first bytes. If the source genuinely grew, **Run workflow** with that source in
+*accept_growth* (for example `api_items`) lets it through once and makes it the
+new baseline; locally, `python tools/build_data.py --accept-growth api_items`.
+
 **And the published copy shows live fissures without being rebuilt for them.**
 That used to be the one thing it could not do: fissures turn over every hour or
 two, so a site rebuilt once a day always found them expired and marked nothing.

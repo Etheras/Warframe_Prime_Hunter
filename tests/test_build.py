@@ -1647,6 +1647,10 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
     real_cache = sources.CACHE_DIR
     real_backstop = limits.BACKSTOP
     stale, missing = list(sources.STALE), list(sources.MISSING)
+    refused, accepted = list(sources.REFUSED), set(sources.ACCEPT_GROWTH)
+    too_much = set(sources.SENT_TOO_MUCH)
+    sources.REFUSED[:] = []
+    sources.SENT_TOO_MUCH.clear()
 
     def answer(body):
         with open(doc, "wb") as fh:
@@ -1680,6 +1684,44 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
               sources.held_size(sources.cache_path("api_events")), len(grown),
               "the cache is what the next build measures against, and reads")
 
+        # Since 2026-10-02 a size refusal fails the run, and the record is all
+        # anyone troubleshooting it will have - the body is never kept.
+        row = sources.REFUSED[-1] if sources.REFUSED else {}
+        check("refusal: it is recorded, with what the limit came from",
+              {k: row.get(k) for k in ("source", "stage", "seen", "limit", "held", "ratio")},
+              {"source": "api_events", "stage": "declared", "seen": 7_000_001,
+               "limit": 7_000_000, "held": 1_400_000, "ratio": 5.0})
+        check("refusal: and with what the server said about it",
+              [k.lower() for k, _ in row.get("headers") or []].count("content-length"), 1,
+              "the headers are the evidence of who sent it and how")
+        check("refusal: and its url", row.get("url"), url(doc))
+
+        # The build reads some sources twice; the second read must not fetch
+        # the refused body again. Counted at urlopen, because asking and not
+        # asking both end on the cached copy.
+        asked = []
+        real_open = urllib.request.urlopen
+        urllib.request.urlopen = lambda *a, **k: (asked.append(1), real_open(*a, **k))[1]
+        sources.STALE[:] = []
+        try:
+            got = sources.fetch(url(doc), "api_events")
+        finally:
+            urllib.request.urlopen = real_open
+        check("refusal: a second read in the same build does not ask again",
+              (got == grown, len(asked), len(sources.REFUSED), sources.STALE),
+              (True, 0, 1, ["api_events"]))
+
+        # The owner's way past it, for a source that genuinely grew.
+        sources.ACCEPT_GROWTH = {"api_events"}
+        sources.STALE[:] = []
+        got = sources.fetch(url(doc), "api_events")
+        check("refusal: --accept-growth lets one source's jump through",
+              (len(got or b""), len(sources.REFUSED)), (5 * len(grown) + 1, 1),
+              "still under the backstop, and nothing new is recorded")
+        check("refusal: and what it let through is the next baseline",
+              sources.held_size(sources.cache_path("api_events")), 5 * len(grown) + 1)
+        sources.ACCEPT_GROWTH = set()
+
         # An empty copy is no baseline: the next answer is held to the
         # backstop, not to five times nothing.
         sources.STALE[:] = []
@@ -1706,7 +1748,131 @@ def test_a_source_cannot_send_more_than_its_ceiling() -> None:
         limits.BACKSTOP = real_backstop
         sources.CACHE_DIR = real_cache
         sources.STALE[:], sources.MISSING[:] = stale, missing
+        sources.REFUSED[:], sources.ACCEPT_GROWTH = refused, accepted
+        sources.SENT_TOO_MUCH.clear()
+        sources.SENT_TOO_MUCH.update(too_much)
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_a_size_refusal_is_kept_as_evidence() -> None:
+    """
+    Owner's decision, 2026-10-02: a body refused for its size is treated as a
+    possible attack. The site publishes from the cached copy and the run then
+    fails, so the record is the only evidence anyone troubleshooting it will
+    have - the body is never kept. Two things it must do: say where the body
+    was caught with what it held, and never let the body speak for itself in
+    the log, where `::` at the start of a line is a command the runner obeys.
+    """
+    import gzip as gziplib
+    import io
+
+    class Answer(io.BytesIO):
+        headers = None                      # chunked: nothing declared
+
+    try:
+        limits.read_capped(Answer(b"<html>" + b"x" * 5000), 1000, "t")
+        got = None
+    except limits.TooLarge as exc:
+        got = (exc.stage, exc.limit, exc.head[:6], len(exc.head))
+    check("refusal: a body cut on the wire says so, and keeps its first bytes",
+          got, ("transfer", 1000, b"<html>", limits.SAMPLE))
+
+    try:
+        limits.gunzip_capped(gziplib.compress(b"{" + b"y" * 5000), 1000, "t")
+        got = None
+    except limits.TooLarge as exc:
+        got = (exc.stage, exc.head[:2])
+    check("refusal: a body cut while expanding says so, and keeps what it expanded to",
+          got, ("expanded", b"{y"))
+
+    # Cut on the wire, a gzip body's first bytes are compressed - which is what
+    # the item list's were, measured 2026-10-02. The record decodes the start.
+    zipped = gziplib.compress(json.dumps([str(i) for i in range(20000)]).encode())
+    try:
+        limits.read_capped(Answer(zipped), 1000, "t")
+        exc = None
+    except limits.TooLarge as caught:
+        exc = caught
+    kept = list(sources.REFUSED)
+    try:
+        row = sources.record_refusal("t", "u", exc) if exc else {}
+    finally:
+        sources.REFUSED[:] = kept
+    check("refusal: a compressed head is decoded as far as it goes",
+          (row.get("head", "")[:2], (row.get("headDecoded") or "")[:12]),
+          ("..", '["0", "1", "'))
+
+    # A hostile head: a newline, a workflow command, a terminal escape.
+    hostile = limits.TooLarge("t", stage="transfer", seen=9, limit=1,
+                              head=b"ok\n::error::pwned\x1b[31m\r::add-mask::x")
+    kept = list(sources.REFUSED)
+    try:
+        row = sources.record_refusal("api_items", "https://example.invalid/x", hostile,
+                                     held=3, answered={"status": 200, "headers": [
+                                         ["X-Evil", sources.printable("a\nb")]]})
+        check("refusal: the sample is one line of printable text",
+              row["head"], "ok.::error::pwned.[31m.::add-mask::x")
+        check("refusal: and the exact bytes are kept beside it, as hex",
+              bytes.fromhex(row["headHex"]), hostile.head)
+
+        tmp = tempfile.mkdtemp(prefix="primehunter-refused-")
+        path = os.path.join(tmp, "data", "refused.json")
+        try:
+            out = io.StringIO()
+            real = sys.stdout
+            sys.stdout = out
+            try:
+                build_data.report_refusals([row], path)
+            finally:
+                sys.stdout = real
+            printed = out.getvalue().splitlines()
+            check("refusal: no printed line can be read as a workflow command",
+                  [ln for ln in printed if ln.lstrip().startswith("::")], [],
+                  "the runner obeys :: after leading spaces")
+            check("refusal: the report names it, loudly",
+                  any("REFUSED 1 DOWNLOAD" in ln for ln in printed), True)
+            check("refusal: and writes the record beside the data",
+                  [r["source"] for r in read_json(path)], ["api_items"])
+            build_data.report_refusals([], path)
+            check("refusal: a build that refused nothing removes an old report",
+                  os.path.exists(path), False)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    finally:
+        sources.REFUSED[:] = kept
+
+
+def test_a_refused_download_fails_the_run_after_the_deploy() -> None:
+    """
+    The workflow half of the same decision. The run must fail - that is what
+    emails the owner - but only after the deploy, so the site stays live on the
+    cached copy; a failing step inside `build` would stop the deploy and buy
+    nothing, since the body was refused and reached nothing.
+    """
+    path = os.path.join(ROOT, ".github", "workflows", "publish.yml")
+    if not os.path.exists(path):
+        print("  skip refusal alarm (no workflow checked out)")
+        return
+    yml = read_text(path)
+    alarm = re.search(r"(?ms)^  alarm:\n(.*?)(?=^  \w|\Z)", yml)
+    body = alarm.group(1) if alarm else ""
+    check_true("alarm: a job of its own, after the build and the deploy",
+               "needs: [build, deploy]" in body, "it must wait for the deploy")
+    check_true("alarm: it runs whatever the deploy did, when something was refused",
+               "always() && needs.build.outputs.refused != ''" in body)
+    check_true("alarm: and it fails the run", "exit 1" in body)
+    check_true("alarm: the build job hands it the refused sources",
+               "refused: ${{ steps.refused.outputs.sources }}" in yml)
+    step = re.search(r"(?ms)- name: Name any refused download\n(.*?)(?=\n      - )", yml)
+    check_true("alarm: the step naming them runs even when the build failed",
+               bool(step) and "if: always()" in step.group(1))
+    assemble = re.search(r"(?ms)- name: Assemble the site\n(.*?)(?=\n      - )", yml)
+    check_true("alarm: the record is never published",
+               bool(assemble) and "refused" not in assemble.group(1))
+    check_true("accept_growth: it forces a full run, the one that saves the cache",
+               "inputs.accept_growth != ''" in yml.split("concurrency:")[0])
+    check_true("accept_growth: and reaches the build as a quoted variable",
+               'build_data.py --accept-growth "$ACCEPT_GROWTH"' in yml)
 
 
 def test_what_the_build_writes_is_what_the_site_ships() -> None:
@@ -6254,6 +6420,8 @@ def main() -> int:
                          test_the_scheduled_task_can_actually_be_registered,
                          test_a_blocked_host_is_routed_around,
                          test_a_source_cannot_send_more_than_its_ceiling,
+                         test_a_size_refusal_is_kept_as_evidence,
+                         test_a_refused_download_fails_the_run_after_the_deploy,
                          test_a_source_is_not_asked_inside_its_own_window,
                          test_a_window_covers_only_the_url_it_came_with,
                          test_a_body_is_not_fresh_once_its_head_has_seen_a_newer_version,

@@ -1609,13 +1609,19 @@ def read_feed_log(published_url: str | None) -> list:
             pass
     if not published_url:
         return []
+    answered = None
     try:
         req = urllib.request.Request(published_url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req, timeout=20) as resp:
+            answered = sources.response_facts(resp)
             raw = limits.read_capped(resp, limits.MAX_FEED_LOG, "feed log")
         rows = json.loads(raw.decode("utf-8"))
         return rows if isinstance(rows, list) else []
     except Exception as exc:                    # noqa: BLE001 - never fatal
+        # Never fatal to the build, but a log over its size is kept as evidence
+        # and fails the run once it has published, as any source's is.
+        if isinstance(exc, limits.TooLarge):
+            sources.record_refusal("feed log", published_url, exc, answered=answered)
         log(f"  feed log: no previous copy ({exc})")
         return []
 
@@ -1797,6 +1803,67 @@ def from_chain(what, de_fresh, proxy, de_cached):
     return None, None
 
 
+# Where a build's refused downloads are written, beside the data and never
+# published: *Assemble the site* copies named files only, and `serve.py` serves
+# named files only. The workflow reads it to fail the run. None on `--check`,
+# which writes nothing.
+REFUSAL_REPORT: str | None = os.path.join(DATA_DIR, "refused.json")
+
+
+def report_refusals(rows: list[dict], path: str | None) -> None:
+    """
+    Say, as loudly as a log can, that a download was refused for its size, and
+    keep the record of it. Owner's decision, 2026-10-02: a body over five times
+    the copy held is treated as a possible attack, the site still publishes from
+    the cached copy, and the run then fails - so the record below is what anyone
+    troubleshooting it will have, because the body itself was never kept.
+
+    Runs however the build ended, from the `finally` at the foot of this file,
+    because a refusal can come before a cold failure stops the build. A build
+    that refused nothing removes an old report, so it can never outlive the
+    build that wrote it.
+
+    Every printed line starts with a label of ours, and every value in it went
+    through `sources.printable`: the runner obeys `::` at the start of a line,
+    after leading spaces, and the head of a hostile body is the place to try it.
+    """
+    if not rows:
+        if path and os.path.exists(path):
+            os.remove(path)
+        return
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(rows, fh, indent=2, ensure_ascii=True)
+    bar = "!" * 60
+    print(bar)
+    print(f"!!! REFUSED {len(rows)} DOWNLOAD(S) FOR SIZE - treat as a possible attack")
+    for r in rows:
+        print(f"  source    {r['source']}")
+        print(f"  url       {r['url']}")
+        print(f"  at        {r['at']}")
+        print(f"  caught    {r['stage']} - {r['seen']:,} bytes against a {r['limit']:,} limit"
+              if r.get("seen") is not None and r.get("limit") is not None
+              else f"  caught    {r['stage']}")
+        print(f"  held      {r['held']:,} bytes, so {r['ratio']}x the copy it would replace"
+              if r.get("held") else "  held      nothing to compare with - the backstop applied")
+        print(f"  status    {r.get('status')}")
+        for name, value in r.get("headers") or []:
+            print(f"  header    {name}: {value}")
+        print(f"  head      {r['head'] or '(nothing read - refused on its declared size)'}")
+        if r.get("headDecoded"):
+            print(f"  decoded   {r['headDecoded']}")
+        print(f"  head hex  {r['headHex'] or '-'}")
+        print("  " + "-" * 58)
+    try:
+        where = os.path.relpath(path, ROOT) if path else "above only (--check)"
+    except ValueError:                          # another drive, on Windows
+        where = path
+    print(f"  the bodies were not kept; the record is {where}")
+    print("  if a source genuinely grew, --accept-growth SOURCE lets one run through")
+    print(bar)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build the Warframe Prime Hunter data payload.")
     ap.add_argument("--offline", action="store_true", help="rebuild from the HTTP cache only")
@@ -1824,8 +1891,21 @@ def main() -> int:
                          "straight to the WFCD proxy. For addresses DE refuse "
                          "(their edge blocks datacentre ranges) - see "
                          "ASK_FIRST_PARTY in tools/sources.py")
+    ap.add_argument("--accept-growth", default="", metavar="SOURCE[,SOURCE]",
+                    help="let these sources past the five-times size ceiling for "
+                         "this run only, still under the 256 MB backstop - for a "
+                         "source that genuinely grew. Names as the build logs them, "
+                         "e.g. api_items. See tools/limits.py")
     args = ap.parse_args()
     off = args.offline
+    global REFUSAL_REPORT
+    if args.check:
+        REFUSAL_REPORT = None
+    accepted = [s.strip() for s in args.accept_growth.split(",") if s.strip()]
+    unnamed = [s for s in accepted if not re.fullmatch(r"[A-Za-z0-9_.-]+", s)]
+    if unnamed:
+        raise SystemExit("--accept-growth: not a source name: " + ", ".join(unnamed))
+    sources.ACCEPT_GROWTH = set(accepted)
     # One flag, two readers: the feed fetch below and `upstream_signature`,
     # which asks the same question about the same document. A second copy of
     # this decision is how the fingerprint and the feeds disagreed once before.
@@ -2987,4 +3067,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    finally:
+        # However the build ended - including a cold failure after a refusal.
+        report_refusals(sources.REFUSED, REFUSAL_REPORT)

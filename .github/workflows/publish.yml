@@ -100,6 +100,15 @@ on:
         description: "Rebuild every source from scratch, rather than only what moved"
         type: boolean
         default: true
+      # The way past a size refusal, for a source that genuinely grew more than
+      # five times at once (`tools/limits.py`). Names as the build logs them,
+      # e.g. `api_items`. It forces a full run, below, because only a full run
+      # saves the cache - so the accepted body becomes the next baseline instead
+      # of being refused again by the light run after.
+      accept_growth:
+        description: "Sources to let past the size ceiling this run (comma-separated, e.g. api_items) - only after reading why they were refused"
+        type: string
+        default: ""
 
 # Which of the two a run is. A push and the daily cron rebuild from scratch; the
 # ten-minute cron takes the short path.
@@ -124,6 +133,7 @@ on:
 # stopped filling the cache. There is no way to reference the entry by name.
 env:
   FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full
+         || github.event_name == 'workflow_dispatch' && inputs.accept_growth != ''
          || github.event_name == 'schedule' && github.event.schedule == '5 18 * * *'
          || github.event_name == 'push' }}
 
@@ -168,6 +178,9 @@ jobs:
     runs-on: ubuntu-latest
     # Nothing beyond the workflow floor: this job reads the repo, fetches from
     # upstream and writes an artifact. It does not deploy.
+    # Which sources were refused for size, for `alarm` at the foot of the file.
+    outputs:
+      refused: ${{ steps.refused.outputs.sources }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -263,7 +276,9 @@ jobs:
 
       - name: Fetch data from Digital Extremes and build
         if: env.FULL == 'true'
-        run: python tools/build_data.py
+        env:
+          ACCEPT_GROWTH: ${{ inputs.accept_growth }}
+        run: python tools/build_data.py --accept-growth "$ACCEPT_GROWTH"
 
       # Which DE export the restored cache was built against, so the light build
       # below can be told apart from one that moved to a new export. See *Keep
@@ -334,6 +349,40 @@ jobs:
         with:
           path: .cache
           key: prime-sources-${{ github.run_id }}
+
+      # A download refused for its size, named on the run page and handed to
+      # `alarm`, which fails the run once the deploy has finished. Owner's
+      # decision, 2026-10-02: a body over five times the copy held is treated as
+      # a possible attack, and the site still publishes from the cached copy.
+      # The full record - URL, status, every header, the sizes, the first bytes
+      # - is printed at the end of the build step above and is what to read;
+      # this only names it. `always()` because a refusal can come before a
+      # failure that stops the build, and is worth knowing about either way.
+      - name: Name any refused download
+        id: refused
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          path = "data/refused.json"
+          rows = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else []
+          n = lambda v: f"{v:,}" if isinstance(v, int) else "?"
+          for r in rows:
+              held = (f"{r['ratio']}x the {n(r['held'])} bytes held" if r.get("held")
+                      else "nothing held to compare with")
+              print(f"::error title=Refused download::{r['source']} - caught at "
+                    f"{r['stage']}, {n(r['seen'])} bytes against a {n(r['limit'])} "
+                    f"limit ({held}). The full record is in the build step's log.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write("sources=" + ",".join(sorted({r["source"] for r in rows})) + "\n")
+          if rows:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+                  fh.write("## Refused for size\n\n| source | caught | bytes | limit | held |\n"
+                           "|---|---|---:|---:|---:|\n")
+                  for r in rows:
+                      fh.write(f"| {r['source']} | {r['stage']} | {n(r['seen'])} | "
+                               f"{n(r['limit'])} | {n(r.get('held'))} |\n")
+          PY
 
       - name: Sanity-check the result
         run: |
@@ -426,3 +475,23 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # Fails the run when a download was refused for its size, so GitHub emails the
+  # owner - and only after the deploy, so the site stays live on the cached copy
+  # meanwhile. Owner's decision, 2026-10-02. A job of its own because a failing
+  # step in `build` would stop the deploy, which buys nothing: the body was
+  # refused, so it reached nothing. `always()` so it runs whether the deploy
+  # ran, was skipped or failed. Every run fails until the source is understood:
+  # either it shrinks back, or a person who has read the record dispatches a run
+  # with `accept_growth`.
+  alarm:
+    needs: [build, deploy]
+    if: ${{ always() && needs.build.outputs.refused != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail the run on a download refused for size
+        env:
+          REFUSED: ${{ needs.build.outputs.refused }}
+        run: |
+          echo "::error title=Refused download::Refused for size: $REFUSED. The site published from the cached copy. Read the record at the end of the build step's log before accepting anything."
+          exit 1

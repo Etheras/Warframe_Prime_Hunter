@@ -39,11 +39,12 @@ it, checked as it expands.
 **Refusing is a failed fetch, not a crash.** `sources.fetch` already has a
 well-worn answer for one: try the next host, then fall back to the cached copy
 and record it in `meta.stale`. Oversize takes that path rather than inventing a
-new one, so a refusal costs a stale build and a loud log line instead of a
-broken build. The cost of the five-times rule is the mirror of that: a source
-that genuinely grows more than five times in one step is refused on every
-build, because a refused body never becomes the next baseline. `TODO.md` has
-how that would be noticed.
+new one, so the build carries on and the site publishes. **And then the run
+fails**, since 2026-10-02: a size refusal is treated as a possible attack,
+`sources.REFUSED` keeps everything known about the response, and the workflow's
+`alarm` job fails the run after the deploy so the owner is emailed. A source
+that genuinely grew more than five times in one step is let through, once, by
+`--accept-growth` - the accepted body is then the next baseline.
 """
 
 from __future__ import annotations
@@ -58,6 +59,10 @@ MB = 1024 * KB
 # enough that a bomb is caught having cost this much rather than all of it.
 CHUNK = 64 * KB
 
+# How much of a refused body is kept for the record of it: enough to tell an
+# error page from JSON from binary, and no more.
+SAMPLE = 256
+
 
 class Refused(Exception):
     """
@@ -71,7 +76,27 @@ class Refused(Exception):
 
 
 class TooLarge(Refused):
-    """A source sent, or expanded to, more than its ceiling allows."""
+    """
+    A source sent, or expanded to, more than its ceiling allows.
+
+    Carries what is known at the moment of refusal, because since 2026-10-02 a
+    size refusal is treated as a possible attack and fails the run, and the
+    record of it is the only evidence anyone will have: the body is never kept.
+
+      stage  where it was caught - "declared" (Content-Length, nothing read),
+             "transfer" (the bytes on the wire) or "expanded" (decompressing)
+      seen   the bytes counted when it stopped, or the size declared
+      limit  the ceiling it went over
+      head   the first `SAMPLE` bytes, when any were read - raw, untrusted,
+             and for a person to look at, never to parse
+    """
+
+    def __init__(self, message: str, *, stage: str | None = None,
+                 seen: int | None = None, limit: int | None = None,
+                 head: bytes = b""):
+        super().__init__(message)
+        self.stage, self.seen, self.limit = stage, seen, limit
+        self.head = bytes(head[:SAMPLE])
 
 
 class Malformed(Refused):
@@ -140,7 +165,8 @@ def read_capped(resp, limit: int, what: str) -> bytes:
         declared = headers.get("Content-Length")
     if declared and declared.strip().isdigit() and int(declared) > limit:
         raise TooLarge(
-            f"{what}: declares {int(declared):,} bytes, over its {limit:,} ceiling")
+            f"{what}: declares {int(declared):,} bytes, over its {limit:,} ceiling",
+            stage="declared", seen=int(declared), limit=limit)
 
     out = bytearray()
     while True:
@@ -150,7 +176,8 @@ def read_capped(resp, limit: int, what: str) -> bytes:
         out += piece
         if len(out) > limit:
             raise TooLarge(
-                f"{what}: response is over its {limit:,} byte ceiling")
+                f"{what}: response is over its {limit:,} byte ceiling",
+                stage="transfer", seen=len(out), limit=limit, head=out[:SAMPLE])
     return bytes(out)
 
 
@@ -193,7 +220,9 @@ def gunzip_capped(raw: bytes, limit: int, what: str) -> bytes:
             while pending:
                 out += dec.decompress(pending, CHUNK)
                 if len(out) > limit:
-                    raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
+                    raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling",
+                                   stage="expanded", seen=len(out), limit=limit,
+                                   head=out[:SAMPLE])
                 pending = dec.unconsumed_tail
             out += dec.flush()
         except zlib.error as exc:
@@ -201,7 +230,9 @@ def gunzip_capped(raw: bytes, limit: int, what: str) -> bytes:
             # onwards, since the first would have failed on the header.
             raise Malformed(f"{what}: not a gzip stream ({exc})") from exc
         if len(out) > limit:
-            raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
+            raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling",
+                           stage="expanded", seen=len(out), limit=limit,
+                           head=out[:SAMPLE])
         if not dec.eof:
             raise Malformed(
                 f"{what}: gzip stream ends part-way through a member, so the "
@@ -230,7 +261,9 @@ def unlzma_capped(blob: bytes, limit: int, what: str,
         data = b""
         out += piece
         if len(out) > limit:
-            raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling")
+            raise TooLarge(f"{what}: expands past its {limit:,} byte ceiling",
+                           stage="expanded", seen=len(out), limit=limit,
+                           head=out[:SAMPLE])
         if dec.eof or dec.needs_input or not piece:
             break
     return bytes(out)
